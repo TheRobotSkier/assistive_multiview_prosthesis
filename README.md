@@ -26,4 +26,32 @@ Perspectives for the students
 - Context-aware control using sensor fusion.
 - Operate a prosthesis with ROS support
 
-## Docker & Docker Compose Setup
+## Quick Start
+
+### Using the Makefile
+The Makefile provides convenient commands to manage the Docker environment. View all available commands:
+
+```bash
+make help
+```
+
+Common commands:
+- `make build` - Build the Docker image
+- `make up` - Start the container
+- `make down` - Stop the container
+- `make shell` - Open a bash shell in the container
+- `make ros-build` - Build the ROS workspace (colcon build)
+
+### Environment Configuration (.env)
+Create a `.env` file in the project root to configure Docker Compose behavior. Supported variables:
+
+- `LINUX=1` - Enable Linux-specific compose file overrides
+- `NVIDIA=1` - Enable NVIDIA GPU support
+
+Example `.env`:
+```
+LINUX=1
+NVIDIA=0
+```
+
+The Makefile automatically loads `.env` and adjusts the compose files accordingly.
