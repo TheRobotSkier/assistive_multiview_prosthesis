@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+
+<package format="3">
+  
+  <name>mia_hand_mujoco</name>
+
+  <version>1.0.0</version>
+
+  <description>
+    Package for simulating Mia Hand with MuJoCo simulator, and interfacing it to 
+    ROS2 Control.
+  </description>
+
+  <author email="andreabu@prensilia.com">Andrea Burani</author>
+
+  <maintainer email="andreabu@prensilia.com">Andrea Burani</maintainer>
+  <maintainer email="francescaci@prensilia.com">Francesca Cini</maintainer>
+  <maintainer email="stefanoan@prensilia.com">Stefano Angeli</maintainer>
+
+  <license>BSD-3-Clause</license>
+
+  <!-- <url type="website">https://wiki.ros.org/mia_hand_ros2_pkgs</url> -->
+  <url type="repository">https://bitbucket.org/prensiliasrl/mia_hand_ros2_pkgs.git</url>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>pluginlib</depend>
+  <depend>hardware_interface</depend>
+  <depend>libglfw3-dev</depend>
+
+  <exec_depend>ros2launch</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>mia_hand_description</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <doc_depend>doxygen</doc_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>
