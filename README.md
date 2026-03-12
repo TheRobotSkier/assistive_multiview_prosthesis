@@ -1,5 +1,5 @@
-# Semi-autonomous prosthesis control using multiview computer vision
-Semi-autonomous control for a dexterous hand prosthesis using computer vision (RGB/depth/point clouds) and sensor fusion to infer user intent, reduce cognitive burden, and assist with context-aware reaching/grasping—implemented and evaluated on functional tasks with ROS support.
+# Semi-autonomous Prosthesis Control using Multiview
+Semi-autonomous control for a dexterous hand prosthesis using multiview (RGB/depth/point clouds) and sensor fusion to infer user intent, reduce cognitive burden, and assist with context-aware reaching/grasping—implemented and evaluated on functional tasks with ROS support.
 
 ## Problem
 Due to the cognitive burden of controlling prostheses for amputees, the rejection rates of prostheses
@@ -25,3 +25,17 @@ Perspectives for the students
 - Control of robotic grasping and reaching using computer vision
 - Context-aware control using sensor fusion.
 - Operate a prosthesis with ROS support
+
+## Docker Setup
+
+To build the docker image, run the following command in the terminal:
+
+```bash
+docker build -t mv_prosthsis .
+```
+
+To run the docker container in interactive mode, use the following command:
+
+```bash
+docker run -it --rm --gpus all --net=host --ipc=host mv_prosthsis
+```
