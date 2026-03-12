@@ -26,16 +26,4 @@ Perspectives for the students
 - Context-aware control using sensor fusion.
 - Operate a prosthesis with ROS support
 
-## Docker Setup
-
-To build the docker image, run the following command in the terminal:
-
-```bash
-docker build -t mv_prosthsis .
-```
-
-To run the docker container in interactive mode, use the following command:
-
-```bash
-docker run -it --rm --gpus all --net=host --ipc=host mv_prosthsis
-```
+## Docker & Docker Compose Setup

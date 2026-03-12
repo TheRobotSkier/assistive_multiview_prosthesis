@@ -1,0 +1,18 @@
+# Docker Compose Linux optimization (host networking for better ROS2 performance)
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.linux.yml up
+# This is beneficial for ROS2 DDS communication on Linux
+
+services:
+  ros:
+    network_mode: host
+    ipc: host
+    pid: host
+    
+    # X11 forwarding for GUI apps (rviz, rqt, etc.)
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - $HOME/.Xauthority:/root/.Xauthority:rw
+
+    # Environment variables
+    environment:
+      - DISPLAY=:0
