@@ -28,6 +28,16 @@ Perspectives for the students
 
 ## Quick Start
 
+### MuJoCo in Docker
+The Docker image installs MuJoCo automatically during build. The default pinned
+asset is `mujoco-3.6.0-linux-x86_64.tar.gz`.
+
+You can override the MuJoCo version and platform at build time:
+
+```bash
+make build MUJOCO_VERSION=3.6.0 MUJOCO_PLATFORM=linux-x86_64
+```
+
 ### Using the Makefile
 The Makefile provides convenient commands to manage the Docker environment. View all available commands:
 

@@ -4,14 +4,26 @@ This package allows to simulate Mia Hand in [MuJoCo](https://mujoco.org/) and to
 control the simulated hand through the [ROS2 Control](https://control.ros.org/jazzy/index.html) 
 framework.
 
-## Prerequisites
+## Docker workflow
+
+When using the repository Docker image, MuJoCo is installed automatically during
+image build. The default pinned archive is `mujoco-3.6.0-linux-x86_64.tar.gz`.
+
+Inside the container:
+
+* `MUJOCO_DIR` is exported as `/opt/mujoco`.
+* `LD_LIBRARY_PATH` already includes `$MUJOCO_DIR/lib`.
+
+No manual MuJoCo installation is required for the Docker workflow.
+
+## Prerequisites (manual/non-Docker)
 
 This package requires MuJoCo system to be installed. A simple procedure to do that 
 is:
 
 * Navigate to the MuJoCo releases [page](https://github.com/google-deepmind/mujoco/releases).
-* Download the archive `mujoco-x.x.x-linux_x86_64.tar.gz`, where `x.x.x` denotes the target version.
-* Extract the files in the archive, through `tar -xf mujoco-x.x.x-linux_x86_64.tar.gz`.
+* Download the archive `mujoco-x.x.x-linux-x86_64.tar.gz`, where `x.x.x` denotes the target version.
+* Extract the files in the archive, through `tar -xf mujoco-x.x.x-linux-x86_64.tar.gz`.
 * Move the extracted `mujoco-x.x.x` folder to a preferred location. Two common 
   destinations are `/usr/local/` or `/opt/`.
 
@@ -22,7 +34,7 @@ After installing MuJoCo, MuJoCo `bin/` directory can be optionally added to `PAT
 by adding `export PATH="$PATH:/PATH_TO_MUJOCO_DIR/mujoco-x.x.x/bin"` to `.bashrc` 
 script.
 
-Before compiling the package, the MUJOCO_DIR variable need to be exported and the 
+Before compiling the package, the MUJOCO_DIR variable needs to be exported and the 
 `lib/` directory needs to be added to LD_LIBRARY_PATH:
 
 ```

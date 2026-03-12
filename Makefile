@@ -5,6 +5,9 @@
 export
 
 COMPOSE_FILES := -f docker-compose.yml
+MUJOCO_VERSION ?= 3.6.0
+MUJOCO_PLATFORM ?= linux-x86_64
+
 ifeq ($(LINUX),1)
   COMPOSE_FILES += -f docker-compose.linux.yml
 endif
@@ -15,6 +18,7 @@ endif
 help:
 	@echo "Available commands:"
 	@echo "  make build          - Build the Docker image"
+	@echo "    Optional: MUJOCO_VERSION=3.6.0 MUJOCO_PLATFORM=linux-x86_64"
 	@echo "  make up             - Start the container (reads LINUX/NVIDIA from .env)"
 	@echo "  make down           - Stop the container"
 	@echo "  make shell          - Open a shell in the running container"
@@ -25,7 +29,9 @@ help:
 	@echo "  make exec CMD=...   - Run commands in the container"
 
 build:
-	docker compose $(COMPOSE_FILES) build
+	docker compose $(COMPOSE_FILES) build \
+		--build-arg MUJOCO_VERSION=$(MUJOCO_VERSION) \
+		--build-arg MUJOCO_PLATFORM=$(MUJOCO_PLATFORM)
 
 up:
 	docker rm -f mv_prosthesis_dev 2>/dev/null || true
@@ -49,10 +55,10 @@ clean:
 	docker rmi mv_prosthesis:latest 2>/dev/null || true
 
 ros-build:
-	docker compose $(COMPOSE_FILES) exec ros bash -c "cd /ros_container && colcon build --symlink-install"
+	docker compose $(COMPOSE_FILES) exec ros bash -lc "source /opt/ros/kilted/setup.bash && cd /ros_container && colcon build --symlink-install"
 
 ros-test:
-	docker compose $(COMPOSE_FILES) exec ros bash -c "cd /ros_container && colcon test"
+	docker compose $(COMPOSE_FILES) exec ros bash -lc "source /opt/ros/kilted/setup.bash && cd /ros_container && colcon test"
 
 # Run arbitrary command in container
 exec:
