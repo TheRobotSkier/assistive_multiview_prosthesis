@@ -1,5 +1,5 @@
 ARG ROS_DISTRO=kilted
-FROM ros:${ROS_DISTRO}
+FROM osrf/ros:${ROS_DISTRO}-desktop
 
 ARG ROS_DISTRO
 ARG MUJOCO_VERSION=3.6.0
@@ -14,7 +14,13 @@ ENV PATH=${MUJOCO_DIR}/bin:${PATH}
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    libglfw3-dev \
     neofetch \
+    ros-${ROS_DISTRO}-controller-manager \
+    ros-${ROS_DISTRO}-hardware-interface \
+    ros-${ROS_DISTRO}-joint-state-publisher-gui \
+    ros-${ROS_DISTRO}-ros2-control \
+    ros-${ROS_DISTRO}-xacro \
     tar \
     && rm -rf /var/lib/apt/lists/*
 
@@ -34,6 +40,7 @@ WORKDIR /ros_container
 
 # Source ROS setup
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc \
+    && echo "if [ -f /ros_container/install/setup.bash ]; then source /ros_container/install/setup.bash; fi" >> /root/.bashrc \
     && echo "export MUJOCO_DIR=${MUJOCO_DIR}" >> /root/.bashrc
 
 # Default command

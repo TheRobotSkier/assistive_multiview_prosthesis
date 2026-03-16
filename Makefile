@@ -7,6 +7,7 @@ export
 COMPOSE_FILES := -f docker-compose.yml
 MUJOCO_VERSION ?= 3.6.0
 MUJOCO_PLATFORM ?= linux-x86_64
+ROS_ENV := source /opt/ros/$${ROS_DISTRO}/setup.bash && if [ -f /ros_container/install/setup.bash ]; then source /ros_container/install/setup.bash; fi
 
 ifeq ($(LINUX),1)
   COMPOSE_FILES += -f docker-compose.linux.yml
@@ -21,7 +22,7 @@ help:
 	@echo "    Optional: MUJOCO_VERSION=3.6.0 MUJOCO_PLATFORM=linux-x86_64"
 	@echo "  make up             - Start the container (reads LINUX/NVIDIA from .env)"
 	@echo "  make down           - Stop the container"
-	@echo "  make shell          - Open a shell in the running container"
+	@echo "  make shell          - Open a shell in the running container (with ROS env sourced)"
 	@echo "  make rebuild        - Rebuild the image and restart container"
 	@echo "  make clean          - Remove containers, images, and build artifacts"
 	@echo "  make ros-build      - Build ROS2 workspace (colcon build)"
@@ -42,7 +43,7 @@ down:
 	docker compose $(COMPOSE_FILES) down
 
 shell:
-	docker compose $(COMPOSE_FILES) exec ros bash
+	docker compose $(COMPOSE_FILES) exec ros bash -lc '$(ROS_ENV) && exec bash'
 
 logs:
 	docker compose $(COMPOSE_FILES) logs -f ros
@@ -55,10 +56,10 @@ clean:
 	docker rmi mv_prosthesis:latest 2>/dev/null || true
 
 ros-build:
-	docker compose $(COMPOSE_FILES) exec ros bash -lc "source /opt/ros/kilted/setup.bash && cd /ros_container && colcon build --symlink-install"
+	docker compose $(COMPOSE_FILES) exec ros bash -lc '$(ROS_ENV) && cd /ros_container && colcon build --symlink-install'
 
 ros-test:
-	docker compose $(COMPOSE_FILES) exec ros bash -lc "source /opt/ros/kilted/setup.bash && cd /ros_container && colcon test"
+	docker compose $(COMPOSE_FILES) exec ros bash -lc '$(ROS_ENV) && cd /ros_container && colcon test'
 
 # Run arbitrary command in container
 exec:

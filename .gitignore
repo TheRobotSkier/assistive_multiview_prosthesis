@@ -54,6 +54,9 @@ CATKIN_IGNORE
 # Environment variables
 .env
 
+# Junk folder
+tmp/
+
 # ROS2 stuff
 build/
 install/
