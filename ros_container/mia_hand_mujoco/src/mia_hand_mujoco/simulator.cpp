@@ -1,5 +1,6 @@
 #include "mia_hand_mujoco/simulator.hpp"
 
+#include <cstdlib>
 #include <string.h>
 
 #include "mia_hand_mujoco/plugin/index_thumb_actuator.h"
@@ -279,6 +280,23 @@ bool Simulator::simulate_impl(
   const char* model, std::promise<bool>&& sim_start_ok)
 {
   bool success = true;
+
+  /* Load MuJoCo dynamic plugins once so mesh decoders (OBJ/STL) are available.
+   */
+  static bool plugins_loaded = false;
+  if (!plugins_loaded)
+  {
+    const char* mujoco_dir = std::getenv("MUJOCO_DIR");
+    std::string plugin_dir = "/opt/mujoco/bin/mujoco_plugin";
+
+    if (nullptr != mujoco_dir)
+    {
+      plugin_dir = std::string(mujoco_dir) + "/bin/mujoco_plugin";
+    }
+
+    mj_loadAllPluginLibraries(plugin_dir.c_str(), nullptr);
+    plugins_loaded = true;
+  }
 
   /* Loading XML model and preparing simulation data.
    */

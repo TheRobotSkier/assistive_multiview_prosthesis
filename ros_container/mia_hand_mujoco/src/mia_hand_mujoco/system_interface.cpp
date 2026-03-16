@@ -11,6 +11,22 @@ namespace mia_hand_mujoco
 {
 SystemInterface::SystemInterface()
 {
+  for (std::size_t data_it = 0; data_it < 3; ++data_it)
+  {
+    b_jnt_pos_cmd_defined_[data_it] = false;
+    b_jnt_pos_state_defined_[data_it] = false;
+    b_jnt_vel_cmd_defined_[data_it] = false;
+    b_jnt_vel_state_defined_[data_it] = false;
+
+    jnt_pos_cmd_[data_it] = 0.0;
+    jnt_pos_state_[data_it] = 0.0;
+    jnt_vel_cmd_[data_it] = 0.0;
+    jnt_vel_state_[data_it] = 0.0;
+
+    rviz2_joints_[data_it].name = "";
+    rviz2_joints_[data_it].pos = 0.0;
+    rviz2_joints_[data_it].vel = 0.0;
+  }
 }
 
 hardware_interface::CallbackReturn SystemInterface::on_init(
@@ -375,6 +391,14 @@ bool SystemInterface::read_joints_info(
 
         if (has_state_interface(*role_match_it, hardware_interface::HW_IF_VELOCITY))
         {
+          b_jnt_vel_state_defined_[jnt_roles_it] = true;
+        }
+        else
+        {
+          RCLCPP_WARN(*logger_,
+            "Joint '%s' does not report a velocity state interface in hardware info. "
+            "Exporting it anyway for ros2_control compatibility.",
+            (*role_match_it).name.c_str());
           b_jnt_vel_state_defined_[jnt_roles_it] = true;
         }
       }

@@ -88,8 +88,7 @@ def launch_fun(context, *args, **kwargs):
         name = 'joint_state_broadcaster_spawner',
         package = 'controller_manager',
         executable = 'spawner',
-        arguments = ['joint_state_broadcaster', '-c', '/controller_manager',
-                      '-n', TextSubstitution(text = robot_ns)]
+        arguments = ['joint_state_broadcaster', '-c', '/controller_manager']
     )
 
     position_controllers_spawner = Node(
