@@ -1,0 +1,162 @@
+# ------------------------------------- #
+# --- Controller manager parameters --- #
+# ------------------------------------- #
+
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Hz
+
+    #
+    # Joint state broadcaster
+    #
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    #
+    # Position feedforward controllers
+    #
+    thumb_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    index_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    mrl_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    group_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    #
+    # Trajectory controllers
+    #
+    thumb_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    index_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    mrl_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    group_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# ------------------------------------- #
+# --- Single controllers parameters --- #
+# ------------------------------------- #
+
+#
+# Joint state broadcaster
+#
+joint_state_broadcaster:
+  ros__parameters:
+    joints:
+      - $(var prefix)j_thumb_fle
+      - $(var prefix)j_index_fle
+      - $(var prefix)j_mrl_fle
+      - $(var prefix)j_thumb_opp
+    interfaces:
+      - position
+      - velocity
+
+#
+# Position controllers
+#
+thumb_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - $(var prefix)j_thumb_fle
+
+index_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - $(var prefix)j_index_fle
+
+mrl_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - $(var prefix)j_mrl_fle
+
+group_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - $(var prefix)j_thumb_fle
+      - $(var prefix)j_index_fle
+      - $(var prefix)j_mrl_fle
+
+#
+# Trajectory controllers
+#
+thumb_trajectory_controller:
+  ros__parameters:
+    joints:
+      - $(var prefix)j_thumb_fle
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      stopped_velocity_tolerance: 0.0
+      goal_time: 4.0
+      $(var prefix)j_thumb_fle:
+        trajectory: 1.0
+        goal: 0.5
+
+index_trajectory_controller:
+  ros__parameters:
+    joints:
+      - $(var prefix)j_index_fle
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      stopped_velocity_tolerance: 0.0
+      goal_time: 4.0
+      $(var prefix)j_index_fle:
+        trajectory: 1.0
+        goal: 0.5
+
+mrl_trajectory_controller:
+  ros__parameters:
+    joints:
+      - $(var prefix)j_mrl_fle
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      stopped_velocity_tolerance: 0.0
+      goal_time: 4.0
+      $(var prefix)j_mrl_fle:
+        trajectory: 1.0
+        goal: 0.5
+
+group_trajectory_controller:
+  ros__parameters:
+    action_monitor_rate: 50.0  # Hz
+    joints:
+      - $(var prefix)j_thumb_fle
+      - $(var prefix)j_index_fle
+      - $(var prefix)j_mrl_fle
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      goal_time: 4.0
+      stopped_velocity_tolerance: 0.0
+      $(var prefix)j_thumb_fle:
+        trajectory: 1.0
+        goal: 0.5
+      $(var prefix)j_index_fle:
+        trajectory: 1.0
+        goal: 0.5
+      $(var prefix)j_mrl_fle:
+        trajectory: 1.0
+        goal: 0.5

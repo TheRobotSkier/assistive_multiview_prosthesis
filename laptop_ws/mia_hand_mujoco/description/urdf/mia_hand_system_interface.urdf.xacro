@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mia_hand_robot">
+
+  <xacro:arg name="xml_model_path" default="$(find mia_hand_mujoco)/mia_hand/scene_right.xml"/>
+  <xacro:arg name="laterality" default="right"/>
+  <xacro:arg name="joint_limits_config_file" default="joint_limits_config_default.yaml"/>
+  <xacro:arg name="prefix" default=""/>
+
+  <!-- Importing Mia Hand macro -->
+  <xacro:include filename="$(find mia_hand_description)/urdf/mia_hand.urdf.xacro"/>
+
+  <!-- Importing Rviz colours -->
+  <xacro:include filename="$(find mia_hand_description)/materials/materials.xacro"/>
+
+  <!-- Importing Mia Hand ROS2 control macro -->
+  <xacro:include filename="$(find mia_hand_mujoco)/description/ros2_control/mia_hand_mujoco.ros2_control.xacro"/>
+
+  <link name="world"/>
+
+  <xacro:mia_hand
+    laterality="$(arg laterality)"
+    joint_limits_config_file="$(arg joint_limits_config_file)"
+    parent="world"
+    prefix="$(arg prefix)">
+    <xacro:if value="${'right' == '$(arg laterality)'}">
+      <origin xyz="0 0 0.2" rpy="1.57 0 0"/>
+    </xacro:if>
+    <xacro:if value="${'left' == '$(arg laterality)'}">
+      <origin xyz="0 0 0.2" rpy="1.57 3.14 0"/>
+    </xacro:if>
+  </xacro:mia_hand>
+
+  <xacro:mia_hand_mujoco_ros2_control 
+    name="MiaHandSim" 
+    prefix="$(arg prefix)"
+    xml_model_path="$(arg xml_model_path)"/>
+
+</robot>

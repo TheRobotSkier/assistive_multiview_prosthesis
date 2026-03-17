@@ -1,0 +1,11 @@
+<library path="mia_hand_mujoco">
+  <class 
+    name="mia_hand_mujoco/SystemInterface"
+    type="mia_hand_mujoco::SystemInterface"
+    base_class_type="hardware_interface::SystemInterface">
+
+    <description>
+      Mia Hand MuJoCo system interface.
+    </description>
+  </class>
+</library>

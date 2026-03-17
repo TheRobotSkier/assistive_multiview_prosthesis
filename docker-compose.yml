@@ -17,7 +17,7 @@ services:
     # Volumes for development
     volumes:
       # Mount the container folder
-      - ./ros_container:/ros_container
+      - ./laptop_ws:/laptop_ws
     
     # Environment variables
     environment:

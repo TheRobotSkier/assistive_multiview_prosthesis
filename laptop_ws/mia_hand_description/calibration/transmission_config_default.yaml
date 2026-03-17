@@ -1,0 +1,6 @@
+/**:
+  ros__parameters:
+    transmissions:
+      j_thumb_opp:
+        th_opp_start_close_index_angle: -0.6536
+        th_opp_stop_close_index_angle: 0.0731

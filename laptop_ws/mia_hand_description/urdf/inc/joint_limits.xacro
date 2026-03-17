@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <xacro:macro name="joint_limits" params="joint_limits_config_file">
+
+    <!-- Reading joint limits YAML file -->
+    <xacro:property name="yaml_file" value="${xacro.load_yaml(joint_limits_config_file)}"/>
+
+    <!-- Extracting joint limits subsection -->
+    <xacro:property name="limits" value="${yaml_file['joint_limits']}"/>
+
+    <!-- Extracting joint limits -->
+    <xacro:property name="j_index_fle_lower_limit" value="${limits['j_index_fle']['min_position']}" scope="parent"/>
+    <xacro:property name="j_index_fle_upper_limit" value="${limits['j_index_fle']['max_position']}" scope="parent"/>
+    <xacro:property name="j_mrl_fle_lower_limit" value="${limits['j_mrl_fle']['min_position']}" scope="parent"/>
+    <xacro:property name="j_mrl_fle_upper_limit" value="${limits['j_mrl_fle']['max_position']}" scope="parent"/>
+    <xacro:property name="j_thumb_fle_lower_limit" value="${limits['j_thumb_fle']['min_position']}" scope="parent"/>
+    <xacro:property name="j_thumb_fle_upper_limit" value="${limits['j_thumb_fle']['max_position']}" scope="parent"/>
+    <xacro:property name="j_thumb_opp_lower_limit" value="${limits['j_thumb_opp']['min_position']}" scope="parent"/>
+    <xacro:property name="j_thumb_opp_upper_limit" value="${limits['j_thumb_opp']['max_position']}" scope="parent"/>
+
+  </xacro:macro>
+
+</robot>
