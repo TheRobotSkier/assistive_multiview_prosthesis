@@ -1,4 +1,4 @@
-ARG ROS_DISTRO=kilted
+ARG ROS_DISTRO=humble
 FROM osrf/ros:${ROS_DISTRO}-desktop
 
 ARG MUJOCO_VERSION=3.6.0
@@ -14,31 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libglfw3-dev \
     neofetch \
-    python3-colcon-common-extensions \
-    ros-${ROS_DISTRO}-controller-manager \
-    ros-${ROS_DISTRO}-hardware-interface \
-    ros-${ROS_DISTRO}-joint-state-publisher-gui \
-    ros-${ROS_DISTRO}-ros2-control \
-    ros-${ROS_DISTRO}-ros2-controllers \
-    ros-${ROS_DISTRO}-xacro \
-    tar \
-    && rm -rf /var/lib/apt/lists/*
-
-# Rust Configuration
-ENV RUSTUP_HOME=/usr/local/rustup \
-    CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
     libclang-dev \
     python3-pip \
-    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path \
-    && chmod -R a+w $RUSTUP_HOME $CARGO_HOME \
+    python3-colcon-common-extensions \
+    tar \
     && rm -rf /var/lib/apt/lists/*
-
-RUN pip3 install --break-system-packages colcon-cargo colcon-ros-bundle
 
 # MuJoCo Installation
 RUN set -eux; \
@@ -53,10 +35,36 @@ RUN set -eux; \
     ln -sfn "/opt/mujoco-${MUJOCO_VERSION}" "${MUJOCO_DIR}"; \
     rm -f "/tmp/${archive}" "/tmp/${archive}.sha256"
 
-WORKDIR /ros_container
+# Rust Installation
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path \
+    && chmod -R a+w $RUSTUP_HOME $CARGO_HOME
+
+# Python packages
+RUN if pip3 install --help | grep -q -- '--break-system-packages'; then \
+      pip3 install --break-system-packages colcon-cargo colcon-ros-bundle; \
+    else \
+      pip3 install colcon-cargo colcon-ros-bundle; \
+    fi
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-${ROS_DISTRO}-controller-manager \
+    ros-${ROS_DISTRO}-hardware-interface \
+    ros-${ROS_DISTRO}-joint-state-publisher-gui \
+    ros-${ROS_DISTRO}-joint-limits \
+    ros-${ROS_DISTRO}-ros2-control \
+    ros-${ROS_DISTRO}-ros2-controllers \
+    ros-${ROS_DISTRO}-xacro \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /laptop_ws
 
 # Shell setup
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc \
-    && echo "if [ -f /ros_container/install/setup.bash ]; then source /ros_container/install/setup.bash; fi" >> /root/.bashrc
+    && echo "if [ -f /laptop_ws/install/setup.bash ]; then source /laptop_ws/install/setup.bash; fi" >> /root/.bashrc
 
 CMD ["/bin/bash"]

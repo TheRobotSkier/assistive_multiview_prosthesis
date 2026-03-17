@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="mia_hand">
+
+  <xacro:arg name="joint_limits_config_file" default="joint_limits_default.yaml"/>
+  <xacro:arg name="prefix" default=""/>
+
+  <!-- Importing Rviz colours -->
+  <xacro:include filename="$(find mia_hand_description)/materials/materials.xacro"/>
+
+   <!-- Importing Mia Hand macro -->
+  <xacro:include filename="$(find mia_hand_description)/urdf/mia_hand.urdf.xacro"/>
+
+  <link name="$(arg prefix)ur_flange">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.001"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="-0.023781363 -0.039999999 0.03784062" rpy="2.879793167 -1.3e-08 1.570796371"/>
+      <geometry>
+        <mesh filename="package://mia_hand_description/meshes/stl/1.001.stl" scale="0.000999987 0.000999987 0.000999987"/>
+      </geometry>
+      <material name="DEFAULT_MTL.001"/>
+    </visual>
+  </link>
+
+  <joint name="$(arg prefix)j_ur_flange" type="fixed">
+    <origin xyz="0 -0.022566028 -0.000111314" rpy="-1.570796251 -1.570796251 0"/>
+    <parent link="$(arg prefix)palm"/>
+    <child link="$(arg prefix)ur_flange"/>
+  </joint>
+
+  <material name="DEFAULT_MTL.001">
+    <color rgba="0.640000019 0.640000019 0.640000019 1.0"/>
+  </material>
+
+  <!-- World link is directly connected to the palm, and not the flange, to 
+       reduce the length of the tf chain matrices-->
+
+  <link name="world"/>
+
+  <xacro:mia_hand 
+    laterality="right"
+    joint_limits_config_file="$(arg joint_limits_config_file)"
+    parent="world"
+    prefix="$(arg prefix)"/>
+
+</robot>
