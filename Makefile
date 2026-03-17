@@ -7,7 +7,7 @@ export
 COMPOSE_FILES := -f docker-compose.yml
 MUJOCO_VERSION ?= 3.6.0
 MUJOCO_PLATFORM ?= linux-x86_64
-ROS_ENV := source /opt/ros/$${ROS_DISTRO}/setup.bash && if [ -f /laptop_ws/install/setup.bash ]; then source /laptop_ws/install/setup.bash; fi
+ROS_ENV := source /opt/ros/$${ROS_DISTRO}/setup.bash && if [ -f /ros_container/install/setup.bash ]; then source /ros_container/install/setup.bash; fi
 
 ifeq ($(LINUX),1)
   COMPOSE_FILES += -f docker-compose.linux.yml
@@ -27,7 +27,6 @@ help:
 	@echo "  make clean          - Remove containers, images, and build artifacts"
 	@echo "  make ros-build      - Build ROS2 workspace (colcon build)"
 	@echo "  make ros-test       - Run ROS2 tests (colcon test)"
-	@echo "  make ros-clean	     - Clean ROS2 build artifacts"
 	@echo "  make exec CMD=...   - Run commands in the container"
 
 build:
@@ -57,13 +56,10 @@ clean:
 	docker rmi mv_prosthesis:latest 2>/dev/null || true
 
 ros-build:
-	docker compose $(COMPOSE_FILES) exec ros bash -lc '$(ROS_ENV) && cd /laptop_ws && colcon build --symlink-install'
+	docker compose $(COMPOSE_FILES) exec ros bash -lc '$(ROS_ENV) && cd /ros_container && colcon build --symlink-install'
 
 ros-test:
-	docker compose $(COMPOSE_FILES) exec ros bash -lc '$(ROS_ENV) && cd /laptop_ws && colcon test'
-
-ros-clean:
-	docker compose $(COMPOSE_FILES) exec ros bash -lc '$(ROS_ENV) && cd /laptop_ws && rm -rf build install log'
+	docker compose $(COMPOSE_FILES) exec ros bash -lc '$(ROS_ENV) && cd /ros_container && colcon test'
 
 # Run arbitrary command in container
 exec:
