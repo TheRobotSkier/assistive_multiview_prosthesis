@@ -29,7 +29,7 @@ public:
    * \brief Function for initializing Mia Hand system interface.
    */
   hardware_interface::CallbackReturn on_init(
-    const hardware_interface::HardwareComponentInterfaceParams& params) override;
+    const hardware_interface::HardwareInfo& info) override;
 
   /**
    * \brief Function for configuring Mia hand system interface.

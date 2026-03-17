@@ -30,23 +30,23 @@ SystemInterface::SystemInterface()
 }
 
 hardware_interface::CallbackReturn SystemInterface::on_init(
-  const hardware_interface::HardwareComponentInterfaceParams& params)
+  const hardware_interface::HardwareInfo& info)
 {
   hardware_interface::CallbackReturn result =
     hardware_interface::CallbackReturn::SUCCESS;
 
   if (hardware_interface::CallbackReturn::SUCCESS ==
-      hardware_interface::SystemInterface::on_init(params))
+      hardware_interface::SystemInterface::on_init(info))
   {
     logger_ = std::make_unique<rclcpp::Logger>(
       rclcpp::get_logger("mia_hand_system_interface_sim"));
 
     RCLCPP_INFO(*logger_, "Initializing...");
 
-    if (params.hardware_info.hardware_parameters.find("xml_model_path") !=
-        params.hardware_info.hardware_parameters.end())
+    if (info.hardware_parameters.find("xml_model_path") !=
+        info.hardware_parameters.end())
     {
-      xml_model_path_ = params.hardware_info.hardware_parameters.at("xml_model_path");
+      xml_model_path_ = info.hardware_parameters.at("xml_model_path");
     }
     else
     {
@@ -61,7 +61,7 @@ hardware_interface::CallbackReturn SystemInterface::on_init(
 
   if (hardware_interface::CallbackReturn::ERROR != result)
   {
-    if (!read_joints_info(params.hardware_info.joints))
+    if (!read_joints_info(info.joints))
     {
       result = hardware_interface::CallbackReturn::ERROR;
     }
@@ -69,7 +69,7 @@ hardware_interface::CallbackReturn SystemInterface::on_init(
 
   if (hardware_interface::CallbackReturn::ERROR != result)
   {
-    read_rviz2_joints_info(params.hardware_info.joints);
+    read_rviz2_joints_info(info.joints);
   }
 
   return result;
