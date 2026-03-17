@@ -1,7 +1,6 @@
 ARG ROS_DISTRO=kilted
 FROM osrf/ros:${ROS_DISTRO}-desktop
 
-ARG ROS_DISTRO
 ARG MUJOCO_VERSION=3.6.0
 ARG MUJOCO_PLATFORM=linux-x86_64
 
@@ -13,9 +12,9 @@ ENV PATH=${MUJOCO_DIR}/bin:${PATH}
 # Install basic tools and ROS2 build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    curl \
     libglfw3-dev \
     neofetch \
+    python3-colcon-common-extensions \
     ros-${ROS_DISTRO}-controller-manager \
     ros-${ROS_DISTRO}-hardware-interface \
     ros-${ROS_DISTRO}-joint-state-publisher-gui \
@@ -25,24 +24,39 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tar \
     && rm -rf /var/lib/apt/lists/*
 
+# Rust Configuration
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    libclang-dev \
+    python3-pip \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path \
+    && chmod -R a+w $RUSTUP_HOME $CARGO_HOME \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --break-system-packages colcon-cargo colcon-ros-bundle
+
+# MuJoCo Installation
 RUN set -eux; \
     archive="mujoco-${MUJOCO_VERSION}-${MUJOCO_PLATFORM}.tar.gz"; \
     base_url="https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VERSION}"; \
     curl -fL "${base_url}/${archive}" -o "/tmp/${archive}"; \
     curl -fL "${base_url}/${archive}.sha256" -o "/tmp/${archive}.sha256"; \
     cd /tmp; \
+    echo "$(cat ${archive}.sha256 | cut -d' ' -f1) ${archive}" > ${archive}.sha256; \
     sha256sum -c "${archive}.sha256"; \
     tar -xf "${archive}" -C /opt; \
     ln -sfn "/opt/mujoco-${MUJOCO_VERSION}" "${MUJOCO_DIR}"; \
     rm -f "/tmp/${archive}" "/tmp/${archive}.sha256"
 
-# Set working directory
 WORKDIR /ros_container
 
-# Source ROS setup
+# Shell setup
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /root/.bashrc \
-    && echo "if [ -f /ros_container/install/setup.bash ]; then source /ros_container/install/setup.bash; fi" >> /root/.bashrc \
-    && echo "export MUJOCO_DIR=${MUJOCO_DIR}" >> /root/.bashrc
+    && echo "if [ -f /ros_container/install/setup.bash ]; then source /ros_container/install/setup.bash; fi" >> /root/.bashrc
 
-# Default command
 CMD ["/bin/bash"]
