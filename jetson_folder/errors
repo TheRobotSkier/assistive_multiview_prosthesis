@@ -1,148 +1,20 @@
-dpkg -l | egrep 'apparmor|libapparmor'
-ii  apparmor                                          3.0.4-2ubuntu2.5                            arm64        user-space parser utility for AppArmor
-ii  libapparmor1:arm64                                3.0.4-2ubuntu2.5                            arm64        changehat AppArmor library
-robotlab@ubuntu:~$ systemctl status apparmor
-○ apparmor.service - Load AppArmor profiles
-     Loaded: loaded (/lib/systemd/system/apparmor.service; enabled; vendor pres>
-     Active: inactive (dead)
-  Condition: start condition failed at Wed 2026-03-18 14:39:58 CET; 59min ago
-       Docs: man:apparmor(7)
-             https://gitlab.com/apparmor/apparmor/wikis/home/
-
-Aug 26 17:23:08 ubuntu systemd[1]: Condition check resulted in Load AppArmor pr>
-Mar 18 14:39:57 ubuntu systemd[1]: Condition check resulted in Load AppArmor pr>
-Mar 18 14:39:58 ubuntu systemd[1]: Condition check resulted in Load AppArmor pr>
- ESCOC
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-les
-/apparmor.service; enabled; vendor preset: enabled)
-
-ed 2026-03-18 14:39:58 CET; 59min ago
-
-/apparmor/wikis/home/
-
-tion check resulted in Load AppArmor profiles being skipped.
-tion check resulted in Load AppArmor profiles being skipped.
-tion check resulted in Load AppArmor profiles being skipped.
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
- ESCOD
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-○ apparmor.service - Load AppArmor profiles
-     Loaded: loaded (/lib/systemd/system/apparmor.service; enabled; vendor pres>
-     Active: inactive (dead)
-  Condition: start condition failed at Wed 2026-03-18 14:39:58 CET; 59min ago
-       Docs: man:apparmor(7)
-             https://gitlab.com/apparmor/apparmor/wikis/home/
-
-Aug 26 17:23:08 ubuntu systemd[1]: Condition check resulted in Load AppArmor pr>
-Mar 18 14:39:57 ubuntu systemd[1]: Condition check resulted in Load AppArmor pr>
-Mar 18 14:39:58 ubuntu systemd[1]: Condition check resulted in Load AppArmor pr>
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-~
-
+uname -a
+Linux ubuntu 5.15.148-tegra #1 SMP PREEMPT Thu Sep 18 15:08:33 PDT 2025 aarch64 aarch64 aarch64 GNU/Linux
+robotlab@ubuntu:~$ cat /sys/kernel/security/lsm
+capability,yama,selinuxrobotlab@ubuntu:~$ modprobe apparmor
+modprobe: FATAL: Module apparmor not found in directory /lib/modules/5.15.148-tegra
+robotlab@ubuntu:~$ echo $?
+1
+robotlab@ubuntu:~$ find /lib/modules/$(uname -r) -iname '*apparmor*'
+robotlab@ubuntu:~$ grep -E 'CONFIG_SECURITY_APPARMOR|CONFIG_DEFAULT_SECURITY|CONFIG_LSM' /boot/config-$(uname -r)
+grep: /boot/config-5.15.148-tegra: No such file or directory
+robotlab@ubuntu:~$ sudo modprobe apparmor
+[sudo] password for robotlab: 
+modprobe: FATAL: Module apparmor not found in directory /lib/modules/5.15.148-tegra
+robotlab@ubuntu:~$ dmesg | tail -50 
+dmesg: read kernel buffer failed: Operation not permitted
 robotlab@ubuntu:~$ cat /sys/module/apparmor/parameters/enabled
 cat: /sys/module/apparmor/parameters/enabled: No such file or directory
-robotlab@ubuntu:~$ cat /proc/cmdline
-root=PARTUUID=df10e0be-889a-4d2f-8137-98ec4222fd51 rw rootwait rootfstype=ext4 mminit_loglevel=4 console=ttyTCU0,115200 firmware_class.path=/etc/firmware fbcon=map:0 nospectre_bhb video=efifb:off console=tty0 nv-auto-config bl_prof_dataptr=2031616@0x271E10000 bl_prof_ro_ptr=65536@0x271E00000 
-robotlab@ubuntu:~$ lsmod | grep apparmor
+robotlab@ubuntu:~$ sudo systemctl start apparmor
+robotlab@ubuntu:~$ sudo aa-status
+apparmor not present.
