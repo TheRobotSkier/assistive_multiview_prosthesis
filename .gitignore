@@ -61,3 +61,7 @@ tmp/
 build/
 install/
 log/
+
+
+# Folders
+ros_bag_recordings/
