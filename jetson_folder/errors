@@ -1,45 +1,11 @@
-sudo snap remove firefox
-firefox removed (snap data snapshot saved)
-robotlab@ubuntu:~$ cd /tmp
-wget "https://download.mozilla.org/?product=firefox-latest&os=linux64-aarch64&lang=en-US" -O firefox.tar.bz2
-tar -xjf firefox.tar.bz2
+cd /tmp
+rm -f firefox.tar.bz2
+wget "https://download.mozilla.org/?product=firefox-latest&os=linux64-aarch64&lang=en-US" -O firefox.tar.xz
+tar -xJf firefox.tar.xz
 sudo rm -rf /opt/firefox
 sudo mv firefox /opt/firefox
 sudo ln -sf /opt/firefox/firefox /usr/local/bin/firefox
 /usr/local/bin/firefox
---2026-03-18 16:44:05--  https://download.mozilla.org/?product=firefox-latest&os=linux64-aarch64&lang=en-US
-Resolving download.mozilla.org (download.mozilla.org)... 34.36.14.59
-Connecting to download.mozilla.org (download.mozilla.org)|34.36.14.59|:443... connected.
-HTTP request sent, awaiting response... 302 Found
-Location: https://download-installer.cdn.mozilla.net/pub/firefox/releases/148.0.2/linux-aarch64/en-US/firefox-148.0.2.tar.xz [following]
---2026-03-18 16:44:06--  https://download-installer.cdn.mozilla.net/pub/firefox/releases/148.0.2/linux-aarch64/en-US/firefox-148.0.2.tar.xz
-Resolving download-installer.cdn.mozilla.net (download-installer.cdn.mozilla.net)... 199.232.43.19, 2a04:4e42:47::787
-Connecting to download-installer.cdn.mozilla.net (download-installer.cdn.mozilla.net)|199.232.43.19|:443... connected.
-HTTP request sent, awaiting response... 200 OK
-Length: 70583064 (67M) [application/x-tar]
-Saving to: ‘firefox.tar.bz2’
 
-firefox.tar.bz2     100%[===================>]  67.31M  5.29MB/s    in 13s     
 
-2026-03-18 16:44:19 (5.12 MB/s) - ‘firefox.tar.bz2’ saved [70583064/70583064]
-
-bzip2: (stdin) is not a bzip2 file.
-tar: Child returned status 2
-tar: Error is not recoverable: exiting now
-mv: cannot stat 'firefox': No such file or directory
-bash: /usr/local/bin/firefox: No such file or directory
-robotlab@ubuntu:/tmp$ mkdir -p ~/.local/share/applications
-cat > ~/.local/share/applications/firefox.desktop <<'EOF'
-[Desktop Entry]
-Version=1.0
-Name=Firefox
-Comment=Web Browser
-Exec=/usr/local/bin/firefox %u
-Icon=/opt/firefox/browser/chrome/icons/default/default128.png
-Terminal=false
-Type=Application
-Categories=Network;WebBrowser;
-MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
-StartupNotify=true
-EOF
-robotlab@ubuntu:/tmp$ update-desktop-database ~/.local/share/applications 2>/dev/null || true
+sed -n '1,200p' ~/.local/share/applications/firefox.desktop
