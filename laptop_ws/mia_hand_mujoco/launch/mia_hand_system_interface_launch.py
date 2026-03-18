@@ -65,7 +65,10 @@ def launch_fun(context, *args, **kwargs):
     ros2_control_node = Node(
         package = 'controller_manager',
         executable = 'ros2_control_node',
-        parameters = [ParameterFile(robot_controllers, allow_substs=True)],
+        parameters = [
+            ParameterFile(robot_controllers, allow_substs=True),
+            {'robot_description': robot_description}
+        ],
         output = 'both',
         remappings = [(
             "robot_description", 
@@ -88,6 +91,7 @@ def launch_fun(context, *args, **kwargs):
         name = 'joint_state_broadcaster_spawner',
         package = 'controller_manager',
         executable = 'spawner',
+        namespace = TextSubstitution(text = robot_ns),
         arguments = ['joint_state_broadcaster', '-c', '/controller_manager']
     )
 
@@ -95,6 +99,7 @@ def launch_fun(context, *args, **kwargs):
         name = 'position_controllers_spawner',
         package = 'controller_manager',
         executable = 'spawner',
+        namespace = TextSubstitution(text = robot_ns),
         arguments = [
             'thumb_pos_ff_controller',
             'index_pos_ff_controller',
