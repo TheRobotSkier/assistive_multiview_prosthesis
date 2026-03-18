@@ -1,0 +1,215 @@
+snap debug sandbox-features
+configfiles:          mediated-configfiles
+confinement-options:  classic devmode
+dbus:                 mediated-bus-access
+kmod:                 mediated-modprobe
+ldconfig:             mediated-ldconfig
+mount:                layouts mount-namespace per-snap-persistency per-snap-profiles per-snap-updates per-snap-user-profiles stale-base-invalidation
+seccomp:              bpf-actlog bpf-argument-filtering kernel:allow kernel:errno kernel:kill_process kernel:kill_thread kernel:log kernel:trace kernel:trap kernel:user_notif
+symlinks:             mediated-symlinks
+udev:                 device-cgroup-v2 device-filtering tagging
+robotlab@ubuntu:~$ sudo aa-status
+apparmor not present.
+robotlab@ubuntu:~$ ls /sys/kernel/security
+integrity  lsm  tpm0
+robotlab@ubuntu:~$ mount | grep ' / '
+/dev/nvme0n1p1 on / type ext4 (rw,relatime)
+robotlab@ubuntu:~$ mount | grep ' /home '
+robotlab@ubuntu:~$ sudo dmesg | tail - 100
+==> standard input <==
+[  106.465366] ACK 04 d4
+[  106.468850] ACK 04 d4
+[  106.554243] IPv6: ADDRCONF(NETDEV_CHANGE): wlP1p1s0: link becomes ready
+[  107.822024] rfkill: input handler disabled
+[  994.649548] NVRM rpcRmApiControl_dce: NVRM_RPC_DCE: Failed RM ctrl call cmd:0x731341 result 0xffff:
+[ 1958.637946] loop12: detected capacity change from 0 to 8
+[ 2080.113807] loop12: detected capacity change from 0 to 8
+[ 2083.817483] loop12: detected capacity change from 0 to 8
+[ 2174.778439] loop12: detected capacity change from 0 to 8
+[ 2451.918767] NVRM rpcRmApiControl_dce: NVRM_RPC_DCE: Failed RM ctrl call cmd:0x731341 result 0xffff:
+tail: cannot open '100' for reading: No such file or directory
+robotlab@ubuntu:~$ sudo dmesg | tail -100
+[   12.781685] rtk_btusb: btusb_close
+[   12.792377] rtk_btcoex: Close BTCOEX
+[   12.792385] rtk_btcoex: -x
+[   13.395476] using random self ethernet address
+[   13.395485] using random host ethernet address
+[   13.441642] loop11: detected capacity change from 0 to 32768
+[   13.464323] Bluetooth: BNEP (Ethernet Emulation) ver 1.3
+[   13.464333] Bluetooth: BNEP filters: protocol multicast
+[   13.464345] Bluetooth: BNEP socket layer initialized
+[   13.473315] NET: Registered PF_ALG protocol family
+[   13.502434] rtk_btusb: btusb_open start
+[   13.502443] rtk_btusb: btusb_open hdev->promisc ==0
+[   13.502444] rtk_btusb: download_patch start
+[   13.502447] rtk_btusb: chip type value: 0x73
+[   13.503560] rtk_btusb: chip_type->status = 0x0, chip_type->chip = 0xbeef
+[   13.503566] rtk_btusb: HCI reset.
+[   13.514521] rtk_btusb: read_ver_rsp->lmp_subver = 0xcbc9
+[   13.514529] rtk_btusb: read_ver_rsp->hci_rev = 0x9a8
+[   13.514531] rtk_btusb: patch_entry->lmp_sub = 0x8822
+[   13.514532] rtk_btusb: Firmware already exists
+[   13.514535] rtk_btusb: Rtk patch end 1
+[   13.514537] rtk_btusb: btusb_open set HCI UP RUNNING
+[   13.514607] rtk_btcoex: Open BTCOEX
+[   13.514636] rtk_btcoex: rtk_vendor_cmd_to_fw: opcode 0xfc1b
+[   13.514645] rtk_btusb: btusb_open end
+[   13.515541] rtk_btcoex: unknown hci command
+[   13.517536] rtk_btcoex: BTCOEX hci_rev 0x09a8
+[   13.517540] rtk_btcoex: BTCOEX lmp_subver 0xcbc9
+[   13.521283] nv_nvsciipc_init.sh[875]: found /dev/nvsciipc
+[   13.565610] nvsciipc: set_db start
+[   13.565645] nvsciipc: set_db done
+[   13.648809] enP8p1s0: 0xffff800009a51000, 48:b0:2d:f7:5c:b8, IRQ 277
+[   13.695394] Mass Storage Function, version: 2009/09/11
+[   13.695402] LUN: removable file: (no medium)
+[   13.707719] using random self ethernet address
+[   13.707727] using random host ethernet address
+[   13.852234] pstore: Using crash dump compression: deflate
+[   13.852324] printk: console [ramoops-1]: printing thread started
+[   13.852345] printk: console [ramoops-1] enabled
+[   13.852347] pstore: Registered ramoops as persistent store backend
+[   13.852349] ramoops: using 0x200000@0x2725f0000, ecc: 0
+[   14.059916] nvgpu: 17000000.gpu                  gk20a_scale_init:541  [INFO]  enabled scaling for GPU
+
+[   14.091265] bridge: filtering via arp/ip/ip6tables is no longer available by default. Update your scripts to load br_netfilter if you need this.
+[   14.111332] usb0: HOST MAC aa:ca:85:bc:b5:b0
+[   14.111341] usb0: MAC aa:ca:85:bc:b5:b1
+[   14.136268] usb1: HOST MAC aa:ca:85:bc:b5:b2
+[   14.136278] usb1: MAC aa:ca:85:bc:b5:b3
+[   14.138470] tegra-xudc 3550000.usb: EP 0 (type: ctrl, dir: out) enabled
+[   14.154383] l4tbr0: port 1(usb0) entered blocking state
+[   14.154407] l4tbr0: port 1(usb0) entered disabled state
+[   14.154846] device usb0 entered promiscuous mode
+[   14.183296] zram: Added device: zram0
+[   14.184012] zram: Added device: zram1
+[   14.184538] zram: Added device: zram2
+[   14.188068] zram: Added device: zram3
+[   14.188842] zram: Added device: zram4
+[   14.191072] l4tbr0: port 2(usb1) entered blocking state
+[   14.191099] l4tbr0: port 2(usb1) entered disabled state
+[   14.193686] zram: Added device: zram5
+[   14.200315] device usb1 entered promiscuous mode
+[   14.223773] loop11: detected capacity change from 0 to 32768
+[   14.235336] zram0: detected capacity change from 0 to 1300456
+[   14.258488] Adding 650224k swap on /dev/zram0.  Priority:5 extents:1 across:650224k SS
+[   14.262699] zram1: detected capacity change from 0 to 1300456
+[   14.287952] Adding 650224k swap on /dev/zram1.  Priority:5 extents:1 across:650224k SS
+[   14.289698] zram2: detected capacity change from 0 to 1300456
+[   14.305137] Adding 650224k swap on /dev/zram2.  Priority:5 extents:1 across:650224k SS
+[   14.313078] zram3: detected capacity change from 0 to 1300456
+[   14.321103] Adding 650224k swap on /dev/zram3.  Priority:5 extents:1 across:650224k SS
+[   14.334936] zram4: detected capacity change from 0 to 1300456
+[   14.350446] Adding 650224k swap on /dev/zram4.  Priority:5 extents:1 across:650224k SS
+[   14.354501] zram5: detected capacity change from 0 to 1300456
+[   14.362165] Adding 650224k swap on /dev/zram5.  Priority:5 extents:1 across:650224k SS
+[   14.454331] overlayfs: idmapped layers are currently not supported
+[   16.749142] nvidia-modeset: Loading NVIDIA UNIX Open Kernel Mode Setting Driver for aarch64  540.4.0  Release Build  (buildbrain@mobile-u64-6354-d6000)  Thu Sep 18 15:33:51 PDT 2025
+[   16.756756] [drm] [nvidia-drm] [GPU ID 0x00020000] Loading driver
+[   17.037250] NVRM rpcRmApiControl_dce: NVRM_RPC_DCE: Failed RM ctrl call cmd:0x731341 result 0xffff:
+[   17.135410] [drm] Initialized nvidia-drm 0.0.0 20160202 for 13800000.display on minor 1
+[   17.135529] checking generic (27de00000 870000) vs hw (27de00000 870000)
+[   17.135533] fb0: switching to nvidia-drm from simple
+[   17.136108] Console: switching to colour dummy device 80x25
+[   17.208827] Console: switching to colour frame buffer device 240x67
+[   17.208848] nv_platform 13800000.display: [drm] fb0: nvidia-drmdrmfb frame buffer device
+[   20.587161] rfkill: input handler disabled
+[   21.813228] loop12: detected capacity change from 0 to 8
+[   23.999509] audit: type=1326 audit(1773841210.328:2): auid=4294967295 uid=0 gid=0 ses=4294967295 subj=kernel pid=2325 comm="cupsd" exe="/snap/cups/1147/sbin/cupsd" sig=0 arch=c00000b7 syscall=55 compat=0 ip=0xffff952cce0c code=0x50000
+[   24.355793] audit: type=1326 audit(1773841210.688:3): auid=4294967295 uid=0 gid=0 ses=4294967295 subj=kernel pid=2325 comm="cupsd" exe="/snap/cups/1147/sbin/cupsd" sig=0 arch=c00000b7 syscall=55 compat=0 ip=0xffff952cce0c code=0x50000
+[   24.379382] audit: type=1326 audit(1773841210.708:4): auid=4294967295 uid=0 gid=0 ses=4294967295 subj=kernel pid=2337 comm="cups-browsed" exe="/snap/cups/1147/sbin/cups-browsed" sig=0 arch=c00000b7 syscall=274 compat=0 ip=0xffffbd375b68 code=0x50000
+[  103.167974] rfkill: input handler enabled
+[  106.465366] ACK 04 d4
+[  106.468850] ACK 04 d4
+[  106.554243] IPv6: ADDRCONF(NETDEV_CHANGE): wlP1p1s0: link becomes ready
+[  107.822024] rfkill: input handler disabled
+[  994.649548] NVRM rpcRmApiControl_dce: NVRM_RPC_DCE: Failed RM ctrl call cmd:0x731341 result 0xffff:
+[ 1958.637946] loop12: detected capacity change from 0 to 8
+[ 2080.113807] loop12: detected capacity change from 0 to 8
+[ 2083.817483] loop12: detected capacity change from 0 to 8
+[ 2174.778439] loop12: detected capacity change from 0 to 8
+[ 2451.918767] NVRM rpcRmApiControl_dce: NVRM_RPC_DCE: Failed RM ctrl call cmd:0x731341 result 0xffff:
+robotlab@ubuntu:~$ journalctl -u snapd --no-pager | tail -100
+Mar 18 14:39:59 ubuntu systemd[1]: Starting Snap Daemon...
+Mar 18 14:40:08 ubuntu snapd[744]: overlord.go:294: Acquiring state lock file
+Mar 18 14:40:08 ubuntu snapd[744]: overlord.go:299: Acquired state lock file
+Mar 18 14:40:08 ubuntu snapd[744]: daemon.go:276: started snapd/2.74.1 (series 16; classic; devmode) ubuntu/22.04 (arm64) linux/5.15.148-tegra.
+Mar 18 14:40:08 ubuntu snapd[744]: daemon.go:370: adjusting startup timeout by 1m20s (pessimistic estimate of 30s plus 5s per snap)
+Mar 18 14:40:08 ubuntu snapd[744]: backends.go:70: AppArmor status: apparmor not enabled
+Mar 18 14:40:08 ubuntu snapd[744]: standby.go:95: will consider standby after: 5s
+Mar 18 14:40:08 ubuntu systemd[1]: Started Snap Daemon.
+Mar 18 14:40:40 ubuntu snapd[744]: snapmgr.go:1659: performing periodic snap downloads cache cleanup
+Mar 18 14:40:40 ubuntu snapd[744]: cache.go:243: removed 0 entries/    0 from downloads cache
+Mar 18 14:40:40 ubuntu snapd[744]: stateengine.go:161: state ensure error: Get "https://api.snapcraft.io/api/v1/snaps/sections": dial tcp: lookup api.snapcraft.io on 127.0.0.53:53: server misbehaving
+Mar 18 14:41:52 ubuntu snapd[744]: storehelpers.go:916: cannot refresh: snap has no updates available: "bare", "core22", "core24", "cups", "firefox", "gnome-42-2204", "gnome-46-2404", "gtk-common-themes", "mesa-2404", "snapd"
+Mar 18 15:12:21 ubuntu snapd[744]: main.go:168: Exiting on terminated signal.
+Mar 18 15:12:21 ubuntu systemd[1]: Stopping Snap Daemon...
+Mar 18 15:12:24 ubuntu snapd[744]: standby.go:121: standby monitoring stop requested
+Mar 18 15:12:24 ubuntu snapd[744]: overlord.go:543: Released state lock file
+Mar 18 15:12:24 ubuntu systemd[1]: snapd.service: Deactivated successfully.
+Mar 18 15:12:24 ubuntu systemd[1]: Stopped Snap Daemon.
+Mar 18 15:12:24 ubuntu systemd[1]: snapd.service: Consumed 7.164s CPU time.
+Mar 18 15:12:24 ubuntu systemd[1]: Starting Snap Daemon...
+Mar 18 15:12:24 ubuntu snapd[4690]: overlord.go:294: Acquiring state lock file
+Mar 18 15:12:24 ubuntu snapd[4690]: overlord.go:299: Acquired state lock file
+Mar 18 15:12:24 ubuntu snapd[4690]: daemon.go:276: started snapd/2.74.1 (series 16; classic; devmode) ubuntu/22.04 (arm64) linux/5.15.148-tegra.
+Mar 18 15:12:24 ubuntu snapd[4690]: daemon.go:370: adjusting startup timeout by 1m20s (pessimistic estimate of 30s plus 5s per snap)
+Mar 18 15:12:24 ubuntu snapd[4690]: backends.go:70: AppArmor status: apparmor not enabled
+Mar 18 15:12:24 ubuntu snapd[4690]: standby.go:95: will consider standby after: 5s
+Mar 18 15:12:24 ubuntu systemd[1]: Started Snap Daemon.
+Mar 18 15:12:25 ubuntu snapd[4690]: snapmgr.go:1659: performing periodic snap downloads cache cleanup
+Mar 18 15:12:25 ubuntu snapd[4690]: cache.go:243: removed 0 entries/    0 from downloads cache
+Mar 18 15:14:22 ubuntu systemd[1]: /lib/systemd/system/snapd.service:23: Unknown key name 'RestartMode' in section 'Service', ignoring.
+Mar 18 15:14:22 ubuntu systemd[1]: Stopping Snap Daemon...
+Mar 18 15:14:22 ubuntu snapd[4690]: main.go:168: Exiting on terminated signal.
+Mar 18 15:14:25 ubuntu snapd[4690]: standby.go:121: standby monitoring stop requested
+Mar 18 15:14:25 ubuntu snapd[4690]: overlord.go:543: Released state lock file
+Mar 18 15:14:25 ubuntu systemd[1]: snapd.service: Deactivated successfully.
+Mar 18 15:14:25 ubuntu systemd[1]: Stopped Snap Daemon.
+Mar 18 15:14:25 ubuntu systemd[1]: snapd.service: Consumed 2.611s CPU time.
+Mar 18 15:14:25 ubuntu systemd[1]: Starting Snap Daemon...
+Mar 18 15:14:26 ubuntu snapd[5612]: overlord.go:294: Acquiring state lock file
+Mar 18 15:14:26 ubuntu snapd[5612]: overlord.go:299: Acquired state lock file
+Mar 18 15:14:26 ubuntu snapd[5612]: daemon.go:276: started snapd/2.74.1 (series 16; classic; devmode) ubuntu/22.04 (arm64) linux/5.15.148-tegra.
+Mar 18 15:14:26 ubuntu snapd[5612]: daemon.go:370: adjusting startup timeout by 1m20s (pessimistic estimate of 30s plus 5s per snap)
+Mar 18 15:14:26 ubuntu snapd[5612]: backends.go:70: AppArmor status: apparmor not enabled
+Mar 18 15:14:26 ubuntu systemd[1]: /lib/systemd/system/snapd.service:23: Unknown key name 'RestartMode' in section 'Service', ignoring.
+Mar 18 15:14:26 ubuntu snapd[5612]: standby.go:95: will consider standby after: 5s
+Mar 18 15:14:26 ubuntu systemd[1]: Started Snap Daemon.
+Mar 18 15:14:26 ubuntu systemd[1]: Stopping Snap Daemon...
+Mar 18 15:14:26 ubuntu snapd[5612]: main.go:168: Exiting on terminated signal.
+Mar 18 15:14:26 ubuntu snapd[5612]: snapmgr.go:1659: performing periodic snap downloads cache cleanup
+Mar 18 15:14:26 ubuntu snapd[5612]: cache.go:243: removed 0 entries/    0 from downloads cache
+Mar 18 15:14:29 ubuntu snapd[5612]: standby.go:121: standby monitoring stop requested
+Mar 18 15:14:29 ubuntu snapd[5612]: overlord.go:543: Released state lock file
+Mar 18 15:14:29 ubuntu systemd[1]: snapd.service: Deactivated successfully.
+Mar 18 15:14:29 ubuntu systemd[1]: Stopped Snap Daemon.
+Mar 18 15:14:29 ubuntu systemd[1]: snapd.service: Consumed 2.283s CPU time.
+Mar 18 15:14:29 ubuntu systemd[1]: Starting Snap Daemon...
+Mar 18 15:14:29 ubuntu snapd[5714]: overlord.go:294: Acquiring state lock file
+Mar 18 15:14:29 ubuntu snapd[5714]: overlord.go:299: Acquired state lock file
+Mar 18 15:14:29 ubuntu snapd[5714]: daemon.go:276: started snapd/2.74.1 (series 16; classic; devmode) ubuntu/22.04 (arm64) linux/5.15.148-tegra.
+Mar 18 15:14:29 ubuntu snapd[5714]: daemon.go:370: adjusting startup timeout by 1m20s (pessimistic estimate of 30s plus 5s per snap)
+Mar 18 15:14:29 ubuntu snapd[5714]: backends.go:70: AppArmor status: apparmor not enabled
+Mar 18 15:14:30 ubuntu snapd[5714]: standby.go:95: will consider standby after: 5s
+Mar 18 15:14:30 ubuntu systemd[1]: Started Snap Daemon.
+Mar 18 15:14:30 ubuntu snapd[5714]: snapmgr.go:1659: performing periodic snap downloads cache cleanup
+Mar 18 15:14:30 ubuntu snapd[5714]: cache.go:243: removed 0 entries/    0 from downloads cache
+Mar 18 15:14:30 ubuntu systemd[1]: /lib/systemd/system/snapd.service:23: Unknown key name 'RestartMode' in section 'Service', ignoring.
+Mar 18 15:15:57 ubuntu snapd[5714]: main.go:168: Exiting on terminated signal.
+Mar 18 15:15:57 ubuntu systemd[1]: Stopping Snap Daemon...
+Mar 18 15:16:00 ubuntu snapd[5714]: standby.go:121: standby monitoring stop requested
+Mar 18 15:16:00 ubuntu snapd[5714]: overlord.go:543: Released state lock file
+Mar 18 15:16:00 ubuntu systemd[1]: snapd.service: Deactivated successfully.
+Mar 18 15:16:00 ubuntu systemd[1]: Stopped Snap Daemon.
+Mar 18 15:16:00 ubuntu systemd[1]: snapd.service: Consumed 1.955s CPU time.
+Mar 18 15:16:00 ubuntu systemd[1]: Starting Snap Daemon...
+Mar 18 15:16:00 ubuntu snapd[5954]: overlord.go:294: Acquiring state lock file
+Mar 18 15:16:00 ubuntu snapd[5954]: overlord.go:299: Acquired state lock file
+Mar 18 15:16:00 ubuntu snapd[5954]: daemon.go:276: started snapd/2.74.1 (series 16; classic; devmode) ubuntu/22.04 (arm64) linux/5.15.148-tegra.
+Mar 18 15:16:00 ubuntu snapd[5954]: daemon.go:370: adjusting startup timeout by 1m20s (pessimistic estimate of 30s plus 5s per snap)
+Mar 18 15:16:00 ubuntu snapd[5954]: backends.go:70: AppArmor status: apparmor not enabled
+Mar 18 15:16:01 ubuntu snapd[5954]: standby.go:95: will consider standby after: 5s
+Mar 18 15:16:01 ubuntu systemd[1]: Started Snap Daemon.
+Mar 18 15:16:01 ubuntu snapd[5954]: snapmgr.go:1659: performing periodic snap downloads cache cleanup
+Mar 18 15:16:01 ubuntu snapd[5954]: cache.go:243: removed 0 entries/    0 from downloads cache
