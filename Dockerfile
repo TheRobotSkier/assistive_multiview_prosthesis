@@ -45,9 +45,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no
 
 # Python packages
 RUN if pip3 install --help | grep -q -- '--break-system-packages'; then \
-      pip3 install --break-system-packages colcon-cargo colcon-ros-bundle; \
+      pip3 install --break-system-packages colcon-cargo colcon-ros-bundle mujoco; \
     else \
-      pip3 install colcon-cargo colcon-ros-bundle; \
+      pip3 install colcon-cargo colcon-ros-bundle mujoco; \
     fi
 
 # System dependencies
