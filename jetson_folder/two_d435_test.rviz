@@ -52,9 +52,13 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: true
+        charuco_board:
+          Value: true
         d435_1_color_frame:
           Value: true
         d435_1_color_optical_frame:
+          Value: true
+        d435_1_color_optical_frame_from_charuco:
           Value: true
         d435_1_depth_frame:
           Value: true
@@ -65,6 +69,8 @@ Visualization Manager:
         d435_2_color_frame:
           Value: true
         d435_2_color_optical_frame:
+          Value: true
+        d435_2_color_optical_frame_from_charuco:
           Value: true
         d435_2_depth_frame:
           Value: true
@@ -78,19 +84,24 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
+        charuco_board:
+          d435_1_color_optical_frame_from_charuco:
+            {}
+          d435_2_color_optical_frame_from_charuco:
+            {}
+          d435_2_link:
+            d435_2_color_frame:
+              d435_2_color_optical_frame:
+                {}
+            d435_2_depth_frame:
+              d435_2_depth_optical_frame:
+                {}
         d435_1_link:
           d435_1_color_frame:
             d435_1_color_optical_frame:
               {}
           d435_1_depth_frame:
             d435_1_depth_optical_frame:
-              {}
-        d435_2_link:
-          d435_2_color_frame:
-            d435_2_color_optical_frame:
-              {}
-          d435_2_depth_frame:
-            d435_2_depth_optical_frame:
               {}
       Update Interval: 0
       Value: true
@@ -221,7 +232,7 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: d435_1_link
+    Fixed Frame: charuco_board
     Frame Rate: 30
   Name: root
   Tools:
@@ -264,7 +275,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 19.38814926147461
+      Distance: 6.506218433380127
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
