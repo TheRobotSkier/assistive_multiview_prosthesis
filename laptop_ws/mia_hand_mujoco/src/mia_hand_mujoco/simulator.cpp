@@ -1,6 +1,7 @@
 #include "mia_hand_mujoco/simulator.hpp"
 
 #include <cstdlib>
+#include <iostream>
 #include <string.h>
 
 #include "mia_hand_mujoco/plugin/index_thumb_actuator.h"
