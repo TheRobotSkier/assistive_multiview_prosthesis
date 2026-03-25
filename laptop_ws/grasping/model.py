@@ -130,8 +130,6 @@ def generate_lut(resolution=10):
     Returns:
         Dictionary containing SE3 transforms for each finger configuration
     """
-    import h5py
-    
     lut = {}
     
     # Generate poses for MRL fingers (middle, ring, little)
@@ -186,34 +184,24 @@ def generate_lut(resolution=10):
         thumb_relative = np.dot(thumb_transform, np.linalg.inv(thumb_neutral))
         lut['thumb_opposition'].append(thumb_relative)
     
-    # Save LUT to HDF5 file
-    output_path = os.path.join(SCRIPT_DIR, "finger_tip_lut.h5")
-    with h5py.File(output_path, 'w') as f:
-        # Save metadata
-        f.attrs['resolution'] = resolution
-        
-        # Save MRL flex data
-        mrl_group = f.create_group('mrl_flex')
-        for i, entry in enumerate(lut['mrl_flex']):
-            sample_group = mrl_group.create_group(f'sample_{i}')
-            sample_group.create_dataset('middle', data=entry['middle'])
-            sample_group.create_dataset('ring', data=entry['ring'])
-            sample_group.create_dataset('little', data=entry['little'])
-        
-        # Save index flex data
-        index_group = f.create_group('index_flex')
-        for i, transform in enumerate(lut['index_flex']):
-            index_group.create_dataset(f'sample_{i}', data=transform)
-        
-        # Save thumb flex data
-        thumb_flex_group = f.create_group('thumb_flex')
-        for i, transform in enumerate(lut['thumb_flex']):
-            thumb_flex_group.create_dataset(f'sample_{i}', data=transform)
-        
-        # Save thumb opposition data
-        thumb_opp_group = f.create_group('thumb_opposition')
-        for i, transform in enumerate(lut['thumb_opposition']):
-            thumb_opp_group.create_dataset(f'sample_{i}', data=transform)
+    # Save LUT to a single file
+    # Structure: dictionary with keys for each finger type
+    # Each finger type has shape (resolution, 4, 4)
+    output_path = os.path.join(SCRIPT_DIR, "finger_tip_lut")
+    
+    # Create a structured array or dictionary
+    lut_data = {
+        'resolution': resolution,
+        'middle': np.array([entry['middle'] for entry in lut['mrl_flex']]),
+        'ring': np.array([entry['ring'] for entry in lut['mrl_flex']]),
+        'little': np.array([entry['little'] for entry in lut['mrl_flex']]),
+        'index_flex': np.array(lut['index_flex']),
+        'thumb_flex': np.array(lut['thumb_flex']),
+        'thumb_opposition': np.array(lut['thumb_opposition']),
+    }
+    
+    # Save as .npz (numpy's compressed format that can store multiple arrays)
+    np.savez(output_path, **lut_data)
     
     print(f"LUT saved to {output_path}")
     print(f"Resolution: {resolution}")
@@ -252,4 +240,4 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print("Generating Finger Tip LUT...")
     print("="*50)
-    lut = generate_lut(resolution=10)
+    lut = generate_lut(resolution=11)
