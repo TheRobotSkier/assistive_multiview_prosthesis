@@ -45,10 +45,35 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no
 
 # Python packages
 RUN if pip3 install --help | grep -q -- '--break-system-packages'; then \
-      pip3 install --break-system-packages colcon-cargo colcon-ros-bundle mujoco; \
+      pip3 install --break-system-packages --upgrade \
+        colcon-cargo colcon-ros-bundle mujoco pin \
+        "numpy>=2.2,<2.3" "matplotlib>=3.9"; \
     else \
-      pip3 install colcon-cargo colcon-ros-bundle mujoco; \
+      pip3 install --upgrade \
+        colcon-cargo colcon-ros-bundle mujoco pin \
+        "numpy>=2.2,<2.3" "matplotlib>=3.9"; \
     fi
+
+# Ubuntu's system matplotlib may drop a namespace .pth that preloads /usr/lib
+# mpl_toolkits ahead of pip's Matplotlib, which breaks 3D axes imports.
+RUN rm -f /usr/lib/python3/dist-packages/matplotlib-*-nspkg.pth \
+    && python3 - <<'PY'
+from pathlib import Path
+import site
+
+for base in site.getsitepackages():
+    if base.startswith('/usr/local'):
+        p = Path(base) / 'mpl_toolkits' / '__init__.py'
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(
+            'from pkgutil import extend_path\n__path__ = extend_path(__path__, __name__)\n',
+            encoding='utf-8'
+        )
+        print(f'Wrote {p}')
+        break
+else:
+    raise RuntimeError('Could not find /usr/local site-packages path')
+PY
 
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -60,6 +85,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-${ROS_DISTRO}-ros2-controllers \
     ros-${ROS_DISTRO}-xacro \
     && rm -rf /var/lib/apt/lists/*
+
+# # Install build dependencies
+# RUN apt-get update && apt-get install -y --no-install-recommends \
+#     build-essential cmake libeigen3-dev liburdfdom-dev python3-dev \
+#     && rm -rf /var/lib/apt/lists/*
+
+# # Build pinocchio from source with casadi support
+# RUN git clone https://github.com/stack-of-tasks/pinocchio.git /tmp/pinocchio && \
+#     cd /tmp/pinocchio && \
+#     mkdir build && cd build && \
+#     cmake .. -DBUILD_WITH_CASADI_SUPPORT=ON \
+#              -DPYTHON_EXECUTABLE=$(which python3) \
+#              -DBUILD_PYTHON_INTERFACE=ON \
+#              -DBUILD_WITH_EXAMPLE_ROBOT_DATA_SUPPORT=OFF && \
+#     make -j$(nproc) && \
+#     make install && \
+#     cd / && rm -rf /tmp/pinocchio
 
 WORKDIR /laptop_ws
 

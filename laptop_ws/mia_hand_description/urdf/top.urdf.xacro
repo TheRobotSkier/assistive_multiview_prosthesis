@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="mia_hand_right">
+
+  <xacro:include filename="mia_hand_right.urdf.xacro" />
+
+  <link name="base_link"/>
+
+  <xacro:mia_hand_right parent="base_link" prefix="mia_">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:mia_hand_right>
+
+</robot>
