@@ -46,11 +46,11 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no
 # Python packages
 RUN if pip3 install --help | grep -q -- '--break-system-packages'; then \
       pip3 install --break-system-packages --upgrade \
-        colcon-cargo colcon-ros-bundle mujoco pin \
+        colcon-cargo colcon-ros-bundle mujoco pin h5py \
         "numpy>=2.2,<2.3" "matplotlib>=3.9"; \
     else \
       pip3 install --upgrade \
-        colcon-cargo colcon-ros-bundle mujoco pin \
+        colcon-cargo colcon-ros-bundle mujoco pin h5py \
         "numpy>=2.2,<2.3" "matplotlib>=3.9"; \
     fi
 

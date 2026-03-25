@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple script to load the MIA hand in MuJoCo and open the normal GUI viewer.
+Simple script to load the MIA hand in MuJoCo and open the normal GUI viewer. 
 """
 
 import mujoco as mj
