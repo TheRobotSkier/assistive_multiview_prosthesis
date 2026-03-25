@@ -1,0 +1,9 @@
+[package]
+name = "preshaping"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+npyz = { version = "0.8", features = ["npz"] }
+nalgebra = "0.32"
+thiserror = "1.0"
