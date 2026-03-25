@@ -3,7 +3,7 @@ import numpy as np
 import pinocchio as pin
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-URDF_PATH = os.path.join(SCRIPT_DIR, "mia_hand_description", "urdf", "mia_hand_flat.urdf")
+URDF_PATH = os.path.join(SCRIPT_DIR, "mia_hand_flat.urdf")
 
 # Active motor order: [Thumb_Flex, TISIT_Motor, MRL_Flex]
 low = np.array([0.0, -1.0, 0.0], dtype=float)
