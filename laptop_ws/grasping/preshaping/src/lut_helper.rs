@@ -1,9 +1,9 @@
 use nalgebra::{Matrix3, Matrix4, UnitQuaternion, Vector3};
+use npyz::npz::NpzArchive;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io::{Read, Seek};
 use thiserror::Error;
-use npyz::npz::NpzArchive;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FingerType {
@@ -67,7 +67,11 @@ impl FingerLUT {
     const ROTATION_DET_TOL: f64 = 1e-5;
     const HOMOGENEOUS_TOL: f64 = 1e-8;
 
-    fn validate_se3_matrix(matrix: &Matrix4<f64>, finger_name: &str, sample_idx: usize) -> Result<(), LutError> {
+    fn validate_se3_matrix(
+        matrix: &Matrix4<f64>,
+        finger_name: &str,
+        sample_idx: usize,
+    ) -> Result<(), LutError> {
         if !matrix.iter().all(|v| v.is_finite()) {
             return Err(LutError::InvalidShape(format!(
                 "{} sample {} has non-finite values",
@@ -75,7 +79,12 @@ impl FingerLUT {
             )));
         }
 
-        let bottom_row = [matrix[(3, 0)], matrix[(3, 1)], matrix[(3, 2)], matrix[(3, 3)]];
+        let bottom_row = [
+            matrix[(3, 0)],
+            matrix[(3, 1)],
+            matrix[(3, 2)],
+            matrix[(3, 3)],
+        ];
         if bottom_row[0].abs() > Self::HOMOGENEOUS_TOL
             || bottom_row[1].abs() > Self::HOMOGENEOUS_TOL
             || bottom_row[2].abs() > Self::HOMOGENEOUS_TOL
@@ -83,12 +92,7 @@ impl FingerLUT {
         {
             return Err(LutError::InvalidShape(format!(
                 "{} sample {} has invalid homogeneous row [{:.6}, {:.6}, {:.6}, {:.6}]",
-                finger_name,
-                sample_idx,
-                bottom_row[0],
-                bottom_row[1],
-                bottom_row[2],
-                bottom_row[3]
+                finger_name, sample_idx, bottom_row[0], bottom_row[1], bottom_row[2], bottom_row[3]
             )));
         }
 
@@ -179,8 +183,7 @@ impl FingerLUT {
     }
 
     pub fn load(path: &str) -> Result<Self, Box<dyn Error>> {
-        let mut npz = NpzArchive::open(path)
-            .map_err(|e| LutError::FileOpenError(e.to_string()))?;
+        let mut npz = NpzArchive::open(path).map_err(|e| LutError::FileOpenError(e.to_string()))?;
 
         // Read resolution
         let resolution_from_file = Self::read_resolution(&mut npz).ok();
@@ -243,7 +246,9 @@ impl FingerLUT {
         let resolution = resolution_from_file.unwrap_or(inferred_resolution);
 
         if resolution == 0 {
-            return Err(LutError::InvalidShape("No transform data found in LUT".to_string()).into());
+            return Err(
+                LutError::InvalidShape("No transform data found in LUT".to_string()).into(),
+            );
         }
 
         Ok(Self {
@@ -272,7 +277,7 @@ impl FingerLUT {
 
         let t = t.clamp(0.0, 1.0);
         let num_samples = transforms.len();
-        
+
         if num_samples == 1 {
             return Some(transforms[0].clone());
         }
