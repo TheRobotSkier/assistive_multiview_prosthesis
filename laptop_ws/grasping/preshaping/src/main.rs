@@ -1,100 +1,115 @@
 mod lut_helper;
 mod pointcloud_helper;
 
-use std::path::Path;
 use std::time::Instant;
+use std::thread;
 
 use lut_helper::{FingerLUT, FingerType};
 use nalgebra::{Matrix4, Vector3};
 use pointcloud_helper::{AabbMask, PointCloud, PointCloudProximityChecker, ProximityQuery};
 
 fn main() {
+    let now = Instant::now();
     // Load the LUT file
     let lut_path = "../finger_tip_lut.npz";
     let xyz_cloud_path = "../sphere.xyz";
 
+    let lut = FingerLUT::load(lut_path).unwrap_or_else(|e| {
+        eprintln!("Failed to load LUT file: {}", e);
+        std::process::exit(1);
+    });
+    println!("\nLUT loaded with resolution: {}", lut.get_resolution());
+    println!("Available fingers: {:?}", lut.get_available_fingers());
+
+    // Load point cloud
+    let pc = PointCloud::from_xyz_file(xyz_cloud_path).unwrap_or_else(|e| {
+        eprintln!("Failed to load point cloud: {}, using synthetic cloud", e);
+        PointCloud::new(vec![
+            Vector3::new(0.09, 0.02, 0.07),
+            Vector3::new(0.10, 0.01, 0.06),
+            Vector3::new(0.12, 0.04, 0.08),
+            Vector3::new(0.50, 0.50, 0.50),
+        ])
+    });
+    println!("Point cloud loaded with {} points", pc.len());
+    let checker = PointCloudProximityChecker::new(pc);
+
+    // Base transform (identity for simplicity)
+    let mut base_transform = Matrix4::identity();
+    base_transform[(0, 3)] = 0.0;
+    base_transform[(1, 3)] = 0.0;
+    base_transform[(2, 3)] = 0.0;
+-
+    // AABB mask for proximity checking (optional)
+    let aabb_mask = AabbMask {
+        min: Vector3::new(-0.2, -0.2, -0.2),
+        max: Vector3::new(0.2, 0.2, 0.2),
+    };
+
+    let collitions_tol = 0.005; // 5 mm tolerance for collision checking
+
+    println!("Time taken for setup: {:.2?}", now.elapsed());
     let now = Instant::now();
 
-    match FingerLUT::load(lut_path) {
-        Ok(lut) => {
-            println!("Successfully loaded LUT file!");
+    // Compute proximity for each finger type in parallel
+    let main_fingers = vec![FingerType::ThumbFlex, FingerType::Index, FingerType::Middle, FingerType::Ring, FingerType::Little];
+    let preshape_main_fingers: Vec<_> = thread::scope(|s| {
+        let mut handles = Vec::new();
+        for i in 0..main_fingers.len() {
+            let lut = &lut;
+            let checker = &checker;
+            let main_fingers = main_fingers.clone();
 
-            // Get resolution
-            println!("Resolution: {}", lut.get_resolution());
+            let base_transform = base_transform.clone();
+            let aabb_mask = aabb_mask.clone();
 
-            // List available fingers
-            println!("Available fingers: {:?}", lut.get_available_fingers());
-
-            // Get a specific transform
-            if let Some(transform) = lut.get_transform(FingerType::Index, 0) {
-                println!("\nIndex finger transform at sample 0:");
-                println!("{:.4}", transform.matrix);
-            }
-
-            // Interpolate between samples
-            if let Some(transform) = lut.interpolate_transform(FingerType::Index, 0.5) {
-                println!("\nIndex finger interpolated transform at t=0.5:");
-                println!("{:.4}", transform.matrix);
-
-                let cloud = if Path::new(xyz_cloud_path).exists() {
-                    match PointCloud::from_xyz_file(xyz_cloud_path) {
-                        Ok(pc) => {
-                            println!("Loaded point cloud from {}", xyz_cloud_path);
-                            pc
+            handles.push(s.spawn(move || {
+                for sample in 0..lut.get_resolution() {
+                    // Get a specific transform
+                    let transform = if main_fingers[i] != FingerType::ThumbFlex {
+                        match lut.get_transform_result(main_fingers[i], sample) {
+                            Ok(transform) => transform,
+                            Err(err) => {
+                                eprintln!("{}", err);
+                                continue;
+                            }
                         }
-                        Err(err) => {
-                            eprintln!(
-                                "Failed to load {} ({}), falling back to synthetic cloud",
-                                xyz_cloud_path, err
-                            );
-                            PointCloud::new(vec![
-                                Vector3::new(0.09, 0.02, 0.07),
-                                Vector3::new(0.10, 0.01, 0.06),
-                                Vector3::new(0.12, 0.04, 0.08),
-                                Vector3::new(0.50, 0.50, 0.50),
-                            ])
+                    } else {
+                        // For thumb, we need to combine the thumb flex transform with the thumb abduction transform
+                        match lut.combine_thumb_transforms(sample, 0) {
+                            Ok(transform) => transform,
+                            Err(err) => {
+                                eprintln!("{}", err);
+                                continue;
+                            }
                         }
+                    };
+
+                    // Check proximity to point cloud
+                    let query = ProximityQuery {
+                        base_transform,
+                        finger_transform: transform.matrix,
+                        mask: Some(aabb_mask),
+                    };
+                    let result = checker.nearest_distance(&query);
+                    let distance = result.nearest_distance.unwrap_or(f64::INFINITY);
+                    if distance < collitions_tol {
+                        return Some(sample);
                     }
-                } else {
-                    PointCloud::new(vec![
-                        Vector3::new(0.09, 0.02, 0.07),
-                        Vector3::new(0.10, 0.01, 0.06),
-                        Vector3::new(0.12, 0.04, 0.08),
-                        Vector3::new(0.50, 0.50, 0.50),
-                    ])
-                };
-                let checker = PointCloudProximityChecker::new(cloud);
-
-                let mut base_transform = Matrix4::identity();
-                base_transform[(0, 3)] = 0.0;
-                base_transform[(1, 3)] = 0.0;
-                base_transform[(2, 3)] = 0.0;
-
-                let query = ProximityQuery {
-                    base_transform,
-                    finger_transform: transform.matrix,
-                    mask: None//Some(AabbMask {min: Vector3::new(-0.2, -0.2, -0.2),max: Vector3::new(0.2, 0.2, 0.2),}),
-                };
-
-                let result = checker.nearest_distance(&query);
-                println!("\nProximity query result:");
-                println!("World tip position: {:?}", result.world_tip);
-                println!("Candidates checked: {}", result.candidates_checked);
-                match result.nearest_distance {
-                    Some(distance) => println!("Nearest point distance: {:.6} m", distance),
-                    None => println!("No points found inside AABB mask"),
+                    // println!("Finger {:?} sample {}: nearest distance = {:.4}", main_fingers[i], sample, distance);
                 }
-            }
-
-            // Combine thumb transforms
-            let combined = lut.combine_thumb_transforms(5, 5);
-            println!("\nCombined thumb transform (flex=5, opp=5):");
-            println!("{:.4}", combined.matrix);
-
-            println!("\nTime taken: {:.2?}", now.elapsed());
+                None
+            }));
         }
-        Err(e) => {
-            eprintln!("Failed to load LUT file: {}", e);
-        }
-    }
+        // return collision index for each finger type
+        let results: Vec<_> = handles.into_iter()
+            .map(|h| h.join().unwrap())
+            .collect();
+        return results;
+    });
+
+    println!("Time taken for collision checking: {:.2?}", now.elapsed());
+    println!("Collision indices for fingers: {:?}", preshape_main_fingers);
+
+    
 }

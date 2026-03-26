@@ -55,6 +55,12 @@ pub enum LutError {
     InvalidShape(String),
     #[error("Attribute not found: {0}")]
     AttributeNotFound(String),
+    #[error("Transform lookup failed for {finger:?} at sample {sample} (available samples: {available_samples})")]
+    TransformLookupFailed {
+        finger: FingerType,
+        sample: usize,
+        available_samples: usize,
+    },
 }
 
 pub struct FingerLUT {
@@ -261,6 +267,19 @@ impl FingerLUT {
         self.transforms.get(&finger)?.get(sample).cloned()
     }
 
+    pub fn get_transform_result(
+        &self,
+        finger: FingerType,
+        sample: usize,
+    ) -> Result<SE3Matrix, LutError> {
+        self.get_transform(finger, sample)
+            .ok_or_else(|| LutError::TransformLookupFailed {
+                finger,
+                sample,
+                available_samples: self.transforms.get(&finger).map(|v| v.len()).unwrap_or(0),
+            })
+    }
+
     pub fn get_resolution(&self) -> usize {
         self.resolution
     }
@@ -309,16 +328,15 @@ impl FingerLUT {
         Some(SE3Matrix::new(matrix))
     }
 
-    pub fn combine_thumb_transforms(&self, flex_sample: usize, opp_sample: usize) -> SE3Matrix {
-        let flex_transform = self
-            .get_transform(FingerType::ThumbFlex, flex_sample)
-            .unwrap_or_else(SE3Matrix::identity);
-
-        let opp_transform = self
-            .get_transform(FingerType::ThumbOpposition, opp_sample)
-            .unwrap_or_else(SE3Matrix::identity);
+    pub fn combine_thumb_transforms(
+        &self,
+        flex_sample: usize,
+        opp_sample: usize,
+    ) -> Result<SE3Matrix, LutError> {
+        let flex_transform = self.get_transform_result(FingerType::ThumbFlex, flex_sample)?;
+        let opp_transform = self.get_transform_result(FingerType::ThumbOpposition, opp_sample)?;
 
         let combined = flex_transform.matrix * opp_transform.matrix;
-        SE3Matrix::new(combined)
+        Ok(SE3Matrix::new(combined))
     }
 }

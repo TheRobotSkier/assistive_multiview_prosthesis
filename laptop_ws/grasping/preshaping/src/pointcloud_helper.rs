@@ -60,6 +60,10 @@ impl PointCloud {
         Ok(Self::new(points))
     }
 
+    pub fn len(&self) -> usize {
+        self.points.len()
+    }
+
     #[cfg(test)]
     pub fn points(&self) -> &[Vector3<f64>] {
         &self.points
