@@ -3,7 +3,7 @@ import numpy as np
 import pinocchio as pin
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-URDF_PATH = os.path.join(SCRIPT_DIR, "mia_hand_flat.urdf")
+URDF_PATH = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "urdf", "mia_hand_flat.urdf"))
 
 # Active motor order: [Thumb_Flex, TISIT_Motor, MRL_Flex]
 low = np.array([0.0, -1.0, 0.0], dtype=float)
@@ -187,7 +187,7 @@ def generate_lut(resolution=10):
     # Save LUT to a single file
     # Structure: dictionary with keys for each finger type
     # Each finger type has shape (resolution, 4, 4)
-    output_path = os.path.join(SCRIPT_DIR, "finger_tip_lut")
+    output_path = os.path.normpath(os.path.join(SCRIPT_DIR, "..", "data", "finger_tip_lut"))
     
     # Create a structured array or dictionary
     lut_data = {

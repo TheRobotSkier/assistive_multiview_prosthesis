@@ -8,8 +8,7 @@ Tests and validates the generated LUT file in .npz format
 import numpy as np
 import os
 
-LUT_PATH = os.path.join(os.path.dirname(__file__), "finger_tip_lut.npz")
-
+LUT_PATH = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data", "finger_tip_lut.npz"))
 
 def print_structure(f):
     """Print structure of .npz file showing all arrays."""
