@@ -18,6 +18,8 @@ pub struct PlannerConfig {
     pub collision_tol: f64,
     pub thumb_opp_sample: usize,
     pub mask: Option<AabbMask>,
+    pub distal_proximal_offset: f64,
+    pub palmar_dorsal_offset: f64,
 }
 
 impl Default for PlannerConfig {
@@ -32,6 +34,8 @@ impl Default for PlannerConfig {
             collision_tol: 0.005,
             thumb_opp_sample: 0,
             mask: None,
+            distal_proximal_offset: 0.0,
+            palmar_dorsal_offset: 0.0,
         }
     }
 }
@@ -61,6 +65,7 @@ pub fn compute_preshape(
     config: &PlannerConfig,
 ) -> Result<PreshapeResult, LutError> {
     let closest_distance = Arc::new(Mutex::new(f64::INFINITY));
+    let finger_offset_tf = make_finger_offset_transform(config);
 
     let collisions: Vec<Option<usize>> = thread::scope(|scope| {
         let mut handles = Vec::new();
@@ -86,7 +91,9 @@ pub fn compute_preshape(
 
                     let query = ProximityQuery {
                         base_transform,
-                        finger_transform: transform.matrix,
+                        // Apply the same fingertip offset in finger local frame once for all fingers.
+                        // For thumb this happens after thumb flex+opposition composition, so it is not double-applied.
+                        finger_transform: transform.matrix * finger_offset_tf,
                         mask,
                     };
 
@@ -151,4 +158,13 @@ fn sample_to_control(sample: usize, resolution: usize) -> f64 {
         return 0.0;
     }
     sample as f64 / (resolution - 1) as f64
+}
+
+fn make_finger_offset_transform(config: &PlannerConfig) -> Matrix4<f64> {
+    let mut tf = Matrix4::identity();
+    // Local finger axes convention used here:
+    // +X: distal/proximal axis, +Z: palmar/dorsal axis.
+    tf[(0, 3)] = config.distal_proximal_offset;
+    tf[(2, 3)] = config.palmar_dorsal_offset;
+    tf
 }

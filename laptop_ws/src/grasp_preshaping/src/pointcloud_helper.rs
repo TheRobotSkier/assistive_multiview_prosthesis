@@ -1,4 +1,5 @@
 use nalgebra::{Matrix4, Vector3};
+use serde::Deserialize;
 use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -60,6 +61,36 @@ impl PointCloud {
         Ok(Self::new(points))
     }
 
+    pub fn from_pointcloud2_yaml(yaml: &str) -> Result<Self, String> {
+        let msg: PointCloud2Yaml = serde_yaml::from_str(yaml)
+            .map_err(|e| format!("Failed to parse PointCloud2 YAML: {}", e))?;
+
+        if msg.point_step == 0 {
+            return Err("PointCloud2 point_step is zero".to_string());
+        }
+
+        let x_field = find_field(&msg.fields, "x")?;
+        let y_field = find_field(&msg.fields, "y")?;
+        let z_field = find_field(&msg.fields, "z")?;
+
+        let point_count_by_data = msg.data.len() / msg.point_step as usize;
+        let point_count_by_dims = (msg.width as usize) * (msg.height as usize);
+        let point_count = point_count_by_data.min(point_count_by_dims.max(1));
+
+        let mut points = Vec::with_capacity(point_count);
+        for i in 0..point_count {
+            let base = i * msg.point_step as usize;
+            let x = read_point_field(&msg.data, base, x_field, msg.is_bigendian)?;
+            let y = read_point_field(&msg.data, base, y_field, msg.is_bigendian)?;
+            let z = read_point_field(&msg.data, base, z_field, msg.is_bigendian)?;
+            if x.is_finite() && y.is_finite() && z.is_finite() {
+                points.push(Vector3::new(x, y, z));
+            }
+        }
+
+        Ok(Self::new(points))
+    }
+
     pub fn len(&self) -> usize {
         self.points.len()
     }
@@ -67,6 +98,75 @@ impl PointCloud {
     #[cfg(test)]
     pub fn points(&self) -> &[Vector3<f64>] {
         &self.points
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct PointCloud2Yaml {
+    height: u32,
+    width: u32,
+    fields: Vec<PointFieldYaml>,
+    is_bigendian: bool,
+    point_step: u32,
+    data: Vec<u8>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PointFieldYaml {
+    name: String,
+    offset: u32,
+    datatype: u8,
+}
+
+fn find_field<'a>(fields: &'a [PointFieldYaml], name: &str) -> Result<&'a PointFieldYaml, String> {
+    fields
+        .iter()
+        .find(|f| f.name == name)
+        .ok_or_else(|| format!("PointCloud2 field '{}' not found", name))
+}
+
+fn read_point_field(
+    data: &[u8],
+    point_base: usize,
+    field: &PointFieldYaml,
+    is_bigendian: bool,
+) -> Result<f64, String> {
+    let off = point_base + field.offset as usize;
+    match field.datatype {
+        // sensor_msgs/PointField FLOAT32
+        7 => {
+            let end = off + 4;
+            if end > data.len() {
+                return Err("PointCloud2 FLOAT32 field exceeds buffer".to_string());
+            }
+            let mut bytes = [0_u8; 4];
+            bytes.copy_from_slice(&data[off..end]);
+            let value = if is_bigendian {
+                f32::from_be_bytes(bytes)
+            } else {
+                f32::from_le_bytes(bytes)
+            };
+            Ok(value as f64)
+        }
+        // sensor_msgs/PointField FLOAT64
+        8 => {
+            let end = off + 8;
+            if end > data.len() {
+                return Err("PointCloud2 FLOAT64 field exceeds buffer".to_string());
+            }
+            let mut bytes = [0_u8; 8];
+            bytes.copy_from_slice(&data[off..end]);
+            let value = if is_bigendian {
+                f64::from_be_bytes(bytes)
+            } else {
+                f64::from_le_bytes(bytes)
+            };
+            Ok(value)
+        }
+        other => Err(format!(
+            "Unsupported PointCloud2 datatype {} for field {}",
+            other, field.name
+        )),
     }
 }
 
@@ -304,5 +404,32 @@ mod tests {
         let reader = BufReader::new(raw.as_bytes());
         let cloud = PointCloud::from_xyz_reader(reader).expect("xyz parsing should succeed");
         assert_eq!(cloud.points().len(), 2);
+    }
+
+    #[test]
+    fn pointcloud2_yaml_parses_float32_xyz() {
+        // Two points: (1,2,3) and (4,5,6) packed as little-endian float32 xyz.
+        let yaml = "height: 1
+width: 2
+fields:
+  - {name: x, offset: 0, datatype: 7}
+  - {name: y, offset: 4, datatype: 7}
+  - {name: z, offset: 8, datatype: 7}
+is_bigendian: false
+point_step: 12
+data: [0,0,128,63,0,0,0,64,0,0,64,64,0,0,128,64,0,0,160,64,0,0,192,64]
+";
+
+        let cloud = PointCloud::from_pointcloud2_yaml(yaml).expect("PointCloud2 parse should work");
+        assert_eq!(cloud.points().len(), 2);
+
+        let p0 = cloud.points()[0];
+        let p1 = cloud.points()[1];
+        assert!((p0.x - 1.0).abs() < 1e-9);
+        assert!((p0.y - 2.0).abs() < 1e-9);
+        assert!((p0.z - 3.0).abs() < 1e-9);
+        assert!((p1.x - 4.0).abs() < 1e-9);
+        assert!((p1.y - 5.0).abs() < 1e-9);
+        assert!((p1.z - 6.0).abs() < 1e-9);
     }
 }

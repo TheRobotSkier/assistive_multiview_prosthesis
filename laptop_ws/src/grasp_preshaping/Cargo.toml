@@ -7,3 +7,5 @@ edition = "2024"
 npyz = { version = "0.8", features = ["npz"] }
 nalgebra = "0.32"
 thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
