@@ -41,7 +41,7 @@ impl Default for CliArgs {
             mode: PointCloudMode::File,
             lut_path: "./data/finger_tip_lut.npz".to_string(),
             xyz_cloud_path: "./data/sphere.xyz".to_string(),
-            pointcloud_topic: TOPIC_POINTCLOUD,
+            pointcloud_topic: TOPIC_POINTCLOUD.to_string(),
             collision_tol: 0.005,
             frequency_hz: 1.0,
             iterations: 1,
