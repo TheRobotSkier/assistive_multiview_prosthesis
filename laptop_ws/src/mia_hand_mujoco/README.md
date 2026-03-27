@@ -57,3 +57,9 @@ The script takes the following arguments:
 * `robot_ns`: namespace assigned to robot-specific nodes. Defaults to `mia_hand`.
 
 This script spawns, for each joint, a position controller.
+
+This is the types of messages that controls it:
+
+ros2 topic pub --once /thumb_pos_ff_controller/commands std_msgs/msg/Float64MultiArray "{data: [0.6]}"
+ros2 topic pub --once /index_pos_ff_controller/commands std_msgs/msg/Float64MultiArray "{data: [0.6]}"
+ros2 topic pub --once /mrl_pos_ff_controller/commands std_msgs/msg/Float64MultiArray "{data: [0.6]}"
