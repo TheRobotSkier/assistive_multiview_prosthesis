@@ -120,7 +120,7 @@ def get_all_finger_transforms(q_active):
     return results
 
 
-def generate_lut(resolution=10):
+def generate_lut(resolution=11):
     """
     Generate a lookup table (LUT) of SE3 matrices for different finger configurations.
     
@@ -240,4 +240,4 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print("Generating Finger Tip LUT...")
     print("="*50)
-    lut = generate_lut(resolution=11)
+    lut = generate_lut(resolution=21)

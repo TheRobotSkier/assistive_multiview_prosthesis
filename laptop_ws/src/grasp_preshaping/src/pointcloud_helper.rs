@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::sync::RwLock;
 
 #[derive(Debug, Clone)]
 pub struct PointCloud {
@@ -170,7 +171,7 @@ fn read_point_field(
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AabbMask {
     pub min: Vector3<f64>,
     pub max: Vector3<f64>,
@@ -205,6 +206,8 @@ pub struct PointCloudProximityChecker {
     cloud: PointCloud,
     sorted_x_indices: Vec<usize>,
     sorted_x_values: Vec<f64>,
+    full_cloud_aabb: Option<AabbMask>,
+    cached_user_mask_aabb: RwLock<Option<(AabbMask, Option<AabbMask>)>>,
 }
 
 impl PointCloudProximityChecker {
@@ -220,24 +223,45 @@ impl PointCloudProximityChecker {
             .iter()
             .map(|idx| cloud.points[*idx].x)
             .collect();
+        let full_cloud_aabb = compute_tight_aabb(cloud.points.iter());
 
         Self {
             cloud,
             sorted_x_indices,
             sorted_x_values,
+            full_cloud_aabb,
+            cached_user_mask_aabb: RwLock::new(None),
         }
     }
 
     pub fn nearest_distance(&self, query: &ProximityQuery) -> NearestDistanceResult {
         let world_tip = compose_tip_position(&query.base_transform, &query.finger_transform);
 
+        let effective_aabb = self.effective_aabb(query.mask);
+
+        let Some(effective_aabb) = effective_aabb else {
+            return NearestDistanceResult {
+                world_tip,
+                nearest_distance: None,
+                candidates_checked: 0,
+            };
+        };
+
+        /*if !effective_aabb.contains(&world_tip) {
+            return NearestDistanceResult {
+                world_tip,
+                nearest_distance: None,
+                candidates_checked: 0,
+            };
+        }*/
+
         let mut best_sq: Option<f64> = None;
         let mut candidates_checked = 0usize;
 
         match query.mask {
             Some(mask) => {
-                let left = lower_bound(&self.sorted_x_values, mask.min.x);
-                let right = upper_bound(&self.sorted_x_values, mask.max.x);
+                let left = lower_bound(&self.sorted_x_values, effective_aabb.min.x);
+                let right = upper_bound(&self.sorted_x_values, effective_aabb.max.x);
 
                 for sorted_pos in left..right {
                     let point_idx = self.sorted_x_indices[sorted_pos];
@@ -267,6 +291,61 @@ impl PointCloudProximityChecker {
             candidates_checked,
         }
     }
+
+    fn effective_aabb(&self, mask: Option<AabbMask>) -> Option<AabbMask> {
+        let Some(mask) = mask else {
+            return self.full_cloud_aabb;
+        };
+
+        {
+            let cached = self
+                .cached_user_mask_aabb
+                .read()
+                .expect("aabb cache lock poisoned");
+            if let Some((cached_mask, cached_aabb)) = *cached {
+                if cached_mask == mask {
+                    return cached_aabb;
+                }
+            }
+        }
+
+        let computed = self.tight_aabb_inside_mask(&mask);
+        let mut cached = self
+            .cached_user_mask_aabb
+            .write()
+            .expect("aabb cache lock poisoned");
+        *cached = Some((mask, computed));
+        computed
+    }
+
+    fn tight_aabb_inside_mask(&self, mask: &AabbMask) -> Option<AabbMask> {
+        let left = lower_bound(&self.sorted_x_values, mask.min.x);
+        let right = upper_bound(&self.sorted_x_values, mask.max.x);
+        compute_tight_aabb(
+            self.sorted_x_indices[left..right]
+                .iter()
+                .map(|idx| &self.cloud.points[*idx])
+                .filter(|point| mask.contains(point)),
+        )
+    }
+}
+
+fn compute_tight_aabb<'a>(points: impl Iterator<Item = &'a Vector3<f64>>) -> Option<AabbMask> {
+    let mut iter = points;
+    let first = iter.next()?;
+
+    let mut min = *first;
+    let mut max = *first;
+    for point in iter {
+        min.x = min.x.min(point.x);
+        min.y = min.y.min(point.y);
+        min.z = min.z.min(point.z);
+        max.x = max.x.max(point.x);
+        max.y = max.y.max(point.y);
+        max.z = max.z.max(point.z);
+    }
+
+    Some(AabbMask { min, max })
 }
 
 pub fn compose_tip_position(
@@ -396,6 +475,67 @@ mod tests {
         let result = checker.nearest_distance(&query);
         assert_eq!(result.candidates_checked, 0);
         assert_eq!(result.nearest_distance, None);
+    }
+
+    #[test]
+    fn nearest_distance_without_mask_skips_when_tip_outside_cloud_aabb() {
+        let cloud = PointCloud::new(vec![
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(1.0, 1.0, 1.0),
+        ]);
+        let checker = PointCloudProximityChecker::new(cloud);
+
+        let query = ProximityQuery {
+            base_transform: Matrix4::identity(),
+            finger_transform: t_xyz(10.0, 10.0, 10.0),
+            mask: None,
+        };
+
+        let result = checker.nearest_distance(&query);
+        assert_eq!(result.candidates_checked, 0);
+        assert_eq!(result.nearest_distance, None);
+    }
+
+    #[test]
+    fn nearest_distance_with_mask_uses_tight_subset_for_tip_gate() {
+        let cloud = PointCloud::new(vec![
+            Vector3::new(10.0, 10.0, 10.0),
+            Vector3::new(11.0, 11.0, 11.0),
+            Vector3::new(50.0, 50.0, 50.0),
+        ]);
+        let checker = PointCloudProximityChecker::new(cloud);
+
+        let query = ProximityQuery {
+            base_transform: Matrix4::identity(),
+            finger_transform: t_xyz(5.0, 5.0, 5.0),
+            mask: Some(AabbMask {
+                min: Vector3::new(0.0, 0.0, 0.0),
+                max: Vector3::new(20.0, 20.0, 20.0),
+            }),
+        };
+
+        let result = checker.nearest_distance(&query);
+        assert_eq!(result.candidates_checked, 0);
+        assert_eq!(result.nearest_distance, None);
+    }
+
+    #[test]
+    fn nearest_distance_tip_on_computed_aabb_boundary_is_included() {
+        let cloud = PointCloud::new(vec![
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(2.0, 0.0, 0.0),
+        ]);
+        let checker = PointCloudProximityChecker::new(cloud);
+
+        let query = ProximityQuery {
+            base_transform: Matrix4::identity(),
+            finger_transform: t_xyz(0.0, 0.0, 0.0),
+            mask: None,
+        };
+
+        let result = checker.nearest_distance(&query);
+        assert_eq!(result.candidates_checked, 2);
+        assert_eq!(result.nearest_distance, Some(0.0));
     }
 
     #[test]

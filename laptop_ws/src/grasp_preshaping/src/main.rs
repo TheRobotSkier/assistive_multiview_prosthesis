@@ -1,4 +1,5 @@
 use nalgebra::Vector3;
+use nalgebra::Matrix4;
 use preshaping::lut_helper::FingerLUT;
 use preshaping::planner::{compute_preshape, PlannerConfig};
 use preshaping::pointcloud_helper::{AabbMask, PointCloud, PointCloudProximityChecker};
@@ -40,7 +41,7 @@ impl Default for CliArgs {
         Self {
             mode: PointCloudMode::File,
             lut_path: "./data/finger_tip_lut.npz".to_string(),
-            xyz_cloud_path: "./data/sphere.xyz".to_string(),
+            xyz_cloud_path: "./data/cyllinder.xyz".to_string(),
             pointcloud_topic: TOPIC_POINTCLOUD.to_string(),
             collision_tol: 0.005,
             frequency_hz: 1.0,
@@ -222,6 +223,11 @@ fn main() {
     planner_cfg.mask = cli.aabb_mask;
     planner_cfg.distal_proximal_offset = cli.distal_proximal_offset;
     planner_cfg.palmar_dorsal_offset = cli.palmar_dorsal_offset;
+    let mut base_transform = Matrix4::identity();
+    base_transform[(0, 3)] = -0.02;
+    base_transform[(1, 3)] = 0.24;
+    base_transform[(2, 3)] = 0.85;
+    planner_cfg.base_transform = base_transform;
 
     println!("Time taken for setup: {:.2?}", now.elapsed());
     let period = Duration::from_secs_f64(1.0 / cli.frequency_hz);
@@ -255,6 +261,8 @@ fn main() {
         println!("[iter {}] Point cloud loaded with {} points", iter_idx, pc.len());
         let checker = PointCloudProximityChecker::new(pc);
 
+        let collision_start = Instant::now();
+
         let result = compute_preshape(&lut, &checker, &planner_cfg).unwrap_or_else(|e| {
             eprintln!("Planning failed: {}", e);
             std::process::exit(1);
@@ -263,7 +271,7 @@ fn main() {
         println!(
             "[iter {}] Time taken for collision checking: {:.2?}",
             iter_idx,
-            tick_start.elapsed()
+            collision_start.elapsed()
         );
         println!("Closest distance found: {:.4} m", result.closest_distance);
         println!(
@@ -304,6 +312,10 @@ fn main() {
         }
 
         let elapsed = tick_start.elapsed();
+        println!(
+            "[iter {}] Total time for iteration: {:.2?}",
+            iter_idx, elapsed
+        );
         if elapsed < period {
             thread::sleep(period - elapsed);
         } else {

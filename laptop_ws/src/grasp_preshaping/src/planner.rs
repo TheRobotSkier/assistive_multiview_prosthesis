@@ -24,13 +24,8 @@ pub struct PlannerConfig {
 
 impl Default for PlannerConfig {
     fn default() -> Self {
-        let mut base_transform = Matrix4::identity();
-        base_transform[(0, 3)] = -0.1;
-        base_transform[(1, 3)] = -1.16;
-        base_transform[(2, 3)] = 0.0;
-
         Self {
-            base_transform,
+            base_transform: Matrix4::identity(),
             collision_tol: 0.005,
             thumb_opp_sample: 0,
             mask: None,
