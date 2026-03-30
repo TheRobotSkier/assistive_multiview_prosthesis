@@ -96,6 +96,15 @@ impl PointCloud {
         self.points.len()
     }
 
+    pub fn scaled(&self, factor: f64) -> Self {
+        if (factor - 1.0).abs() < f64::EPSILON {
+            return self.clone();
+        }
+
+        let points = self.points.iter().map(|p| p * factor).collect();
+        Self::new(points)
+    }
+
     #[cfg(test)]
     pub fn points(&self) -> &[Vector3<f64>] {
         &self.points
@@ -571,5 +580,20 @@ data: [0,0,128,63,0,0,0,64,0,0,64,64,0,0,128,64,0,0,160,64,0,0,192,64]
         assert!((p1.x - 4.0).abs() < 1e-9);
         assert!((p1.y - 5.0).abs() < 1e-9);
         assert!((p1.z - 6.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn scaled_multiplies_all_points() {
+        let cloud = PointCloud::new(vec![Vector3::new(1.0, -2.0, 3.0), Vector3::new(0.5, 1.0, -1.5)]);
+        let scaled = cloud.scaled(0.01);
+
+        let p0 = scaled.points()[0];
+        let p1 = scaled.points()[1];
+        assert!((p0.x - 0.01).abs() < 1e-12);
+        assert!((p0.y + 0.02).abs() < 1e-12);
+        assert!((p0.z - 0.03).abs() < 1e-12);
+        assert!((p1.x - 0.005).abs() < 1e-12);
+        assert!((p1.y - 0.01).abs() < 1e-12);
+        assert!((p1.z + 0.015).abs() < 1e-12);
     }
 }

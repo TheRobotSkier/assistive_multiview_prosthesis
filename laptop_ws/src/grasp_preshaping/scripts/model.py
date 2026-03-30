@@ -120,12 +120,12 @@ def get_all_finger_transforms(q_active):
     return results
 
 
-def generate_lut(resolution=11):
+def generate_lut(resolution=21):
     """
     Generate a lookup table (LUT) of SE3 matrices for different finger configurations.
     
     Args:
-        resolution: Number of samples to generate across each actuation range (default: 10)
+        resolution: Number of samples to generate across each actuation range (default: 21)
     
     Returns:
         Dictionary containing SE3 transforms for each finger configuration

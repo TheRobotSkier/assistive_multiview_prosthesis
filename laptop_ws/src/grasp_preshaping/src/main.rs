@@ -1,7 +1,7 @@
 use nalgebra::Vector3;
 use nalgebra::Matrix4;
 use preshaping::lut_helper::FingerLUT;
-use preshaping::planner::{compute_preshape, PlannerConfig};
+use preshaping::planner::{compute_preshape, PlannerConfig, PreshapeResult};
 use preshaping::pointcloud_helper::{AabbMask, PointCloud, PointCloudProximityChecker};
 use preshaping::ros_command_helper::publish_float64_multi_array_once;
 use std::env;
@@ -27,10 +27,14 @@ struct CliArgs {
     lut_path: String,
     xyz_cloud_path: String,
     pointcloud_topic: String,
+    pointcloud_scale: f64,
     collision_tol: f64,
     frequency_hz: f64,
     iterations: usize,
     publish_commands: bool,
+    search_base_transform: bool,
+    base_search_step: f64,
+    base_search_span: f64,
     aabb_mask: Option<AabbMask>,
     distal_proximal_offset: f64,
     palmar_dorsal_offset: f64,
@@ -41,12 +45,16 @@ impl Default for CliArgs {
         Self {
             mode: PointCloudMode::File,
             lut_path: "./data/finger_tip_lut.npz".to_string(),
-            xyz_cloud_path: "./data/cyllinder.xyz".to_string(),
+            xyz_cloud_path: "./data/sphere.xyz".to_string(),
             pointcloud_topic: TOPIC_POINTCLOUD.to_string(),
+            pointcloud_scale: 0.03,
             collision_tol: 0.005,
             frequency_hz: 1.0,
             iterations: 1,
             publish_commands: false,
+            search_base_transform: false,
+            base_search_step: 0.01,
+            base_search_span: 0.2,
             aabb_mask: None,
             distal_proximal_offset: 0.0,
             palmar_dorsal_offset: 0.0,
@@ -98,6 +106,14 @@ fn parse_cli_args() -> Result<CliArgs, String> {
                     .next()
                     .ok_or_else(|| "Missing value for --pointcloud-topic".to_string())?;
             }
+            "--pc-scale" | "--pointcloud-scale" => {
+                let raw = iter
+                    .next()
+                    .ok_or_else(|| "Missing value for --pc-scale".to_string())?;
+                cfg.pointcloud_scale = raw
+                    .parse::<f64>()
+                    .map_err(|e| format!("Invalid --pc-scale value {}: {}", raw, e))?;
+            }
             "--frequency-hz" => {
                 let raw = iter
                     .next()
@@ -116,6 +132,15 @@ fn parse_cli_args() -> Result<CliArgs, String> {
             }
             "--publish-commands" => {
                 cfg.publish_commands = true;
+            }
+            "--search-base-transform" => {
+                cfg.search_base_transform = true;
+            }
+            "--base-search-step" => {
+                cfg.base_search_step = parse_next_f64(&mut iter, "--base-search-step")?;
+            }
+            "--base-search-span" => {
+                cfg.base_search_span = parse_next_f64(&mut iter, "--base-search-span")?;
             }
             "--aabb" => {
                 let xmin = parse_next_f64(&mut iter, "--aabb xmin")?;
@@ -150,6 +175,18 @@ fn parse_cli_args() -> Result<CliArgs, String> {
         return Err("--frequency-hz must be > 0".to_string());
     }
 
+    if !cfg.pointcloud_scale.is_finite() || cfg.pointcloud_scale <= 0.0 {
+        return Err("--pc-scale must be a finite value > 0".to_string());
+    }
+
+    if !cfg.base_search_step.is_finite() || cfg.base_search_step <= 0.0 {
+        return Err("--base-search-step must be a finite value > 0".to_string());
+    }
+
+    if !cfg.base_search_span.is_finite() || cfg.base_search_span < 0.0 {
+        return Err("--base-search-span must be a finite value >= 0".to_string());
+    }
+
     Ok(cfg)
 }
 
@@ -170,9 +207,13 @@ fn print_usage() {
     println!("  --lut PATH             LUT file (default: ./data/finger_tip_lut.npz)");
     println!("  --cloud PATH           point cloud .xyz file (default: ./data/sphere.xyz)");
     println!("  --pointcloud-topic TOPIC point cloud topic for --mode ros (default: /segmented_object_cloud)");
+    println!("  --pc-scale VALUE       isotropic point cloud scale factor (default: 0.03)");
     println!("  --collision-tol VALUE  collision tolerance in meters (default: 0.005)");
     println!("  --frequency-hz VALUE   execution frequency in Hz (default: 1.0)");
     println!("  --iterations N         number of iterations (0 => run forever, default: 1)");
+    println!("  --search-base-transform run a 3D grid search over base translation around (0,0,0)");
+    println!("  --base-search-step VALUE  translation increment in meters (default: 0.005)");
+    println!("  --base-search-span VALUE  search span in each axis, [-span,+span] (default: 0.02)");
     println!("  --aabb xmin ymin zmin xmax ymax zmax");
     println!("                         optional AABB mask; if omitted full cloud is used");
     println!("  --offset-distal-proximal VALUE  finger-local X translation in meters");
@@ -203,6 +244,84 @@ fn read_ros_pointcloud(topic: &str) -> Result<PointCloud, String> {
     PointCloud::from_pointcloud2_yaml(&raw)
 }
 
+fn count_collisions(result: &PreshapeResult) -> usize {
+    [
+        result.thumb_sample,
+        result.index_sample,
+        result.middle_sample,
+        result.ring_sample,
+        result.little_sample,
+    ]
+    .iter()
+    .filter(|sample| sample.is_some())
+    .count()
+}
+
+fn select_better_result(
+    best: &(Matrix4<f64>, PreshapeResult),
+    candidate: &(Matrix4<f64>, PreshapeResult),
+) -> bool {
+    let best_collisions = count_collisions(&best.1);
+    let candidate_collisions = count_collisions(&candidate.1);
+    if candidate_collisions != best_collisions {
+        return candidate_collisions > best_collisions;
+    }
+
+    if (candidate.1.closest_distance - best.1.closest_distance).abs() > f64::EPSILON {
+        return candidate.1.closest_distance < best.1.closest_distance;
+    }
+
+    let best_norm_sq = best.0[(0, 3)].powi(2) + best.0[(1, 3)].powi(2) + best.0[(2, 3)].powi(2);
+    let candidate_norm_sq =
+        candidate.0[(0, 3)].powi(2) + candidate.0[(1, 3)].powi(2) + candidate.0[(2, 3)].powi(2);
+    candidate_norm_sq < best_norm_sq
+}
+
+fn search_best_base_transform(
+    lut: &FingerLUT,
+    checker: &PointCloudProximityChecker,
+    planner_cfg: &PlannerConfig,
+    step: f64,
+    span: f64,
+) -> Result<(Matrix4<f64>, PreshapeResult, usize), String> {
+    let cells_per_axis = (span / step).floor() as isize;
+    let mut best: Option<(Matrix4<f64>, PreshapeResult)> = None;
+    let mut evaluated = 0usize;
+
+    for ix in -cells_per_axis..=cells_per_axis {
+        for iy in -cells_per_axis..=cells_per_axis {
+            for iz in -cells_per_axis..=cells_per_axis {
+                let tx = ix as f64 * step;
+                let ty = iy as f64 * step;
+                let tz = iz as f64 * step;
+
+                let mut cfg = planner_cfg.clone();
+                let mut tf = Matrix4::identity();
+                tf[(0, 3)] = tx;
+                tf[(1, 3)] = ty;
+                tf[(2, 3)] = tz;
+                cfg.base_transform = tf;
+
+                let result = compute_preshape(lut, checker, &cfg)
+                    .map_err(|e| format!("Grid-search planning failed: {}", e))?;
+                let candidate = (tf, result);
+                evaluated += 1;
+
+                if let Some(current_best) = &best {
+                    if select_better_result(current_best, &candidate) {
+                        best = Some(candidate);
+                    }
+                } else {
+                    best = Some(candidate);
+                }
+            }
+        }
+    }
+
+    let (best_tf, best_result) = best.ok_or_else(|| "Grid search had no candidates".to_string())?;
+    Ok((best_tf, best_result, evaluated))
+}
+
 fn main() {
     let cli = parse_cli_args().unwrap_or_else(|e| {
         eprintln!("{}", e);
@@ -224,9 +343,9 @@ fn main() {
     planner_cfg.distal_proximal_offset = cli.distal_proximal_offset;
     planner_cfg.palmar_dorsal_offset = cli.palmar_dorsal_offset;
     let mut base_transform = Matrix4::identity();
-    base_transform[(0, 3)] = -0.02;
-    base_transform[(1, 3)] = 0.24;
-    base_transform[(2, 3)] = 0.85;
+    base_transform[(0, 3)] = 0.0;
+    base_transform[(1, 3)] = -0.11;
+    base_transform[(2, 3)] = -0.05;
     planner_cfg.base_transform = base_transform;
 
     println!("Time taken for setup: {:.2?}", now.elapsed());
@@ -256,22 +375,60 @@ fn main() {
                 eprintln!("Failed to read PointCloud2 from ROS topic: {}", e);
                 std::process::exit(1);
             }),
-        };
+        }
+        .scaled(cli.pointcloud_scale);
 
-        println!("[iter {}] Point cloud loaded with {} points", iter_idx, pc.len());
+        println!(
+            "[iter {}] Point cloud loaded with {} points (scale {:.6})",
+            iter_idx,
+            pc.len(),
+            cli.pointcloud_scale
+        );
         let checker = PointCloudProximityChecker::new(pc);
 
         let collision_start = Instant::now();
 
-        let result = compute_preshape(&lut, &checker, &planner_cfg).unwrap_or_else(|e| {
-            eprintln!("Planning failed: {}", e);
-            std::process::exit(1);
-        });
+        let (active_base_tf, result, evaluated_candidates) = if cli.search_base_transform {
+            search_best_base_transform(
+                &lut,
+                &checker,
+                &planner_cfg,
+                cli.base_search_step,
+                cli.base_search_span,
+            )
+            .map(|(tf, res, n)| (tf, res, n))
+            .unwrap_or_else(|e| {
+                eprintln!("Base-transform grid search failed: {}", e);
+                std::process::exit(1);
+            })
+        } else {
+            let res = compute_preshape(&lut, &checker, &planner_cfg).unwrap_or_else(|e| {
+                eprintln!("Planning failed: {}", e);
+                std::process::exit(1);
+            });
+            (planner_cfg.base_transform, res, 1)
+        };
 
         println!(
             "[iter {}] Time taken for collision checking: {:.2?}",
             iter_idx,
             collision_start.elapsed()
+        );
+        println!(
+            "[iter {}] Base transform search candidates evaluated: {}",
+            iter_idx, evaluated_candidates
+        );
+        println!(
+            "[iter {}] Active base translation: x={:.4}, y={:.4}, z={:.4}",
+            iter_idx,
+            active_base_tf[(0, 3)],
+            active_base_tf[(1, 3)],
+            active_base_tf[(2, 3)]
+        );
+        println!(
+            "[iter {}] Finger collisions in best result: {}/5",
+            iter_idx,
+            count_collisions(&result)
         );
         println!("Closest distance found: {:.4} m", result.closest_distance);
         println!(
