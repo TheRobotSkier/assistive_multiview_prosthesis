@@ -22,6 +22,16 @@ THEN cd to the docker-deployment directory:
 
 cd docker_ws/docker-deployment
 
+### For the new dynamic simulation:
+
+Run
+
+docker compose run --build --rm mujoco_dynamic
+
+This will launch the dynamic simulation, and you should have a GUI for selecting the grasp planning parameters (and executing the grasp planning). Logs for the grasp planner can be found under docker_ws/dev/mujoco/log/
+
+### For the old simulation:
+
 THEN to build the simulation:
 
 scene=custom docker compose run --build --rm miahand_mujoco
