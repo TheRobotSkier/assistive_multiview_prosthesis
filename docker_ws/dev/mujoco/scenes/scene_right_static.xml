@@ -1,0 +1,51 @@
+<!-- Static dev scene for grasp_preshaping validation.
+     This is the renamed successor to the old "custom" scene.
+     The hand pose matches the default MuJoCo right-hand pose used in
+     grasp_preshaping/src/main.rs.
+     The target sphere is placed so that its position relative to the hand is the
+     same as in the original setup where the sphere was at world origin and the
+     hand was moved to (0, -0.11, -0.05) with identity orientation.
+     Relative sphere position in hand frame: (0, 0.11, 0.05)
+     Sphere radius = 0.03 m = sphere.xyz unit radius × default pointcloud_scale (0.03). -->
+<mujoco model="mia_hand_right static scene">
+  <include file="mia_hand_right_grasp_frame.xml"/>
+
+  <!-- Camera framing: centre between the default hand pose and the target sphere. -->
+  <statistic extent="0.4" center="-0.1 -0.025 0.255"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0"
+      width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+      rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+      texrepeat="5 5" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 3" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 .125" type="plane" material="groundplane"
+      conaffinity="15" condim="3"/>
+    <!-- Target sphere position preserves the original sphere-to-hand relation
+         under the new default hand pose. -->
+    <geom name="target_sphere" type="sphere" pos="-0.1 -0.0499124 0.3100398" size="0.03"
+      rgba="1 0 0 1" contype="0" conaffinity="0"/>
+
+    <!-- Fixed depth camera for simulated object-only point cloud publication.
+         Pose adapted from the legacy pixi prototype and chosen to view both the
+         target sphere and the approaching fingertips. -->
+    <body name="depth_cam_body" pos="-0.08 -0.46 0.36" euler="-1.67079632679 0 0">
+      <camera
+        name="front_depth_cam"
+        pos="0 0 0"
+        euler="3.14 0 0"
+        fovy="58"/>
+    </body>
+  </worldbody>
+</mujoco>

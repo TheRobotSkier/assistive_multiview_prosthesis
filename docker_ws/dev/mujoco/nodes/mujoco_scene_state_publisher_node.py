@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish simulated depth outputs and an object-only world-frame point cloud."""
+"""Publish shared MuJoCo-derived scene state for depth and TF consumer nodes."""
 
 from __future__ import annotations
 
@@ -10,8 +10,10 @@ from pathlib import Path
 import mujoco
 import numpy as np
 import rclpy
+from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, JointState, PointCloud2, PointField
+from tf2_msgs.msg import TFMessage
 
 
 def absolutize_file_refs(xml_text: str, base_dir: Path) -> str:
@@ -101,9 +103,19 @@ def derive_thumb_opposition(index_angle: float, min_angle: float, max_angle: flo
     return min_angle + alpha * (max_angle - min_angle)
 
 
-class MujocoDepthPublisher(Node):
+def sanitize_frame_name(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_]", "_", name).strip("_")
+
+
+def matrix_to_quaternion_xyzw(matrix: np.ndarray) -> np.ndarray:
+    quat_wxyz = np.zeros(4, dtype=np.float64)
+    mujoco.mju_mat2Quat(quat_wxyz, matrix.reshape(-1))
+    return np.array([quat_wxyz[1], quat_wxyz[2], quat_wxyz[3], quat_wxyz[0]], dtype=np.float64)
+
+
+class MujocoSceneStatePublisher(Node):
     def __init__(self) -> None:
-        super().__init__("mujoco_depth_publisher")
+        super().__init__("mujoco_scene_state_publisher")
 
         self.declare_parameter("xml_model_path", "")
         self.declare_parameter("output_dir", "/tmp/mia_hand_mujoco_depth")
@@ -111,13 +123,15 @@ class MujocoDepthPublisher(Node):
         self.declare_parameter("camera_frame_id", "mujoco_front_depth_cam")
         self.declare_parameter("world_frame_id", "world")
         self.declare_parameter("joint_state_topic", "/joint_states")
-        self.declare_parameter("depth_image_topic", "/mujoco/depth/image")
-        self.declare_parameter("depth_camera_info_topic", "/mujoco/depth/camera_info")
-        self.declare_parameter("depth_camera_pointcloud_topic", "/mujoco/depth/points_camera")
-        self.declare_parameter("segmented_pointcloud_topic", "/segmented_object_cloud")
+        self.declare_parameter("internal_depth_image_topic", "/mujoco/internal/depth/image")
+        self.declare_parameter("internal_depth_camera_info_topic", "/mujoco/internal/depth/camera_info")
+        self.declare_parameter("internal_depth_camera_pointcloud_topic", "/mujoco/internal/depth/points_camera")
+        self.declare_parameter("internal_segmented_pointcloud_topic", "/mujoco/internal/segmented_object_cloud")
+        self.declare_parameter("internal_scene_tf_topic", "/mujoco/internal/scene_transforms")
         self.declare_parameter("width", 640)
         self.declare_parameter("height", 480)
-        self.declare_parameter("publish_hz", 5.0)
+        self.declare_parameter("depth_publish_hz", 5.0)
+        self.declare_parameter("tf_publish_hz", 30.0)
         self.declare_parameter("max_depth", 1.5)
         self.declare_parameter("pointcloud_stride", 2)
         self.declare_parameter("warmup_steps", 0)
@@ -128,6 +142,7 @@ class MujocoDepthPublisher(Node):
         self.declare_parameter("publish_camera_info", True)
         self.declare_parameter("publish_camera_cloud", True)
         self.declare_parameter("wait_for_joint_state", True)
+        self.declare_parameter("camera_frame_convention", "legacy")
 
         xml_model_path_value = str(self.get_parameter("xml_model_path").value).strip()
         if not xml_model_path_value:
@@ -144,7 +159,8 @@ class MujocoDepthPublisher(Node):
         self.world_frame_id = str(self.get_parameter("world_frame_id").value)
         self.width = int(self.get_parameter("width").value)
         self.height = int(self.get_parameter("height").value)
-        self.publish_hz = float(self.get_parameter("publish_hz").value)
+        self.depth_publish_hz = float(self.get_parameter("depth_publish_hz").value)
+        self.tf_publish_hz = float(self.get_parameter("tf_publish_hz").value)
         self.max_depth = float(self.get_parameter("max_depth").value)
         self.pointcloud_stride = max(1, int(self.get_parameter("pointcloud_stride").value))
         self.publish_depth_image = bool(self.get_parameter("publish_depth_image").value)
@@ -154,6 +170,12 @@ class MujocoDepthPublisher(Node):
         self.target_geom_name = str(self.get_parameter("target_geom_name").value)
         self.prefix = str(self.get_parameter("prefix").value)
         self.laterality = str(self.get_parameter("laterality").value)
+        self.camera_frame_convention = str(self.get_parameter("camera_frame_convention").value)
+
+        if self.camera_frame_convention not in {"legacy", "ros_optical"}:
+            raise ValueError(
+                f"Unsupported camera_frame_convention '{self.camera_frame_convention}'. Expected legacy|ros_optical"
+            )
 
         self.renderer = mujoco.Renderer(self.model, height=self.height, width=self.width)
         self.renderer.enable_depth_rendering()
@@ -173,22 +195,46 @@ class MujocoDepthPublisher(Node):
         self.cy = (self.height - 1) * 0.5
         self.geomgroup = np.ones(6, dtype=np.uint8)
 
-        self.lock = threading.Lock()
-        self.latest_joint_positions: dict[str, float] = {}
-        self.have_joint_state = False
-        self.warned_waiting_for_joint_state = False
-
         self.ros_to_mj = self._build_joint_name_map()
         self.thumb_opp_qposadr = self._qposadr_for_joint(self.ros_to_mj.get(self.prefix + "j_thumb_opp", ""))
         self.thumb_opp_range = self._joint_range(self.ros_to_mj.get(self.prefix + "j_thumb_opp", ""))
+        self.body_frame_map = self._build_named_body_frame_map()
+        self.geom_frame_map = self._build_named_geom_frame_map()
+        self.camera_frame_map = self._build_named_camera_frame_map()
 
         for _ in range(max(0, int(self.get_parameter("warmup_steps").value))):
             mujoco.mj_forward(self.model, self.data)
 
-        self.depth_pub = self.create_publisher(Image, str(self.get_parameter("depth_image_topic").value), 10)
-        self.info_pub = self.create_publisher(CameraInfo, str(self.get_parameter("depth_camera_info_topic").value), 10)
-        self.camera_cloud_pub = self.create_publisher(PointCloud2, str(self.get_parameter("depth_camera_pointcloud_topic").value), 10)
-        self.world_cloud_pub = self.create_publisher(PointCloud2, str(self.get_parameter("segmented_pointcloud_topic").value), 10)
+        self.depth_pub = self.create_publisher(
+            Image,
+            str(self.get_parameter("internal_depth_image_topic").value),
+            10,
+        )
+        self.info_pub = self.create_publisher(
+            CameraInfo,
+            str(self.get_parameter("internal_depth_camera_info_topic").value),
+            10,
+        )
+        self.camera_cloud_pub = self.create_publisher(
+            PointCloud2,
+            str(self.get_parameter("internal_depth_camera_pointcloud_topic").value),
+            10,
+        )
+        self.world_cloud_pub = self.create_publisher(
+            PointCloud2,
+            str(self.get_parameter("internal_segmented_pointcloud_topic").value),
+            10,
+        )
+        self.tf_message_pub = self.create_publisher(
+            TFMessage,
+            str(self.get_parameter("internal_scene_tf_topic").value),
+            10,
+        )
+
+        self.state_lock = threading.Lock()
+        self.latest_joint_positions: dict[str, float] = {}
+        self.have_joint_state = False
+        self.warned_waiting_for_joint_state = False
 
         self.joint_state_sub = self.create_subscription(
             JointState,
@@ -197,12 +243,18 @@ class MujocoDepthPublisher(Node):
             10,
         )
 
-        timer_period = 1.0 / max(1e-3, self.publish_hz)
-        self.timer = self.create_timer(timer_period, self.on_timer)
+        self.depth_timer = self.create_timer(
+            1.0 / max(1e-3, self.depth_publish_hz),
+            self.on_depth_timer,
+        )
+        self.tf_timer = self.create_timer(
+            1.0 / max(1e-3, self.tf_publish_hz),
+            self.on_tf_timer,
+        )
 
-        self.get_logger().info(f"Loaded shadow MuJoCo model from: {used_xml}")
+        self.get_logger().info(f"Loaded shared MuJoCo shadow model from: {used_xml}")
         if fallback_used:
-            self.get_logger().warn("Using generated no-plugin MuJoCo model fallback for depth publishing.")
+            self.get_logger().warn("Using generated no-plugin MuJoCo model fallback for shared state publishing.")
 
     def destroy_node(self) -> bool:
         self.renderer.close()
@@ -214,6 +266,44 @@ class MujocoDepthPublisher(Node):
         for base_name in ["j_thumb_fle", "j_index_fle", "j_mrl_fle", "j_thumb_opp"]:
             mapping[self.prefix + base_name] = base_name + suffix
         return mapping
+
+    def _build_named_body_frame_map(self) -> dict[int, str]:
+        frame_map: dict[int, str] = {}
+        for body_id in range(1, int(self.model.nbody)):
+            name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body_id)
+            if not name:
+                continue
+            sanitized = sanitize_frame_name(name)
+            frame_map[body_id] = f"mujoco_body_{sanitized}"
+            if name == "palm_r":
+                frame_map[body_id] = "mujoco_palm_r"
+            elif name == "palm_l":
+                frame_map[body_id] = "mujoco_palm_l"
+        return frame_map
+
+    def _build_named_geom_frame_map(self) -> dict[int, str]:
+        frame_map: dict[int, str] = {}
+        for geom_id in range(int(self.model.ngeom)):
+            name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            if not name:
+                continue
+            sanitized = sanitize_frame_name(name)
+            frame_map[geom_id] = f"mujoco_geom_{sanitized}"
+            if name == self.target_geom_name:
+                frame_map[geom_id] = f"mujoco_{sanitized}"
+        return frame_map
+
+    def _build_named_camera_frame_map(self) -> dict[int, str]:
+        frame_map: dict[int, str] = {}
+        for cam_id in range(int(self.model.ncam)):
+            name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_CAMERA, cam_id)
+            if not name:
+                continue
+            if name == self.camera_name:
+                frame_map[cam_id] = self.camera_frame_id
+            else:
+                frame_map[cam_id] = f"mujoco_camera_{sanitize_frame_name(name)}"
+        return frame_map
 
     def _qposadr_for_joint(self, joint_name: str) -> int | None:
         if not joint_name:
@@ -235,48 +325,58 @@ class MujocoDepthPublisher(Node):
         )
 
     def on_joint_state(self, msg: JointState) -> None:
-        with self.lock:
+        with self.state_lock:
             self.latest_joint_positions = {
                 name: position
                 for name, position in zip(msg.name, msg.position)
             }
             self.have_joint_state = True
 
-    def on_timer(self) -> None:
-        with self.lock:
-            joint_positions = dict(self.latest_joint_positions)
-            have_joint_state = self.have_joint_state
+    def on_depth_timer(self) -> None:
+        with self.state_lock:
+            if not self._ensure_ready("depth image and cloud"):
+                return
+            self._apply_joint_positions_unlocked()
+            mujoco.mj_forward(self.model, self.data)
 
-        if self.wait_for_joint_state and not have_joint_state:
+            self.renderer.update_scene(self.data, camera=self.camera_name)
+            depth = self.renderer.render().astype(np.float32)
+            invalid = (depth <= 0.0) | (~np.isfinite(depth)) | (depth > self.max_depth)
+            depth[invalid] = 0.0
+            stamp = self.get_clock().now().to_msg()
+
+            if self.publish_depth_image:
+                self.depth_pub.publish(self.make_depth_image(depth, stamp))
+            if self.publish_camera_info:
+                self.info_pub.publish(self.make_camera_info(stamp))
+
+            points_cam_ros = self.depth_to_camera_points(depth)
+            points_cam_ros = self.filter_points_by_target_geom(points_cam_ros)
+            points_world = self.camera_points_to_world(points_cam_ros)
+
+            if self.publish_camera_cloud:
+                self.camera_cloud_pub.publish(self.make_pointcloud2(points_cam_ros, stamp, self.camera_frame_id))
+            self.world_cloud_pub.publish(self.make_pointcloud2(points_world, stamp, self.world_frame_id))
+
+    def on_tf_timer(self) -> None:
+        with self.state_lock:
+            if not self._ensure_ready("scene TF state"):
+                return
+            self._apply_joint_positions_unlocked()
+            mujoco.mj_forward(self.model, self.data)
+            stamp = self.get_clock().now().to_msg()
+            self.tf_message_pub.publish(TFMessage(transforms=self.build_scene_transforms(stamp)))
+
+    def _ensure_ready(self, output_name: str) -> bool:
+        if self.wait_for_joint_state and not self.have_joint_state:
             if not self.warned_waiting_for_joint_state:
-                self.get_logger().info("Waiting for /joint_states before publishing depth cloud.")
+                self.get_logger().info(f"Waiting for /joint_states before publishing {output_name}.")
                 self.warned_waiting_for_joint_state = True
-            return
+            return False
+        return True
 
-        self._apply_joint_positions(joint_positions)
-        mujoco.mj_forward(self.model, self.data)
-
-        self.renderer.update_scene(self.data, camera=self.camera_name)
-        depth = self.renderer.render().astype(np.float32)
-        invalid = (depth <= 0.0) | (~np.isfinite(depth)) | (depth > self.max_depth)
-        depth[invalid] = 0.0
-
-        stamp = self.get_clock().now().to_msg()
-
-        if self.publish_depth_image:
-            self.depth_pub.publish(self.make_depth_image(depth, stamp))
-        if self.publish_camera_info:
-            self.info_pub.publish(self.make_camera_info(stamp))
-
-        points_cam_ros = self.depth_to_camera_points(depth)
-        points_cam_ros = self.filter_points_by_target_geom(points_cam_ros)
-        points_world = self.camera_points_to_world(points_cam_ros)
-
-        if self.publish_camera_cloud:
-            self.camera_cloud_pub.publish(self.make_pointcloud2(points_cam_ros, stamp, self.camera_frame_id))
-        self.world_cloud_pub.publish(self.make_pointcloud2(points_world, stamp, self.world_frame_id))
-
-    def _apply_joint_positions(self, joint_positions: dict[str, float]) -> None:
+    def _apply_joint_positions_unlocked(self) -> None:
+        joint_positions = self.latest_joint_positions
         for ros_name, mj_name in self.ros_to_mj.items():
             if ros_name not in joint_positions or ros_name.endswith("j_thumb_opp"):
                 continue
@@ -301,7 +401,10 @@ class MujocoDepthPublisher(Node):
 
         z = depth[valid]
         x = (u[valid] - self.cx) * z / self.fx
-        y = -(v[valid] - self.cy) * z / self.fy
+        if self.camera_frame_convention == "ros_optical":
+            y = (v[valid] - self.cy) * z / self.fy
+        else:
+            y = -(v[valid] - self.cy) * z / self.fy
         points = np.column_stack((x, y, z)).astype(np.float32)
 
         if self.pointcloud_stride > 1 and points.shape[0] > 0:
@@ -319,7 +422,7 @@ class MujocoDepthPublisher(Node):
         geomid = np.array([-1], dtype=np.int32)
 
         for i, point in enumerate(points_cam_ros):
-            ray_cam = np.array([float(point[0]), float(point[1]), -float(point[2])], dtype=np.float64)
+            ray_cam = self.camera_points_to_mujoco(point[np.newaxis, :])[0].astype(np.float64)
             norm = np.linalg.norm(ray_cam)
             if norm < 1e-12:
                 continue
@@ -347,11 +450,63 @@ class MujocoDepthPublisher(Node):
         if points_cam_ros.shape[0] == 0:
             return points_cam_ros
 
-        points_cam_mj = points_cam_ros.copy()
-        points_cam_mj[:, 2] *= -1.0
+        points_cam_mj = self.camera_points_to_mujoco(points_cam_ros)
         rot = self.data.cam_xmat[self.cam_id].reshape(3, 3).copy()
         cam_pos = self.data.cam_xpos[self.cam_id].copy()
         return (points_cam_mj @ rot.T + cam_pos).astype(np.float32)
+
+    def camera_points_to_mujoco(self, points_cam: np.ndarray) -> np.ndarray:
+        points_cam_mj = points_cam.copy()
+        if self.camera_frame_convention == "ros_optical":
+            points_cam_mj[:, 1] *= -1.0
+        points_cam_mj[:, 2] *= -1.0
+        return points_cam_mj
+
+    def build_scene_transforms(self, stamp) -> list[TransformStamped]:
+        transforms: list[TransformStamped] = []
+
+        for body_id, child_frame in self.body_frame_map.items():
+            rotation = self.data.xmat[body_id].reshape(3, 3).copy()
+            translation = self.data.xpos[body_id].copy()
+            transforms.append(self.make_transform(stamp, child_frame, translation, rotation))
+
+        for geom_id, child_frame in self.geom_frame_map.items():
+            rotation = self.data.geom_xmat[geom_id].reshape(3, 3).copy()
+            translation = self.data.geom_xpos[geom_id].copy()
+            transforms.append(self.make_transform(stamp, child_frame, translation, rotation))
+
+        for cam_id, child_frame in self.camera_frame_map.items():
+            rotation = self.camera_rotation_for_tf(cam_id)
+            translation = self.data.cam_xpos[cam_id].copy()
+            transforms.append(self.make_transform(stamp, child_frame, translation, rotation))
+
+        return transforms
+
+    def camera_rotation_for_tf(self, cam_id: int) -> np.ndarray:
+        rotation = self.data.cam_xmat[cam_id].reshape(3, 3).copy()
+        if self.camera_frame_convention == "ros_optical":
+            optical_to_mujoco = np.array([
+                [1.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0],
+                [0.0, 0.0, -1.0],
+            ], dtype=np.float64)
+            return rotation @ optical_to_mujoco
+        return rotation
+
+    def make_transform(self, stamp, child_frame: str, translation: np.ndarray, rotation: np.ndarray) -> TransformStamped:
+        msg = TransformStamped()
+        msg.header.stamp = stamp
+        msg.header.frame_id = self.world_frame_id
+        msg.child_frame_id = child_frame
+        msg.transform.translation.x = float(translation[0])
+        msg.transform.translation.y = float(translation[1])
+        msg.transform.translation.z = float(translation[2])
+        quat_xyzw = matrix_to_quaternion_xyzw(rotation)
+        msg.transform.rotation.x = float(quat_xyzw[0])
+        msg.transform.rotation.y = float(quat_xyzw[1])
+        msg.transform.rotation.z = float(quat_xyzw[2])
+        msg.transform.rotation.w = float(quat_xyzw[3])
+        return msg
 
     def make_depth_image(self, depth: np.ndarray, stamp) -> Image:
         msg = Image()
@@ -406,7 +561,7 @@ class MujocoDepthPublisher(Node):
 
 def main(args: list[str] | None = None) -> int:
     rclpy.init(args=args)
-    node = MujocoDepthPublisher()
+    node = MujocoSceneStatePublisher()
     try:
         rclpy.spin(node)
     finally:

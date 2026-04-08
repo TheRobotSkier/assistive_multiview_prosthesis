@@ -66,12 +66,12 @@ services:
     extends: miahand_ros2
     container_name: miahand_ros2_mujoco
     environment:
-      - MUJOCO_SCENE=${MUJOCO_SCENE:-custom}
+      - MUJOCO_SCENE=${MUJOCO_SCENE:-static}
       - ENABLE_DEPTH_PUBLISHER=${ENABLE_DEPTH_PUBLISHER:-true}
     command:  >
       bash -c "
         source install/setup.bash &&
-        ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=${MUJOCO_SCENE:-custom} enable_depth_publisher:=${ENABLE_DEPTH_PUBLISHER:-true};
+        ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=${MUJOCO_SCENE:-static} enable_depth_publisher:=${ENABLE_DEPTH_PUBLISHER:-true};
         /bin/bash
       "
   miahand_ros2_control:

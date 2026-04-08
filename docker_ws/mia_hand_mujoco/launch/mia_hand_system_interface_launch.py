@@ -19,6 +19,7 @@ def launch_fun(context, *args, **kwargs):
     prefix         = LaunchConfiguration('prefix').perform(context)
     robot_ns       = LaunchConfiguration('robot_ns').perform(context)
     enable_depth_publisher = LaunchConfiguration('enable_depth_publisher')
+    enable_depth_publisher_value = enable_depth_publisher.perform(context)
     depth_camera_name = LaunchConfiguration('depth_camera_name')
     depth_frame_id = LaunchConfiguration('depth_frame_id')
     depth_world_frame_id = LaunchConfiguration('depth_world_frame_id')
@@ -34,12 +35,26 @@ def launch_fun(context, *args, **kwargs):
     depth_segmented_pointcloud_topic = LaunchConfiguration('depth_segmented_pointcloud_topic')
     depth_target_geom_name = LaunchConfiguration('depth_target_geom_name')
     depth_output_dir = LaunchConfiguration('depth_output_dir')
+    depth_publish_tf = LaunchConfiguration('depth_publish_tf').perform(context)
+    depth_camera_frame_convention = LaunchConfiguration('depth_camera_frame_convention').perform(context)
+    tf_publish_hz = LaunchConfiguration('tf_publish_hz')
+
+    internal_depth_image_topic = '/mujoco/internal/depth/image'
+    internal_depth_camera_info_topic = '/mujoco/internal/depth/camera_info'
+    internal_depth_camera_pointcloud_topic = '/mujoco/internal/depth/points_camera'
+    internal_segmented_pointcloud_topic = '/mujoco/internal/segmented_object_cloud'
+    internal_scene_tf_topic = '/mujoco/internal/scene_transforms'
+
+    def as_bool(value: str) -> bool:
+        return value.lower() in ('1', 'true', 'yes', 'on')
 
     # Resolve xml_model_path from scene arg when no explicit path was given
     if not xml_model_path:
         scene_file_map = {
             'default': 'scene_right.xml',
-            'custom':  'scene_right_custom.xml',
+            'custom':  'scene_right_static.xml',
+            'static':  'scene_right_static.xml',
+            'dynamic': 'scene_right_dynamic.xml',
         }
         scene_filename = scene_file_map.get(scene, 'scene_right.xml')
         xml_model_path = PathJoinSubstitution([
@@ -47,6 +62,12 @@ def launch_fun(context, *args, **kwargs):
             'mia_hand',
             scene_filename
         ]).perform(context)
+
+    scene_is_dynamic = scene == 'dynamic'
+    publish_tf = scene_is_dynamic or as_bool(depth_publish_tf)
+    publish_depth = as_bool(enable_depth_publisher_value)
+    start_scene_state_publisher = publish_tf or publish_depth
+    camera_frame_convention = 'ros_optical' if scene_is_dynamic else depth_camera_frame_convention
 
     joint_limits_config_file_path = PathJoinSubstitution([
         FindPackageShare('mia_hand_description'), 'calibration',
@@ -141,10 +162,10 @@ def launch_fun(context, *args, **kwargs):
         )
     )
 
-    depth_publisher_node = Node(
+    scene_state_publisher_node = Node(
         package = 'mia_hand_mujoco',
-        executable = 'mujoco_depth_publisher_node.py',
-        name = 'mujoco_depth_publisher',
+        executable = 'mujoco_scene_state_publisher_node.py',
+        name = 'mujoco_scene_state_publisher',
         output = 'screen',
         parameters = [{
             'xml_model_path': xml_model_path,
@@ -152,21 +173,53 @@ def launch_fun(context, *args, **kwargs):
             'camera_name': depth_camera_name,
             'camera_frame_id': depth_frame_id,
             'world_frame_id': depth_world_frame_id,
+            'internal_depth_image_topic': internal_depth_image_topic,
+            'internal_depth_camera_info_topic': internal_depth_camera_info_topic,
+            'internal_depth_camera_pointcloud_topic': internal_depth_camera_pointcloud_topic,
+            'internal_segmented_pointcloud_topic': internal_segmented_pointcloud_topic,
+            'internal_scene_tf_topic': internal_scene_tf_topic,
             'width': depth_width,
             'height': depth_height,
-            'publish_hz': depth_publish_hz,
+            'depth_publish_hz': depth_publish_hz,
+            'tf_publish_hz': tf_publish_hz,
             'max_depth': depth_max_depth,
             'pointcloud_stride': depth_pointcloud_stride,
             'joint_state_topic': depth_joint_state_topic,
+            'target_geom_name': depth_target_geom_name,
+            'laterality': laterality,
+            'prefix': prefix,
+            'camera_frame_convention': camera_frame_convention,
+        }],
+        condition = IfCondition(TextSubstitution(text = str(start_scene_state_publisher).lower())),
+    )
+
+    depth_publisher_node = Node(
+        package = 'mia_hand_mujoco',
+        executable = 'mujoco_depth_publisher_node.py',
+        name = 'mujoco_depth_publisher',
+        output = 'screen',
+        parameters = [{
+            'internal_depth_image_topic': internal_depth_image_topic,
+            'internal_depth_camera_info_topic': internal_depth_camera_info_topic,
+            'internal_depth_camera_pointcloud_topic': internal_depth_camera_pointcloud_topic,
+            'internal_segmented_pointcloud_topic': internal_segmented_pointcloud_topic,
             'depth_image_topic': depth_image_topic,
             'depth_camera_info_topic': depth_camera_info_topic,
             'depth_camera_pointcloud_topic': depth_camera_pointcloud_topic,
             'segmented_pointcloud_topic': depth_segmented_pointcloud_topic,
-            'target_geom_name': depth_target_geom_name,
-            'laterality': laterality,
-            'prefix': prefix,
         }],
-        condition = IfCondition(enable_depth_publisher),
+        condition = IfCondition(TextSubstitution(text = str(publish_depth).lower())),
+    )
+
+    tf_publisher_node = Node(
+        package = 'mia_hand_mujoco',
+        executable = 'mujoco_tf_publisher_node.py',
+        name = 'mujoco_tf_publisher',
+        output = 'screen',
+        parameters = [{
+            'scene_tf_topic': internal_scene_tf_topic,
+        }],
+        condition = IfCondition(TextSubstitution(text = str(publish_tf).lower())),
     )
 
     return [
@@ -174,17 +227,21 @@ def launch_fun(context, *args, **kwargs):
         robot_state_publisher,
         joint_state_broadcaster_spawner,
         position_controllers_spawner_after_joint_state_broadcaster_spawner,
+        scene_state_publisher_node,
         depth_publisher_node,
+        tf_publisher_node,
     ]
 
 def generate_launch_description():
 
     scene_arg = DeclareLaunchArgument(
         'scene',
-        default_value='custom',
-        choices=['default', 'custom'],
+        default_value='static',
+        choices=['default', 'custom', 'static', 'dynamic'],
         description='MuJoCo scene to load. "default" uses scene_right.xml, '
-                    '"custom" uses scene_right_custom.xml with a red origin marker.'
+                    '"static" is the renamed successor to the old custom scene, '
+                    '"custom" remains as a compatibility alias, and "dynamic" '
+                    'enables TF-driven dynamic alignment.'
     )
 
     xml_model_path_arg = DeclareLaunchArgument(
@@ -293,6 +350,25 @@ def generate_launch_description():
         default_value='/tmp/mia_hand_mujoco_depth'
     )
 
+    depth_publish_tf_arg = DeclareLaunchArgument(
+        'depth_publish_tf',
+        default_value='false',
+        description='Publish MuJoCo body/geom/camera TF frames. Automatically enabled when scene:=dynamic.'
+    )
+
+    depth_camera_frame_convention_arg = DeclareLaunchArgument(
+        'depth_camera_frame_convention',
+        default_value='legacy',
+        description='Camera frame convention for the raw camera-frame point cloud. '
+                    'scene:=dynamic forces ros_optical so the camera frame is TF-consistent.'
+    )
+
+    tf_publish_hz_arg = DeclareLaunchArgument(
+        'tf_publish_hz',
+        default_value='30.0',
+        description='Publish rate for the dedicated MuJoCo TF publisher node.'
+    )
+
     return LaunchDescription([
         scene_arg,
         xml_model_path_arg,
@@ -315,5 +391,8 @@ def generate_launch_description():
         depth_segmented_pointcloud_topic_arg,
         depth_target_geom_name_arg,
         depth_output_dir_arg,
+        depth_publish_tf_arg,
+        depth_camera_frame_convention_arg,
+        tf_publish_hz_arg,
         OpaqueFunction(function = launch_fun)
     ])

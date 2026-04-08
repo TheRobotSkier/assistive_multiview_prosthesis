@@ -6,6 +6,7 @@ use preshaping::ros_command_helper::{
     publish_float64_multi_array_once,
     publish_joint_trajectory_once,
 };
+use preshaping::tf_helper::lookup_transform_matrix;
 use std::env;
 use std::process::Command;
 use std::thread;
@@ -38,6 +39,9 @@ const DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Z: f64 = 0.0;
 const DEFAULT_CUSTOM_SCENE_OBJECT_POS_X: f64 = -0.1;
 const DEFAULT_CUSTOM_SCENE_OBJECT_POS_Y: f64 = -0.049_912_4;
 const DEFAULT_CUSTOM_SCENE_OBJECT_POS_Z: f64 = 0.310_039_8;
+const DEFAULT_BASE_TF_TOPIC: &str = "/tf";
+const DEFAULT_BASE_PARENT_FRAME: &str = "world";
+const DEFAULT_BASE_CHILD_FRAME: &str = "mujoco_palm_r";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PointCloudMode {
@@ -49,6 +53,12 @@ enum PointCloudMode {
 enum CommandBackend {
     Trajectory,
     PosFf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BaseTransformMode {
+    Static,
+    Tf,
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +73,10 @@ struct CliArgs {
     iterations: usize,
     publish_commands: bool,
     command_backend: CommandBackend,
+    base_transform_mode: BaseTransformMode,
+    base_tf_topic: String,
+    base_parent_frame: String,
+    base_child_frame: String,
     search_base_transform: bool,
     base_search_step: f64,
     base_search_span: f64,
@@ -84,6 +98,10 @@ impl Default for CliArgs {
             iterations: 1,
             publish_commands: false,
             command_backend: CommandBackend::Trajectory,
+            base_transform_mode: BaseTransformMode::Static,
+            base_tf_topic: DEFAULT_BASE_TF_TOPIC.to_string(),
+            base_parent_frame: DEFAULT_BASE_PARENT_FRAME.to_string(),
+            base_child_frame: DEFAULT_BASE_CHILD_FRAME.to_string(),
             search_base_transform: false,
             base_search_step: 0.01,
             base_search_span: 0.2,
@@ -180,6 +198,36 @@ fn parse_cli_args() -> Result<CliArgs, String> {
                     }
                 };
             }
+            "--base-transform-mode" => {
+                let raw = iter
+                    .next()
+                    .ok_or_else(|| "Missing value for --base-transform-mode".to_string())?;
+                cfg.base_transform_mode = match raw.as_str() {
+                    "static" => BaseTransformMode::Static,
+                    "tf" => BaseTransformMode::Tf,
+                    _ => {
+                        return Err(format!(
+                            "Invalid --base-transform-mode value '{}'. Supported: static|tf",
+                            raw
+                        ));
+                    }
+                };
+            }
+            "--base-tf-topic" => {
+                cfg.base_tf_topic = iter
+                    .next()
+                    .ok_or_else(|| "Missing value for --base-tf-topic".to_string())?;
+            }
+            "--base-parent-frame" => {
+                cfg.base_parent_frame = iter
+                    .next()
+                    .ok_or_else(|| "Missing value for --base-parent-frame".to_string())?;
+            }
+            "--base-child-frame" => {
+                cfg.base_child_frame = iter
+                    .next()
+                    .ok_or_else(|| "Missing value for --base-child-frame".to_string())?;
+            }
             "--search-base-transform" => {
                 cfg.search_base_transform = true;
             }
@@ -268,6 +316,11 @@ fn print_usage() {
     println!("  --iterations N         number of iterations (0 => run forever, default: 1)");
     println!("  --command-backend trajectory|pos_ff");
     println!("                         controller command target when --publish-commands is used (default: trajectory)");
+    println!("  --base-transform-mode static|tf");
+    println!("                         source for the world->palm base transform (default: static)");
+    println!("  --base-tf-topic TOPIC  TF topic used when --base-transform-mode tf (default: /tf)");
+    println!("  --base-parent-frame FRAME   parent frame for TF base lookup (default: world)");
+    println!("  --base-child-frame FRAME    child frame for TF base lookup (default: mujoco_palm_r)");
     println!("  Default hand pose matches mia_hand_mujoco/mia_hand/mia_hand_right.xml:");
     println!("    pos=({:.3}, {:.3}, {:.3}), quat(wxyz)=({:.6}, {:.6}, {:.6}, {:.6})",
         DEFAULT_MUJOCO_RIGHT_HAND_POS_X,
@@ -309,6 +362,17 @@ fn default_custom_scene_object_transform() -> Matrix4<f64> {
     transform[(1, 3)] = DEFAULT_CUSTOM_SCENE_OBJECT_POS_Y;
     transform[(2, 3)] = DEFAULT_CUSTOM_SCENE_OBJECT_POS_Z;
     transform
+}
+
+fn resolve_base_transform(cli: &CliArgs) -> Result<Matrix4<f64>, String> {
+    match cli.base_transform_mode {
+        BaseTransformMode::Static => Ok(default_mujoco_right_hand_base_transform()),
+        BaseTransformMode::Tf => lookup_transform_matrix(
+            &cli.base_tf_topic,
+            &cli.base_parent_frame,
+            &cli.base_child_frame,
+        ),
+    }
 }
 
 fn read_ros_pointcloud(topic: &str) -> Result<PointCloud, String> {
@@ -459,16 +523,28 @@ fn main() {
     planner_cfg.palmar_dorsal_offset = cli.palmar_dorsal_offset;
     planner_cfg.base_transform = default_mujoco_right_hand_base_transform();
 
-    println!(
-        "Using hardcoded MuJoCo default hand pose: pos=({:.3}, {:.3}, {:.3}), quat(wxyz)=({:.6}, {:.6}, {:.6}, {:.6})",
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_X,
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_Y,
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_Z,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_W,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_X,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Y,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Z,
-    );
+    match cli.base_transform_mode {
+        BaseTransformMode::Static => {
+            println!(
+                "Using hardcoded MuJoCo default hand pose: pos=({:.3}, {:.3}, {:.3}), quat(wxyz)=({:.6}, {:.6}, {:.6}, {:.6})",
+                DEFAULT_MUJOCO_RIGHT_HAND_POS_X,
+                DEFAULT_MUJOCO_RIGHT_HAND_POS_Y,
+                DEFAULT_MUJOCO_RIGHT_HAND_POS_Z,
+                DEFAULT_MUJOCO_RIGHT_HAND_QUAT_W,
+                DEFAULT_MUJOCO_RIGHT_HAND_QUAT_X,
+                DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Y,
+                DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Z,
+            );
+        }
+        BaseTransformMode::Tf => {
+            println!(
+                "Using live TF base transform lookup: topic='{}', parent='{}', child='{}'",
+                cli.base_tf_topic,
+                cli.base_parent_frame,
+                cli.base_child_frame,
+            );
+        }
+    }
 
     if cli.publish_commands {
         println!(
@@ -492,6 +568,11 @@ fn main() {
         iter_idx += 1;
 
         let tick_start = Instant::now();
+
+        planner_cfg.base_transform = resolve_base_transform(&cli).unwrap_or_else(|e| {
+            eprintln!("Failed to resolve base transform: {}", e);
+            std::process::exit(1);
+        });
 
         let pc = match cli.mode {
             PointCloudMode::File => PointCloud::from_xyz_file(&cli.xyz_cloud_path).unwrap_or_else(|e| {
