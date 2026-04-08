@@ -41,6 +41,14 @@ cd src/dev/grasp_preshaping && cargo run -r -- --mode ros --pointcloud-topic /se
 
 cd src/dev/grasp_preshaping && cargo run -r -- --mode ros --publish-commands --command-backend pos_ff
 
+
+If there are any issues, try exiting the docker container, then stop all containers with
+
+docker stop -a
+
+and start your container again.
+
+
 Multiview:
 The multiview system presumes launch on the Nvidia Jetson, and is not containerized-- This will be harder to set up to run on your own systems.
 For using the launch script in the multiview folder, change the directory path in the .sh file as: RVIZ_CONFIG.

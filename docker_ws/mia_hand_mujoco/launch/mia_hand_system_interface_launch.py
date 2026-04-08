@@ -158,10 +158,26 @@ def launch_fun(context, *args, **kwargs):
         ]
     )
 
+    trajectory_controllers_spawner = Node(
+        name = 'trajectory_controllers_spawner',
+        package = 'controller_manager',
+        executable = 'spawner',
+        arguments = [
+            'thumb_trajectory_controller',
+            'index_trajectory_controller',
+            'mrl_trajectory_controller',
+            '--inactive',
+            '-c', '/controller_manager'
+        ]
+    )
+
     position_controllers_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         event_handler = OnProcessExit(
             target_action = joint_state_broadcaster_spawner,
-            on_exit = [position_controllers_spawner]
+            on_exit = [
+                position_controllers_spawner,
+                trajectory_controllers_spawner,
+            ]
         )
     )
 

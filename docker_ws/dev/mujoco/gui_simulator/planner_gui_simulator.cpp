@@ -2,9 +2,15 @@
 
 #include <algorithm>
 #include <chrono>
+#include <ctime>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <optional>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <sys/wait.h>
@@ -18,6 +24,64 @@ constexpr const char* kPlannerWorkdir = "/miahand_ws/src/dev/grasp_preshaping";
 constexpr const char* kPlannerManifest = "/miahand_ws/src/dev/grasp_preshaping/Cargo.toml";
 constexpr const char* kPlannerBinary = "/miahand_ws/src/dev/grasp_preshaping/target/release/preshaping";
 constexpr const char* kPlannerPointcloudTopic = "/segmented_object_cloud";
+constexpr const char* kPlannerLogDir = "/miahand_ws/src/dev/mujoco/log";
+constexpr const char* kPlannerMostRecentLog = "/miahand_ws/src/dev/mujoco/log/most_recent.txt";
+
+namespace fs = std::filesystem;
+
+std::string log_display_name(const std::string& log_path)
+{
+  const std::string stem = fs::path(log_path).stem().string();
+  const std::smatch match = [&stem]() {
+    std::smatch local_match;
+    std::regex_match(stem, local_match, std::regex(R"(^grasp_log_(\d{3,})$)"));
+    return local_match;
+  }();
+  if (match.size() == 2)
+  {
+    return std::string("log_") + match[1].str();
+  }
+
+  return stem;
+}
+
+std::string short_execution_mode_label(const int execution_mode)
+{
+  switch (execution_mode)
+  {
+    case 0:
+      return "dry";
+    case 1:
+      return "traj";
+    case 2:
+      return "pos";
+    default:
+      return "unk";
+  }
+}
+
+bool write_log_header(const std::string& log_path)
+{
+  std::ofstream log_stream(log_path, std::ios::trunc);
+  if (!log_stream.is_open())
+  {
+    return false;
+  }
+
+  const auto now = std::chrono::system_clock::now();
+  const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+  std::tm local_tm {};
+  localtime_r(&now_time, &local_tm);
+  log_stream << "Timestamp: " << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S") << '\n';
+  return true;
+}
+
+bool copy_to_most_recent_log(const std::string& log_path)
+{
+  std::error_code error;
+  fs::copy_file(log_path, kPlannerMostRecentLog, fs::copy_options::overwrite_existing, error);
+  return !error;
+}
 
 int map_glfw_button(int button)
 {
@@ -731,9 +795,7 @@ void PlannerGuiSimulator::launch_planner(
     return;
   }
 
-  set_status(
-    std::string("Running ") + transform_mode_label(transform_mode) + " / " +
-    execution_mode_label(execution_mode));
+  set_status("Preparing planner");
 
   std::thread(
     &PlannerGuiSimulator::run_planner_worker, this, transform_mode, execution_mode).detach();
@@ -743,29 +805,40 @@ void PlannerGuiSimulator::run_planner_worker(
   PlannerTransformMode transform_mode, PlannerExecutionMode execution_mode)
 {
   const std::string log_path = make_log_path();
+  const std::string log_name = log_display_name(log_path);
+
+  if (!write_log_header(log_path))
+  {
+    set_status("Log init failed");
+    planner_running_.store(false);
+    return;
+  }
+
+  set_status(
+    std::string("Run ") + short_execution_mode_label(static_cast<int>(execution_mode)) +
+    " " + log_name);
+
   const std::string command = build_planner_command(transform_mode, execution_mode, log_path);
 
   const int result = std::system(command.c_str());
+  copy_to_most_recent_log(log_path);
 
   if (result == -1)
   {
-    set_status("Planner launch failed");
+    set_status(std::string("ERR ") + log_name);
   }
   else if (WIFEXITED(result) && WEXITSTATUS(result) == 0)
   {
-    set_status(
-      std::string("Success: ") + transform_mode_label(transform_mode) + " / " +
-      execution_mode_label(execution_mode));
+    set_status(std::string("OK ") + log_name);
   }
   else if (WIFEXITED(result))
   {
     set_status(
-      std::string("Failed (exit ") + std::to_string(WEXITSTATUS(result)) +
-      "), see log");
+      std::string("FAIL") + std::to_string(WEXITSTATUS(result)) + " " + log_name);
   }
   else
   {
-    set_status("Planner terminated unexpectedly");
+    set_status(std::string("TERM ") + log_name);
   }
 
   planner_running_.store(false);
@@ -779,6 +852,23 @@ std::string PlannerGuiSimulator::build_planner_command(
   std::ostringstream cmd;
   cmd << "cd " << shell_quote(kPlannerWorkdir) << " && ";
 
+  if (execution_mode == PlannerExecutionMode::kTrajectory)
+  {
+    cmd << "ros2 control switch_controllers -c /controller_manager"
+        << " --deactivate thumb_pos_ff_controller index_pos_ff_controller mrl_pos_ff_controller"
+        << " --activate thumb_trajectory_controller index_trajectory_controller"
+        << " mrl_trajectory_controller"
+        << " >> " << shell_quote(log_path) << " 2>&1 && ";
+  }
+  else if (execution_mode == PlannerExecutionMode::kPosFf)
+  {
+    cmd << "ros2 control switch_controllers -c /controller_manager"
+        << " --deactivate thumb_trajectory_controller index_trajectory_controller"
+        << " mrl_trajectory_controller"
+        << " --activate thumb_pos_ff_controller index_pos_ff_controller mrl_pos_ff_controller"
+        << " >> " << shell_quote(log_path) << " 2>&1 && ";
+  }
+
   if (access(kPlannerBinary, X_OK) == 0)
   {
     cmd << shell_quote(kPlannerBinary);
@@ -791,7 +881,8 @@ std::string PlannerGuiSimulator::build_planner_command(
   cmd << " --mode ros"
       << " --pointcloud-topic " << shell_quote(kPlannerPointcloudTopic)
       << " --iterations 1"
-      << " --frequency-hz 1";
+      << " --frequency-hz 1"
+      << " --pc-scale 1.0";
 
   if (transform_mode == PlannerTransformMode::kDynamicTf)
   {
@@ -810,15 +901,39 @@ std::string PlannerGuiSimulator::build_planner_command(
         << ((execution_mode == PlannerExecutionMode::kPosFf) ? "pos_ff" : "trajectory");
   }
 
-  cmd << " > " << shell_quote(log_path) << " 2>&1";
+  cmd << " >> " << shell_quote(log_path) << " 2>&1";
   return cmd.str();
 }
 
 std::string PlannerGuiSimulator::make_log_path() const
 {
-  const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
-    std::chrono::system_clock::now().time_since_epoch()).count();
-  return std::string("/tmp/mia_hand_grasp_planner_") + std::to_string(now) + ".log";
+  std::error_code error;
+  fs::create_directories(kPlannerLogDir, error);
+
+  int max_log_number = 0;
+  const std::regex log_pattern(R"(^grasp_log_(\d{3,})\.txt$)");
+  if (!error)
+  {
+    for (const fs::directory_entry& entry : fs::directory_iterator(kPlannerLogDir, error))
+    {
+      if (error || !entry.is_regular_file())
+      {
+        continue;
+      }
+
+      const std::string filename = entry.path().filename().string();
+      std::smatch match;
+      if (std::regex_match(filename, match, log_pattern) && match.size() == 2)
+      {
+        max_log_number = std::max(max_log_number, std::stoi(match[1].str()));
+      }
+    }
+  }
+
+  std::ostringstream filename;
+  filename << "grasp_log_" << std::setw(3) << std::setfill('0') << (max_log_number + 1)
+           << ".txt";
+  return (fs::path(kPlannerLogDir) / filename.str()).string();
 }
 
 std::string PlannerGuiSimulator::shell_quote(const std::string& value)
