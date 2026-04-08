@@ -1,26 +1,132 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider, Button
-from model import get_all_finger_positions, tip_data, low, high
+import os
+import sys
+
+try:
+    from mia_hand_ros2_pkgs.dev.grasp_preshaping.scripts.model import (
+        COLLISION_GEOMETRIES,
+        CONTACT_DEFINITIONS,
+        get_sampled_contact_transforms,
+        get_q_full,
+        low,
+        model as pin_model,
+        data as pin_data,
+        high,
+        pin,
+    )
+except ModuleNotFoundError:
+    # Allow direct execution via `python path/to/hand_tip_visualizer.py`.
+    repo_root = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+    from mia_hand_ros2_pkgs.dev.grasp_preshaping.scripts.model import (
+        COLLISION_GEOMETRIES,
+        CONTACT_DEFINITIONS,
+        get_sampled_contact_transforms,
+        get_q_full,
+        low,
+        model as pin_model,
+        data as pin_data,
+        high,
+        pin,
+    )
 
 
-def sphere_mesh(center, radius, n_u=20, n_v=14):
-    """Generate a sphere surface mesh centered at `center`."""
-    u = np.linspace(0.0, 2.0 * np.pi, n_u)
-    v = np.linspace(0.0, np.pi, n_v)
+def _plot_sphere_wire(ax, center, radius, color="#888888", alpha=0.2):
+    u = np.linspace(0.0, 2.0 * np.pi, 14)
+    v = np.linspace(0.0, np.pi, 10)
     x = center[0] + radius * np.outer(np.cos(u), np.sin(v))
     y = center[1] + radius * np.outer(np.sin(u), np.sin(v))
     z = center[2] + radius * np.outer(np.ones_like(u), np.cos(v))
-    return x, y, z
+    return ax.plot_wireframe(x, y, z, color=color, alpha=alpha, linewidth=0.6)
+
+
+def _plot_cylinder_wire(ax, T, radius, length, color="#888888", alpha=0.25):
+    t = np.linspace(0.0, 2.0 * np.pi, 18)
+    z_vals = np.array([-0.5 * length, 0.5 * length], dtype=float)
+    artists = []
+
+    for z in z_vals:
+        local = np.stack(
+            [radius * np.cos(t), radius * np.sin(t), np.full_like(t, z), np.ones_like(t)],
+            axis=0,
+        )
+        world = T @ local
+        line = ax.plot(world[0], world[1], world[2], color=color, alpha=alpha, linewidth=0.8)[0]
+        artists.append(line)
+
+    for angle in np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False):
+        local = np.array(
+            [
+                [radius * np.cos(angle), radius * np.cos(angle)],
+                [radius * np.sin(angle), radius * np.sin(angle)],
+                [-0.5 * length, 0.5 * length],
+                [1.0, 1.0],
+            ],
+            dtype=float,
+        )
+        world = T @ local
+        line = ax.plot(world[0], world[1], world[2], color=color, alpha=alpha, linewidth=0.6)[0]
+        artists.append(line)
+
+    return artists
+
+
+def _plot_box_wire(ax, T, half_extents, color="#888888", alpha=0.25):
+    hx, hy, hz = half_extents
+    corners = np.array(
+        [
+            [-hx, -hy, -hz, 1.0],
+            [hx, -hy, -hz, 1.0],
+            [hx, hy, -hz, 1.0],
+            [-hx, hy, -hz, 1.0],
+            [-hx, -hy, hz, 1.0],
+            [hx, -hy, hz, 1.0],
+            [hx, hy, hz, 1.0],
+            [-hx, hy, hz, 1.0],
+        ],
+        dtype=float,
+    ).T
+    wc = (T @ corners)[:3].T
+
+    edges = [
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 0),
+        (4, 5),
+        (5, 6),
+        (6, 7),
+        (7, 4),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
+    ]
+
+    artists = []
+    for i, j in edges:
+        line = ax.plot(
+            [wc[i, 0], wc[j, 0]],
+            [wc[i, 1], wc[j, 1]],
+            [wc[i, 2], wc[j, 2]],
+            color=color,
+            alpha=alpha,
+            linewidth=0.7,
+        )[0]
+        artists.append(line)
+    return artists
 
 
 def estimate_workspace_bounds(samples=250):
-    """Estimate fixed axis limits by random motor sampling."""
+    """Estimate fixed axis limits from all sampled contact positions."""
     all_pts = []
     for _ in range(samples):
         q = np.random.uniform(low, high)
-        pos = get_all_finger_positions(q)
-        all_pts.extend(pos.values())
+        transforms = get_sampled_contact_transforms(q)
+        all_pts.extend([t[:3, 3] for t in transforms.values()])
 
     pts = np.vstack(all_pts)
     mins = pts.min(axis=0)
@@ -33,13 +139,17 @@ def estimate_workspace_bounds(samples=250):
 
 
 def main():
-    finger_colors = {
+    group_colors = {
         "thumb": "#f4a261",
         "index": "#e76f51",
         "middle": "#2a9d8f",
         "ring": "#457b9d",
         "little": "#8d99ae",
+        "palm": "#6a994e",
     }
+
+    contact_group = {c["name"]: c["group"] for c in CONTACT_DEFINITIONS}
+    sorted_contacts = sorted(contact_group.keys())
 
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
@@ -51,7 +161,7 @@ def main():
     ax.set_zlim(center[2] - half, center[2] + half)
     ax.set_box_aspect((1.0, 1.0, 1.0))
     
-    ax.set_title("MIA Hand Fingertip Visualizer")
+    ax.set_title("MIA Hand Contact Point Visualizer")
     ax.set_xlabel("X [m]")
     ax.set_ylabel("Y [m]")
     ax.set_zlabel("Z [m]")
@@ -59,44 +169,89 @@ def main():
     # Draw a faint origin marker for reference.
     ax.scatter([0.0], [0.0], [0.0], c="black", s=20, alpha=0.35)
 
-    initial_q = np.array([0, 0, 0], dtype=float)
-    sphere_artists = {}
-    line_artists = {}
+    initial_q = np.array([0.0, 0.0, 0.0], dtype=float)
+    point_artist = None
+    text_artist = None
+    geom_artists = []
 
     def redraw(q_active):
-        positions = get_all_finger_positions(q_active)
+        nonlocal point_artist, text_artist, geom_artists
 
-        for artist in sphere_artists.values():
-            artist.remove()
-        sphere_artists.clear()
+        transforms = get_sampled_contact_transforms(q_active)
+        q_f = get_q_full(q_active)
+        pin.forwardKinematics(pin_model, pin_data, q_f)
 
-        for artist in line_artists.values():
-            artist.remove()
-        line_artists.clear()
+        xyz = np.array([transforms[name][:3, 3] for name in sorted_contacts], dtype=float)
+        colors = [group_colors.get(contact_group[name], "#4c78a8") for name in sorted_contacts]
 
-        for finger, pos in positions.items():
-            line = ax.plot(
-                [0.0, float(pos[0])],
-                [0.0, float(pos[1])],
-                [0.0, float(pos[2])],
-                color=finger_colors.get(finger, "#4c78a8"),
-                alpha=0.8,
-                linewidth=1.8,
-            )[0]
-            line_artists[finger] = line
+        if point_artist is not None:
+            point_artist.remove()
+        point_artist = ax.scatter(
+            xyz[:, 0],
+            xyz[:, 1],
+            xyz[:, 2],
+            c=colors,
+            s=36,
+            alpha=0.9,
+            depthshade=True,
+        )
 
-            radius = max(float(tip_data[finger]["radius"]), 0.005)
-            x, y, z = sphere_mesh(pos, radius)
-            artist = ax.plot_surface(
-                x,
-                y,
-                z,
-                color=finger_colors.get(finger, "#4c78a8"),
-                alpha=0.72,
-                linewidth=0,
-                shade=True,
-            )
-            sphere_artists[finger] = artist
+        for artist in geom_artists:
+            if isinstance(artist, list):
+                for sub in artist:
+                    sub.remove()
+            else:
+                artist.remove()
+        geom_artists = []
+
+        for geom_name, geom_info in COLLISION_GEOMETRIES.items():
+            m_joint = pin_data.oMi[geom_info["joint_id"]]
+            m_geom = m_joint * geom_info["placement"]
+            T = m_geom.homogeneous
+            gtype = geom_info["type"]
+            params = geom_info["params"]
+
+            if gtype == "sphere":
+                artist = _plot_sphere_wire(
+                    ax,
+                    center=T[:3, 3],
+                    radius=params["radius"],
+                    color="#888888",
+                    alpha=0.22,
+                )
+                geom_artists.append(artist)
+            elif gtype == "cylinder":
+                artists = _plot_cylinder_wire(
+                    ax,
+                    T=T,
+                    radius=params["radius"],
+                    length=params["length"],
+                    color="#888888",
+                    alpha=0.25,
+                )
+                geom_artists.append(artists)
+            elif gtype == "box":
+                artists = _plot_box_wire(
+                    ax,
+                    T=T,
+                    half_extents=params["half_extents"],
+                    color="#888888",
+                    alpha=0.30,
+                )
+                geom_artists.append(artists)
+
+        if text_artist is not None:
+            text_artist.remove()
+        text_artist = ax.text2D(
+            0.02,
+            0.02,
+            (
+                f"Thumb={q_active[0]:.3f}  TISIT={q_active[1]:.3f}  MRL={q_active[2]:.3f}\\n"
+                f"Showing {len(sorted_contacts)} sampled contact points"
+            ),
+            transform=ax.transAxes,
+            fontsize=10,
+        )
 
         fig.canvas.draw_idle()
 

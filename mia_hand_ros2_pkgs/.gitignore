@@ -7,3 +7,9 @@ log/
 # ignore rust files
 target/
 Cargo.lock
+
+# ignore old files
+*.old.*
+
+# ignore python cache
+__pycache__/
