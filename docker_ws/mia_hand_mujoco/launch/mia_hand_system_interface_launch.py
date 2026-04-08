@@ -14,6 +14,7 @@ from os.path import exists
 
 def launch_fun(context, *args, **kwargs):
     xml_model_path = LaunchConfiguration('xml_model_path').perform(context)
+    hardware_plugin = LaunchConfiguration('hardware_plugin').perform(context)
     scene          = LaunchConfiguration('scene').perform(context)
     laterality     = LaunchConfiguration('laterality').perform(context)
     prefix         = LaunchConfiguration('prefix').perform(context)
@@ -97,6 +98,8 @@ def launch_fun(context, *args, **kwargs):
             ]),
             ' xml_model_path:=',
             TextSubstitution(text = xml_model_path),
+            ' hardware_plugin:=',
+            TextSubstitution(text = hardware_plugin),
             ' laterality:=',
             TextSubstitution(text = laterality),
             ' prefix:=',
@@ -251,6 +254,12 @@ def generate_launch_description():
                     'Overrides the "scene" argument when non-empty.'
     )
 
+    hardware_plugin_arg = DeclareLaunchArgument(
+        'hardware_plugin',
+        default_value='mia_hand_mujoco/SystemInterface',
+        description='ROS 2 control hardware plugin class to use for the MuJoCo simulator.'
+    )
+
     laterality_arg = DeclareLaunchArgument(
         'laterality',
         default_value = 'right',
@@ -372,6 +381,7 @@ def generate_launch_description():
     return LaunchDescription([
         scene_arg,
         xml_model_path_arg,
+        hardware_plugin_arg,
         laterality_arg,
         prefix_arg,
         robot_ns_arg,

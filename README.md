@@ -6,16 +6,21 @@ Check the docker-compose.yml, and comment out lines that have comments "#added L
 From the main directory (docker_miniproject):
 THEN RUN:
 
-echo -e "USER_UID=$(id -u $USER)\nUSER_GID=$(id -g $USER)" > mia_hand_ros2_pkgs/docker-deployment/.env
+echo -e "USER_UID=$(id -u $USER)\nUSER_GID=$(id -g $USER)" > docker_ws/docker-deployment/.env
 
 For Linux Wayland, also run:
 
-echo "XAUTHORITY=${XAUTHORITY:-$HOME/.Xauthority}" >> mia_hand_ros2_pkgs/docker-deployment/.env
+echo "XAUTHORITY=${XAUTHORITY:-$HOME/.Xauthority}" >> docker_ws/docker-deployment/.env
 
+Linux note: if not using bash shell, use 
+
+bash -c 'COMMAND'
+
+and replace COMMAND with the command to run (keep the quotes in). This will run the command as a bash command regardless of your shell.
 
 THEN cd to the docker-deployment directory:
 
-cd mia_hand_ros2_pkgs/docker-deployment
+cd docker_ws/docker-deployment
 
 THEN to build the simulation:
 

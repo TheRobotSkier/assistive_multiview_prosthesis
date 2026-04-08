@@ -4,11 +4,11 @@
 
   <xacro:macro 
     name="mia_hand_mujoco_ros2_control" 
-    params="name prefix xml_model_path">
+    params="name prefix xml_model_path hardware_plugin">
 
     <ros2_control name="${name}" type="system">
       <hardware>
-        <plugin>mia_hand_mujoco/SystemInterface</plugin>
+        <plugin>${hardware_plugin}</plugin>
         <param name="xml_model_path">${xml_model_path}</param>
       </hardware>
 
