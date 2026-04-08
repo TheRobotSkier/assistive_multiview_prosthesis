@@ -52,33 +52,69 @@ CONTACT_GROUPS = {
     "palm": ["mia_palm_0", "mia_palm_1"],
 }
 
+# Simplified geometry-centric contact definitions.
+# Each contact specifies: name, group, geometry, and manual surface placement descriptor.
+# Surface placements are resolved to local offsets via _resolve_surface_descriptor().
+# 
+# Surface types:
+#   - "palmar": geometry-specific hand-facing surface
+#       * cylinders: dorsal side in the current URDF frame
+#       * spheres: dorsal side along the finger axis
+#       * boxes: palm-facing side
+#   - "lateral_pos": facing positive X (right side in local frame)
+#   - "lateral_neg": facing negative X (left side in local frame)
+#   - "distal": facing positive Z (tip/end direction)
+#
+# Contacts per geometry:
+#   - Index (4 geoms): 2 each (palmar + lateral) = 8 total
+#   - Middle (4 geoms): 1 each = 4 total
+#   - Ring/Little/Thumb (3 geoms each): 1 each = 9 total
+#   - Palm (2 geoms): 2 each (palmar_center + lateral) = 4 total
+#   - TOTAL: 25 contacts
+
 CONTACT_DEFINITIONS = [
-    {"name": "index_proximal_pad", "group": "index", "geom": "mia_index_fle_0", "offset": "cyl_mid_palmar"},
-    {"name": "index_mid_pad", "group": "index", "geom": "mia_index_sensor_0", "offset": "cyl_mid_palmar"},
-    {"name": "index_distal_pad", "group": "index", "geom": "mia_index_sensor_1", "offset": "cyl_distal_palmar"},
-    {"name": "index_tip_pad", "group": "index", "geom": "mia_index_sensor_2", "offset": "sphere_pad"},
-    {"name": "middle_proximal_pad", "group": "middle", "geom": "mia_middle_fle_0", "offset": "cyl_mid_palmar"},
-    {"name": "middle_mid_pad", "group": "middle", "geom": "mia_middle_sensor_0", "offset": "cyl_mid_palmar"},
-    {"name": "middle_distal_pad", "group": "middle", "geom": "mia_middle_sensor_1", "offset": "cyl_distal_palmar"},
-    {"name": "middle_tip_pad", "group": "middle", "geom": "mia_middle_sensor_2", "offset": "sphere_pad"},
-    {"name": "ring_proximal_pad", "group": "ring", "geom": "mia_ring_fle_1", "offset": "cyl_mid_palmar"},
-    {"name": "ring_mid_pad", "group": "ring", "geom": "mia_ring_fle_0", "offset": "cyl_mid_palmar"},
-    {"name": "ring_lateral_pad", "group": "ring", "geom": "mia_ring_fle_0", "offset": "cyl_side_palmar"},
-    {"name": "ring_tip_pad", "group": "ring", "geom": "mia_ring_fle_2", "offset": "sphere_pad"},
-    {"name": "little_proximal_pad", "group": "little", "geom": "mia_little_fle_1", "offset": "cyl_mid_palmar"},
-    {"name": "little_mid_pad", "group": "little", "geom": "mia_little_fle_0", "offset": "cyl_mid_palmar"},
-    {"name": "little_lateral_pad", "group": "little", "geom": "mia_little_fle_0", "offset": "cyl_side_palmar"},
-    {"name": "little_tip_pad", "group": "little", "geom": "mia_little_fle_2", "offset": "sphere_pad"},
-    {"name": "thumb_proximal_pad", "group": "thumb", "geom": "mia_thumb_fle_1", "offset": "cyl_mid_palmar"},
-    {"name": "thumb_mid_pad", "group": "thumb", "geom": "mia_thumb_fle_0", "offset": "cyl_mid_palmar"},
-    {"name": "thumb_precision_pad", "group": "thumb", "geom": "mia_thumb_fle_0", "offset": "cyl_distal_palmar"},
-    {"name": "thumb_tip_pad", "group": "thumb", "geom": "mia_thumb_fle_2", "offset": "sphere_pad"},
-    {"name": "palm_distal_center", "group": "palm", "geom": "mia_palm_0", "offset": "box_palmar_center"},
-    {"name": "palm_distal_right", "group": "palm", "geom": "mia_palm_0", "offset": "box_palmar_right"},
-    {"name": "palm_distal_left", "group": "palm", "geom": "mia_palm_0", "offset": "box_palmar_left"},
-    {"name": "palm_distal_side", "group": "palm", "geom": "mia_palm_0", "offset": "box_side_support"},
-    {"name": "palm_proximal_center", "group": "palm", "geom": "mia_palm_1", "offset": "box_palmar_center"},
-    {"name": "palm_proximal_side", "group": "palm", "geom": "mia_palm_1", "offset": "box_side_support"},
+    # Index: proximal flex geom (mia_index_fle_0)
+    {"name": "index_fle_0_palmar", "group": "index", "geom": "mia_index_fle_0", "surface": "palmar"},
+    {"name": "index_fle_0_lateral", "group": "index", "geom": "mia_index_fle_0", "surface": "lateral_pos"},
+    
+    # Index: proximal sensor geom (mia_index_sensor_0)
+    {"name": "index_sensor_0_palmar", "group": "index", "geom": "mia_index_sensor_0", "surface": "palmar"},
+    {"name": "index_sensor_0_lateral", "group": "index", "geom": "mia_index_sensor_0", "surface": "lateral_pos"},
+    
+    # Index: distal sensor geom (mia_index_sensor_1)
+    {"name": "index_sensor_1_palmar", "group": "index", "geom": "mia_index_sensor_1", "surface": "palmar"},
+    {"name": "index_sensor_1_lateral", "group": "index", "geom": "mia_index_sensor_1", "surface": "lateral_pos"},
+    
+    # Index: tip sensor geom (mia_index_sensor_2)
+    {"name": "index_sensor_2_palmar", "group": "index", "geom": "mia_index_sensor_2", "surface": "palmar"},
+    {"name": "index_sensor_2_lateral", "group": "index", "geom": "mia_index_sensor_2", "surface": "lateral_pos"},
+    
+    # Middle: one per geometry
+    {"name": "middle_fle_0_palmar", "group": "middle", "geom": "mia_middle_fle_0", "surface": "palmar"},
+    {"name": "middle_sensor_0_palmar", "group": "middle", "geom": "mia_middle_sensor_0", "surface": "palmar"},
+    {"name": "middle_sensor_1_palmar", "group": "middle", "geom": "mia_middle_sensor_1", "surface": "palmar"},
+        {"name": "middle_sensor_2_palmar", "group": "middle", "geom": "mia_middle_sensor_2", "surface": "palmar"},
+    
+    # Ring: one per geometry
+    {"name": "ring_fle_0_palmar", "group": "ring", "geom": "mia_ring_fle_0", "surface": "palmar"},
+    {"name": "ring_fle_1_palmar", "group": "ring", "geom": "mia_ring_fle_1", "surface": "palmar"},
+    {"name": "ring_fle_2_palmar", "group": "ring", "geom": "mia_ring_fle_2", "surface": "palmar"},
+    
+    # Little: one per geometry
+    {"name": "little_fle_0_palmar", "group": "little", "geom": "mia_little_fle_0", "surface": "palmar"},
+    {"name": "little_fle_1_palmar", "group": "little", "geom": "mia_little_fle_1", "surface": "palmar"},
+    {"name": "little_fle_2_palmar", "group": "little", "geom": "mia_little_fle_2", "surface": "palmar"},
+    
+    # Thumb: one per geometry
+    {"name": "thumb_fle_0_palmar", "group": "thumb", "geom": "mia_thumb_fle_0", "surface": "lateral_neg"},
+    {"name": "thumb_fle_1_palmar", "group": "thumb", "geom": "mia_thumb_fle_1", "surface": "lateral_neg"},
+    {"name": "thumb_fle_2_palmar", "group": "thumb", "geom": "mia_thumb_fle_2", "surface": "lateral_neg"},
+    
+    # Palm: two per geometry (center and lateral support)
+    {"name": "palm_0_palmar_center", "group": "palm", "geom": "mia_palm_0", "surface": "lateral_neg"},
+    {"name": "palm_0_lateral", "group": "palm", "geom": "mia_palm_0", "surface": "lateral_pos"},
+    {"name": "palm_1_palmar_center", "group": "palm", "geom": "mia_palm_1", "surface": "lateral_neg"},
+    {"name": "palm_1_lateral", "group": "palm", "geom": "mia_palm_1", "surface": "lateral_pos"},
 ]
 
 
@@ -155,133 +191,82 @@ JOINT_LIMITS_FOR_CONTROL = {
 COLLISION_GEOMETRIES = _extract_collision_geometries(geom_model, CONTACT_GROUPS)
 
 
-def _offset_for_strategy(geom_info, strategy_name):
+def _resolve_surface_descriptor(geom_info, surface_type, depth_scale=1.05):
+    """
+    Compute a local offset from a surface descriptor and geometry parameters.
+    
+    Args:
+        geom_info: dict with keys 'type' and 'params', from COLLISION_GEOMETRIES
+        surface_type: str describing target surface ("palmar", "lateral_pos", "lateral_neg", "distal", "side")
+        depth_scale: multiplier for radius/half-extent to control offset magnitude (default 1.05 for proximal)
+    
+    Returns:
+        np.array([x, y, z]) of local offset in the geometry's local frame
+    
+    Local frame conventions (consistent across all geometry types):
+        - X: right (positive)
+        - Y: proximal toward palm/base (negative Y is toward palm)
+        - Z: distal toward apex/tip (positive Z is outward)
+    """
     geom_type = geom_info["type"]
     params = geom_info["params"]
 
     if geom_type == "cylinder":
         r = params["radius"]
         l = params["length"]
-        if strategy_name == "cyl_mid_palmar":
-            return np.array([0.0, -1.05 * r, 0.0], dtype=float)
-        if strategy_name == "cyl_distal_palmar":
-            return np.array([0.0, -1.05 * r, 0.35 * l], dtype=float)
-        if strategy_name == "cyl_side_palmar":
-            return np.array([0.65 * r, -0.8 * r, 0.0], dtype=float)
+        if surface_type == "palmar":
+            return np.array([0.0, depth_scale * r, 0.0], dtype=float)
+        elif surface_type == "lateral_pos":
+            return np.array([depth_scale * r, -0.0, 0.0], dtype=float)
+        elif surface_type == "lateral_neg":
+            return np.array([-depth_scale * r, -0.0, 0.0], dtype=float)
+        elif surface_type == "distal":
+            return np.array([0.0, -depth_scale * r, 0.35 * l], dtype=float)
+        else:
+            raise RuntimeError(f"Unsupported surface '{surface_type}' for cylinder")
 
-    if geom_type == "sphere":
+    elif geom_type == "sphere":
         r = params["radius"]
-        if strategy_name == "sphere_pad":
-            return np.array([0.0, -1.05 * r, 0.2 * r], dtype=float)
+        if surface_type == "palmar":
+            return np.array([0.0, 0.0, depth_scale * r], dtype=float)
+        elif surface_type == "lateral_pos":
+            return np.array([depth_scale * r, 0.0, 0.0], dtype=float)
+        elif surface_type == "lateral_neg":
+            return np.array([-depth_scale * r, 0.0, 0.0], dtype=float)
+        elif surface_type == "distal":
+            return np.array([0.0, -depth_scale * r, 0.2 * r], dtype=float)
+        else:
+            raise RuntimeError(f"Unsupported surface '{surface_type}' for sphere")
 
-    if geom_type == "box":
+    elif geom_type == "box":
         hx, hy, hz = params["half_extents"]
-        if strategy_name == "box_palmar_center":
-            return np.array([0.0, 0.0, -1.02 * hz], dtype=float)
-        if strategy_name == "box_palmar_right":
-            return np.array([0.35 * hx, 0.0, -1.02 * hz], dtype=float)
-        if strategy_name == "box_palmar_left":
-            return np.array([-0.35 * hx, 0.0, -1.02 * hz], dtype=float)
-        if strategy_name == "box_side_support":
-            return np.array([0.0, 1.02 * hy, -0.4 * hz], dtype=float)
+        if surface_type == "palmar":
+            return np.array([0.0, 0.0, depth_scale * hz], dtype=float)
+        elif surface_type == "lateral_pos":
+            return np.array([depth_scale * 0.35 * hx, 0.0, depth_scale * hz], dtype=float)
+        elif surface_type == "lateral_neg":
+            return np.array([-depth_scale * 0.35 * hx, 0.0, depth_scale * hz], dtype=float)
+        else:
+            raise RuntimeError(f"Unsupported surface '{surface_type}' for box")
 
-    raise RuntimeError(
-        f"Invalid sampling strategy '{strategy_name}' for geometry type '{geom_type}'"
-    )
+    else:
+        raise RuntimeError(f"Unknown geometry type '{geom_type}'")
 
 
+# Initialize contact offsets from surface descriptors.
 for contact in CONTACT_DEFINITIONS:
     geom_info = COLLISION_GEOMETRIES[contact["geom"]]
-    contact["local_offset"] = _offset_for_strategy(geom_info, contact["offset"])
+    surface_type = contact.get("surface", "palmar")
+    depth_scale = contact.get("depth_scale", 1.05)
+    contact["local_offset"] = _resolve_surface_descriptor(geom_info, surface_type, depth_scale)
 
 
-def _compute_palm_center_at_neutral():
-    q_neutral = np.array([0.0, 0.0, 0.0], dtype=float)
-    q_f = get_q_full(q_neutral)
-    pin.forwardKinematics(model, data, q_f)
-
-    palm_geoms = [c for c in CONTACT_DEFINITIONS if c["group"] == "palm"]
-    points = []
-    for c in palm_geoms:
-        g = COLLISION_GEOMETRIES[c["geom"]]
-        m_joint = data.oMi[g["joint_id"]]
-        m_geom = m_joint * g["placement"]
-        points.append(m_geom.translation + m_geom.rotation @ c["local_offset"])
-    return np.mean(points, axis=0)
-
-
-def _compute_neutral_reference_points():
-    q_neutral = np.array([0.0, 0.0, 0.0], dtype=float)
-    transforms = get_sampled_contact_transforms(q_neutral)
-    palm_points = np.array(
-        [transforms[c["name"]][:3, 3] for c in CONTACT_DEFINITIONS if c["group"] == "palm"],
-        dtype=float,
-    )
-    return {
-        "palm_center": np.mean(palm_points, axis=0),
-        "index_tip": transforms["index_tip_pad"][:3, 3].copy(),
-        "thumb_tip": transforms["thumb_tip_pad"][:3, 3].copy(),
-    }
-
-
-def _radial_candidates(radius, z_val=0.0, num=12):
-    return [
-        np.array([radius * np.cos(t), radius * np.sin(t), z_val], dtype=float)
-        for t in np.linspace(0.0, 2.0 * np.pi, num=num, endpoint=False)
-    ]
-
-
-def _align_contact_offsets_to_targets():
-    # Use neutral pose to pick radial directions based on the target interaction region.
-    refs = _compute_neutral_reference_points()
-    q_neutral = np.array([0.0, 0.0, 0.0], dtype=float)
-    q_f = get_q_full(q_neutral)
-    pin.forwardKinematics(model, data, q_f)
-
-    for contact in CONTACT_DEFINITIONS:
-        if contact["group"] == "palm":
-            continue
-
-        geom_info = COLLISION_GEOMETRIES[contact["geom"]]
-        geom_type = geom_info["type"]
-        params = geom_info["params"]
-
-        m_joint = data.oMi[geom_info["joint_id"]]
-        m_geom = m_joint * geom_info["placement"]
-        if contact["group"] == "index":
-            target_world = refs["thumb_tip"]
-        elif contact["group"] == "thumb":
-            target_world = refs["index_tip"]
-        else:
-            target_world = refs["palm_center"]
-
-        v_to_target_world = target_world - m_geom.translation
-
-        if np.linalg.norm(v_to_target_world) < 1e-10:
-            continue
-
-        if geom_type == "cylinder":
-            r = params["radius"]
-            z_val = float(contact["local_offset"][2])
-            candidates_local = _radial_candidates(1.05 * r, z_val=z_val)
-        elif geom_type == "sphere":
-            r = params["radius"]
-            # Keep a slight distal bias but select azimuth by palm-facing score.
-            candidates_local = _radial_candidates(1.05 * r, z_val=0.2 * r)
-        else:
-            continue
-
-        best = None
-        best_score = -np.inf
-        for cand_local in candidates_local:
-            cand_world_vec = m_geom.rotation @ cand_local
-            score = float(np.dot(cand_world_vec, v_to_target_world))
-            if score > best_score:
-                best_score = score
-                best = cand_local
-
-        if best is not None:
-            contact["local_offset"] = best
+# Note: Auto-alignment logic (_compute_palm_center_at_neutral, _compute_neutral_reference_points,
+# _radial_candidates, and _align_contact_offsets_to_targets) has been removed.
+# Contact offsets are now determined entirely by manual surface descriptors resolved via
+# _resolve_surface_descriptor(), which provides deterministic and easily-editable placement.
+# To adjust contact locations, edit the CONTACT_DEFINITIONS entries above or modify
+# _resolve_surface_descriptor() to calibrate offset magnitudes.
 
 
 CONTACT_NAMES_BY_GROUP = {
@@ -493,9 +478,6 @@ def get_sampled_contact_dual_quaternions(q_active, thumb_opp_mode=None):
     }
 
 
-_align_contact_offsets_to_targets()
-
-
 def _build_contact_table(samples, q_builder, contact_names, thumb_opp_mode=None):
     table = np.zeros((len(samples), len(contact_names), 8), dtype=np.float32)
     for i, value in enumerate(samples):
@@ -567,7 +549,7 @@ def generate_contact_lut(resolution=11):
 
     np.savez(
         LUT_PATH,
-        meta_version=np.array(["2.0"], dtype="<U8"),
+        meta_version=np.array(["3.0"], dtype="<U8"),
         representation=np.array(["dual_quaternion_wxyz"], dtype="<U32"),
         resolution=np.array([resolution], dtype=np.int32),
         joint_names=np.array(JOINT_ORDER, dtype="<U32"),
@@ -592,8 +574,9 @@ def generate_contact_lut(resolution=11):
 
     print(f"LUT saved to {LUT_PATH}")
     print(f"Resolution: {resolution}")
-    print(f"Contacts per finger: index=4, middle=4, ring=4, little=4, thumb=4")
-    print("Palm contacts: 6")
+    print(f"Contacts per finger: index=8 (2×4 geoms), middle=4, ring=3, little=3, thumb=3")
+    print("Palm contacts: 4 (2×2 geoms)")
+    print("Total contacts: 25")
     print("Stored as dual quaternions with component order [qr_w, qr_x, qr_y, qr_z, qd_w, qd_x, qd_y, qd_z]")
 
     return {
@@ -636,12 +619,12 @@ if __name__ == "__main__":
     print(f"\nRandom Config: {random_q}")
     contacts = get_sampled_contact_transforms(random_q)
     for c_name in [
-        "index_tip_pad",
-        "middle_tip_pad",
-        "ring_tip_pad",
-        "little_tip_pad",
-        "thumb_tip_pad",
-        "palm_distal_center",
+        "index_sensor_2_palmar",
+        "middle_sensor_1_palmar",
+        "ring_fle_2_palmar",
+        "little_fle_2_palmar",
+        "thumb_fle_2_palmar",
+        "palm_0_palmar_center",
     ]:
         pos = contacts[c_name][:3, 3]
         print(f"{c_name:<22} x={pos[0]:.4f}, y={pos[1]:.4f}, z={pos[2]:.4f}")
