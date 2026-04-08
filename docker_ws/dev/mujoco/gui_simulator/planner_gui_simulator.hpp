@@ -51,10 +51,10 @@ private:
   static constexpr int kUiRectPanel = 1;
   static constexpr int kUiRectViewport = 2;
   static constexpr int kUiSectionPlanner = 0;
-  static constexpr int kUiItemTransformMode = 0;
-  static constexpr int kUiItemExecutionMode = 1;
-  static constexpr int kUiItemRunPlanner = 2;
-  static constexpr int kUiItemStatus = 3;
+  static constexpr int kUiItemTransformMode = 1;
+  static constexpr int kUiItemExecutionMode = 3;
+  static constexpr int kUiItemRunPlanner = 5;
+  static constexpr int kUiItemStatus = 7;
 
   PlannerGuiSimulator();
 
@@ -80,7 +80,6 @@ private:
   bool dispatch_ui_event(mjtEvent event_type, int button, int key, double x, double y,
                          double scroll_x, double scroll_y, int mods);
   void handle_ui_item(mjuiItem* item);
-  bool is_mouse_over_ui(double x, double y);
   void set_status(const std::string& status);
   void launch_planner(PlannerTransformMode transform_mode,
                       PlannerExecutionMode execution_mode);
@@ -111,7 +110,7 @@ private:
   int ui_last_height_;
   int planner_transform_mode_value_;
   int planner_execution_mode_value_;
-  char planner_status_text_[mjMAXUITEXT];
+  bool ui_mouse_capture_;
 
   mjtMouse mjt_action_;
   mjtNum mjt_sim_t0_;

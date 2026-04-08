@@ -122,6 +122,7 @@ PlannerGuiSimulator::PlannerGuiSimulator()
   ui_last_height_(0),
   planner_transform_mode_value_(0),
   planner_execution_mode_value_(0),
+  ui_mouse_capture_(false),
   mjt_sim_t0_(0.0),
   mjt_sim_dt_(1.0 / 60.0),
   mouse_btn_left_pressed_(false),
@@ -141,7 +142,6 @@ PlannerGuiSimulator::PlannerGuiSimulator()
   planner_status_dirty_(true)
 {
   err_msg_[0] = '\0';
-  std::snprintf(planner_status_text_, sizeof(planner_status_text_), "%s", "Idle");
 
   for (double& value : jnt_vel_state_)
   {
@@ -220,10 +220,50 @@ void PlannerGuiSimulator::mouse_button_cb_impl(
 
   glfwGetCursorPos(window, &mouse_last_x_, &mouse_last_y_);
 
+  int window_width = 0;
+  int window_height = 0;
+  int fb_width = 0;
+  int fb_height = 0;
+  glfwGetWindowSize(window, &window_width, &window_height);
+  glfwGetFramebufferSize(window, &fb_width, &fb_height);
+
+  if (window_width > 0 && window_height > 0 && fb_width > 0 && fb_height > 0)
+  {
+    const double scale_x = static_cast<double>(fb_width) / static_cast<double>(window_width);
+    const double scale_y = static_cast<double>(fb_height) / static_cast<double>(window_height);
+    const int fb_x = static_cast<int>(mouse_last_x_ * scale_x);
+    const int fb_y = static_cast<int>((static_cast<double>(window_height) - mouse_last_y_) * scale_y);
+    ui_state_.mouserect =
+      mjr_findRect(fb_x, fb_y, ui_state_.nrect - 1, ui_state_.rect + 1) + 1;
+  }
+  else
+  {
+    ui_state_.mouserect = 0;
+  }
+
   const mjtEvent event_type =
     (act == GLFW_PRESS) ? mjEVENT_PRESS : mjEVENT_RELEASE;
-  dispatch_ui_event(event_type, map_glfw_button(button), 0,
-                    mouse_last_x_, mouse_last_y_, 0.0, 0.0, mods);
+  const int mj_button = map_glfw_button(button);
+
+  if (act == GLFW_PRESS && ui_state_.mouserect)
+  {
+    ui_state_.dragrect = ui_state_.mouserect;
+    ui_state_.dragbutton = mj_button;
+  }
+
+  const bool ui_consumed = dispatch_ui_event(
+    event_type, mj_button, 0, mouse_last_x_, mouse_last_y_, 0.0, 0.0, mods);
+
+  if (act == GLFW_RELEASE)
+  {
+    ui_state_.dragrect = 0;
+    ui_state_.dragbutton = 0;
+    ui_mouse_capture_ = false;
+  }
+  else if (act == GLFW_PRESS && ui_consumed)
+  {
+    ui_mouse_capture_ = true;
+  }
 }
 
 void PlannerGuiSimulator::mouse_move_cb_impl(
@@ -232,7 +272,7 @@ void PlannerGuiSimulator::mouse_move_cb_impl(
   const bool ui_consumed = dispatch_ui_event(
     mjEVENT_MOVE, mjBUTTON_NONE, 0, xpos, ypos, 0.0, 0.0, 0);
 
-  if (ui_consumed)
+  if (ui_consumed || ui_mouse_capture_)
   {
     mouse_last_x_ = xpos;
     mouse_last_y_ = ypos;
@@ -366,7 +406,7 @@ bool PlannerGuiSimulator::simulate_impl(
     mjr_defaultContext(&mjr_context_);
 
     mjv_makeScene(mj_model_, &mjv_scene_, 2000);
-    mjr_makeContext(mj_model_, &mjr_context_, mjFONTSCALE_150);
+    mjr_makeContext(mj_model_, &mjr_context_, mjFONTSCALE_100);
 
     init_ui();
 
@@ -384,9 +424,9 @@ bool PlannerGuiSimulator::simulate_impl(
         mj_step(mj_model_, mj_data_);
       }
 
-      glfwGetFramebufferSize(window_, &mjr_viewport_.width, &mjr_viewport_.height);
       refresh_ui_layout();
       sync_status_to_ui();
+      mjr_viewport_ = ui_state_.rect[kUiRectViewport];
 
       mjv_updateScene(
         mj_model_, mj_data_, &mjv_options_, nullptr,
@@ -456,11 +496,14 @@ void PlannerGuiSimulator::init_ui()
 
   planner_transform_mode_value_ = static_cast<int>(PlannerTransformMode::kDynamicTf);
   planner_execution_mode_value_ = static_cast<int>(PlannerExecutionMode::kDryRun);
+  ui_mouse_capture_ = false;
 
   ui_state_.userdata = this;
   ui_state_.nrect = 3;
+  ui_state_.dragrect = 0;
+  ui_state_.dragbutton = 0;
 
-  ui_.spacing = mjui_themeSpacing(0);
+  ui_.spacing = mjui_themeSpacing(1);
   ui_.color = mjui_themeColor(0);
   ui_.predicate = nullptr;
   ui_.userdata = this;
@@ -469,12 +512,16 @@ void PlannerGuiSimulator::init_ui()
   ui_.radiocol = 1;
 
   const mjuiDef planner_def[] = {
-    {mjITEM_SECTION,   "Grasp Planner",      mjPRESERVE, nullptr,                      "", 0},
-    {mjITEM_RADIOLINE, "Pose source",        1,          &planner_transform_mode_value_, "Dynamic TF\nLegacy static", 0},
-    {mjITEM_RADIOLINE, "Command mode",       1,          &planner_execution_mode_value_, "Dry run\nTrajectory\nPos FF", 0},
-    {mjITEM_BUTTON,    "Run Grasp Planner",  1,          nullptr,                      "", 0},
-    {mjITEM_EDITTXT,   "Status",             0,          planner_status_text_,         "", 0},
-    {mjITEM_END,       "",                   0,          nullptr,                      "", 0}
+    {mjITEM_SECTION,   "Grasp Planner", mjPRESERVE, nullptr,                       "", 0},
+    {mjITEM_SEPARATOR, "Pose Source",   1,          nullptr,                       "", 0},
+    {mjITEM_RADIO,     "Pose",          1,          &planner_transform_mode_value_, "Dynamic TF\nLegacy static", 0},
+    {mjITEM_SEPARATOR, "Execution",     1,          nullptr,                       "", 0},
+    {mjITEM_RADIO,     "Mode",          1,          &planner_execution_mode_value_, "Dry run\nTrajectory\nPos FF", 0},
+    {mjITEM_SEPARATOR, "",              1,          nullptr,                       "", 0},
+    {mjITEM_BUTTON,    "Run Planner",   1,          nullptr,                       "", 0},
+    {mjITEM_SEPARATOR, "",              1,          nullptr,                       "", 0},
+    {mjITEM_STATIC,    "Status",        1,          nullptr,                       "Idle", 0},
+    {mjITEM_END,       "",              0,          nullptr,                       "", 0}
   };
 
   mjui_add(&ui_, planner_def);
@@ -553,8 +600,9 @@ void PlannerGuiSimulator::sync_status_to_ui()
     return;
   }
 
-  std::snprintf(planner_status_text_, sizeof(planner_status_text_), "%s",
-                planner_status_pending_.c_str());
+  std::snprintf(
+    ui_.sect[kUiSectionPlanner].item[kUiItemStatus].multi.name[0],
+    mjMAXUINAME, "%s", planner_status_pending_.c_str());
   mjui_update(kUiSectionPlanner, kUiItemStatus, &ui_, &ui_state_, &mjr_context_);
   planner_status_dirty_ = false;
 }
@@ -613,13 +661,14 @@ bool PlannerGuiSimulator::dispatch_ui_event(
     ((mods & GLFW_MOD_ALT) != 0) ||
     (glfwGetKey(window_, GLFW_KEY_LEFT_ALT) == GLFW_PRESS) ||
     (glfwGetKey(window_, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS);
-  ui_state_.mouserect = mjr_findRect(
-    static_cast<int>(fb_x), static_cast<int>(fb_y), ui_state_.nrect, ui_state_.rect);
+  ui_state_.mouserect =
+    mjr_findRect(static_cast<int>(fb_x), static_cast<int>(fb_y),
+                 ui_state_.nrect - 1, ui_state_.rect + 1) + 1;
 
   const bool directed_to_ui =
     (event_type == mjEVENT_KEY) ||
     (ui_state_.dragrect == ui_.rectid) ||
-    (ui_state_.mouserect == ui_.rectid);
+    (ui_state_.dragrect == 0 && ui_state_.mouserect == ui_.rectid);
   if (!directed_to_ui)
   {
     return false;
@@ -663,31 +712,6 @@ void PlannerGuiSimulator::handle_ui_item(mjuiItem* item)
 
     launch_planner(transform_mode, execution_mode);
   }
-}
-
-bool PlannerGuiSimulator::is_mouse_over_ui(double x, double y)
-{
-  if (!ui_initialized_ || window_ == nullptr)
-  {
-    return false;
-  }
-
-  int window_width = 0;
-  int window_height = 0;
-  int fb_width = 0;
-  int fb_height = 0;
-  glfwGetWindowSize(window_, &window_width, &window_height);
-  glfwGetFramebufferSize(window_, &fb_width, &fb_height);
-  if (window_width <= 0 || window_height <= 0 || fb_width <= 0 || fb_height <= 0)
-  {
-    return false;
-  }
-
-  const double scale_x = static_cast<double>(fb_width) / static_cast<double>(window_width);
-  const double scale_y = static_cast<double>(fb_height) / static_cast<double>(window_height);
-  const int fb_x = static_cast<int>(x * scale_x);
-  const int fb_y = static_cast<int>((static_cast<double>(window_height) - y) * scale_y);
-  return mjr_findRect(fb_x, fb_y, ui_state_.nrect, ui_state_.rect) == ui_.rectid;
 }
 
 void PlannerGuiSimulator::set_status(const std::string& status)
