@@ -3,6 +3,7 @@ install/
 log/
 .env
 .vscode
+.github/
 agent.md
 
 # ignore rust files
