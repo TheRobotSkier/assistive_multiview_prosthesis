@@ -35,6 +35,16 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+### OPEN3D
+# Install Open3D system dependencies and pip
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    libegl1 \
+    libgl1 \
+    libgomp1 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+###
+
 # Configure and install MuJoCo
 ENV MUJOCO_VERSION=${MUJOCO_VERSION}
 ENV MUJOCO_DIR="/opt/mujoco/mujoco-${MUJOCO_VERSION}"
@@ -95,6 +105,13 @@ RUN sudo apt-get update \
 RUN echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/$USERNAME/.bashrc
 
 RUN sudo python3 -m pip install --no-cache-dir --break-system-packages mujoco==${MUJOCO_VERSION}
+
+
+
+### OPEN3D
+# Install Open3D from the PyPI repositories
+RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
+###
 
 WORKDIR /miahand_ws
 
