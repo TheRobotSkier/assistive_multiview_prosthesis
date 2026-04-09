@@ -67,7 +67,7 @@ CONTACT_GROUPS = {
 #
 # Contact naming convention:
 #   Finger + Region + Side/Depth
-# Examples: IndexPipTop, IndexSidePipBot, ThumbAddDip, ThumbAbdTip, PalmDistUlna.
+# Examples: IndexPip, IndexPipSide, ThumbAddDip, ThumbAbdTip, PalmDistUlna.
 #
 # Contacts per geometry:
 #   - Index (4 geoms): 2 each (top + side) = 8 total

@@ -25,11 +25,11 @@ REQUIRED_KEYS = [
     "all_contact_local_offsets",
     "index_contact_names",
     "mrl_contact_names",
-    "thumb_contact_names",
+    "thumb_add_contact_names",
+    "thumb_abd_contact_names",
     "palm_contact_names",
     "index_table",
     "mrl_table",
-    "thumb_flex_table",
     "thumb_opp_mode0_table",
     "thumb_opp_mode1_table",
     "palm_table",
@@ -156,7 +156,7 @@ def verify_contact_metadata_consistency(f):
     group_map = {
         "index": f["index_contact_names"],
         "mrl": f["mrl_contact_names"],
-        "thumb": f["thumb_contact_names"],
+        "thumb_add": f["thumb_add_contact_names"],
         "palm": f["palm_contact_names"],
     }
     all_name_set = set(all_names.tolist())
@@ -280,9 +280,8 @@ def verify_table_dimensions(f, resolution):
     shape_expectations = [
         ("index_table", (resolution, f["index_contact_names"].shape[0], 8)),
         ("mrl_table", (resolution, f["mrl_contact_names"].shape[0], 8)),
-        ("thumb_flex_table", (resolution, f["thumb_contact_names"].shape[0], 8)),
-        ("thumb_opp_mode0_table", (resolution, f["all_contact_names"].shape[0], 8)),
-        ("thumb_opp_mode1_table", (resolution, f["all_contact_names"].shape[0], 8)),
+        ("thumb_opp_mode0_table", (resolution, f["thumb_add_contact_names"].shape[0], 8)),
+        ("thumb_opp_mode1_table", (resolution, f["thumb_abd_contact_names"].shape[0], 8)),
         ("palm_table", (f["palm_contact_names"].shape[0], 8)),
     ]
 
@@ -307,25 +306,26 @@ def verify_mode_consistency(f):
 
     mode0 = f["thumb_opp_mode0_table"]
     mode1 = f["thumb_opp_mode1_table"]
-    groups = f["all_contact_groups"]
+    add_names = f["thumb_add_contact_names"]
+    abd_names = f["thumb_abd_contact_names"]
 
-    thumb_mask = groups == "thumb"
-    non_thumb_mask = np.logical_not(thumb_mask)
-
-    if not np.any(thumb_mask):
-        print("FAIL no thumb contacts in all_contact_groups")
+    if add_names.shape != abd_names.shape:
+        print("FAIL thumb_add_contact_names and thumb_abd_contact_names shape mismatch")
         return False
 
-    thumb_delta = np.max(np.abs(mode0[:, thumb_mask, :] - mode1[:, thumb_mask, :]))
+    converted = np.array([name.replace("ThumbAdd", "ThumbAbd", 1) for name in add_names], dtype=abd_names.dtype)
+    if not np.array_equal(converted, abd_names):
+        print("FAIL thumb add/abd contact names are not aligned")
+        ok = False
+    else:
+        print("PASS thumb add/abd contact names are aligned")
+
+    thumb_delta = np.max(np.abs(mode0 - mode1))
     if thumb_delta < 1e-6:
         print("FAIL thumb mode tables appear identical on thumb contacts")
         ok = False
     else:
         print(f"PASS thumb contacts differ across modes (max delta {thumb_delta:.3e})")
-
-    if np.any(non_thumb_mask):
-        non_thumb_delta = np.max(np.abs(mode0[:, non_thumb_mask, :] - mode1[:, non_thumb_mask, :]))
-        print(f"INFO non-thumb max delta across thumb modes: {non_thumb_delta:.3e}")
 
     return ok
 
@@ -340,12 +340,12 @@ def demonstrate_lookup(f):
     j = min(1, f["index_table"].shape[1] - 1)
     print(f"index_table[{i}, {j}] DQ: {f['index_table'][i, j]}")
 
-    i = min(5, f["thumb_flex_table"].shape[0] - 1)
-    j = min(2, f["thumb_flex_table"].shape[1] - 1)
-    print(f"thumb_flex_table[{i}, {j}] DQ: {f['thumb_flex_table'][i, j]}")
+    i = min(5, f["thumb_opp_mode0_table"].shape[0] - 1)
+    j = min(2, f["thumb_opp_mode0_table"].shape[1] - 1)
+    print(f"thumb_opp_mode0_table[{i}, {j}] DQ: {f['thumb_opp_mode0_table'][i, j]}")
 
     i = min(4, f["thumb_opp_mode1_table"].shape[0] - 1)
-    j = min(10, f["thumb_opp_mode1_table"].shape[1] - 1)
+    j = min(2, f["thumb_opp_mode1_table"].shape[1] - 1)
     print(f"thumb_opp_mode1_table[{i}, {j}] DQ: {f['thumb_opp_mode1_table'][i, j]}")
 
 
@@ -359,7 +359,6 @@ def verify_all_dq_tables(f):
     for key in [
         "index_table",
         "mrl_table",
-        "thumb_flex_table",
         "thumb_opp_mode0_table",
         "thumb_opp_mode1_table",
         "palm_table",
@@ -400,7 +399,6 @@ def verify_discretization_jump_lengths(f):
     table_keys = [
         "index_table",
         "mrl_table",
-        "thumb_flex_table",
         "thumb_opp_mode0_table",
         "thumb_opp_mode1_table",
     ]
@@ -469,7 +467,6 @@ def verify_contact_bbox(f):
     table_keys = [
         "index_table",
         "mrl_table",
-        "thumb_flex_table",
         "thumb_opp_mode0_table",
         "thumb_opp_mode1_table",
         "palm_table",
