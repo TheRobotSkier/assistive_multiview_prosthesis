@@ -8,6 +8,7 @@ try:
     from mia_hand_ros2_pkgs.dev.grasp_preshaping.scripts.model import (
         COLLISION_GEOMETRIES,
         CONTACT_DEFINITIONS,
+        LUT_PATH,
         get_sampled_contact_transforms,
         get_q_full,
         low,
@@ -24,6 +25,7 @@ except ModuleNotFoundError:
     from mia_hand_ros2_pkgs.dev.grasp_preshaping.scripts.model import (
         COLLISION_GEOMETRIES,
         CONTACT_DEFINITIONS,
+        LUT_PATH,
         get_sampled_contact_transforms,
         get_q_full,
         low,
@@ -138,6 +140,20 @@ def estimate_workspace_bounds(samples=250):
     return center, half
 
 
+def load_contact_names_from_lut():
+    """Load contact names from LUT metadata, fallback to model definitions if unavailable."""
+    fallback = [c["name"] for c in CONTACT_DEFINITIONS]
+    try:
+        with np.load(LUT_PATH, allow_pickle=False) as lut:
+            if "all_contact_names" in lut.files:
+                names = [str(name) for name in lut["all_contact_names"].tolist()]
+                if names:
+                    return names
+    except (OSError, ValueError):
+        pass
+    return fallback
+
+
 def main():
     group_colors = {
         "thumb": "#f4a261",
@@ -149,7 +165,7 @@ def main():
     }
 
     contact_group = {c["name"]: c["group"] for c in CONTACT_DEFINITIONS}
-    sorted_contacts = sorted(contact_group.keys())
+    sorted_contacts = load_contact_names_from_lut()
 
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
@@ -172,17 +188,22 @@ def main():
     initial_q = np.array([0.0, 0.0, 0.0], dtype=float)
     point_artist = None
     text_artist = None
+    label_artists = []
     geom_artists = []
 
     def redraw(q_active):
-        nonlocal point_artist, text_artist, geom_artists
+        nonlocal point_artist, text_artist, label_artists, geom_artists
 
         transforms = get_sampled_contact_transforms(q_active)
         q_f = get_q_full(q_active)
         pin.forwardKinematics(pin_model, pin_data, q_f)
 
-        xyz = np.array([transforms[name][:3, 3] for name in sorted_contacts], dtype=float)
-        colors = [group_colors.get(contact_group[name], "#4c78a8") for name in sorted_contacts]
+        active_contacts = [name for name in sorted_contacts if name in transforms]
+        if not active_contacts:
+            return
+
+        xyz = np.array([transforms[name][:3, 3] for name in active_contacts], dtype=float)
+        colors = [group_colors.get(contact_group.get(name), "#4c78a8") for name in active_contacts]
 
         if point_artist is not None:
             point_artist.remove()
@@ -195,6 +216,21 @@ def main():
             alpha=0.9,
             depthshade=True,
         )
+
+        for artist in label_artists:
+            artist.remove()
+        label_artists = []
+        for i, name in enumerate(active_contacts):
+            label = ax.text(
+                xyz[i, 0],
+                xyz[i, 1],
+                xyz[i, 2],
+                name,
+                fontsize=7,
+                color=colors[i],
+                alpha=0.9,
+            )
+            label_artists.append(label)
 
         for artist in geom_artists:
             if isinstance(artist, list):
@@ -247,7 +283,7 @@ def main():
             0.02,
             (
                 f"Thumb={q_active[0]:.3f}  TISIT={q_active[1]:.3f}  MRL={q_active[2]:.3f}\\n"
-                f"Showing {len(sorted_contacts)} sampled contact points"
+                f"Showing {len(active_contacts)} sampled contact points"
             ),
             transform=ax.transAxes,
             fontsize=10,

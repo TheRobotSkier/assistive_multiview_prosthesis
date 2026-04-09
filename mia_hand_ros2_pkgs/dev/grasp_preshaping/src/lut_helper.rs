@@ -1,342 +1,560 @@
-use nalgebra::{Matrix3, Matrix4, UnitQuaternion, Vector3};
+use nalgebra::{Matrix4, Quaternion, UnitQuaternion, Vector3};
 use npyz::npz::NpzArchive;
-use std::collections::HashMap;
-use std::error::Error;
 use std::io::{Read, Seek};
-use thiserror::Error;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum FingerType {
-    Index,
-    Middle,
-    Ring,
-    Little,
-    ThumbFlex,
-    ThumbOpposition,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DualQuaternion {
+    pub real: [f64; 4],
+    pub dual: [f64; 4],
 }
 
-#[derive(Debug, Clone)]
-pub struct SE3Matrix {
-    pub matrix: Matrix4<f64>,
-}
+impl DualQuaternion {
+    pub fn to_se3(self) -> Matrix4<f64> {
+        let qr = self.normalized_real_quaternion();
+        let qd = Quaternion::new(self.dual[0], self.dual[1], self.dual[2], self.dual[3]);
+        let t_quat = qd * qr.conjugate() * 2.0;
 
-impl SE3Matrix {
-    pub fn new(matrix: Matrix4<f64>) -> Self {
-        Self { matrix }
+        let rotation = UnitQuaternion::from_quaternion(qr)
+            .to_rotation_matrix()
+            .matrix()
+            .clone_owned();
+
+        let mut m = Matrix4::identity();
+        m.fixed_view_mut::<3, 3>(0, 0).copy_from(&rotation);
+        m[(0, 3)] = t_quat.i;
+        m[(1, 3)] = t_quat.j;
+        m[(2, 3)] = t_quat.k;
+        m
     }
 
-    pub fn identity() -> Self {
+    pub fn location(self) -> Vector3<f64> {
+        let se3 = self.to_se3();
+        Vector3::new(se3[(0, 3)], se3[(1, 3)], se3[(2, 3)])
+    }
+
+    fn from_slice(v: &[f64]) -> Self {
         Self {
-            matrix: Matrix4::identity(),
+            real: [v[0], v[1], v[2], v[3]],
+            dual: [v[4], v[5], v[6], v[7]],
         }
     }
 
-    pub fn rotation(&self) -> UnitQuaternion<f64> {
-        let rotation: Matrix3<f64> = self.matrix.fixed_view::<3, 3>(0, 0).into_owned();
-        UnitQuaternion::from_matrix(&rotation)
+    fn normalized_real_quaternion(self) -> Quaternion<f64> {
+        let q = Quaternion::new(self.real[0], self.real[1], self.real[2], self.real[3]);
+        let norm = q.norm();
+        if norm > 0.0 {
+            q / norm
+        } else {
+            Quaternion::identity()
+        }
     }
 
-    pub fn translation(&self) -> Vector3<f64> {
-        Vector3::new(
-            self.matrix[(0, 3)],
-            self.matrix[(1, 3)],
-            self.matrix[(2, 3)],
-        )
+    fn lerp(a: Self, b: Self, t: f64) -> Self {
+        let mut b_real = b.real;
+        let mut b_dual = b.dual;
+
+        // Keep quaternion sign continuity before blending.
+        let dot = a.real[0] * b.real[0]
+            + a.real[1] * b.real[1]
+            + a.real[2] * b.real[2]
+            + a.real[3] * b.real[3];
+        if dot < 0.0 {
+            for i in 0..4 {
+                b_real[i] = -b_real[i];
+                b_dual[i] = -b_dual[i];
+            }
+        }
+
+        let mut out_real = [0.0; 4];
+        let mut out_dual = [0.0; 4];
+        for i in 0..4 {
+            out_real[i] = (1.0 - t) * a.real[i] + t * b_real[i];
+            out_dual[i] = (1.0 - t) * a.dual[i] + t * b_dual[i];
+        }
+
+        let mut dq = Self {
+            real: out_real,
+            dual: out_dual,
+        };
+        dq.normalize_in_place();
+        dq
+    }
+
+    fn normalize_in_place(&mut self) {
+        let n = (self.real[0] * self.real[0]
+            + self.real[1] * self.real[1]
+            + self.real[2] * self.real[2]
+            + self.real[3] * self.real[3])
+            .sqrt();
+        if n > 0.0 {
+            for i in 0..4 {
+                self.real[i] /= n;
+                self.dual[i] /= n;
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn from_translation_xyz(x: f64, y: f64, z: f64) -> Self {
+        // qr = [1,0,0,0], qd = 0.5 * [0,tx,ty,tz] * qr
+        Self {
+            real: [1.0, 0.0, 0.0, 0.0],
+            dual: [0.0, 0.5 * x, 0.5 * y, 0.5 * z],
+        }
     }
 }
 
-#[derive(Error, Debug)]
-pub enum LutError {
-    #[error("Failed to open .npz file: {0}")]
-    FileOpenError(String),
-    #[error("Array not found: {0}")]
-    ArrayNotFound(String),
-    #[error("Invalid array shape: {0}")]
-    InvalidShape(String),
-    #[error("Attribute not found: {0}")]
-    AttributeNotFound(String),
-    #[error("Transform lookup failed for {finger:?} at sample {sample} (available samples: {available_samples})")]
-    TransformLookupFailed {
-        finger: FingerType,
-        sample: usize,
-        available_samples: usize,
-    },
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Contact {
+    IndexPipTop,
+    IndexSidePipBot,
+    IndexMcpTop,
+    IndexSideMcpBot,
+    IndexDipTop,
+    IndexSideDipBot,
+    IndexTipTop,
+    IndexSideTipBot,
+    MiddlePipTop,
+    MiddleMcpTop,
+    MiddleDipTop,
+    MiddleTipTop,
+    RingPipTop,
+    RingDipTop,
+    RingTipTop,
+    LittlePipTop,
+    LittleDipTop,
+    LittleTipTop,
+    ThumbAddPip,
+    ThumbAddDip,
+    ThumbAddTip,
+    ThumbAbdPip,
+    ThumbAbdDip,
+    ThumbAbdTip,
+    PalmProxUlna,
+    PalmProxRadi,
+    PalmDistUlna,
+    PalmDistRadi,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ContactTable {
+    Index,
+    Mrl,
+    ThumbAdd,
+    ThumbAbd,
+    Palm,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ContactSpec {
+    table: ContactTable,
+    index: usize,
 }
 
 pub struct FingerLUT {
     resolution: usize,
-    transforms: HashMap<FingerType, Vec<SE3Matrix>>,
+    index_table: Vec<DualQuaternion>,
+    mrl_table: Vec<DualQuaternion>,
+    thumb_add_table: Vec<DualQuaternion>,
+    thumb_abd_table: Vec<DualQuaternion>,
+    palm_table: Vec<DualQuaternion>,
 }
 
 impl FingerLUT {
-    const ROTATION_ORTHO_TOL: f64 = 1e-5;
-    const ROTATION_DET_TOL: f64 = 1e-5;
-    const HOMOGENEOUS_TOL: f64 = 1e-8;
+    const INDEX_CONTACTS: usize = 8;
+    const MRL_CONTACTS: usize = 10;
+    const THUMB_CONTACTS: usize = 3;
+    const PALM_CONTACTS: usize = 4;
 
-    fn validate_se3_matrix(
-        matrix: &Matrix4<f64>,
-        finger_name: &str,
-        sample_idx: usize,
-    ) -> Result<(), LutError> {
-        if !matrix.iter().all(|v| v.is_finite()) {
-            return Err(LutError::InvalidShape(format!(
-                "{} sample {} has non-finite values",
-                finger_name, sample_idx
-            )));
-        }
+    pub fn load(path: &str) -> Self {
+        let mut npz = NpzArchive::open(path).expect("failed to open LUT npz file");
 
-        let bottom_row = [
-            matrix[(3, 0)],
-            matrix[(3, 1)],
-            matrix[(3, 2)],
-            matrix[(3, 3)],
-        ];
-        if bottom_row[0].abs() > Self::HOMOGENEOUS_TOL
-            || bottom_row[1].abs() > Self::HOMOGENEOUS_TOL
-            || bottom_row[2].abs() > Self::HOMOGENEOUS_TOL
-            || (bottom_row[3] - 1.0).abs() > Self::HOMOGENEOUS_TOL
-        {
-            return Err(LutError::InvalidShape(format!(
-                "{} sample {} has invalid homogeneous row [{:.6}, {:.6}, {:.6}, {:.6}]",
-                finger_name, sample_idx, bottom_row[0], bottom_row[1], bottom_row[2], bottom_row[3]
-            )));
-        }
+        let resolution = Self::read_resolution(&mut npz);
+        let index_raw = Self::read_numeric_array(&mut npz, "index_table");
+        let mrl_raw = Self::read_numeric_array(&mut npz, "mrl_table");
+        let thumb_add_raw = Self::read_numeric_array(&mut npz, "thumb_opp_mode0_table");
+        let thumb_abd_raw = Self::read_numeric_array(&mut npz, "thumb_opp_mode1_table");
+        let palm_raw = Self::read_numeric_array(&mut npz, "palm_table");
 
-        let rotation: Matrix3<f64> = matrix.fixed_view::<3, 3>(0, 0).into_owned();
-        let ortho_err = (rotation.transpose() * rotation - Matrix3::identity()).norm();
-        if ortho_err > Self::ROTATION_ORTHO_TOL {
-            return Err(LutError::InvalidShape(format!(
-                "{} sample {} rotation is not orthonormal (error {:.6e})",
-                finger_name, sample_idx, ortho_err
-            )));
-        }
+        let index_table = Self::decode_table(&index_raw, resolution, Self::INDEX_CONTACTS, "index_table");
+        let mrl_table = Self::decode_table(&mrl_raw, resolution, Self::MRL_CONTACTS, "mrl_table");
+        let thumb_add_table =
+            Self::decode_table(&thumb_add_raw, resolution, Self::THUMB_CONTACTS, "thumb_opp_mode0_table");
+        let thumb_abd_table =
+            Self::decode_table(&thumb_abd_raw, resolution, Self::THUMB_CONTACTS, "thumb_opp_mode1_table");
+        let palm_table = Self::decode_palm_table(&palm_raw, Self::PALM_CONTACTS, "palm_table");
 
-        let det = rotation.determinant();
-        if (det - 1.0).abs() > Self::ROTATION_DET_TOL {
-            return Err(LutError::InvalidShape(format!(
-                "{} sample {} rotation determinant {:.6} is not close to +1",
-                finger_name, sample_idx, det
-            )));
-        }
-
-        Ok(())
-    }
-
-    fn read_resolution<R: Read + Seek>(npz: &mut NpzArchive<R>) -> Result<usize, LutError> {
-        let read_u32 = npz
-            .by_name("resolution")
-            .map_err(|e| LutError::FileOpenError(e.to_string()))?
-            .ok_or_else(|| LutError::AttributeNotFound("resolution".to_string()))?
-            .into_vec::<u32>();
-        if let Ok(values) = read_u32 {
-            if let Some(value) = values.first() {
-                return Ok(*value as usize);
-            }
-        }
-
-        let read_i32 = npz
-            .by_name("resolution")
-            .map_err(|e| LutError::FileOpenError(e.to_string()))?
-            .ok_or_else(|| LutError::AttributeNotFound("resolution".to_string()))?
-            .into_vec::<i32>();
-        if let Ok(values) = read_i32 {
-            if let Some(value) = values.first() {
-                return Ok((*value).max(0) as usize);
-            }
-        }
-
-        let read_i8 = npz
-            .by_name("resolution")
-            .map_err(|e| LutError::FileOpenError(e.to_string()))?
-            .ok_or_else(|| LutError::AttributeNotFound("resolution".to_string()))?
-            .into_vec::<i8>();
-        if let Ok(values) = read_i8 {
-            if let Some(value) = values.first() {
-                return Ok((*value).max(0) as usize);
-            }
-        }
-
-        Err(LutError::InvalidShape(
-            "Failed to read resolution as u32, i32, or i8".to_string(),
-        ))
-    }
-
-    fn read_transform_data<R: Read + Seek>(
-        npz: &mut NpzArchive<R>,
-        array_name: &str,
-    ) -> Result<Option<Vec<f64>>, LutError> {
-        let array = match npz
-            .by_name(array_name)
-            .map_err(|e| LutError::FileOpenError(e.to_string()))?
-        {
-            Some(array) => array,
-            None => return Ok(None),
-        };
-
-        if let Ok(values) = array.into_vec::<f64>() {
-            return Ok(Some(values));
-        }
-
-        let array_f32 = npz
-            .by_name(array_name)
-            .map_err(|e| LutError::FileOpenError(e.to_string()))?
-            .ok_or_else(|| LutError::ArrayNotFound(array_name.to_string()))?;
-        let values_f32: Vec<f32> = array_f32.into_vec::<f32>().map_err(|e| {
-            LutError::InvalidShape(format!("Failed to read {} as f32: {}", array_name, e))
-        })?;
-
-        Ok(Some(values_f32.into_iter().map(|v| v as f64).collect()))
-    }
-
-    pub fn load(path: &str) -> Result<Self, Box<dyn Error>> {
-        let mut npz = NpzArchive::open(path).map_err(|e| LutError::FileOpenError(e.to_string()))?;
-
-        // Read resolution
-        let resolution_from_file = Self::read_resolution(&mut npz).ok();
-
-        let mut transforms = HashMap::new();
-
-        let finger_types = vec![
-            (FingerType::Index, "index_flex"),
-            (FingerType::Middle, "middle"),
-            (FingerType::Ring, "ring"),
-            (FingerType::Little, "little"),
-            (FingerType::ThumbFlex, "thumb_flex"),
-            (FingerType::ThumbOpposition, "thumb_opposition"),
-        ];
-
-        for (finger_type, array_name) in finger_types {
-            if let Some(data) = Self::read_transform_data(&mut npz, array_name)? {
-                if data.len() % 16 != 0 {
-                    return Err(LutError::InvalidShape(format!(
-                        "{} has {} values, which is not divisible by 16",
-                        array_name,
-                        data.len()
-                    ))
-                    .into());
-                }
-
-                // Data should be (resolution, 4, 4) flattened
-                let num_samples = data.len() / 16;
-
-                if let Some(expected_resolution) = resolution_from_file {
-                    if num_samples != expected_resolution {
-                        return Err(LutError::InvalidShape(format!(
-                            "{} has {} samples, expected {} from resolution",
-                            array_name, num_samples, expected_resolution
-                        ))
-                        .into());
-                    }
-                }
-
-                let mut finger_transforms = Vec::with_capacity(num_samples);
-
-                for i in 0..num_samples {
-                    let start = i * 16;
-                    let mut matrix = Matrix4::zeros();
-                    for row in 0..4 {
-                        for col in 0..4 {
-                            matrix[(row, col)] = data[start + row * 4 + col];
-                        }
-                    }
-
-                    Self::validate_se3_matrix(&matrix, array_name, i)?;
-                    finger_transforms.push(SE3Matrix::new(matrix));
-                }
-
-                transforms.insert(finger_type, finger_transforms);
-            }
-        }
-
-        let inferred_resolution = transforms.values().next().map(|v| v.len()).unwrap_or(0);
-        let resolution = resolution_from_file.unwrap_or(inferred_resolution);
-
-        if resolution == 0 {
-            return Err(
-                LutError::InvalidShape("No transform data found in LUT".to_string()).into(),
-            );
-        }
-
-        Ok(Self {
+        Self {
             resolution,
-            transforms,
-        })
+            index_table,
+            mrl_table,
+            thumb_add_table,
+            thumb_abd_table,
+            palm_table,
+        }
     }
 
-    pub fn get_transform(&self, finger: FingerType, sample: usize) -> Option<SE3Matrix> {
-        self.transforms.get(&finger)?.get(sample).cloned()
+    pub fn get_se_transform(&self, contact: Contact, control: f64) -> Matrix4<f64> {
+        self.get_dq(contact, control).to_se3()
     }
 
-    pub fn get_transform_result(
-        &self,
-        finger: FingerType,
-        sample: usize,
-    ) -> Result<SE3Matrix, LutError> {
-        self.get_transform(finger, sample)
-            .ok_or_else(|| LutError::TransformLookupFailed {
-                finger,
-                sample,
-                available_samples: self.transforms.get(&finger).map(|v| v.len()).unwrap_or(0),
-            })
+    pub fn get_location(&self, contact: Contact, control: f64) -> Vector3<f64> {
+        self.get_dq(contact, control).location()
+    }
+
+    pub fn get_dq(&self, contact: Contact, control: f64) -> DualQuaternion {
+        let spec = Self::contact_spec(contact);
+        if matches!(spec.table, ContactTable::Palm) {
+            return self.palm_table[spec.index];
+        }
+
+        let clamped = control.clamp(0.0, 1.0);
+        if self.resolution <= 1 {
+            return self.get_dq_sample(contact, 0);
+        }
+
+        let float_idx = clamped * (self.resolution - 1) as f64;
+        let i0 = float_idx.floor() as usize;
+        let i1 = (i0 + 1).min(self.resolution - 1);
+        let alpha = float_idx - i0 as f64;
+
+        let d0 = self.get_dq_sample(contact, i0);
+        let d1 = self.get_dq_sample(contact, i1);
+        DualQuaternion::lerp(d0, d1, alpha)
+    }
+
+    pub fn get_se_transform_sample(&self, contact: Contact, sample: usize) -> Matrix4<f64> {
+        self.get_dq_sample(contact, sample).to_se3()
+    }
+
+    pub fn get_location_sample(&self, contact: Contact, sample: usize) -> Vector3<f64> {
+        self.get_dq_sample(contact, sample).location()
+    }
+
+    pub fn get_dq_sample(&self, contact: Contact, sample: usize) -> DualQuaternion {
+        let spec = Self::contact_spec(contact);
+        match spec.table {
+            ContactTable::Index => {
+                assert!(sample < self.resolution, "sample out of range for index table");
+                self.index_table[sample * Self::INDEX_CONTACTS + spec.index]
+            }
+            ContactTable::Mrl => {
+                assert!(sample < self.resolution, "sample out of range for mrl table");
+                self.mrl_table[sample * Self::MRL_CONTACTS + spec.index]
+            }
+            ContactTable::ThumbAdd => {
+                assert!(sample < self.resolution, "sample out of range for thumb add table");
+                self.thumb_add_table[sample * Self::THUMB_CONTACTS + spec.index]
+            }
+            ContactTable::ThumbAbd => {
+                assert!(sample < self.resolution, "sample out of range for thumb abd table");
+                self.thumb_abd_table[sample * Self::THUMB_CONTACTS + spec.index]
+            }
+            ContactTable::Palm => self.palm_table[spec.index],
+        }
     }
 
     pub fn get_resolution(&self) -> usize {
         self.resolution
     }
 
-    pub fn get_available_fingers(&self) -> Vec<FingerType> {
-        self.transforms.keys().cloned().collect()
+    pub fn get_control(&self, sample: usize) -> f64 {
+        assert!(sample < self.resolution, "sample out of range in get_control");
+        if self.resolution <= 1 {
+            0.0
+        } else {
+            sample as f64 / (self.resolution - 1) as f64
+        }
     }
 
-    pub fn interpolate_transform(&self, finger: FingerType, t: f64) -> Option<SE3Matrix> {
-        let transforms = self.transforms.get(&finger)?;
-        if transforms.is_empty() {
-            return None;
+    pub fn get_sample(&self, control: f64) -> usize {
+        if self.resolution <= 1 {
+            return 0;
         }
 
-        let t = t.clamp(0.0, 1.0);
-        let num_samples = transforms.len();
-
-        if num_samples == 1 {
-            return Some(transforms[0].clone());
-        }
-
-        let float_idx = t * (num_samples - 1) as f64;
-        let idx = float_idx.floor() as usize;
-        let next_idx = (idx + 1).min(num_samples - 1);
-        let alpha = float_idx - idx as f64;
-
-        let t1 = &transforms[idx];
-        let t2 = &transforms[next_idx];
-
-        let q1 = t1.rotation();
-        let q2 = t2.rotation();
-        let q_interp = q1.slerp(&q2, alpha);
-
-        let trans1 = t1.translation();
-        let trans2 = t2.translation();
-        let trans_interp = trans1.lerp(&trans2, alpha);
-
-        let mut matrix = Matrix4::identity();
-        matrix
-            .fixed_view_mut::<3, 3>(0, 0)
-            .copy_from(q_interp.to_rotation_matrix().matrix());
-        matrix[(0, 3)] = trans_interp[0];
-        matrix[(1, 3)] = trans_interp[1];
-        matrix[(2, 3)] = trans_interp[2];
-
-        Some(SE3Matrix::new(matrix))
+        let clamped = control.clamp(0.0, 1.0);
+        let idx = (clamped * (self.resolution - 1) as f64).round() as usize;
+        idx.min(self.resolution - 1)
     }
 
-    pub fn combine_thumb_transforms(
-        &self,
-        flex_sample: usize,
-        opp_sample: usize,
-    ) -> Result<SE3Matrix, LutError> {
-        let flex_transform = self.get_transform_result(FingerType::ThumbFlex, flex_sample)?;
-        let opp_transform = self.get_transform_result(FingerType::ThumbOpposition, opp_sample)?;
+    fn read_resolution<R: Read + Seek>(npz: &mut NpzArchive<R>) -> usize {
+        let as_i32 = npz
+            .by_name("resolution")
+            .expect("failed to access resolution")
+            .expect("resolution array missing")
+            .into_vec::<i32>();
 
-        let combined = flex_transform.matrix * opp_transform.matrix;
-        Ok(SE3Matrix::new(combined))
+        if let Ok(v) = as_i32 {
+            assert!(!v.is_empty(), "resolution array is empty");
+            return v[0].max(1) as usize;
+        }
+
+        let as_u32 = npz
+            .by_name("resolution")
+            .expect("failed to access resolution")
+            .expect("resolution array missing")
+            .into_vec::<u32>()
+            .expect("failed to decode resolution as i32 or u32");
+        assert!(!as_u32.is_empty(), "resolution array is empty");
+        as_u32[0].max(1) as usize
+    }
+
+    fn read_numeric_array<R: Read + Seek>(npz: &mut NpzArchive<R>, name: &str) -> Vec<f64> {
+        let arr_f32 = npz
+            .by_name(name)
+            .unwrap_or_else(|_| panic!("failed to access {}", name))
+            .unwrap_or_else(|| panic!("{} array missing", name))
+            .into_vec::<f32>();
+
+        if let Ok(v) = arr_f32 {
+            return v.into_iter().map(|x| x as f64).collect();
+        }
+
+        npz.by_name(name)
+            .unwrap_or_else(|_| panic!("failed to access {}", name))
+            .unwrap_or_else(|| panic!("{} array missing", name))
+            .into_vec::<f64>()
+            .unwrap_or_else(|_| panic!("failed to decode {} as f32 or f64", name))
+    }
+
+    fn decode_table(data: &[f64], samples: usize, contacts: usize, name: &str) -> Vec<DualQuaternion> {
+        let expected = samples * contacts * 8;
+        assert_eq!(
+            data.len(),
+            expected,
+            "{} has unexpected length (got {}, expected {})",
+            name,
+            data.len(),
+            expected
+        );
+
+        data.chunks_exact(8).map(DualQuaternion::from_slice).collect()
+    }
+
+    fn decode_palm_table(data: &[f64], contacts: usize, name: &str) -> Vec<DualQuaternion> {
+        let expected = contacts * 8;
+        assert_eq!(
+            data.len(),
+            expected,
+            "{} has unexpected length (got {}, expected {})",
+            name,
+            data.len(),
+            expected
+        );
+
+        data.chunks_exact(8).map(DualQuaternion::from_slice).collect()
+    }
+
+    fn contact_spec(contact: Contact) -> ContactSpec {
+        match contact {
+            Contact::IndexPipTop => ContactSpec {
+                table: ContactTable::Index,
+                index: 0,
+            },
+            Contact::IndexSidePipBot => ContactSpec {
+                table: ContactTable::Index,
+                index: 1,
+            },
+            Contact::IndexMcpTop => ContactSpec {
+                table: ContactTable::Index,
+                index: 2,
+            },
+            Contact::IndexSideMcpBot => ContactSpec {
+                table: ContactTable::Index,
+                index: 3,
+            },
+            Contact::IndexDipTop => ContactSpec {
+                table: ContactTable::Index,
+                index: 4,
+            },
+            Contact::IndexSideDipBot => ContactSpec {
+                table: ContactTable::Index,
+                index: 5,
+            },
+            Contact::IndexTipTop => ContactSpec {
+                table: ContactTable::Index,
+                index: 6,
+            },
+            Contact::IndexSideTipBot => ContactSpec {
+                table: ContactTable::Index,
+                index: 7,
+            },
+            Contact::MiddlePipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 0,
+            },
+            Contact::MiddleMcpTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 1,
+            },
+            Contact::MiddleDipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 2,
+            },
+            Contact::MiddleTipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 3,
+            },
+            Contact::RingPipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 4,
+            },
+            Contact::RingDipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 5,
+            },
+            Contact::RingTipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 6,
+            },
+            Contact::LittlePipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 7,
+            },
+            Contact::LittleDipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 8,
+            },
+            Contact::LittleTipTop => ContactSpec {
+                table: ContactTable::Mrl,
+                index: 9,
+            },
+            Contact::ThumbAddPip => ContactSpec {
+                table: ContactTable::ThumbAdd,
+                index: 0,
+            },
+            Contact::ThumbAddDip => ContactSpec {
+                table: ContactTable::ThumbAdd,
+                index: 1,
+            },
+            Contact::ThumbAddTip => ContactSpec {
+                table: ContactTable::ThumbAdd,
+                index: 2,
+            },
+            Contact::ThumbAbdPip => ContactSpec {
+                table: ContactTable::ThumbAbd,
+                index: 0,
+            },
+            Contact::ThumbAbdDip => ContactSpec {
+                table: ContactTable::ThumbAbd,
+                index: 1,
+            },
+            Contact::ThumbAbdTip => ContactSpec {
+                table: ContactTable::ThumbAbd,
+                index: 2,
+            },
+            Contact::PalmProxUlna => ContactSpec {
+                table: ContactTable::Palm,
+                index: 0,
+            },
+            Contact::PalmProxRadi => ContactSpec {
+                table: ContactTable::Palm,
+                index: 1,
+            },
+            Contact::PalmDistUlna => ContactSpec {
+                table: ContactTable::Palm,
+                index: 2,
+            },
+            Contact::PalmDistRadi => ContactSpec {
+                table: ContactTable::Palm,
+                index: 3,
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Contact, DualQuaternion, FingerLUT};
+
+    fn build_test_lut() -> FingerLUT {
+        let resolution = 5;
+
+        let mut index_table = Vec::new();
+        for s in 0..resolution {
+            for c in 0..8 {
+                index_table.push(DualQuaternion::from_translation_xyz(s as f64 + c as f64, 0.0, 0.0));
+            }
+        }
+
+        let mut mrl_table = Vec::new();
+        for s in 0..resolution {
+            for c in 0..10 {
+                mrl_table.push(DualQuaternion::from_translation_xyz(100.0 + s as f64 + c as f64, 0.0, 0.0));
+            }
+        }
+
+        let mut thumb_add_table = Vec::new();
+        let mut thumb_abd_table = Vec::new();
+        for s in 0..resolution {
+            for c in 0..3 {
+                thumb_add_table.push(DualQuaternion::from_translation_xyz(200.0 + s as f64 + c as f64, 0.0, 0.0));
+                thumb_abd_table.push(DualQuaternion::from_translation_xyz(300.0 + s as f64 + c as f64, 0.0, 0.0));
+            }
+        }
+
+        let palm_table = vec![
+            DualQuaternion::from_translation_xyz(400.0, 0.0, 0.0),
+            DualQuaternion::from_translation_xyz(401.0, 0.0, 0.0),
+            DualQuaternion::from_translation_xyz(402.0, 0.0, 0.0),
+            DualQuaternion::from_translation_xyz(403.0, 0.0, 0.0),
+        ];
+
+        FingerLUT {
+            resolution,
+            index_table,
+            mrl_table,
+            thumb_add_table,
+            thumb_abd_table,
+            palm_table,
+        }
+    }
+
+    #[test]
+    fn sample_control_roundtrip_is_stable() {
+        let lut = build_test_lut();
+        for s in 0..lut.get_resolution() {
+            let c = lut.get_control(s);
+            let s2 = lut.get_sample(c);
+            assert_eq!(s, s2);
+        }
+    }
+
+    #[test]
+    fn control_endpoints_match_sample_endpoints() {
+        let lut = build_test_lut();
+
+        let first = lut.get_location(Contact::ThumbAbdTip, 0.0);
+        let first_sample = lut.get_location_sample(Contact::ThumbAbdTip, 0);
+        assert!((first[0] - first_sample[0]).abs() < 1e-9);
+
+        let last = lut.get_location(Contact::ThumbAbdTip, 1.0);
+        let last_sample = lut.get_location_sample(Contact::ThumbAbdTip, lut.get_resolution() - 1);
+        assert!((last[0] - last_sample[0]).abs() < 1e-9);
+    }
+
+    #[test]
+    fn sample_query_returns_finite_values() {
+        let lut = build_test_lut();
+        let p = lut.get_location_sample(Contact::IndexSidePipBot, 3);
+        assert!(p.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn location_matches_transform_translation() {
+        let lut = build_test_lut();
+        let p = lut.get_location(Contact::PalmDistUlna, 0.42);
+        let m = lut.get_se_transform(Contact::PalmDistUlna, 0.42);
+        assert!((p[0] - m[(0, 3)]).abs() < 1e-9);
+        assert!((p[1] - m[(1, 3)]).abs() < 1e-9);
+        assert!((p[2] - m[(2, 3)]).abs() < 1e-9);
+    }
+
+    #[test]
+    fn thumb_modes_are_distinct() {
+        let lut = build_test_lut();
+        let add = lut.get_location_sample(Contact::ThumbAddTip, 2);
+        let abd = lut.get_location_sample(Contact::ThumbAbdTip, 2);
+        assert!(abd[0] > add[0]);
     }
 }

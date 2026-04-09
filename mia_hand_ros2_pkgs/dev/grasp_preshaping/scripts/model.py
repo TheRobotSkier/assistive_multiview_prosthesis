@@ -65,56 +65,60 @@ CONTACT_GROUPS = {
 #   - "lateral_neg": facing negative X (left side in local frame)
 #   - "distal": facing positive Z (tip/end direction)
 #
+# Contact naming convention:
+#   Finger + Region + Side/Depth
+# Examples: IndexPipTop, IndexSidePipBot, ThumbAddDip, ThumbAbdTip, PalmDistUlna.
+#
 # Contacts per geometry:
-#   - Index (4 geoms): 2 each (palmar + lateral) = 8 total
+#   - Index (4 geoms): 2 each (top + side) = 8 total
 #   - Middle (4 geoms): 1 each = 4 total
 #   - Ring/Little/Thumb (3 geoms each): 1 each = 9 total
-#   - Palm (2 geoms): 2 each (palmar_center + lateral) = 4 total
+#   - Palm (2 geoms): 2 each (ulnar + radial) = 4 total
 #   - TOTAL: 25 contacts
 
 CONTACT_DEFINITIONS = [
     # Index: proximal flex geom (mia_index_fle_0)
-    {"name": "index_fle_0_palmar", "group": "index", "geom": "mia_index_fle_0", "surface": "palmar"},
-    {"name": "index_fle_0_lateral", "group": "index", "geom": "mia_index_fle_0", "surface": "lateral_pos"},
+    {"name": "IndexMcp", "group": "index", "geom": "mia_index_fle_0", "surface": "palmar"},
+    {"name": "IndexMcpSide", "group": "index", "geom": "mia_index_fle_0", "surface": "lateral_pos"},
     
     # Index: proximal sensor geom (mia_index_sensor_0)
-    {"name": "index_sensor_0_palmar", "group": "index", "geom": "mia_index_sensor_0", "surface": "palmar"},
-    {"name": "index_sensor_0_lateral", "group": "index", "geom": "mia_index_sensor_0", "surface": "lateral_pos"},
+    {"name": "IndexDip", "group": "index", "geom": "mia_index_sensor_0", "surface": "palmar"},
+    {"name": "IndexDipSide", "group": "index", "geom": "mia_index_sensor_0", "surface": "lateral_pos"},
     
     # Index: distal sensor geom (mia_index_sensor_1)
-    {"name": "index_sensor_1_palmar", "group": "index", "geom": "mia_index_sensor_1", "surface": "palmar"},
-    {"name": "index_sensor_1_lateral", "group": "index", "geom": "mia_index_sensor_1", "surface": "lateral_pos"},
+    {"name": "IndexPip", "group": "index", "geom": "mia_index_sensor_1", "surface": "palmar"},
+    {"name": "IndexPipSide", "group": "index", "geom": "mia_index_sensor_1", "surface": "lateral_pos"},
     
     # Index: tip sensor geom (mia_index_sensor_2)
-    {"name": "index_sensor_2_palmar", "group": "index", "geom": "mia_index_sensor_2", "surface": "palmar"},
-    {"name": "index_sensor_2_lateral", "group": "index", "geom": "mia_index_sensor_2", "surface": "lateral_pos"},
+    {"name": "IndexTip", "group": "index", "geom": "mia_index_sensor_2", "surface": "palmar"},
+    {"name": "IndexTipSide", "group": "index", "geom": "mia_index_sensor_2", "surface": "lateral_pos"},
     
     # Middle: one per geometry
-    {"name": "middle_fle_0_palmar", "group": "middle", "geom": "mia_middle_fle_0", "surface": "palmar"},
-    {"name": "middle_sensor_0_palmar", "group": "middle", "geom": "mia_middle_sensor_0", "surface": "palmar"},
-    {"name": "middle_sensor_1_palmar", "group": "middle", "geom": "mia_middle_sensor_1", "surface": "palmar"},
-        {"name": "middle_sensor_2_palmar", "group": "middle", "geom": "mia_middle_sensor_2", "surface": "palmar"},
+    {"name": "MiddleMcp", "group": "middle", "geom": "mia_middle_fle_0", "surface": "palmar"},
+    {"name": "MiddleDip", "group": "middle", "geom": "mia_middle_sensor_0", "surface": "palmar"},
+    {"name": "MiddlePip", "group": "middle", "geom": "mia_middle_sensor_1", "surface": "palmar"},
+    {"name": "MiddleTip", "group": "middle", "geom": "mia_middle_sensor_2", "surface": "palmar"},
     
     # Ring: one per geometry
-    {"name": "ring_fle_0_palmar", "group": "ring", "geom": "mia_ring_fle_0", "surface": "palmar"},
-    {"name": "ring_fle_1_palmar", "group": "ring", "geom": "mia_ring_fle_1", "surface": "palmar"},
-    {"name": "ring_fle_2_palmar", "group": "ring", "geom": "mia_ring_fle_2", "surface": "palmar"},
+    {"name": "RingDip", "group": "ring", "geom": "mia_ring_fle_0", "surface": "palmar"},
+    {"name": "RingPip", "group": "ring", "geom": "mia_ring_fle_1", "surface": "palmar"},
+    {"name": "RingTip", "group": "ring", "geom": "mia_ring_fle_2", "surface": "palmar"},
     
     # Little: one per geometry
-    {"name": "little_fle_0_palmar", "group": "little", "geom": "mia_little_fle_0", "surface": "palmar"},
-    {"name": "little_fle_1_palmar", "group": "little", "geom": "mia_little_fle_1", "surface": "palmar"},
-    {"name": "little_fle_2_palmar", "group": "little", "geom": "mia_little_fle_2", "surface": "palmar"},
+    {"name": "LittleDip", "group": "little", "geom": "mia_little_fle_0", "surface": "palmar"},
+    {"name": "LittlePip", "group": "little", "geom": "mia_little_fle_1", "surface": "palmar"},
+    {"name": "LittleTip", "group": "little", "geom": "mia_little_fle_2", "surface": "palmar"},
     
     # Thumb: one per geometry
-    {"name": "thumb_fle_0_palmar", "group": "thumb", "geom": "mia_thumb_fle_0", "surface": "lateral_neg"},
-    {"name": "thumb_fle_1_palmar", "group": "thumb", "geom": "mia_thumb_fle_1", "surface": "lateral_neg"},
-    {"name": "thumb_fle_2_palmar", "group": "thumb", "geom": "mia_thumb_fle_2", "surface": "lateral_neg"},
+    {"name": "ThumbAddDip", "group": "thumb", "geom": "mia_thumb_fle_0", "surface": "lateral_neg"},
+    {"name": "ThumbAddPip", "group": "thumb", "geom": "mia_thumb_fle_1", "surface": "lateral_neg"},
+    {"name": "ThumbAddTip", "group": "thumb", "geom": "mia_thumb_fle_2", "surface": "lateral_neg"},
     
     # Palm: two per geometry (center and lateral support)
-    {"name": "palm_0_palmar_center", "group": "palm", "geom": "mia_palm_0", "surface": "lateral_neg"},
-    {"name": "palm_0_lateral", "group": "palm", "geom": "mia_palm_0", "surface": "lateral_pos"},
-    {"name": "palm_1_palmar_center", "group": "palm", "geom": "mia_palm_1", "surface": "lateral_neg"},
-    {"name": "palm_1_lateral", "group": "palm", "geom": "mia_palm_1", "surface": "lateral_pos"},
+    {"name": "PalmProxUlna", "group": "palm", "geom": "mia_palm_0", "surface": "palm_ulnar"},
+    {"name": "PalmProxRadi", "group": "palm", "geom": "mia_palm_0", "surface": "palm_radial"},
+    {"name": "PalmDistUlna", "group": "palm", "geom": "mia_palm_1", "surface": "palm_ulnar"},
+    {"name": "PalmDistRadi", "group": "palm", "geom": "mia_palm_1", "surface": "palm_radial"},
 ]
 
 
@@ -242,9 +246,9 @@ def _resolve_surface_descriptor(geom_info, surface_type, depth_scale=1.05):
         hx, hy, hz = params["half_extents"]
         if surface_type == "palmar":
             return np.array([0.0, 0.0, depth_scale * hz], dtype=float)
-        elif surface_type == "lateral_pos":
+        elif surface_type == "palm_radial":
             return np.array([depth_scale * 0.35 * hx, 0.0, depth_scale * hz], dtype=float)
-        elif surface_type == "lateral_neg":
+        elif surface_type == "palm_ulnar":
             return np.array([-depth_scale * 0.35 * hx, 0.0, depth_scale * hz], dtype=float)
         else:
             raise RuntimeError(f"Unsupported surface '{surface_type}' for box")
@@ -425,11 +429,11 @@ def get_all_finger_positions(q_active):
 
     results = {}
     primary = {
-        "index": "index_tip_pad",
-        "middle": "middle_tip_pad",
-        "ring": "ring_tip_pad",
-        "little": "little_tip_pad",
-        "thumb": "thumb_tip_pad",
+        "index": "IndexTipTop",
+        "middle": "MiddleTipTop",
+        "ring": "RingTipTop",
+        "little": "LittleTipTop",
+        "thumb": "ThumbAddTip",
     }
     for finger, contact_name in primary.items():
         results[finger] = transforms[contact_name][:3, 3].copy()
@@ -441,11 +445,11 @@ def get_all_finger_transforms(q_active):
     """Return dict[finger] -> 4x4 SE3 matrix in world coordinates."""
     sampled = get_sampled_contact_transforms(q_active)
     return {
-        "index": sampled["index_tip_pad"],
-        "middle": sampled["middle_tip_pad"],
-        "ring": sampled["ring_tip_pad"],
-        "little": sampled["little_tip_pad"],
-        "thumb": sampled["thumb_tip_pad"],
+        "index": sampled["IndexTipTop"],
+        "middle": sampled["MiddleTipTop"],
+        "ring": sampled["RingTipTop"],
+        "little": sampled["LittleTipTop"],
+        "thumb": sampled["ThumbAddTip"],
     }
 
 
@@ -503,7 +507,11 @@ def generate_contact_lut(resolution=11):
         + CONTACT_NAMES_BY_GROUP["little"],
         dtype="<U64",
     )
-    thumb_names = np.array(CONTACT_NAMES_BY_GROUP["thumb"], dtype="<U64")
+    thumb_add_names = np.array(CONTACT_NAMES_BY_GROUP["thumb"], dtype="<U64")
+    thumb_abd_names = np.array(
+        [name.replace("ThumbAdd", "ThumbAbd", 1) for name in thumb_add_names],
+        dtype="<U64",
+    )
     palm_names = np.array(CONTACT_NAMES_BY_GROUP["palm"], dtype="<U64")
 
     index_table = _build_contact_table(
@@ -518,23 +526,17 @@ def generate_contact_lut(resolution=11):
         contact_names=mrl_names,
     )
 
-    thumb_flex_table = _build_contact_table(
-        samples,
-        q_builder=lambda s: np.array([s, 0.0, 0.0], dtype=float),
-        contact_names=thumb_names,
-    )
-
     thumb_opp_mode0_table = _build_contact_table(
         samples,
         q_builder=lambda s: np.array([s, 0.0, 0.0], dtype=float),
-        contact_names=all_contacts,
+        contact_names=thumb_add_names,
         thumb_opp_mode=THUMB_OPPOSITION_STATES[0],
     )
 
     thumb_opp_mode1_table = _build_contact_table(
         samples,
         q_builder=lambda s: np.array([s, 0.0, 0.0], dtype=float),
-        contact_names=all_contacts,
+        contact_names=thumb_add_names,
         thumb_opp_mode=THUMB_OPPOSITION_STATES[1],
     )
 
@@ -562,11 +564,11 @@ def generate_contact_lut(resolution=11):
         all_contact_local_offsets=contact_offsets,
         index_contact_names=index_names,
         mrl_contact_names=mrl_names,
-        thumb_contact_names=thumb_names,
+        thumb_add_contact_names=thumb_add_names,
+        thumb_abd_contact_names=thumb_abd_names,
         palm_contact_names=palm_names,
         index_table=index_table,
         mrl_table=mrl_table,
-        thumb_flex_table=thumb_flex_table,
         thumb_opp_mode0_table=thumb_opp_mode0_table,
         thumb_opp_mode1_table=thumb_opp_mode1_table,
         palm_table=palm_table,
@@ -582,7 +584,6 @@ def generate_contact_lut(resolution=11):
     return {
         "index_table": index_table,
         "mrl_table": mrl_table,
-        "thumb_flex_table": thumb_flex_table,
         "thumb_opp_mode0_table": thumb_opp_mode0_table,
         "thumb_opp_mode1_table": thumb_opp_mode1_table,
         "palm_table": palm_table,
@@ -615,19 +616,6 @@ if __name__ == "__main__":
         get_sampled_contact_transforms(random_q)
     end = time.time()
     print(f"\nTime for 1000 sampled-contact FK calls: {(end - start) * 1000:.4f} ms")
-
-    print(f"\nRandom Config: {random_q}")
-    contacts = get_sampled_contact_transforms(random_q)
-    for c_name in [
-        "index_sensor_2_palmar",
-        "middle_sensor_1_palmar",
-        "ring_fle_2_palmar",
-        "little_fle_2_palmar",
-        "thumb_fle_2_palmar",
-        "palm_0_palmar_center",
-    ]:
-        pos = contacts[c_name][:3, 3]
-        print(f"{c_name:<22} x={pos[0]:.4f}, y={pos[1]:.4f}, z={pos[2]:.4f}")
 
     print("\n" + "=" * 50)
     print("Generating Collision Contact LUT...")
