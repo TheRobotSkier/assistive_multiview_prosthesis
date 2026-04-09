@@ -106,24 +106,24 @@ impl DualQuaternion {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Contact {
-    IndexPipTop,
-    IndexSidePipBot,
-    IndexMcpTop,
-    IndexSideMcpBot,
-    IndexDipTop,
-    IndexSideDipBot,
-    IndexTipTop,
-    IndexSideTipBot,
-    MiddlePipTop,
-    MiddleMcpTop,
-    MiddleDipTop,
-    MiddleTipTop,
-    RingPipTop,
-    RingDipTop,
-    RingTipTop,
-    LittlePipTop,
-    LittleDipTop,
-    LittleTipTop,
+    IndexPip,
+    IndexPipSide,
+    IndexMcp,
+    IndexMcpSide,
+    IndexDip,
+    IndexDipSide,
+    IndexTip,
+    IndexTipSide,
+    MiddleMcp,
+    MiddleDip,
+    MiddlePip,
+    MiddleTip,
+    RingDip,
+    RingPip,
+    RingTip,
+    LittleDip,
+    LittlePip,
+    LittleTip,
     ThumbAddPip,
     ThumbAddDip,
     ThumbAddTip,
@@ -347,75 +347,75 @@ impl FingerLUT {
 
     fn contact_spec(contact: Contact) -> ContactSpec {
         match contact {
-            Contact::IndexPipTop => ContactSpec {
+            Contact::IndexMcp => ContactSpec {
                 table: ContactTable::Index,
                 index: 0,
             },
-            Contact::IndexSidePipBot => ContactSpec {
+            Contact::IndexMcpSide => ContactSpec {
                 table: ContactTable::Index,
                 index: 1,
             },
-            Contact::IndexMcpTop => ContactSpec {
+            Contact::IndexDip => ContactSpec {
                 table: ContactTable::Index,
                 index: 2,
             },
-            Contact::IndexSideMcpBot => ContactSpec {
+            Contact::IndexDipSide => ContactSpec {
                 table: ContactTable::Index,
                 index: 3,
             },
-            Contact::IndexDipTop => ContactSpec {
+            Contact::IndexPip => ContactSpec {
                 table: ContactTable::Index,
                 index: 4,
             },
-            Contact::IndexSideDipBot => ContactSpec {
+            Contact::IndexPipSide => ContactSpec {
                 table: ContactTable::Index,
                 index: 5,
             },
-            Contact::IndexTipTop => ContactSpec {
+            Contact::IndexTip => ContactSpec {
                 table: ContactTable::Index,
                 index: 6,
             },
-            Contact::IndexSideTipBot => ContactSpec {
+            Contact::IndexTipSide => ContactSpec {
                 table: ContactTable::Index,
                 index: 7,
             },
-            Contact::MiddlePipTop => ContactSpec {
+            Contact::MiddleMcp => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 0,
             },
-            Contact::MiddleMcpTop => ContactSpec {
+            Contact::MiddlePip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 1,
             },
-            Contact::MiddleDipTop => ContactSpec {
+            Contact::MiddleDip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 2,
             },
-            Contact::MiddleTipTop => ContactSpec {
+            Contact::MiddleTip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 3,
             },
-            Contact::RingPipTop => ContactSpec {
+            Contact::RingDip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 4,
             },
-            Contact::RingDipTop => ContactSpec {
+            Contact::RingPip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 5,
             },
-            Contact::RingTipTop => ContactSpec {
+            Contact::RingTip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 6,
             },
-            Contact::LittlePipTop => ContactSpec {
+            Contact::LittleDip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 7,
             },
-            Contact::LittleDipTop => ContactSpec {
+            Contact::LittlePip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 8,
             },
-            Contact::LittleTipTop => ContactSpec {
+            Contact::LittleTip => ContactSpec {
                 table: ContactTable::Mrl,
                 index: 9,
             },
@@ -536,7 +536,7 @@ mod tests {
     #[test]
     fn sample_query_returns_finite_values() {
         let lut = build_test_lut();
-        let p = lut.get_location_sample(Contact::IndexSidePipBot, 3);
+        let p = lut.get_location_sample(Contact::IndexPipSide, 3);
         assert!(p.iter().all(|v| v.is_finite()));
     }
 

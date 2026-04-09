@@ -67,7 +67,7 @@ CONTACT_GROUPS = {
 #
 # Contact naming convention:
 #   Finger + Region + Side/Depth
-# Examples: IndexPip, IndexPipSide, ThumbAddDip, ThumbAbdTip, PalmDistUlna.
+# Examples: IndexMcp, IndexMcpSide, ThumbAddDip, ThumbAbdTip, PalmDistUlna.
 #
 # Contacts per geometry:
 #   - Index (4 geoms): 2 each (top + side) = 8 total
@@ -429,10 +429,10 @@ def get_all_finger_positions(q_active):
 
     results = {}
     primary = {
-        "index": "IndexTipTop",
-        "middle": "MiddleTipTop",
-        "ring": "RingTipTop",
-        "little": "LittleTipTop",
+        "index": "IndexTip",
+        "middle": "MiddleTip",
+        "ring": "RingTip",
+        "little": "LittleTip",
         "thumb": "ThumbAddTip",
     }
     for finger, contact_name in primary.items():
@@ -445,10 +445,10 @@ def get_all_finger_transforms(q_active):
     """Return dict[finger] -> 4x4 SE3 matrix in world coordinates."""
     sampled = get_sampled_contact_transforms(q_active)
     return {
-        "index": sampled["IndexTipTop"],
-        "middle": sampled["MiddleTipTop"],
-        "ring": sampled["RingTipTop"],
-        "little": sampled["LittleTipTop"],
+        "index": sampled["IndexTip"],
+        "middle": sampled["MiddleTip"],
+        "ring": sampled["RingTip"],
+        "little": sampled["LittleTip"],
         "thumb": sampled["ThumbAddTip"],
     }
 
