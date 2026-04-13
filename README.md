@@ -41,7 +41,9 @@ docker compose run --build --rm mujoco_interactive
 This launches an interactive MuJoCo simulation based on the upstream MuJoCo `simulate` viewer. It includes:
 - A full MuJoCo GUI with physics controls, rendering options, and joint/actuator sliders
 - A **Grasp Planner** panel for triggering the grasping pipeline and selecting grasp modes
-- A **Scene Control** panel for adjusting the hand base pose, object (sphere) position, and camera position/orientation in real time, via ROS topics (`/mujoco/scene/hand_pose`, `/mujoco/scene/object_pose`, `/mujoco/scene/camera_pose`)
+- A **Scene Control** panel for instantly repositioning the hand base, object (sphere), and depth camera by typing position/orientation values; changes are also available via ROS topics (`/mujoco/scene/hand_pose`, `/mujoco/scene/object_pose`, `/mujoco/scene/camera_pose`)
+- A **Motion Control** panel for smoothly interpolating the hand, object, or camera to a target pose over a set duration (in seconds); each entity has its own target position/RPY fields and a *Move* button
+- The built-in **Rendering** panel (left sidebar) contains a *Camera* dropdown listing all cameras in the scene — select the depth camera entry to switch the viewport to the depth camera's point of view
 
 Logs for the grasp planner can be found under `docker_ws/dev/mujoco/log/`
 

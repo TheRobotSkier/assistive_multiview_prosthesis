@@ -2,6 +2,7 @@
 #define MIA_HAND_MUJOCO_INTERACTIVE_SIMULATOR_HPP
 
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <future>
 #include <mutex>
@@ -73,6 +74,21 @@ private:
   static constexpr int kSceneCamX    = 15;
   static constexpr int kSceneCamYaw  = 20;
 
+  // item indices within the "Motion Control" section (SECTION header not counted)
+  // Duration(0), HandSep(1), X(2)..Yaw(7), MoveHand(8),
+  // ObjSep(9), X(10)..Yaw(15), MoveObj(16),
+  // CamSep(17), X(18)..Yaw(23), MoveCam(24)
+  static constexpr int kMotionDuration  =  0;
+  static constexpr int kMotionHandX     =  2;
+  static constexpr int kMotionHandYaw   =  7;
+  static constexpr int kMotionHandMove  =  8;
+  static constexpr int kMotionObjX      = 10;
+  static constexpr int kMotionObjYaw    = 15;
+  static constexpr int kMotionObjMove   = 16;
+  static constexpr int kMotionCamX      = 18;
+  static constexpr int kMotionCamYaw    = 23;
+  static constexpr int kMotionCamMove   = 24;
+
   InteractiveSimulator();
 
   static void control_cb(const mjModel* model, mjData* data);
@@ -106,6 +122,31 @@ private:
   static void quat_to_rpy(const mjtNum q_wxyz[4], mjtNum rpy[3]);
   static void apply_body_pose(mjModel* m, int body_id,
                               const mjtNum pos[3], const mjtNum quat_wxyz[4]);
+  static void slerp_quat(mjtNum res[4], const mjtNum q0[4],
+                         const mjtNum q1[4], mjtNum t);
+
+  // Motion Control UI
+  // Command posted from render thread; consumed on physics thread under sim_->mtx.
+  struct MotionCmd {
+    mjtNum tgt_pos[3];
+    mjtNum tgt_quat[4];  // wxyz (pre-converted from RPY)
+    double duration;
+    enum class Type { kNone, kStart, kCancel } type = Type::kNone;
+  };
+  // State is physics-thread-only; accessed only inside apply_scene_poses / advance_motions.
+  struct MotionState {
+    mjtNum src_pos[3]  = {0, 0, 0};
+    mjtNum src_quat[4] = {1, 0, 0, 0};  // wxyz
+    mjtNum tgt_pos[3]  = {0, 0, 0};
+    mjtNum tgt_quat[4] = {1, 0, 0, 0};  // wxyz
+    std::chrono::steady_clock::time_point start_time;
+    double duration = 1.0;
+    bool active = false;
+  };
+
+  void add_motion_section(mujoco::Simulate* sim);
+  void handle_motion_event(mujoco::Simulate* sim, int itemid);
+  void advance_motions(mjModel* m);
 
   mjModel* mj_model_;
   mjData* mj_data_;
@@ -167,6 +208,28 @@ private:
   int obj_body_id_;
   int cam_body_id_;
   int scene_sect_id_;
+
+  // Motion Control UI fields (render-thread-owned pdata)
+  mjtNum motion_duration_;
+  mjtNum motion_hand_tgt_pos_[3];
+  mjtNum motion_hand_tgt_rpy_[3];
+  mjtNum motion_obj_tgt_pos_[3];
+  mjtNum motion_obj_tgt_rpy_[3];
+  mjtNum motion_cam_tgt_pos_[3];
+  mjtNum motion_cam_tgt_rpy_[3];
+
+  // Motion command mailbox: render thread writes, physics thread consumes.
+  std::mutex motion_cmd_mtx_;
+  MotionCmd motion_hand_cmd_;
+  MotionCmd motion_obj_cmd_;
+  MotionCmd motion_cam_cmd_;
+
+  // Motion execution state: physics-thread only, no extra lock needed.
+  MotionState motion_hand_state_;
+  MotionState motion_obj_state_;
+  MotionState motion_cam_state_;
+
+  int motion_sect_id_;
 };
 }  // namespace mia_hand_mujoco
 
