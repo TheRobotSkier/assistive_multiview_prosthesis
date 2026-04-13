@@ -170,7 +170,15 @@ InteractiveSimulator::InteractiveSimulator()
   planner_transform_mode_value_(0),
   planner_execution_mode_value_(0),
   planner_running_(false),
-  planner_status_dirty_(false)
+  planner_status_dirty_(false),
+  scene_hand_dirty_(false),
+  scene_obj_dirty_(false),
+  scene_cam_dirty_(false),
+  scene_ui_sync_needed_(false),
+  hand_body_id_(-1),
+  obj_body_id_(-1),
+  cam_body_id_(-1),
+  scene_sect_id_(-1)
 {
   err_msg_[0] = '\0';
 
@@ -182,6 +190,15 @@ InteractiveSimulator::InteractiveSimulator()
   for (double& v : jnt_vel_cmd_)   { v = 0.0; }
   for (double& v : jnt_pos_state_) { v = 0.0; }
   for (double& v : jnt_pos_cmd_)   { v = 0.0; }
+
+  for (int i = 0; i < 3; ++i) {
+    scene_hand_pos_[i] = 0.0; scene_hand_rpy_[i] = 0.0;
+    scene_obj_pos_[i]  = 0.0; scene_obj_rpy_[i]  = 0.0;
+    scene_cam_pos_[i]  = 0.0; scene_cam_rpy_[i]  = 0.0;
+  }
+  ros_hand_pending_ = {{0,0,0},{1,0,0,0},false};
+  ros_obj_pending_  = {{0,0,0},{1,0,0,0},false};
+  ros_cam_pending_  = {{0,0,0},{1,0,0,0},false};
 }
 
 void InteractiveSimulator::control_cb(const mjModel* model, mjData* data)
@@ -249,6 +266,9 @@ void InteractiveSimulator::physics_thread_fn(
       const std::unique_lock<std::recursive_mutex> lock(sim_->mtx);
 
       if (mj_model_) {
+        // Apply pending scene pose overrides before each step
+        apply_scene_poses(mj_model_, mj_data_);
+
         if (sim_->run) {
           bool stepped = false;
 
@@ -375,15 +395,20 @@ bool InteractiveSimulator::simulate_impl(
     &mjv_camera_, &mjv_options_, &mjv_pert_,
     /* is_passive = */ false);
 
-  // Wire Grasp Planner UI hooks
+  // Wire Grasp Planner + Scene Control UI hooks
   sim_->custom_section_init = [this](mujoco::Simulate* sim) {
     add_custom_section(sim);
+    add_scene_section(sim);
   };
   sim_->custom_section_event = [this](mujoco::Simulate* sim, int sec, int item) {
     handle_custom_event(sim, sec, item);
+    if (sec == scene_sect_id_) {
+      handle_scene_event(sim, item);
+    }
   };
   sim_->custom_sync_fn = [this](mujoco::Simulate* sim) {
     sync_custom_status(sim);
+    sync_scene_ui(sim);
   };
 
   mjcb_control = &InteractiveSimulator::control_cb;
@@ -619,6 +644,239 @@ std::string InteractiveSimulator::shell_quote(const std::string& value)
   }
   result.push_back('\'');
   return result;
+}
+
+// --- Scene Control ---
+
+void InteractiveSimulator::rpy_to_quat(const mjtNum rpy[3], mjtNum q[4])
+{
+  const double cr = std::cos(rpy[0] * 0.5), sr = std::sin(rpy[0] * 0.5);
+  const double cp = std::cos(rpy[1] * 0.5), sp = std::sin(rpy[1] * 0.5);
+  const double cy = std::cos(rpy[2] * 0.5), sy = std::sin(rpy[2] * 0.5);
+  q[0] = cr*cp*cy + sr*sp*sy;  // w
+  q[1] = sr*cp*cy - cr*sp*sy;  // x
+  q[2] = cr*sp*cy + sr*cp*sy;  // y
+  q[3] = cr*cp*sy - sr*sp*cy;  // z
+}
+
+void InteractiveSimulator::quat_to_rpy(const mjtNum q[4], mjtNum rpy[3])
+{
+  // roll
+  const double sinr_cosp = 2.0*(q[0]*q[1] + q[2]*q[3]);
+  const double cosr_cosp = 1.0 - 2.0*(q[1]*q[1] + q[2]*q[2]);
+  rpy[0] = std::atan2(sinr_cosp, cosr_cosp);
+  // pitch
+  const double sinp = 2.0*(q[0]*q[2] - q[3]*q[1]);
+  rpy[1] = (std::abs(sinp) >= 1.0) ? std::copysign(M_PI * 0.5, sinp) : std::asin(sinp);
+  // yaw
+  const double siny_cosp = 2.0*(q[0]*q[3] + q[1]*q[2]);
+  const double cosy_cosp = 1.0 - 2.0*(q[2]*q[2] + q[3]*q[3]);
+  rpy[2] = std::atan2(siny_cosp, cosy_cosp);
+}
+
+void InteractiveSimulator::apply_body_pose(
+  mjModel* m, int body_id, const mjtNum pos[3], const mjtNum quat_wxyz[4])
+{
+  m->body_pos[body_id*3 + 0] = pos[0];
+  m->body_pos[body_id*3 + 1] = pos[1];
+  m->body_pos[body_id*3 + 2] = pos[2];
+  mjtNum nq[4] = {quat_wxyz[0], quat_wxyz[1], quat_wxyz[2], quat_wxyz[3]};
+  mju_normalize4(nq);
+  m->body_quat[body_id*4 + 0] = nq[0];
+  m->body_quat[body_id*4 + 1] = nq[1];
+  m->body_quat[body_id*4 + 2] = nq[2];
+  m->body_quat[body_id*4 + 3] = nq[3];
+}
+
+void InteractiveSimulator::add_scene_section(mujoco::Simulate* sim)
+{
+  if (!mj_model_) return;
+
+  // Look up body IDs
+  hand_body_id_ = mj_name2id(mj_model_, mjOBJ_BODY, "palm_r");
+  obj_body_id_  = mj_name2id(mj_model_, mjOBJ_BODY, "target_sphere_body");
+  cam_body_id_  = mj_name2id(mj_model_, mjOBJ_BODY, "depth_cam_body");
+
+  // Read initial poses from the model
+  auto read_body_pose = [&](int id, mjtNum pos[3], mjtNum rpy[3]) {
+    if (id < 0) return;
+    pos[0] = mj_model_->body_pos[id*3 + 0];
+    pos[1] = mj_model_->body_pos[id*3 + 1];
+    pos[2] = mj_model_->body_pos[id*3 + 2];
+    const mjtNum* q = &mj_model_->body_quat[id*4];
+    quat_to_rpy(q, rpy);
+  };
+
+  read_body_pose(hand_body_id_, scene_hand_pos_, scene_hand_rpy_);
+  read_body_pose(obj_body_id_,  scene_obj_pos_,  scene_obj_rpy_);
+  read_body_pose(cam_body_id_,  scene_cam_pos_,  scene_cam_rpy_);
+
+  scene_sect_id_ = sim->ui1.nsect;
+
+  const mjuiDef scene_def[] = {
+    {mjITEM_SECTION,   "Scene Control",  mjPRESERVE, nullptr,          "", 0},
+    {mjITEM_SEPARATOR, "Hand",           1,          nullptr,          "", 0},
+    {mjITEM_EDITNUM,   "X [m]",          2,          &scene_hand_pos_[0], "1", 0},
+    {mjITEM_EDITNUM,   "Y [m]",          2,          &scene_hand_pos_[1], "1", 0},
+    {mjITEM_EDITNUM,   "Z [m]",          2,          &scene_hand_pos_[2], "1", 0},
+    {mjITEM_EDITNUM,   "Roll [rad]",     2,          &scene_hand_rpy_[0], "1", 0},
+    {mjITEM_EDITNUM,   "Pitch [rad]",    2,          &scene_hand_rpy_[1], "1", 0},
+    {mjITEM_EDITNUM,   "Yaw [rad]",      2,          &scene_hand_rpy_[2], "1", 0},
+    {mjITEM_SEPARATOR, "Object",         1,          nullptr,          "", 0},
+    {mjITEM_EDITNUM,   "X [m]",          2,          &scene_obj_pos_[0],  "1", 0},
+    {mjITEM_EDITNUM,   "Y [m]",          2,          &scene_obj_pos_[1],  "1", 0},
+    {mjITEM_EDITNUM,   "Z [m]",          2,          &scene_obj_pos_[2],  "1", 0},
+    {mjITEM_EDITNUM,   "Roll [rad]",     2,          &scene_obj_rpy_[0],  "1", 0},
+    {mjITEM_EDITNUM,   "Pitch [rad]",    2,          &scene_obj_rpy_[1],  "1", 0},
+    {mjITEM_EDITNUM,   "Yaw [rad]",      2,          &scene_obj_rpy_[2],  "1", 0},
+    {mjITEM_SEPARATOR, "Camera",         1,          nullptr,          "", 0},
+    {mjITEM_EDITNUM,   "X [m]",          2,          &scene_cam_pos_[0],  "1", 0},
+    {mjITEM_EDITNUM,   "Y [m]",          2,          &scene_cam_pos_[1],  "1", 0},
+    {mjITEM_EDITNUM,   "Z [m]",          2,          &scene_cam_pos_[2],  "1", 0},
+    {mjITEM_EDITNUM,   "Roll [rad]",     2,          &scene_cam_rpy_[0],  "1", 0},
+    {mjITEM_EDITNUM,   "Pitch [rad]",    2,          &scene_cam_rpy_[1],  "1", 0},
+    {mjITEM_EDITNUM,   "Yaw [rad]",      2,          &scene_cam_rpy_[2],  "1", 0},
+    {mjITEM_END,       "",               0,          nullptr,          "", 0}
+  };
+
+  mjui_add(&sim->ui1, scene_def);
+  sim->ui1.sect[scene_sect_id_].state = mjSECT_CLOSED;
+}
+
+void InteractiveSimulator::handle_scene_event(
+  mujoco::Simulate* /*sim*/, int itemid)
+{
+  if (itemid >= kSceneHandX && itemid <= kSceneHandYaw) {
+    scene_hand_dirty_ = true;
+  } else if (itemid >= kSceneObjX && itemid <= kSceneObjYaw) {
+    scene_obj_dirty_ = true;
+  } else if (itemid >= kSceneCamX && itemid <= kSceneCamYaw) {
+    scene_cam_dirty_ = true;
+  }
+}
+
+void InteractiveSimulator::apply_scene_poses(mjModel* m, mjData* /*d*/)
+{
+  // Flush ROS-pending overrides into the slider arrays first
+  {
+    std::lock_guard<std::mutex> lock(scene_ros_mtx_);
+    auto flush_pending = [&](RosPosePending& pending,
+                             mjtNum pos[3], mjtNum rpy[3],
+                             std::atomic<bool>& dirty) {
+      if (!pending.dirty) return;
+      pos[0] = static_cast<mjtNum>(pending.pos[0]);
+      pos[1] = static_cast<mjtNum>(pending.pos[1]);
+      pos[2] = static_cast<mjtNum>(pending.pos[2]);
+      const mjtNum q[4] = {
+        static_cast<mjtNum>(pending.quat_wxyz[0]),
+        static_cast<mjtNum>(pending.quat_wxyz[1]),
+        static_cast<mjtNum>(pending.quat_wxyz[2]),
+        static_cast<mjtNum>(pending.quat_wxyz[3])
+      };
+      quat_to_rpy(q, rpy);
+      dirty = true;
+      scene_ui_sync_needed_ = true;
+      pending.dirty = false;
+    };
+    flush_pending(ros_hand_pending_, scene_hand_pos_, scene_hand_rpy_, scene_hand_dirty_);
+    flush_pending(ros_obj_pending_,  scene_obj_pos_,  scene_obj_rpy_,  scene_obj_dirty_);
+    flush_pending(ros_cam_pending_,  scene_cam_pos_,  scene_cam_rpy_,  scene_cam_dirty_);
+  }
+
+  // Apply dirty poses to the model
+  if (scene_hand_dirty_.exchange(false) && hand_body_id_ >= 0) {
+    mjtNum q[4];
+    rpy_to_quat(scene_hand_rpy_, q);
+    apply_body_pose(m, hand_body_id_, scene_hand_pos_, q);
+  }
+  if (scene_obj_dirty_.exchange(false) && obj_body_id_ >= 0) {
+    mjtNum q[4];
+    rpy_to_quat(scene_obj_rpy_, q);
+    apply_body_pose(m, obj_body_id_, scene_obj_pos_, q);
+  }
+  if (scene_cam_dirty_.exchange(false) && cam_body_id_ >= 0) {
+    mjtNum q[4];
+    rpy_to_quat(scene_cam_rpy_, q);
+    apply_body_pose(m, cam_body_id_, scene_cam_pos_, q);
+  }
+}
+
+void InteractiveSimulator::sync_scene_ui(mujoco::Simulate* sim)
+{
+  if (!scene_ui_sync_needed_.exchange(false)) return;
+  if (scene_sect_id_ < 0) return;
+
+  // Refresh all EDITNUM items so slider display matches the updated values.
+  // Items kSceneHandX..kSceneCamYaw are the 18 EDITNUM fields (non-separator items).
+  for (int item = kSceneHandX; item <= kSceneCamYaw; ++item) {
+    mjui_update(scene_sect_id_, item, &sim->ui1, &sim->uistate, &sim->platform_ui->mjr_context());
+  }
+}
+
+void InteractiveSimulator::set_hand_pose(const double pos[3], const double quat_wxyz[4])
+{
+  std::lock_guard<std::mutex> lock(scene_ros_mtx_);
+  ros_hand_pending_.pos[0] = pos[0];
+  ros_hand_pending_.pos[1] = pos[1];
+  ros_hand_pending_.pos[2] = pos[2];
+  ros_hand_pending_.quat_wxyz[0] = quat_wxyz[0];
+  ros_hand_pending_.quat_wxyz[1] = quat_wxyz[1];
+  ros_hand_pending_.quat_wxyz[2] = quat_wxyz[2];
+  ros_hand_pending_.quat_wxyz[3] = quat_wxyz[3];
+  ros_hand_pending_.dirty = true;
+}
+
+void InteractiveSimulator::set_object_pose(const double pos[3], const double quat_wxyz[4])
+{
+  std::lock_guard<std::mutex> lock(scene_ros_mtx_);
+  ros_obj_pending_.pos[0] = pos[0];
+  ros_obj_pending_.pos[1] = pos[1];
+  ros_obj_pending_.pos[2] = pos[2];
+  ros_obj_pending_.quat_wxyz[0] = quat_wxyz[0];
+  ros_obj_pending_.quat_wxyz[1] = quat_wxyz[1];
+  ros_obj_pending_.quat_wxyz[2] = quat_wxyz[2];
+  ros_obj_pending_.quat_wxyz[3] = quat_wxyz[3];
+  ros_obj_pending_.dirty = true;
+}
+
+void InteractiveSimulator::set_camera_pose(const double pos[3], const double quat_wxyz[4])
+{
+  std::lock_guard<std::mutex> lock(scene_ros_mtx_);
+  ros_cam_pending_.pos[0] = pos[0];
+  ros_cam_pending_.pos[1] = pos[1];
+  ros_cam_pending_.pos[2] = pos[2];
+  ros_cam_pending_.quat_wxyz[0] = quat_wxyz[0];
+  ros_cam_pending_.quat_wxyz[1] = quat_wxyz[1];
+  ros_cam_pending_.quat_wxyz[2] = quat_wxyz[2];
+  ros_cam_pending_.quat_wxyz[3] = quat_wxyz[3];
+  ros_cam_pending_.dirty = true;
+}
+
+void InteractiveSimulator::get_hand_pose(double pos[3], double quat_wxyz[4]) const
+{
+  std::lock_guard<std::mutex> lock(scene_ros_mtx_);
+  for (int i = 0; i < 3; ++i) pos[i] = static_cast<double>(scene_hand_pos_[i]);
+  mjtNum q[4];
+  rpy_to_quat(scene_hand_rpy_, q);
+  for (int i = 0; i < 4; ++i) quat_wxyz[i] = static_cast<double>(q[i]);
+}
+
+void InteractiveSimulator::get_object_pose(double pos[3], double quat_wxyz[4]) const
+{
+  std::lock_guard<std::mutex> lock(scene_ros_mtx_);
+  for (int i = 0; i < 3; ++i) pos[i] = static_cast<double>(scene_obj_pos_[i]);
+  mjtNum q[4];
+  rpy_to_quat(scene_obj_rpy_, q);
+  for (int i = 0; i < 4; ++i) quat_wxyz[i] = static_cast<double>(q[i]);
+}
+
+void InteractiveSimulator::get_camera_pose(double pos[3], double quat_wxyz[4]) const
+{
+  std::lock_guard<std::mutex> lock(scene_ros_mtx_);
+  for (int i = 0; i < 3; ++i) pos[i] = static_cast<double>(scene_cam_pos_[i]);
+  mjtNum q[4];
+  rpy_to_quat(scene_cam_rpy_, q);
+  for (int i = 0; i < 4; ++i) quat_wxyz[i] = static_cast<double>(q[i]);
 }
 
 }  // namespace mia_hand_mujoco

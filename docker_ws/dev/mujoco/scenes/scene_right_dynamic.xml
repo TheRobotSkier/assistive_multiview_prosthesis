@@ -30,8 +30,10 @@
     <light pos="0 0 3" dir="0 0 -1" directional="true"/>
     <geom name="floor" size="0 0 .125" type="plane" material="groundplane"
       conaffinity="15" condim="3"/>
-    <geom name="target_sphere" type="sphere" pos="-0.1 -0.0499124 0.3100398" size="0.03"
-      rgba="1 0 0 1" contype="0" conaffinity="0"/>
+    <body name="target_sphere_body" pos="-0.1 -0.0499124 0.3100398">
+      <geom name="target_sphere" type="sphere" size="0.03"
+        rgba="1 0 0 1" contype="0" conaffinity="0"/>
+    </body>
 
     <!-- Dynamic-mode consumers should use the camera TF and world-frame point cloud
          rather than any static camera transform constants. -->

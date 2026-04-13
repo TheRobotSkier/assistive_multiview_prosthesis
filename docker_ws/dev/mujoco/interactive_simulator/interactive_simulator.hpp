@@ -34,6 +34,14 @@ public:
   void set_jnt_vel(uint_fast8_t jnt, double vel);
   void stop_jnt(uint_fast8_t jnt);
 
+  // Scene pose control (thread-safe; called from ROS callbacks or scripts)
+  void set_hand_pose(const double pos[3], const double quat_wxyz[4]);
+  void set_object_pose(const double pos[3], const double quat_wxyz[4]);
+  void set_camera_pose(const double pos[3], const double quat_wxyz[4]);
+  void get_hand_pose(double pos[3], double quat_wxyz[4]) const;
+  void get_object_pose(double pos[3], double quat_wxyz[4]) const;
+  void get_camera_pose(double pos[3], double quat_wxyz[4]) const;
+
 private:
   enum class PlannerTransformMode
   {
@@ -53,6 +61,17 @@ private:
   static constexpr int kPlannerItemExecutionMode = 3;
   static constexpr int kPlannerItemRunPlanner    = 5;
   static constexpr int kPlannerItemStatus        = 7;
+
+  // item indices within the "Scene Control" section (SECTION header not counted)
+  // Hand: separator(0), X(1), Y(2), Z(3), Roll(4), Pitch(5), Yaw(6)
+  // Object: separator(7), X(8), Y(9), Z(10), Roll(11), Pitch(12), Yaw(13)
+  // Camera: separator(14), X(15), Y(16), Z(17), Roll(18), Pitch(19), Yaw(20)
+  static constexpr int kSceneHandX   =  1;
+  static constexpr int kSceneHandYaw =  6;
+  static constexpr int kSceneObjX    =  8;
+  static constexpr int kSceneObjYaw  = 13;
+  static constexpr int kSceneCamX    = 15;
+  static constexpr int kSceneCamYaw  = 20;
 
   InteractiveSimulator();
 
@@ -77,6 +96,16 @@ private:
                                     const std::string& log_path) const;
   std::string make_log_path() const;
   static std::string shell_quote(const std::string& value);
+
+  // Scene Control UI
+  void add_scene_section(mujoco::Simulate* sim);
+  void handle_scene_event(mujoco::Simulate* sim, int itemid);
+  void apply_scene_poses(mjModel* m, mjData* d);
+  void sync_scene_ui(mujoco::Simulate* sim);
+  static void rpy_to_quat(const mjtNum rpy[3], mjtNum q_wxyz[4]);
+  static void quat_to_rpy(const mjtNum q_wxyz[4], mjtNum rpy[3]);
+  static void apply_body_pose(mjModel* m, int body_id,
+                              const mjtNum pos[3], const mjtNum quat_wxyz[4]);
 
   mjModel* mj_model_;
   mjData* mj_data_;
@@ -108,6 +137,36 @@ private:
   std::mutex planner_status_mtx_;
   std::string planner_status_pending_;
   bool planner_status_dirty_;
+
+  // Scene Control UI state (render thread writes pdata; physics thread reads)
+  mjtNum scene_hand_pos_[3];
+  mjtNum scene_hand_rpy_[3];
+  mjtNum scene_obj_pos_[3];
+  mjtNum scene_obj_rpy_[3];
+  mjtNum scene_cam_pos_[3];
+  mjtNum scene_cam_rpy_[3];
+
+  std::atomic<bool> scene_hand_dirty_;
+  std::atomic<bool> scene_obj_dirty_;
+  std::atomic<bool> scene_cam_dirty_;
+  std::atomic<bool> scene_ui_sync_needed_;
+
+  // Pending pose from ROS callbacks (locked by scene_ros_mtx_)
+  struct RosPosePending {
+    double pos[3];
+    double quat_wxyz[4];
+    bool dirty;
+  };
+  mutable std::mutex scene_ros_mtx_;
+  RosPosePending ros_hand_pending_;
+  RosPosePending ros_obj_pending_;
+  RosPosePending ros_cam_pending_;
+
+  // MuJoCo body IDs (set in add_scene_section after model load)
+  int hand_body_id_;
+  int obj_body_id_;
+  int cam_body_id_;
+  int scene_sect_id_;
 };
 }  // namespace mia_hand_mujoco
 

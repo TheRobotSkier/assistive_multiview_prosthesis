@@ -15,6 +15,7 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(glfw3 REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 if(DEFINED ENV{MUJOCO_DIR})
 
@@ -81,6 +82,26 @@ add_library(${PROJECT_NAME}_interactive SHARED
   ${INTERACTIVE_SIM_DIR}/simulate_src/lodepng.cpp
 )
 
+# Suppress -Wmissing-field-initializers for the entire interactive target.
+# simulate.h (vendored) defines mjuiDef_ arrays with partial initializers; the
+# warning fires in every TU that includes simulate.h, not only simulate.cc.
+target_compile_options(${PROJECT_NAME}_interactive PRIVATE
+  -Wno-missing-field-initializers
+)
+
+# Suppress additional warnings that are pre-existing in the vendored MuJoCo
+# simulate sources and are not actionable. Applied only to the vendored files
+# so our own code (interactive_simulator.cpp, interactive_system_interface.cpp)
+# retains these diagnostics.
+set_source_files_properties(
+  ${INTERACTIVE_SIM_DIR}/simulate_src/simulate.cc
+  ${INTERACTIVE_SIM_DIR}/simulate_src/glfw_adapter.cc
+  ${INTERACTIVE_SIM_DIR}/simulate_src/glfw_dispatch.cc
+  ${INTERACTIVE_SIM_DIR}/simulate_src/platform_ui_adapter.cc
+  ${INTERACTIVE_SIM_DIR}/simulate_src/lodepng.cpp
+  PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter -Wno-sign-compare"
+)
+
 ament_target_dependencies(${PROJECT_NAME} PUBLIC
   rclcpp
   rclcpp_lifecycle
@@ -103,6 +124,7 @@ ament_target_dependencies(${PROJECT_NAME}_interactive PUBLIC
   hardware_interface
   pluginlib
   glfw3
+  geometry_msgs
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC

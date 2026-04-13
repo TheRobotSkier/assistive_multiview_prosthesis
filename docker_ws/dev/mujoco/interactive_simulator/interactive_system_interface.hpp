@@ -7,10 +7,13 @@
 #include <thread>
 #include <vector>
 
+#include "geometry_msgs/msg/pose.hpp"
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/publisher.hpp"
+#include "rclcpp/subscription.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
 #include "interactive_simulator.hpp"
@@ -68,6 +71,16 @@ private:
   void read_rviz2_joints_info(
     const std::vector<hardware_interface::ComponentInfo>& jnt_info);
 
+  // Scene pose ROS callbacks
+  void on_hand_pose_msg(const geometry_msgs::msg::Pose::SharedPtr msg);
+  void on_object_pose_msg(const geometry_msgs::msg::Pose::SharedPtr msg);
+  void on_camera_pose_msg(const geometry_msgs::msg::Pose::SharedPtr msg);
+
+  // Helper: convert geometry_msgs Pose (xyzw quaternion) to InteractiveSimulator API
+  static void pose_msg_to_sim(
+    const geometry_msgs::msg::Pose& msg,
+    double pos[3], double quat_wxyz[4]);
+
   std::unique_ptr<rclcpp::Logger> logger_;
 
   std::string xml_model_path_;
@@ -106,6 +119,17 @@ private:
   std::array<Rviz2JointInfo, 3> rviz2_joints_;
 
   std::thread sim_trd_;
+
+  // Scene pose subscriptions and publishers
+  rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr hand_pose_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr object_pose_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr camera_pose_sub_;
+
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr hand_pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr object_pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr camera_pose_pub_;
+
+  int pose_pub_counter_;
 };
 }  // namespace mia_hand_mujoco
 

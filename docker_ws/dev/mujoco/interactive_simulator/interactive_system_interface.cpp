@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <future>
+#include <functional>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
@@ -11,6 +12,7 @@
 namespace mia_hand_mujoco
 {
 InteractiveSystemInterface::InteractiveSystemInterface()
+: pose_pub_counter_(0)
 {
 }
 
@@ -114,6 +116,26 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
   const rclcpp_lifecycle::State& /* previous_state */)
 {
   RCLCPP_INFO(*logger_, "Activating interactive simulator...");
+
+  using Pose = geometry_msgs::msg::Pose;
+  auto node = get_node();
+
+  hand_pose_sub_ = node->create_subscription<Pose>(
+    "/mujoco/set_hand_pose", 10,
+    std::bind(&InteractiveSystemInterface::on_hand_pose_msg, this, std::placeholders::_1));
+  object_pose_sub_ = node->create_subscription<Pose>(
+    "/mujoco/set_object_pose", 10,
+    std::bind(&InteractiveSystemInterface::on_object_pose_msg, this, std::placeholders::_1));
+  camera_pose_sub_ = node->create_subscription<Pose>(
+    "/mujoco/set_camera_pose", 10,
+    std::bind(&InteractiveSystemInterface::on_camera_pose_msg, this, std::placeholders::_1));
+
+  hand_pose_pub_   = node->create_publisher<Pose>("/mujoco/hand_pose",   10);
+  object_pose_pub_ = node->create_publisher<Pose>("/mujoco/object_pose", 10);
+  camera_pose_pub_ = node->create_publisher<Pose>("/mujoco/camera_pose", 10);
+
+  pose_pub_counter_ = 0;
+
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -121,6 +143,12 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_deactivate(
   const rclcpp_lifecycle::State& /* previous_state */)
 {
   RCLCPP_INFO(*logger_, "Deactivating interactive simulator...");
+  hand_pose_sub_.reset();
+  object_pose_sub_.reset();
+  camera_pose_sub_.reset();
+  hand_pose_pub_.reset();
+  object_pose_pub_.reset();
+  camera_pose_pub_.reset();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -241,6 +269,33 @@ hardware_interface::return_type InteractiveSystemInterface::read(
     }
   }
 
+  // Publish current scene poses at ~10 Hz (throttled from 1 kHz read loop)
+  if (++pose_pub_counter_ >= 100) {
+    pose_pub_counter_ = 0;
+    auto publish_pose = [](
+      const rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr& pub,
+      const double pos[3], const double quat_wxyz[4])
+    {
+      if (!pub) return;
+      geometry_msgs::msg::Pose msg;
+      msg.position.x = pos[0];
+      msg.position.y = pos[1];
+      msg.position.z = pos[2];
+      msg.orientation.w = quat_wxyz[0];
+      msg.orientation.x = quat_wxyz[1];
+      msg.orientation.y = quat_wxyz[2];
+      msg.orientation.z = quat_wxyz[3];
+      pub->publish(msg);
+    };
+    double pos[3], quat[4];
+    InteractiveSimulator::get_instance().get_hand_pose(pos, quat);
+    publish_pose(hand_pose_pub_, pos, quat);
+    InteractiveSimulator::get_instance().get_object_pose(pos, quat);
+    publish_pose(object_pose_pub_, pos, quat);
+    InteractiveSimulator::get_instance().get_camera_pose(pos, quat);
+    publish_pose(camera_pose_pub_, pos, quat);
+  }
+
   return hardware_interface::return_type::OK;
 }
 
@@ -347,6 +402,44 @@ void InteractiveSystemInterface::read_rviz2_joints_info(
         jnt_name_to_find.c_str());
     }
   }
+}
+
+void InteractiveSystemInterface::pose_msg_to_sim(
+  const geometry_msgs::msg::Pose& msg,
+  double pos[3], double quat_wxyz[4])
+{
+  pos[0] = msg.position.x;
+  pos[1] = msg.position.y;
+  pos[2] = msg.position.z;
+  // geometry_msgs uses xyzw; InteractiveSimulator expects wxyz
+  quat_wxyz[0] = msg.orientation.w;
+  quat_wxyz[1] = msg.orientation.x;
+  quat_wxyz[2] = msg.orientation.y;
+  quat_wxyz[3] = msg.orientation.z;
+}
+
+void InteractiveSystemInterface::on_hand_pose_msg(
+  const geometry_msgs::msg::Pose::SharedPtr msg)
+{
+  double pos[3], quat[4];
+  pose_msg_to_sim(*msg, pos, quat);
+  InteractiveSimulator::get_instance().set_hand_pose(pos, quat);
+}
+
+void InteractiveSystemInterface::on_object_pose_msg(
+  const geometry_msgs::msg::Pose::SharedPtr msg)
+{
+  double pos[3], quat[4];
+  pose_msg_to_sim(*msg, pos, quat);
+  InteractiveSimulator::get_instance().set_object_pose(pos, quat);
+}
+
+void InteractiveSystemInterface::on_camera_pose_msg(
+  const geometry_msgs::msg::Pose::SharedPtr msg)
+{
+  double pos[3], quat[4];
+  pose_msg_to_sim(*msg, pos, quat);
+  InteractiveSimulator::get_instance().set_camera_pose(pos, quat);
 }
 
 }  // namespace mia_hand_mujoco
