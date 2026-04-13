@@ -1651,6 +1651,11 @@ void UiEvent(mjuiState* state) {
       }
     }
 
+    // custom sections (e.g. Grasp Planner added via custom_section_init)
+    if (it && it->sectionid > SECT_EQUALITY && sim->custom_section_event) {
+      sim->custom_section_event(sim, it->sectionid, it->itemid);
+    }
+
     // stop if UI processed event
     if (it!=nullptr || (state->type==mjEVENT_KEY && state->key==0)) {
       return;
@@ -2432,6 +2437,12 @@ void Simulate::LoadOnRenderThread() {
   UiModify(&this->ui1, &this->uistate, &this->platform_ui->mjr_context());
   UpdateSettings(this, this->m_);
 
+  // allow caller to append custom sections (e.g. Grasp Planner)
+  if (this->custom_section_init) {
+    this->custom_section_init(this);
+    UiModify(&this->ui1, &this->uistate, &this->platform_ui->mjr_context());
+  }
+
   // clear request
   this->loadrequest = 0;
   cond_loadrequest.notify_all();
@@ -2643,6 +2654,11 @@ void Simulate::Render() {
   if (rtlabel[0]) {
     mjr_overlay(mjFONT_BIG, mjGRID_TOPLEFT, smallrect, rtlabel, nullptr,
                 &this->platform_ui->mjr_context());
+  }
+
+  // flush custom section status updates (e.g. Grasp Planner status text)
+  if (this->m_ && this->custom_sync_fn) {
+    this->custom_sync_fn(this);
   }
 
   // show ui 0

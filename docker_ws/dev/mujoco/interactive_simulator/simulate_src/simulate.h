@@ -18,6 +18,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -286,6 +287,14 @@ class Simulate {
   mjuiState& uistate;
   mjUI ui0 = {};
   mjUI ui1 = {};
+
+  // Custom UI section hooks (set before RenderLoop; called on render thread)
+  // custom_section_init: called after model loads; add custom ui1 sections here
+  // custom_section_event: called for ui1 items not handled by built-in sections
+  // custom_sync_fn: called each frame before ui1 render; flush status updates
+  std::function<void(Simulate*)> custom_section_init;
+  std::function<void(Simulate*, int, int)> custom_section_event;
+  std::function<void(Simulate*)> custom_sync_fn;
 
   // Constant arrays needed for the option section of UI and the UI interface
   // TODO setting the size here is not ideal
