@@ -4,35 +4,38 @@ Single-IMU EKF prototype (plain Python, direct I2C read)
 
 Purpose
 -------
-This script will estimate the IMU pose relative to its start pose using:
+This script estimates the IMU pose relative to its start pose using:
 - gyroscope
 - accelerometer
 - optional magnetometer later
 
-Development plan
-----------------
-Step 1: file skeleton and imports
-Step 2: math helper functions
-Step 3: EKF state definition
-Step 4: IMU read function
-Step 5: prediction step
-Step 6: accelerometer update
-Step 7: optional magnetometer update
-Step 8: main loop and logging
+Current stage
+-------------
+This version includes:
+- nominal state propagation from IMU
+- 15-state error-state covariance propagation
+- accelerometer gravity-direction update
+- startup initialization
+- continuous live loop with logging
 
 Notes
 -----
 - This version is a normal Python script, not a ROS 2 node.
 - IMU data is read directly over I2C.
-- Orientation will be stored internally as a quaternion.
-- Roll, pitch, yaw can still be computed for debugging and printing.
+- Orientation is stored internally as a quaternion [w, x, y, z].
+- Roll, pitch, yaw are computed only for debugging / printing.
+- Position will drift over time because there is no external correction yet.
 """
 
-from logging import config
 import time
 import math
 import numpy as np
 from smbus2 import SMBus
+
+
+# ============================================================
+# Quaternion and math helper functions
+# ============================================================
 
 def quat_normalize(q):
     """
@@ -48,6 +51,7 @@ def quat_normalize(q):
     if n < 1e-12:
         return np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
     return q / n
+
 
 def quat_mul(q1, q2):
     """
@@ -70,6 +74,7 @@ def quat_mul(q1, q2):
         w1*z2 + x1*y2 - y1*x2 + z1*w2,
     ], dtype=np.float64)
 
+
 def quat_from_small_angle(dtheta):
     """
     Convert a small rotation vector dtheta = [dx, dy, dz]
@@ -79,7 +84,7 @@ def quat_from_small_angle(dtheta):
     - direction of dtheta = rotation axis
     - magnitude of dtheta = rotation angle in radians
 
-    This will later be used for:
+    This is used for:
     - gyro integration
     - small EKF correction updates
     """
@@ -87,7 +92,6 @@ def quat_from_small_angle(dtheta):
     angle = np.linalg.norm(dtheta)
 
     if angle < 1e-12:
-        # First-order approximation for very small angles
         return quat_normalize(np.array([
             1.0,
             0.5 * dtheta[0],
@@ -106,14 +110,18 @@ def quat_from_small_angle(dtheta):
         axis[2] * s
     ], dtype=np.float64)
 
+
 def quat_to_rotmat(q):
     """
     Convert quaternion q = [w, x, y, z] into a 3x3 rotation matrix.
 
-    We will use this later when we need to:
-    - rotate acceleration from body frame to world frame
-    - compute expected gravity direction in body frame
-    - compute expected magnetic field direction in body frame
+    Interpretation:
+    - This returns rotation_world_from_body.
+    - It maps a vector from body frame into world frame.
+
+    We use this for:
+    - rotating acceleration from body frame to world frame
+    - computing expected gravity direction in body frame
     """
     q = quat_normalize(q)
     w, x, y, z = q
@@ -123,6 +131,7 @@ def quat_to_rotmat(q):
         [    2*(x*y + z*w), 1 - 2*(x*x + z*z),     2*(y*z - x*w)],
         [    2*(x*z - y*w),     2*(y*z + x*w), 1 - 2*(x*x + y*y)],
     ], dtype=np.float64)
+
 
 def quat_to_rpy(q):
     """
@@ -134,19 +143,16 @@ def quat_to_rpy(q):
     q = quat_normalize(q)
     w, x, y, z = q
 
-    # Roll (x-axis rotation)
     sinr_cosp = 2.0 * (w*x + y*z)
     cosr_cosp = 1.0 - 2.0 * (x*x + y*y)
     roll = math.atan2(sinr_cosp, cosr_cosp)
 
-    # Pitch (y-axis rotation)
     sinp = 2.0 * (w*y - z*x)
     if abs(sinp) >= 1.0:
         pitch = math.copysign(math.pi / 2.0, sinp)
     else:
         pitch = math.asin(sinp)
 
-    # Yaw (z-axis rotation)
     siny_cosp = 2.0 * (w*z + x*y)
     cosy_cosp = 1.0 - 2.0 * (y*y + z*z)
     yaw = math.atan2(siny_cosp, cosy_cosp)
@@ -157,8 +163,6 @@ def quat_to_rpy(q):
 def rpy_to_quat(roll_rad, pitch_rad, yaw_rad):
     """
     Convert roll, pitch, yaw [rad] into quaternion [w, x, y, z].
-
-    This is used if the user wants to specify an initial start pose.
     """
     cr = math.cos(roll_rad * 0.5)
     sr = math.sin(roll_rad * 0.5)
@@ -178,6 +182,39 @@ def rpy_to_quat(roll_rad, pitch_rad, yaw_rad):
 
     return quat_normalize(quat)
 
+
+def quat_from_accel_gravity(accel_mean_mps2, yaw_rad=0.0):
+    """
+    Estimate an initial orientation quaternion from the averaged accelerometer.
+
+    Purpose
+    -------
+    When the IMU is stationary, the accelerometer mostly measures gravity
+    (actually specific force opposite gravity). We use that to estimate
+    initial roll and pitch.
+
+    Yaw cannot be determined from accelerometer alone, so yaw_rad is supplied
+    separately and defaults to 0.
+
+    Convention
+    ----------
+    This function assumes:
+    - world frame has +Z up
+    - a stationary level IMU typically measures approximately [0, 0, +g]
+      in its body frame
+
+    Returns
+    -------
+    Quaternion [w, x, y, z]
+    """
+    ax, ay, az = accel_mean_mps2
+
+    roll_rad = math.atan2(ay, az)
+    pitch_rad = math.atan2(-ax, math.sqrt(ay * ay + az * az))
+
+    return rpy_to_quat(roll_rad, pitch_rad, yaw_rad)
+
+
 def apply_small_angle_quat_correction(quat, dtheta):
     """
     Apply a small-angle correction dtheta to an existing quaternion.
@@ -188,13 +225,10 @@ def apply_small_angle_quat_correction(quat, dtheta):
 
     Returns:
         corrected normalized quaternion
-
-    Why:
-    In the EKF, attitude (orientation in 3D) error is represented as a small 3D angle.
-    We convert that small angle into a small quaternion and apply it.
     """
     delta_quat = quat_from_small_angle(dtheta)
     return quat_normalize(quat_mul(quat, delta_quat))
+
 
 def skew_symmetric(vec3):
     """
@@ -205,8 +239,6 @@ def skew_symmetric(vec3):
         [  0  -z   y ]
         [  z   0  -x ]
         [ -y   x   0 ]
-
-    We will use this more later for EKF Jacobians.
     """
     x, y, z = vec3
     return np.array([
@@ -216,76 +248,49 @@ def skew_symmetric(vec3):
     ], dtype=np.float64)
 
 
+# ============================================================
+# EKF configuration
+# ============================================================
+
 class ImuEkfConfig:
     """
     Configuration values for startup behavior, thresholds, and optional
     future sensor calibration settings.
-
-    This keeps 'tuning numbers' out of the EKF logic itself.
     """
 
     def __init__(self):
-        # --------------------------------------------------------
-        # Startup mode
-        # --------------------------------------------------------
-        # "instant":
-        #   Start immediately using either:
-        #   - a user-defined initial pose, or
-        #   - identity orientation (startup pose becomes world frame)
-        #
-        # "stationary_calibration":
-        #   Collect startup samples, check whether the IMU is still,
-        #   estimate gyro bias, and estimate initial tilt from gravity.
+        # Startup mode:
+        # "instant" or "stationary_calibration"
         self.startup_mode = "instant"
 
-        # --------------------------------------------------------
         # Optional user-defined initial pose
-        # --------------------------------------------------------
-        # If True, we use the user-defined initial pose below.
-        # If False, startup orientation becomes the world reference pose.
         self.use_user_initial_pose = False
-
-        # Initial position [m]
         self.initial_pos = np.array([0.0, 0.0, 0.0], dtype=np.float64)
-
-        # Initial orientation as roll, pitch, yaw [deg]
-        # Only used if use_user_initial_pose = True
         self.initial_rpy_deg = np.array([0.0, 0.0, 0.0], dtype=np.float64)
 
-        # --------------------------------------------------------
         # Startup stationary calibration settings
-        # --------------------------------------------------------
-        # Number of startup samples to collect if stationary calibration is used.
         self.startup_sample_count = 100
-
-        # Delay between startup samples [s]
         self.startup_sample_dt_sec = 0.01
 
         # Stillness thresholds
-        #
-        # If the IMU is stationary:
-        # - gyro magnitude should be small
-        # - accel magnitude should be close to gravity
-        # - accel variation should be small
         self.still_gyro_max_rps = 0.08
         self.still_accel_norm_min_mps2 = 9.3
         self.still_accel_norm_max_mps2 = 10.4
         self.still_accel_std_max_mps2 = 0.25
 
-        # --------------------------------------------------------
-        # Magnetometer configuration placeholders
-        # --------------------------------------------------------
-        # We are not using mag fusion yet, but we prepare for it here.
+        # Magnetometer placeholders for later
         self.use_magnetometer = False
-
-        # If True, apply manual calibration values to mag data later.
         self.use_mag_calibration = False
-
-        # Hard-iron offset (bias)
         self.mag_bias = np.array([0.0, 0.0, 0.0], dtype=np.float64)
-
-        # Soft-iron scale matrix
         self.mag_scale_matrix = np.eye(3, dtype=np.float64)
+
+        # Logging behavior
+        self.print_interval_sec = 0.20
+
+
+# ============================================================
+# EKF state
+# ============================================================
 
 class ImuEkfState:
     """
@@ -306,78 +311,95 @@ class ImuEkfState:
     """
 
     def __init__(self):
-        # --------------------------------------------------------
         # Nominal state
-        # --------------------------------------------------------
-
-        # Position in world frame [m]
-        # Start pose is defined as the origin.
         self.pos = np.zeros(3, dtype=np.float64)
-
-        # Velocity in world frame [m/s]
         self.vel = np.zeros(3, dtype=np.float64)
-
-        # Orientation quaternion [w, x, y, z]
-        # Identity quaternion means "no rotation" at startup.
         self.quat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
-
-        # Gyroscope bias [rad/s]
         self.bias_gyro = np.zeros(3, dtype=np.float64)
-
-        # Accelerometer bias [m/s^2]
         self.bias_acc = np.zeros(3, dtype=np.float64)
 
-        # --------------------------------------------------------
-        # Error-state covariance matrix
-        # --------------------------------------------------------
-        # Error-state ordering:
-        #   0:3   -> position error            dpos
-        #   3:6   -> velocity error            dvel
-        #   6:9   -> attitude error            dtheta
-        #   9:12  -> gyro bias error           dbias_gyro
-        #   12:15 -> accelerometer bias error  dbias_acc
+        # Error covariance
         self.cov = np.zeros((15, 15), dtype=np.float64)
-
-        # Initial uncertainty values.
-        # These are just reasonable starting values for now.
-        # Later we can tune them using stationary measurements.
-
-        # Position uncertainty [m^2]
         self.cov[0:3, 0:3] = np.eye(3) * 1e-6
-
-        # Velocity uncertainty [(m/s)^2]
         self.cov[3:6, 3:6] = np.eye(3) * 1e-3
-
-        # Attitude uncertainty [rad^2]
         self.cov[6:9, 6:9] = np.eye(3) * 1e-2
-
-        # Gyro bias uncertainty [(rad/s)^2]
         self.cov[9:12, 9:12] = np.eye(3) * 1e-3
-
-        # Accelerometer bias uncertainty [(m/s^2)^2]
         self.cov[12:15, 12:15] = np.eye(3) * 1e-2
 
-        
-        # Gravity magnitude used by the prediction model [m/s^2]
-        self.gravity_mps2 = 9.80665
-
-        # Gravity vector in world frame.
-        # World frame is chosen with +Z up, so gravity points downward.
+        # Gravity
+        self.gravity_mps2 = 9.80665 #9.82 # m/s^2
         self.gravity_world = np.array([0.0, 0.0, -self.gravity_mps2], dtype=np.float64)
 
-        # Last timestamp used for prediction
+        # Timing
         self.last_timestamp_sec = None
 
-        
         # Accelerometer update settings
-        # We only trust the accelerometer as a gravity measurement when
-        # its magnitude is reasonably close to 1 g.
         self.accel_update_min_mps2 = 8.0
         self.accel_update_max_mps2 = 11.5
-
-        # Accelerometer direction measurement noise
         self.accel_meas_std = 0.08
-    
+
+        # IMU process noise settings
+        # These are reasonable starting values, not final tuned values.
+        self.gyro_noise_std_rps = 0.02
+        self.accel_noise_std_mps2 = 0.20
+        self.gyro_bias_random_walk_std = 0.001
+        self.accel_bias_random_walk_std = 0.01
+
+    def predict_covariance(self, gyro_unbiased_rps, accel_unbiased_mps2, dt):
+        """
+        Propagate the 15x15 error-state covariance through one IMU prediction step.
+
+        Error-state ordering:
+            0:3   dpos
+            3:6   dvel
+            6:9   dtheta
+            9:12  dbias_gyro
+            12:15 dbias_acc
+        """
+        rotation_world_from_body = quat_to_rotmat(self.quat)
+
+        F = np.zeros((15, 15), dtype=np.float64)
+
+        # dpos_dot = dvel
+        F[0:3, 3:6] = np.eye(3, dtype=np.float64)
+
+        # dvel_dot = -R * skew(accel_body) * dtheta - R * dbias_acc + R * accel_noise
+        F[3:6, 6:9] = -rotation_world_from_body @ skew_symmetric(accel_unbiased_mps2)
+        F[3:6, 12:15] = -rotation_world_from_body
+
+        # dtheta_dot = -skew(gyro_body) * dtheta - dbias_gyro - gyro_noise
+        F[6:9, 6:9] = -skew_symmetric(gyro_unbiased_rps)
+        F[6:9, 9:12] = -np.eye(3, dtype=np.float64)
+
+        # Noise Jacobian G
+        # Noise ordering:
+        #   0:3   accel white noise
+        #   3:6   gyro white noise
+        #   6:9   gyro bias random walk
+        #   9:12  accel bias random walk
+        G = np.zeros((15, 12), dtype=np.float64)
+        G[3:6, 0:3] = rotation_world_from_body
+        G[6:9, 3:6] = -np.eye(3, dtype=np.float64)
+        G[9:12, 6:9] = np.eye(3, dtype=np.float64)
+        G[12:15, 9:12] = np.eye(3, dtype=np.float64)
+
+        accel_noise_var = self.accel_noise_std_mps2 ** 2
+        gyro_noise_var = self.gyro_noise_std_rps ** 2
+        gyro_bias_rw_var = self.gyro_bias_random_walk_std ** 2
+        accel_bias_rw_var = self.accel_bias_random_walk_std ** 2
+
+        Qc = np.zeros((12, 12), dtype=np.float64)
+        Qc[0:3, 0:3] = np.eye(3, dtype=np.float64) * accel_noise_var
+        Qc[3:6, 3:6] = np.eye(3, dtype=np.float64) * gyro_noise_var
+        Qc[6:9, 6:9] = np.eye(3, dtype=np.float64) * gyro_bias_rw_var
+        Qc[9:12, 9:12] = np.eye(3, dtype=np.float64) * accel_bias_rw_var
+
+        identity = np.eye(15, dtype=np.float64)
+        Phi = identity + F * dt
+        Qd = G @ Qc @ G.T * dt
+
+        self.cov = Phi @ self.cov @ Phi.T + Qd
+        self.cov = 0.5 * (self.cov + self.cov.T)
 
     def predict_from_imu(self, imu_sample):
         """
@@ -392,22 +414,12 @@ class ImuEkfState:
             self.quat
             self.vel
             self.pos
-
-        Notes
-        -----
-        - Gyro is used to update orientation.
-        - Acceleration is rotated from body frame to world frame.
-        - Gravity is added in world frame to recover linear acceleration.
-        - This is prediction only: no correction/update is applied yet.
+            self.cov
         """
-
         timestamp_sec = imu_sample["timestamp_sec"]
         gyro_rps = imu_sample["gyro_rps"]
         accel_mps2 = imu_sample["accel_mps2"]
 
-        # --------------------------------------------------------
-        # Compute dt
-        # --------------------------------------------------------
         if self.last_timestamp_sec is None:
             self.last_timestamp_sec = timestamp_sec
             return
@@ -415,54 +427,39 @@ class ImuEkfState:
         dt = timestamp_sec - self.last_timestamp_sec
         self.last_timestamp_sec = timestamp_sec
 
-        # Reject clearly bad dt values (e.g. first sample, or if the IMU read is very delayed).
         if dt <= 0.0 or dt > 0.1:
             return
 
-        # --------------------------------------------------------
         # 1) Bias-correct gyro and accel
-        # --------------------------------------------------------
-        gyro_unbiased_rps = gyro_rps - self.bias_gyro       # rps=[rad/s]
-        accel_unbiased_mps2 = accel_mps2 - self.bias_acc    # mps2=[m/s^2]
+        gyro_unbiased_rps = gyro_rps - self.bias_gyro
+        accel_unbiased_mps2 = accel_mps2 - self.bias_acc
 
-        # --------------------------------------------------------
-        # 2) Update orientation quaternion from gyro
-        # --------------------------------------------------------
+        # 2) Propagate nominal orientation
         delta_theta = gyro_unbiased_rps * dt
         delta_quat = quat_from_small_angle(delta_theta)
-
-        # Apply the incremental rotation to the current orientation
         self.quat = quat_normalize(quat_mul(self.quat, delta_quat))
 
-        # --------------------------------------------------------
         # 3) Rotate body-frame acceleration into world frame
-        # --------------------------------------------------------
         rotation_world_from_body = quat_to_rotmat(self.quat)
         accel_world_mps2 = rotation_world_from_body @ accel_unbiased_mps2
 
-        # --------------------------------------------------------
-        # 4) Add gravity in world frame to get linear acceleration
-        # --------------------------------------------------------
-        # Accelerometers measure specific force, not direct world-frame
-        # linear acceleration. For this simple inertial model:
-        #
-        #   linear_accel_world = rotated_accel + gravity_world
-        #
-        linear_accel_world_mps2 = accel_world_mps2 + self.gravity_world # mps2=[m/s^2]
+        # 4) Recover world-frame linear acceleration
+        linear_accel_world_mps2 = accel_world_mps2 + self.gravity_world
 
-        # --------------------------------------------------------
-        # 5) Integrate to velocity and position
-        # --------------------------------------------------------
+        # 5) Integrate velocity and position
         old_vel = self.vel.copy()
-
         self.vel = self.vel + linear_accel_world_mps2 * dt
         self.pos = self.pos + old_vel * dt + 0.5 * linear_accel_world_mps2 * dt * dt
 
-        # --------------------------------------------------------
-        # 6) Accelerometer correction update
-        # --------------------------------------------------------
-        self.update_from_accel(imu_sample)
+        # 6) Propagate covariance
+        self.predict_covariance(
+            gyro_unbiased_rps=gyro_unbiased_rps,
+            accel_unbiased_mps2=accel_unbiased_mps2,
+            dt=dt
+        )
 
+        # 7) Accelerometer update
+        self.update_from_accel(imu_sample)
 
     def inject_error_state(self, error_state):
         """
@@ -487,7 +484,6 @@ class ImuEkfState:
         self.bias_gyro = self.bias_gyro + dbias_gyro
         self.bias_acc = self.bias_acc + dbias_acc
 
-    
     def update_from_accel(self, imu_sample):
         """
         Correct orientation using the accelerometer as a gravity-direction measurement.
@@ -503,21 +499,17 @@ class ImuEkfState:
         What it does NOT correct:
         - yaw
         """
-        accel_mps2 = imu_sample["accel_mps2"]
+        accel_mps2 = imu_sample["accel_mps2"] - self.bias_acc
 
         accel_norm = np.linalg.norm(accel_mps2)
         if accel_norm < 1e-12:
             return
 
-        # Only use the accelerometer as a gravity-direction measurement
-        # when its magnitude is close to gravity.
         if not (self.accel_update_min_mps2 <= accel_norm <= self.accel_update_max_mps2):
             return
 
-        # Measured gravity direction in body frame
         measured_dir_body = accel_mps2 / accel_norm
 
-        # Expected gravity direction in body frame from current orientation
         rotation_world_from_body = quat_to_rotmat(self.quat)
         rotation_body_from_world = rotation_world_from_body.T
 
@@ -525,11 +517,10 @@ class ImuEkfState:
         expected_dir_body = rotation_body_from_world @ gravity_dir_world
         expected_dir_body = expected_dir_body / np.linalg.norm(expected_dir_body)
 
-        # Innovation: measured minus expected gravity direction
         innovation = measured_dir_body - expected_dir_body
 
-        # Measurement Jacobian H:
-        # For this first readable version, we only model sensitivity to attitude error.
+        # Numerical measurement Jacobian H for now.
+        # Later we can replace this with an analytic Jacobian.
         H = np.zeros((3, 15), dtype=np.float64)
 
         eps = 1e-6
@@ -558,10 +549,12 @@ class ImuEkfState:
         error_state = K @ innovation
 
         identity = np.eye(15, dtype=np.float64)
-        self.cov = (identity - K @ H) @ self.cov
-        self.cov = 0.5 * (self.cov + self.cov.T) # just a numerical cleanup step, because covariance should stay symmetric.
+        temp = identity - K @ H
+        self.cov = temp @ self.cov @ temp.T + K @ R_meas @ K.T
+        self.cov = 0.5 * (self.cov + self.cov.T)
 
         self.inject_error_state(error_state)
+
 
 # ============================================================
 # MPU-9250 register definitions
@@ -577,31 +570,20 @@ MPU_ACCEL_CONFIG = 0x1C
 MPU_ACCEL_CONFIG2 = 0x1D
 MPU_ACCEL_XOUT_H = 0x3B
 
+
 def int16_from_bytes(msb, lsb):
     """
     Combine two 8-bit bytes into one signed 16-bit integer.
-
-    The MPU-9250 stores many sensor values as:
-    - high byte (MSB)
-    - low byte (LSB)
-
-    This function converts those two bytes into a normal Python int.
     """
     value = (msb << 8) | lsb
     if value & 0x8000:
         value -= 65536
     return value
 
+
 def compute_startup_imu_metrics(startup_samples):
     """
     Compute simple sanity metrics from a list of startup IMU samples.
-
-    Returns a dictionary containing:
-    - mean gyro
-    - mean accel
-    - mean accel norm
-    - std accel norm
-    - mean gyro norm
     """
     gyro_array = np.array([sample["gyro_rps"] for sample in startup_samples], dtype=np.float64)
     accel_array = np.array([sample["accel_mps2"] for sample in startup_samples], dtype=np.float64)
@@ -616,7 +598,6 @@ def compute_startup_imu_metrics(startup_samples):
         "accel_norm_mean_mps2": float(np.mean(accel_norm_array)),
         "accel_norm_std_mps2": float(np.std(accel_norm_array)),
     }
-
     return metrics
 
 
@@ -634,15 +615,84 @@ def is_imu_stationary(metrics, config):
 
     return gyro_ok and accel_mean_ok and accel_std_ok
 
+
+def initialize_ekf_from_startup(ekf, config, startup_samples, startup_metrics):
+    """
+    Initialize EKF state from startup mode and startup IMU data.
+    """
+    init_report = {
+        "mode_requested": config.startup_mode,
+        "mode_used": None,
+        "stationary_detected": None,
+    }
+
+    ekf.pos = np.array(config.initial_pos, dtype=np.float64)
+
+    if config.startup_mode == "instant":
+        init_report["mode_used"] = "instant"
+        init_report["stationary_detected"] = None
+
+        if config.use_user_initial_pose:
+            roll_rad = math.radians(config.initial_rpy_deg[0])
+            pitch_rad = math.radians(config.initial_rpy_deg[1])
+            yaw_rad = math.radians(config.initial_rpy_deg[2])
+            ekf.quat = rpy_to_quat(roll_rad, pitch_rad, yaw_rad)
+        else:
+            ekf.quat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+
+        ekf.vel = np.zeros(3, dtype=np.float64)
+        ekf.bias_gyro = np.zeros(3, dtype=np.float64)
+        ekf.bias_acc = np.zeros(3, dtype=np.float64)
+        return init_report
+
+    if config.startup_mode == "stationary_calibration":
+        stationary_detected = is_imu_stationary(startup_metrics, config)
+        init_report["stationary_detected"] = stationary_detected
+
+        if stationary_detected:
+            init_report["mode_used"] = "stationary_calibration"
+
+            ekf.bias_gyro = np.array(startup_metrics["gyro_mean_rps"], dtype=np.float64)
+
+            if config.use_user_initial_pose:
+                yaw_rad = math.radians(config.initial_rpy_deg[2])
+            else:
+                yaw_rad = 0.0
+
+            ekf.quat = quat_from_accel_gravity(
+                startup_metrics["accel_mean_mps2"],
+                yaw_rad=yaw_rad
+            )
+
+            ekf.vel = np.zeros(3, dtype=np.float64)
+            ekf.bias_acc = np.zeros(3, dtype=np.float64)
+            return init_report
+
+        init_report["mode_used"] = "instant_fallback"
+
+        if config.use_user_initial_pose:
+            roll_rad = math.radians(config.initial_rpy_deg[0])
+            pitch_rad = math.radians(config.initial_rpy_deg[1])
+            yaw_rad = math.radians(config.initial_rpy_deg[2])
+            ekf.quat = rpy_to_quat(roll_rad, pitch_rad, yaw_rad)
+        else:
+            ekf.quat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+
+        ekf.vel = np.zeros(3, dtype=np.float64)
+        ekf.bias_gyro = np.zeros(3, dtype=np.float64)
+        ekf.bias_acc = np.zeros(3, dtype=np.float64)
+        return init_report
+
+    raise ValueError(f"Unknown startup_mode: {config.startup_mode}")
+
+
+# ============================================================
+# MPU-9250 reader
+# ============================================================
+
 class Mpu9250Reader:
     """
     Minimal MPU-9250 reader for accelerometer, gyroscope, and temperature.
-
-    This class:
-    - opens the sensor through an already-open SMBus object
-    - configures the IMU
-    - reads one sample at a time
-    - converts raw values into physical units
 
     Output units:
     - acceleration: m/s^2
@@ -655,51 +705,44 @@ class Mpu9250Reader:
         self.i2c_addr = i2c_addr
 
     def write_u8(self, register_addr, value):
-        """Write one byte to one IMU register."""
         self.i2c_bus.write_byte_data(self.i2c_addr, register_addr, value)
 
+    def read_u8(self, register_addr):
+        return self.i2c_bus.read_byte_data(self.i2c_addr, register_addr)
+
+    def check_connection(self):
+        """
+        Read WHO_AM_I from the MPU-9250.
+
+        For MPU-9250 this is typically 0x71.
+        """
+        MPU_WHO_AM_I = 0x75
+        return self.read_u8(MPU_WHO_AM_I)
+
     def read_block(self, register_addr, length):
-        """Read multiple bytes starting from one IMU register."""
         return self.i2c_bus.read_i2c_block_data(self.i2c_addr, register_addr, length)
-    
+
     def initialize(self):
         """
         Initialize the MPU-9250.
 
-        Configuration chosen for now:
-        - wake up the sensor
+        Configuration:
+        - wake up sensor
         - sample rate divider = 4
-        - low-pass filter enabled
+        - DLPF enabled
         - gyro range = ±250 deg/s
         - accel range = ±2 g
-
-        These settings match the scale factors we use below:
-        - gyro sensitivity = 131 LSB/(deg/s)
-        - accel sensitivity = 16384 LSB/g
         """
-        # Wake up the sensor
         self.write_u8(MPU_PWR_MGMT_1, 0x00)
         time.sleep(0.1)
 
-        # Sample rate divider
-        # With DLPF enabled, internal rate is typically 1 kHz,
-        # so sample_rate = 1000 / (1 + 4) = 200 Hz
         self.write_u8(MPU_SMPLRT_DIV, 0x04)
-
-        # Low-pass filter configuration
         self.write_u8(MPU_CONFIG, 0x03)
-
-        # Gyro full-scale range = ±250 deg/s
         self.write_u8(MPU_GYRO_CONFIG, 0x00)
-
-        # Accelerometer full-scale range = ±2 g
         self.write_u8(MPU_ACCEL_CONFIG, 0x00)
-
-        # Additional accelerometer filtering
         self.write_u8(MPU_ACCEL_CONFIG2, 0x03)
 
         time.sleep(0.05)
-    
 
     def read_sample(self):
         """
@@ -710,26 +753,9 @@ class Mpu9250Reader:
             accel_mps2
             gyro_rps
             temperature_c
-
-        Notes on conversions
-        --------------------
-        Accel:
-            ±2 g  => 16384 LSB/g
-            accel_g = raw / 16384
-            accel_mps2 = accel_g * 9.80665
-
-        Gyro:
-            ±250 deg/s => 131 LSB/(deg/s)
-            gyro_dps = raw / 131
-            gyro_rps = gyro_dps * pi / 180
-
-        Temperature:
-            temp_c = (temp_raw / 333.87) + 21.0
         """
         timestamp_sec = time.time()
 
-        # Read 14 bytes:
-        # accel xyz (6), temp (2), gyro xyz (6)
         data = self.read_block(MPU_ACCEL_XOUT_H, 14)
 
         raw_accel_x = int16_from_bytes(data[0], data[1])
@@ -742,14 +768,11 @@ class Mpu9250Reader:
         raw_gyro_y = int16_from_bytes(data[10], data[11])
         raw_gyro_z = int16_from_bytes(data[12], data[13])
 
-        # ----------------------------------------
-        # Convert accelerometer to m/s^2
-        # ----------------------------------------
         accel_x_g = raw_accel_x / 16384.0
         accel_y_g = raw_accel_y / 16384.0
         accel_z_g = raw_accel_z / 16384.0
 
-        g0 = 9.80665  # standard gravity [m/s^2]
+        g0 = 9.80665
 
         accel_mps2 = np.array([
             accel_x_g * g0,
@@ -757,24 +780,17 @@ class Mpu9250Reader:
             accel_z_g * g0
         ], dtype=np.float64)
 
-        # ----------------------------------------
-        # Convert gyroscope to rad/s
-        # ----------------------------------------
         gyro_x_dps = raw_gyro_x / 131.0
         gyro_y_dps = raw_gyro_y / 131.0
         gyro_z_dps = raw_gyro_z / 131.0
 
         deg_to_rad = math.pi / 180.0
-
         gyro_rps = np.array([
             gyro_x_dps * deg_to_rad,
             gyro_y_dps * deg_to_rad,
             gyro_z_dps * deg_to_rad
         ], dtype=np.float64)
 
-        # ----------------------------------------
-        # Convert temperature to deg C
-        # ----------------------------------------
         temperature_c = (raw_temp / 333.87) + 21.0
 
         return {
@@ -787,11 +803,16 @@ class Mpu9250Reader:
         }
 
 
+# ============================================================
+# Main
+# ============================================================
+
 def main():
     print("Single-IMU EKF prototype started")
 
     config = ImuEkfConfig()
-    #config.startup_mode = "stationary_calibration"
+    config.startup_mode = "stationary_calibration"
+
     ekf = ImuEkfState()
 
     print("\nStartup configuration:")
@@ -804,28 +825,123 @@ def main():
 
     bus_num = 7
 
+    startup_samples = []
+    startup_metrics = None
+
     with SMBus(bus_num) as i2c_bus:
         imu_reader = Mpu9250Reader(i2c_bus)
+
+        try:
+            who_am_i = imu_reader.check_connection()
+            print(f"\nMPU WHO_AM_I: 0x{who_am_i:02X}")
+        except OSError:
+            print("Failed to communicate with MPU-9250 before initialization.")
+            print("Check power, wiring, and run: sudo i2cdetect -y -r 7")
+            raise
+
         imu_reader.initialize()
 
-        startup_samples = []
-        for sample_index in range(config.startup_sample_count):
-            sample = imu_reader.read_sample()
-            startup_samples.append(sample)
-            time.sleep(config.startup_sample_dt_sec)
+        # --------------------------------------------------------
+        # Startup initialization
+        # --------------------------------------------------------
+        if config.startup_mode == "stationary_calibration":
+            print("\nCollecting startup samples for stationary calibration...")
+            for sample_index in range(config.startup_sample_count):
+                sample = imu_reader.read_sample()
+                startup_samples.append(sample)
+                time.sleep(config.startup_sample_dt_sec)
 
-    metrics = compute_startup_imu_metrics(startup_samples)
-    stationary = is_imu_stationary(metrics, config)
+            startup_metrics = compute_startup_imu_metrics(startup_samples)
 
-    print("\nStartup sanity metrics:")
-    print("gyro_mean_rps:", metrics["gyro_mean_rps"])
-    print("accel_mean_mps2:", metrics["accel_mean_mps2"])
-    print("gyro_norm_mean_rps:", metrics["gyro_norm_mean_rps"])
-    print("accel_norm_mean_mps2:", metrics["accel_norm_mean_mps2"])
-    print("accel_norm_std_mps2:", metrics["accel_norm_std_mps2"])
-    print("stationary_detected:", stationary)
+            print("\nStartup sanity metrics:")
+            print("gyro_mean_rps:", startup_metrics["gyro_mean_rps"])
+            print("accel_mean_mps2:", startup_metrics["accel_mean_mps2"])
+            print("gyro_norm_mean_rps:", startup_metrics["gyro_norm_mean_rps"])
+            print("accel_norm_mean_mps2:", startup_metrics["accel_norm_mean_mps2"])
+            print("accel_norm_std_mps2:", startup_metrics["accel_norm_std_mps2"])
+            print("stationary_detected:", is_imu_stationary(startup_metrics, config))
+        else:
+            startup_metrics = {
+                "gyro_mean_rps": np.zeros(3, dtype=np.float64),
+                "accel_mean_mps2": np.array([0.0, 0.0, ekf.gravity_mps2], dtype=np.float64),
+                "gyro_norm_mean_rps": 0.0,
+                "accel_norm_mean_mps2": ekf.gravity_mps2,
+                "accel_norm_std_mps2": 0.0,
+            }
 
-    print("\nStep 7A complete: startup config and sanity metrics are ready")
+        init_report = initialize_ekf_from_startup(
+            ekf=ekf,
+            config=config,
+            startup_samples=startup_samples,
+            startup_metrics=startup_metrics
+        )
+
+        print("\nInitialization report:")
+        print("mode_requested:", init_report["mode_requested"])
+        print("mode_used:", init_report["mode_used"])
+        print("stationary_detected:", init_report["stationary_detected"])
+
+        init_roll, init_pitch, init_yaw = quat_to_rpy(ekf.quat)
+
+        print("\nInitialized EKF state:")
+        print("pos:", ekf.pos)
+        print("vel:", ekf.vel)
+        print("quat:", ekf.quat)
+        print("bias_gyro:", ekf.bias_gyro)
+        print("bias_acc:", ekf.bias_acc)
+        print("initial roll, pitch, yaw [rad]:", (init_roll, init_pitch, init_yaw))
+
+        # --------------------------------------------------------
+        # Live EKF loop
+        # --------------------------------------------------------
+        print("\nEntering live EKF loop. Press Ctrl+C to stop.\n")
+
+        last_print_time = time.time()
+
+        try:
+            while True:
+                imu_sample = imu_reader.read_sample()
+                ekf.predict_from_imu(imu_sample)
+
+                now = time.time()
+                if (now - last_print_time) >= config.print_interval_sec:
+                    roll_rad, pitch_rad, yaw_rad = quat_to_rpy(ekf.quat)
+
+                    roll_deg = math.degrees(roll_rad)
+                    pitch_deg = math.degrees(pitch_rad)
+                    yaw_deg = math.degrees(yaw_rad)
+
+                    accel_norm = np.linalg.norm(imu_sample["accel_mps2"])
+                    gyro_norm = np.linalg.norm(imu_sample["gyro_rps"])
+
+                    att_cov_diag = np.diag(ekf.cov)[6:9]
+                    gyro_bias_cov_diag = np.diag(ekf.cov)[9:12]
+                    accel_bias_cov_diag = np.diag(ekf.cov)[12:15]
+
+                    print(
+                        f"RPY deg: "
+                        f"{roll_deg:+7.2f} {pitch_deg:+7.2f} {yaw_deg:+7.2f} | "
+                        f"gyro_norm rps: {gyro_norm:8.4f} | "
+                        f"accel_norm mps2: {accel_norm:8.4f}"
+                    )
+                    print(
+                        f"bias_gyro rps: {ekf.bias_gyro} | "
+                        f"bias_acc mps2: {ekf.bias_acc}"
+                    )
+                    print(
+                        f"att_cov diag: {att_cov_diag} | "
+                        f"gyro_bias_cov diag: {gyro_bias_cov_diag} | "
+                        f"acc_bias_cov diag: {accel_bias_cov_diag}"
+                    )
+                    print("-" * 120)
+
+                    last_print_time = now
+
+        except KeyboardInterrupt:
+            print("\nStopped by user.")
+
+    print("\nSingle-IMU EKF prototype finished.")
+
 
 if __name__ == "__main__":
     main()
