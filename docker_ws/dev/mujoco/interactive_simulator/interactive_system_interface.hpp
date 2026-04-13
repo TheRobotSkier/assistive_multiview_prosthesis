@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
@@ -71,10 +72,15 @@ private:
   void read_rviz2_joints_info(
     const std::vector<hardware_interface::ComponentInfo>& jnt_info);
 
-  // Scene pose ROS callbacks
+  // Scene pose ROS callbacks (instant teleport)
   void on_hand_pose_msg(const geometry_msgs::msg::Pose::SharedPtr msg);
   void on_object_pose_msg(const geometry_msgs::msg::Pose::SharedPtr msg);
   void on_camera_pose_msg(const geometry_msgs::msg::Pose::SharedPtr msg);
+
+  // Smooth motion ROS callbacks (PoseStamped: stamp encodes duration in seconds)
+  void on_hand_motion_msg(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+  void on_object_motion_msg(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
+  void on_camera_motion_msg(const geometry_msgs::msg::PoseStamped::SharedPtr msg);
 
   // Helper: convert geometry_msgs Pose (xyzw quaternion) to InteractiveSimulator API
   static void pose_msg_to_sim(
@@ -128,6 +134,11 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr hand_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr object_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr camera_pose_pub_;
+
+  // Smooth motion subscriptions
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr motion_hand_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr motion_obj_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr motion_cam_sub_;
 
   int pose_pub_counter_;
 };

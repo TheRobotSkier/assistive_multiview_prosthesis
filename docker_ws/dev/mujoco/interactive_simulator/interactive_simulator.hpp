@@ -43,6 +43,12 @@ public:
   void get_object_pose(double pos[3], double quat_wxyz[4]) const;
   void get_camera_pose(double pos[3], double quat_wxyz[4]) const;
 
+  // Smooth motion: move the named entity to target pose over duration_s seconds.
+  // May be called from any thread (e.g. a ROS subscription callback).
+  void request_hand_move(const double pos[3], const double quat_wxyz[4], double duration_s);
+  void request_object_move(const double pos[3], const double quat_wxyz[4], double duration_s);
+  void request_camera_move(const double pos[3], const double quat_wxyz[4], double duration_s);
+
 private:
   enum class PlannerTransformMode
   {

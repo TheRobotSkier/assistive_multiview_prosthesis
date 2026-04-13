@@ -5,6 +5,7 @@
 #include <future>
 #include <functional>
 
+#include "builtin_interfaces/msg/time.hpp"
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/logging.hpp"
@@ -134,6 +135,17 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
   object_pose_pub_ = node->create_publisher<Pose>("/mujoco/object_pose", 10);
   camera_pose_pub_ = node->create_publisher<Pose>("/mujoco/camera_pose", 10);
 
+  using PoseStamped = geometry_msgs::msg::PoseStamped;
+  motion_hand_sub_ = node->create_subscription<PoseStamped>(
+    "/mujoco/move_hand", 10,
+    std::bind(&InteractiveSystemInterface::on_hand_motion_msg, this, std::placeholders::_1));
+  motion_obj_sub_ = node->create_subscription<PoseStamped>(
+    "/mujoco/move_object", 10,
+    std::bind(&InteractiveSystemInterface::on_object_motion_msg, this, std::placeholders::_1));
+  motion_cam_sub_ = node->create_subscription<PoseStamped>(
+    "/mujoco/move_camera", 10,
+    std::bind(&InteractiveSystemInterface::on_camera_motion_msg, this, std::placeholders::_1));
+
   pose_pub_counter_ = 0;
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -149,6 +161,9 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_deactivate(
   hand_pose_pub_.reset();
   object_pose_pub_.reset();
   camera_pose_pub_.reset();
+  motion_hand_sub_.reset();
+  motion_obj_sub_.reset();
+  motion_cam_sub_.reset();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -440,6 +455,43 @@ void InteractiveSystemInterface::on_camera_pose_msg(
   double pos[3], quat[4];
   pose_msg_to_sim(*msg, pos, quat);
   InteractiveSimulator::get_instance().set_camera_pose(pos, quat);
+}
+
+// Smooth motion callbacks. The stamp field encodes the motion duration:
+//   duration_s = stamp.sec + stamp.nanosec / 1e9
+// If stamp is zero, a default of 1.0 s is used.
+static double duration_from_stamp(const builtin_interfaces::msg::Time& stamp)
+{
+  const double d = static_cast<double>(stamp.sec)
+                 + static_cast<double>(stamp.nanosec) * 1e-9;
+  return (d > 1e-6) ? d : 1.0;
+}
+
+void InteractiveSystemInterface::on_hand_motion_msg(
+  const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+{
+  double pos[3], quat[4];
+  pose_msg_to_sim(msg->pose, pos, quat);
+  InteractiveSimulator::get_instance().request_hand_move(
+    pos, quat, duration_from_stamp(msg->header.stamp));
+}
+
+void InteractiveSystemInterface::on_object_motion_msg(
+  const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+{
+  double pos[3], quat[4];
+  pose_msg_to_sim(msg->pose, pos, quat);
+  InteractiveSimulator::get_instance().request_object_move(
+    pos, quat, duration_from_stamp(msg->header.stamp));
+}
+
+void InteractiveSystemInterface::on_camera_motion_msg(
+  const geometry_msgs::msg::PoseStamped::SharedPtr msg)
+{
+  double pos[3], quat[4];
+  pose_msg_to_sim(msg->pose, pos, quat);
+  InteractiveSimulator::get_instance().request_camera_move(
+    pos, quat, duration_from_stamp(msg->header.stamp));
 }
 
 }  // namespace mia_hand_mujoco

@@ -929,6 +929,36 @@ void InteractiveSimulator::get_camera_pose(double pos[3], double quat_wxyz[4]) c
   for (int i = 0; i < 4; ++i) quat_wxyz[i] = static_cast<double>(q[i]);
 }
 
+void InteractiveSimulator::request_hand_move(
+  const double pos[3], const double quat_wxyz[4], double duration_s)
+{
+  std::lock_guard<std::mutex> lock(motion_cmd_mtx_);
+  for (int i = 0; i < 3; ++i) motion_hand_cmd_.tgt_pos[i]  = static_cast<mjtNum>(pos[i]);
+  for (int i = 0; i < 4; ++i) motion_hand_cmd_.tgt_quat[i] = static_cast<mjtNum>(quat_wxyz[i]);
+  motion_hand_cmd_.duration = std::max(0.001, duration_s);
+  motion_hand_cmd_.type = MotionCmd::Type::kStart;
+}
+
+void InteractiveSimulator::request_object_move(
+  const double pos[3], const double quat_wxyz[4], double duration_s)
+{
+  std::lock_guard<std::mutex> lock(motion_cmd_mtx_);
+  for (int i = 0; i < 3; ++i) motion_obj_cmd_.tgt_pos[i]  = static_cast<mjtNum>(pos[i]);
+  for (int i = 0; i < 4; ++i) motion_obj_cmd_.tgt_quat[i] = static_cast<mjtNum>(quat_wxyz[i]);
+  motion_obj_cmd_.duration = std::max(0.001, duration_s);
+  motion_obj_cmd_.type = MotionCmd::Type::kStart;
+}
+
+void InteractiveSimulator::request_camera_move(
+  const double pos[3], const double quat_wxyz[4], double duration_s)
+{
+  std::lock_guard<std::mutex> lock(motion_cmd_mtx_);
+  for (int i = 0; i < 3; ++i) motion_cam_cmd_.tgt_pos[i]  = static_cast<mjtNum>(pos[i]);
+  for (int i = 0; i < 4; ++i) motion_cam_cmd_.tgt_quat[i] = static_cast<mjtNum>(quat_wxyz[i]);
+  motion_cam_cmd_.duration = std::max(0.001, duration_s);
+  motion_cam_cmd_.type = MotionCmd::Type::kStart;
+}
+
 // --- Motion Control ---
 
 void InteractiveSimulator::add_motion_section(mujoco::Simulate* sim)

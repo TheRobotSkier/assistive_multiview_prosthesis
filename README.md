@@ -41,11 +41,71 @@ docker compose run --build --rm mujoco_interactive
 This launches an interactive MuJoCo simulation based on the upstream MuJoCo `simulate` viewer. It includes:
 - A full MuJoCo GUI with physics controls, rendering options, and joint/actuator sliders
 - A **Grasp Planner** panel for triggering the grasping pipeline and selecting grasp modes
-- A **Scene Control** panel for instantly repositioning the hand base, object (sphere), and depth camera by typing position/orientation values; changes are also available via ROS topics (`/mujoco/scene/hand_pose`, `/mujoco/scene/object_pose`, `/mujoco/scene/camera_pose`)
-- A **Motion Control** panel for smoothly interpolating the hand, object, or camera to a target pose over a set duration (in seconds); each entity has its own target position/RPY fields and a *Move* button
+- A **Scene Control** panel for instantly repositioning the hand base, object (sphere), and depth camera by typing position/orientation values; changes are also available via ROS topics (`/mujoco/set_hand_pose`, `/mujoco/set_object_pose`, `/mujoco/set_camera_pose`)
+- A **Motion Control** panel for smoothly interpolating the hand, object, or camera to a target pose over a set duration (in seconds); each entity has its own target position/RPY fields and a *Move* button — also available via ROS topics (see below)
 - The built-in **Rendering** panel (left sidebar) contains a *Camera* dropdown listing all cameras in the scene — select the depth camera entry to switch the viewport to the depth camera's point of view
 
 Logs for the grasp planner can be found under `docker_ws/dev/mujoco/log/`
+
+#### ROS topics for scripted motion control
+
+The simulation exposes the following ROS2 topics for external control from Python scripts or the terminal.
+
+**Instant teleport** (`geometry_msgs/Pose`, orientation as quaternion xyzw):
+- `/mujoco/set_hand_pose` — immediately move the hand base to the given pose
+- `/mujoco/set_object_pose` — immediately move the object (sphere)
+- `/mujoco/set_camera_pose` — immediately move the depth camera body
+
+**Smooth interpolated motion** (`geometry_msgs/PoseStamped`, orientation as quaternion xyzw):
+- `/mujoco/move_hand` — smoothly move the hand to the given pose
+- `/mujoco/move_object` — smoothly move the object
+- `/mujoco/move_camera` — smoothly move the camera
+
+For the motion topics the **duration in seconds** is encoded in `header.stamp` (i.e. `stamp.sec + stamp.nanosec / 1e9`). If the stamp is zero, a default of 1.0 s is used.
+
+**Current poses** are published at ~10 Hz on:
+- `/mujoco/hand_pose`, `/mujoco/object_pose`, `/mujoco/camera_pose`
+
+### ASGER: I have not actually tested these examples! I did not have time. But, the motion control UI is tested and works perfectly.
+
+**Terminal example** — move the hand to (x=0.0, y=0.1, z=0.3) over 2 seconds:
+
+```bash
+ros2 topic pub --once /mujoco/move_hand geometry_msgs/msg/PoseStamped \
+  "{header: {stamp: {sec: 2, nanosec: 0}}, pose: {position: {x: 0.0, y: 0.1, z: 0.3}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}"
+```
+
+**Python example** — move the hand along a short trajectory:
+
+```python
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import PoseStamped
+import time
+
+rclpy.init()
+node = Node('motion_sender')
+pub = node.create_publisher(PoseStamped, '/mujoco/move_hand', 10)
+
+waypoints = [
+    (0.0,  0.0, 0.2),
+    (0.0,  0.1, 0.3),
+    (0.05, 0.0, 0.25),
+]
+
+for x, y, z in waypoints:
+    msg = PoseStamped()
+    msg.header.stamp.sec = 2      # 2-second move duration
+    msg.pose.position.x = x
+    msg.pose.position.y = y
+    msg.pose.position.z = z
+    msg.pose.orientation.w = 1.0  # identity rotation
+    pub.publish(msg)
+    time.sleep(2.5)               # wait for motion to complete before next waypoint
+
+node.destroy_node()
+rclpy.shutdown()
+```
 
 ### For the dynamic simulation:
 
