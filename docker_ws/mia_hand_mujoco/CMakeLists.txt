@@ -69,6 +69,18 @@ add_library(${PROJECT_NAME}_planner_gui SHARED
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/gui_simulator/planner_gui_system_interface.cpp
 )
 
+set(INTERACTIVE_SIM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/interactive_simulator)
+
+add_library(${PROJECT_NAME}_interactive SHARED
+  ${INTERACTIVE_SIM_DIR}/interactive_simulator.cpp
+  ${INTERACTIVE_SIM_DIR}/interactive_system_interface.cpp
+  ${INTERACTIVE_SIM_DIR}/simulate_src/simulate.cc
+  ${INTERACTIVE_SIM_DIR}/simulate_src/glfw_adapter.cc
+  ${INTERACTIVE_SIM_DIR}/simulate_src/glfw_dispatch.cc
+  ${INTERACTIVE_SIM_DIR}/simulate_src/platform_ui_adapter.cc
+  ${INTERACTIVE_SIM_DIR}/simulate_src/lodepng.cpp
+)
+
 ament_target_dependencies(${PROJECT_NAME} PUBLIC
   rclcpp
   rclcpp_lifecycle
@@ -78,6 +90,14 @@ ament_target_dependencies(${PROJECT_NAME} PUBLIC
 )
 
 ament_target_dependencies(${PROJECT_NAME}_planner_gui PUBLIC
+  rclcpp
+  rclcpp_lifecycle
+  hardware_interface
+  pluginlib
+  glfw3
+)
+
+ament_target_dependencies(${PROJECT_NAME}_interactive PUBLIC
   rclcpp
   rclcpp_lifecycle
   hardware_interface
@@ -97,6 +117,12 @@ target_link_libraries(${PROJECT_NAME}_planner_gui PUBLIC
   glfw
 )
 
+target_link_libraries(${PROJECT_NAME}_interactive PUBLIC
+  ${MUJOCO_LIBRARIES}
+  miahanditactuator
+  glfw
+)
+
 target_include_directories(${PROJECT_NAME} PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>"
@@ -108,11 +134,20 @@ target_include_directories(${PROJECT_NAME}_planner_gui PUBLIC
   ${MUJOCO_INCLUDE_DIR}
 )
 
+target_include_directories(${PROJECT_NAME}_interactive PUBLIC
+  "$<BUILD_INTERFACE:${INTERACTIVE_SIM_DIR}>"
+  "$<BUILD_INTERFACE:${INTERACTIVE_SIM_DIR}/simulate_src>"
+  ${MUJOCO_INCLUDE_DIR}
+)
+
 pluginlib_export_plugin_description_file(hardware_interface
   mia_hand_mujoco.xml)
 
 pluginlib_export_plugin_description_file(hardware_interface
   ../dev/mujoco/gui_simulator/mia_hand_mujoco_planner_gui.xml)
+
+pluginlib_export_plugin_description_file(hardware_interface
+  ../dev/mujoco/interactive_simulator/mia_hand_mujoco_interactive.xml)
 
 # Installing libraries.
 install(TARGETS ${PROJECT_NAME}
@@ -122,6 +157,12 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 install(TARGETS ${PROJECT_NAME}_planner_gui
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(TARGETS ${PROJECT_NAME}_interactive
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -185,5 +226,5 @@ endif()
 
 ament_export_dependencies(rclcpp rclcpp_lifecycle hardware_interface pluginlib)
 ament_export_include_directories(include)
-ament_export_libraries(${PROJECT_NAME} ${PROJECT_NAME}_planner_gui)
+ament_export_libraries(${PROJECT_NAME} ${PROJECT_NAME}_planner_gui ${PROJECT_NAME}_interactive)
 ament_package()

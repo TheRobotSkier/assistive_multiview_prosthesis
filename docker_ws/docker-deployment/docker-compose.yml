@@ -89,6 +89,18 @@ services:
         ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=dynamic enable_depth_publisher:=true hardware_plugin:=${MUJOCO_HARDWARE_PLUGIN:-mia_hand_mujoco/PlannerGuiSystemInterface};
         /bin/bash
       "
+  mujoco_interactive:
+    extends: miahand_ros2
+    container_name: miahand_ros2_mujoco_interactive
+    command:  >
+      bash -c "
+        source /opt/ros/jazzy/setup.bash &&
+        cd /miahand_ws &&
+        colcon build --packages-select mia_hand_mujoco &&
+        source install/setup.bash &&
+        ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=dynamic enable_depth_publisher:=true hardware_plugin:=mia_hand_mujoco/InteractiveSystemInterface;
+        /bin/bash
+      "
   miahand_ros2_control:
     extends: miahand_ros2
     container_name: miahand_ros2_control
