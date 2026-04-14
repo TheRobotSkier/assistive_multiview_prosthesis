@@ -138,6 +138,7 @@ class MujocoSceneStatePublisher(Node):
         self.declare_parameter("laterality", "right")
         self.declare_parameter("prefix", "")
         self.declare_parameter("target_geom_name", "target_sphere")
+        self.declare_parameter("pc_mode", "object")
         self.declare_parameter("publish_depth_image", True)
         self.declare_parameter("publish_camera_info", True)
         self.declare_parameter("publish_camera_cloud", True)
@@ -168,6 +169,7 @@ class MujocoSceneStatePublisher(Node):
         self.publish_camera_cloud = bool(self.get_parameter("publish_camera_cloud").value)
         self.wait_for_joint_state = bool(self.get_parameter("wait_for_joint_state").value)
         self.target_geom_name = str(self.get_parameter("target_geom_name").value)
+        self.pc_mode = str(self.get_parameter("pc_mode").value)
         self.prefix = str(self.get_parameter("prefix").value)
         self.laterality = str(self.get_parameter("laterality").value)
         self.camera_frame_convention = str(self.get_parameter("camera_frame_convention").value)
@@ -186,7 +188,10 @@ class MujocoSceneStatePublisher(Node):
 
         self.target_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, self.target_geom_name)
         if self.target_geom_id < 0:
-            raise ValueError(f"Target geom '{self.target_geom_name}' not found in {used_xml}")
+            if self.pc_mode == 'full':
+                self.get_logger().warn(f"Target geom '{self.target_geom_name}' not found, but pc_mode=full so filtering is disabled.")
+            else:
+                raise ValueError(f"Target geom '{self.target_geom_name}' not found in {used_xml}")
 
         self.fovy = float(self.model.cam_fovy[self.cam_id])
         self.fx = 0.5 * self.width / np.tan(np.deg2rad(self.fovy) * 0.5)
@@ -351,7 +356,8 @@ class MujocoSceneStatePublisher(Node):
                 self.info_pub.publish(self.make_camera_info(stamp))
 
             points_cam_ros = self.depth_to_camera_points(depth)
-            points_cam_ros = self.filter_points_by_target_geom(points_cam_ros)
+            if self.pc_mode != 'full':
+                points_cam_ros = self.filter_points_by_target_geom(points_cam_ros)
             points_world = self.camera_points_to_world(points_cam_ros)
 
             if self.publish_camera_cloud:

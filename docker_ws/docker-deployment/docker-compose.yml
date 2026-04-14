@@ -92,13 +92,16 @@ services:
   mujoco_interactive:
     extends: miahand_ros2
     container_name: miahand_ros2_mujoco_interactive
+    environment:
+      - MUJOCO_OBJECT=${MUJOCO_OBJECT:-sphere}
+      - MUJOCO_PC_MODE=${MUJOCO_PC_MODE:-object}
     command:  >
       bash -c "
         source /opt/ros/jazzy/setup.bash &&
         cd /miahand_ws &&
         colcon build --packages-select mia_hand_mujoco &&
         source install/setup.bash &&
-        ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=dynamic enable_depth_publisher:=true hardware_plugin:=mia_hand_mujoco/InteractiveSystemInterface;
+        ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=${MUJOCO_OBJECT:-sphere} depth_target_geom_name:=target_${MUJOCO_OBJECT:-sphere} depth_pc_mode:=${MUJOCO_PC_MODE:-object} enable_depth_publisher:=true hardware_plugin:=mia_hand_mujoco/InteractiveSystemInterface;
         /bin/bash
       "
   miahand_ros2_control:
