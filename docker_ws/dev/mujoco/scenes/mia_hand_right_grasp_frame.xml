@@ -119,6 +119,17 @@
         <geom class="collision_r" name="collision_little_proximal_r" size="0.00782782 0.015221" pos="-0.00197874 0.0273017 -4.4674e-05" quat="0.492576 0.522025 -0.478045 0.506292" type="cylinder" rgba="0.8 0.8 0.8 1"/>
         <geom class="collision_r" name="collision_little_tip_r" size="0.00484472" pos="-0.0165956 0.064732 -0.000363789" quat="0.653774 0.266396 -0.707705 0.0276879" rgba="0.8 0.8 0.8 1"/>
       </body>
+
+      <!-- Wrist-mounted camera: fixed to back of hand, at knuckle level, pointing toward fingertips.
+           pos=[0, 0.08, -0.04] in palm_r frame: Y≈0.08 (knuckle row), Z≈-0.04 (~1.5cm above dorsum).
+           Camera looks along palm_r +Y (fingertip direction): euler="-1.5708 0 0" rotates -Z → +Y. -->
+      <body name="wrist_cam_body" pos="0 0.08 -0.04">
+        <site name="wrist_imu_site" pos="0 0 0" size="0.005"/>
+        <camera name="wrist_cam" pos="0 0 0" euler="-1.5708 0 0" fovy="60"/>
+        <geom name="wrist_cam_visual" type="mesh" mesh="d435_body"
+          pos="0 0 0" euler="-1.5708 0 3.14159"
+          contype="0" conaffinity="0" group="0" rgba="0.2 0.2 0.2 1"/>
+      </body>
     </body>
   </worldbody>
 

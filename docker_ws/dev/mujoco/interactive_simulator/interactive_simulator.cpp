@@ -178,6 +178,7 @@ InteractiveSimulator::InteractiveSimulator()
   hand_body_id_(-1),
   obj_body_id_(-1),
   cam_body_id_(-1),
+  wrist_cam_body_id_(-1),
   scene_sect_id_(-1),
   motion_duration_(1.0),
   motion_sect_id_(-1)
@@ -223,6 +224,23 @@ InteractiveSimulator::InteractiveSimulator()
   imu_prev_quat_[3] = 0.0;
   sim_time_       = 0.0;
   imu_initialized_ = false;
+
+  for (int i = 0; i < 3; ++i) {
+    imu2_ang_vel_[i]      = 0.0;
+    imu2_lin_acc_[i]      = 0.0;
+    imu2_mag_field_[i]    = 0.0;
+    imu2_prev_pos_[i]     = 0.0;
+    imu2_prev_lin_vel_[i] = 0.0;
+  }
+  imu2_orientation_wxyz_[0] = 1.0;
+  imu2_orientation_wxyz_[1] = 0.0;
+  imu2_orientation_wxyz_[2] = 0.0;
+  imu2_orientation_wxyz_[3] = 0.0;
+  imu2_prev_quat_[0] = 1.0;
+  imu2_prev_quat_[1] = 0.0;
+  imu2_prev_quat_[2] = 0.0;
+  imu2_prev_quat_[3] = 0.0;
+  imu2_initialized_ = false;
 }
 
 void InteractiveSimulator::control_cb(const mjModel* model, mjData* data)
@@ -451,6 +469,70 @@ void InteractiveSimulator::physics_thread_fn(
               imu_prev_lin_vel_[i] = lin_vel_new[i];
             }
             for (int i = 0; i < 4; ++i) imu_prev_quat_[i] = quat[i];
+          }
+
+          // --- IMU2: wrist-mounted camera (child of palm_r) ---
+          if (wrist_cam_body_id_ >= 0) {
+            const mjtNum dt   = mj_model_->opt.timestep;
+            const mjtNum* pos  = &mj_data_->xpos[wrist_cam_body_id_ * 3];
+            const mjtNum* quat = &mj_data_->xquat[wrist_cam_body_id_ * 4];
+            const mjtNum* R    = &mj_data_->xmat[wrist_cam_body_id_ * 9];
+
+            if (!imu2_initialized_) {
+              for (int i = 0; i < 3; ++i) {
+                imu2_prev_pos_[i]     = pos[i];
+                imu2_prev_lin_vel_[i] = 0.0;
+              }
+              for (int i = 0; i < 4; ++i) imu2_prev_quat_[i] = quat[i];
+              imu2_initialized_ = true;
+            }
+
+            mjtNum inv_prev2[4] = {imu2_prev_quat_[0], -imu2_prev_quat_[1],
+                                   -imu2_prev_quat_[2], -imu2_prev_quat_[3]};
+            mjtNum delta_q2[4];
+            mju_mulQuat(delta_q2, inv_prev2, quat);
+            if (delta_q2[0] < 0) {
+              for (int i = 0; i < 4; ++i) delta_q2[i] = -delta_q2[i];
+            }
+            mjtNum omega2[3] = {
+              2.0 * delta_q2[1] / dt,
+              2.0 * delta_q2[2] / dt,
+              2.0 * delta_q2[3] / dt
+            };
+
+            mjtNum lin_vel2[3], lin_acc_world2[3];
+            for (int i = 0; i < 3; ++i) {
+              lin_vel2[i]       = (pos[i] - imu2_prev_pos_[i]) / dt;
+              lin_acc_world2[i] = (lin_vel2[i] - imu2_prev_lin_vel_[i]) / dt;
+            }
+            const mjtNum* grav = mj_model_->opt.gravity;
+            mjtNum a2_world[3] = {
+              lin_acc_world2[0] - grav[0],
+              lin_acc_world2[1] - grav[1],
+              lin_acc_world2[2] - grav[2]
+            };
+            mjtNum a2_body[3];
+            for (int i = 0; i < 3; ++i) {
+              a2_body[i] = R[0*3+i]*a2_world[0]
+                         + R[1*3+i]*a2_world[1]
+                         + R[2*3+i]*a2_world[2];
+            }
+            mjtNum mag2[3] = {R[0*3+0], R[1*3+0], R[2*3+0]};
+
+            for (int i = 0; i < 3; ++i) {
+              imu2_ang_vel_[i]   = static_cast<double>(omega2[i]);
+              imu2_lin_acc_[i]   = static_cast<double>(a2_body[i]);
+              imu2_mag_field_[i] = static_cast<double>(mag2[i]);
+            }
+            for (int i = 0; i < 4; ++i) {
+              imu2_orientation_wxyz_[i] = static_cast<double>(quat[i]);
+            }
+
+            for (int i = 0; i < 3; ++i) {
+              imu2_prev_pos_[i]     = pos[i];
+              imu2_prev_lin_vel_[i] = lin_vel2[i];
+            }
+            for (int i = 0; i < 4; ++i) imu2_prev_quat_[i] = quat[i];
           }
         }
       }
@@ -825,9 +907,10 @@ void InteractiveSimulator::add_scene_section(mujoco::Simulate* sim)
   if (!mj_model_) return;
 
   // Look up body IDs
-  hand_body_id_ = mj_name2id(mj_model_, mjOBJ_BODY, "palm_r");
-  obj_body_id_  = mj_name2id(mj_model_, mjOBJ_BODY, "target_sphere_body");
-  cam_body_id_  = mj_name2id(mj_model_, mjOBJ_BODY, "depth_cam_body");
+  hand_body_id_       = mj_name2id(mj_model_, mjOBJ_BODY, "palm_r");
+  obj_body_id_        = mj_name2id(mj_model_, mjOBJ_BODY, "target_sphere_body");
+  cam_body_id_        = mj_name2id(mj_model_, mjOBJ_BODY, "depth_cam_body");
+  wrist_cam_body_id_  = mj_name2id(mj_model_, mjOBJ_BODY, "wrist_cam_body");
 
   // Read initial poses from the model
   auto read_body_pose = [&](int id, mjtNum pos[3], mjtNum rpy[3]) {
@@ -1041,6 +1124,21 @@ void InteractiveSimulator::get_imu_data(
   }
   for (int i = 0; i < 4; ++i) orientation_wxyz[i] = imu_orientation_wxyz_[i];
   sim_time = sim_time_;
+}
+
+void InteractiveSimulator::get_wrist_cam_imu_data(
+  double ang_vel[3],
+  double lin_acc[3],
+  double mag_field[3],
+  double orientation_wxyz[4]) const
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  for (int i = 0; i < 3; ++i) {
+    ang_vel[i]   = imu2_ang_vel_[i];
+    lin_acc[i]   = imu2_lin_acc_[i];
+    mag_field[i] = imu2_mag_field_[i];
+  }
+  for (int i = 0; i < 4; ++i) orientation_wxyz[i] = imu2_orientation_wxyz_[i];
 }
 
 void InteractiveSimulator::request_hand_move(

@@ -56,6 +56,13 @@ public:
     double orientation_wxyz[4],
     double& sim_time) const;
 
+  // IMU data from wrist-mounted camera body (wrist_cam_body, child of palm_r)
+  void get_wrist_cam_imu_data(
+    double ang_vel[3],
+    double lin_acc[3],
+    double mag_field[3],
+    double orientation_wxyz[4]) const;
+
   // Smooth motion: move the named entity to target pose over duration_s seconds.
   // May be called from any thread (e.g. a ROS subscription callback).
   void request_hand_move(const double pos[3], const double quat_wxyz[4], double duration_s);
@@ -226,6 +233,7 @@ private:
   int hand_body_id_;
   int obj_body_id_;
   int cam_body_id_;
+  int wrist_cam_body_id_;
   int scene_sect_id_;
 
   // Motion Control UI fields (render-thread-owned pdata)
@@ -250,17 +258,28 @@ private:
 
   int motion_sect_id_;
 
-  // IMU data: computed every physics step, stored under sim_mtx_
+  // IMU data for front camera (depth_cam_body): computed every physics step, stored under sim_mtx_
   double imu_ang_vel_[3];
   double imu_lin_acc_[3];
   double imu_mag_field_[3];
   double imu_orientation_wxyz_[4];
   double sim_time_;
-  // Previous-step values for numerical differentiation
+  // Previous-step values for numerical differentiation (front cam)
   mjtNum imu_prev_pos_[3];
   mjtNum imu_prev_lin_vel_[3];
   mjtNum imu_prev_quat_[4];
   bool imu_initialized_;
+
+  // IMU data for wrist camera (wrist_cam_body): same approach, stored under sim_mtx_
+  double imu2_ang_vel_[3];
+  double imu2_lin_acc_[3];
+  double imu2_mag_field_[3];
+  double imu2_orientation_wxyz_[4];
+  // Previous-step values for numerical differentiation (wrist cam)
+  mjtNum imu2_prev_pos_[3];
+  mjtNum imu2_prev_lin_vel_[3];
+  mjtNum imu2_prev_quat_[4];
+  bool imu2_initialized_;
 };
 }  // namespace mia_hand_mujoco
 

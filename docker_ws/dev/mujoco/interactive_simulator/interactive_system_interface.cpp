@@ -149,11 +149,16 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
   imu_pub_counter_  = 0;
 
   imu_pub_      = node->create_publisher<sensor_msgs::msg::Imu>(
-    "/mujoco/imu", 10);
+    "/mujoco/front_cam/imu", 10);
   mag_pub_      = node->create_publisher<sensor_msgs::msg::MagneticField>(
-    "/mujoco/imu/magnetic_field", 10);
+    "/mujoco/front_cam/imu/magnetic_field", 10);
   sim_time_pub_ = node->create_publisher<std_msgs::msg::Float64>(
     "/mujoco/sim_time", 10);
+
+  imu2_pub_ = node->create_publisher<sensor_msgs::msg::Imu>(
+    "/mujoco/wrist_cam/imu", 10);
+  mag2_pub_ = node->create_publisher<sensor_msgs::msg::MagneticField>(
+    "/mujoco/wrist_cam/imu/magnetic_field", 10);
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -174,6 +179,8 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_deactivate(
   imu_pub_.reset();
   mag_pub_.reset();
   sim_time_pub_.reset();
+  imu2_pub_.reset();
+  mag2_pub_.reset();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -368,6 +375,42 @@ hardware_interface::return_type InteractiveSystemInterface::read(
       mag_msg.magnetic_field.z = mag_field[2];
       mag_msg.magnetic_field_covariance[0] = -1.0;
       mag_pub_->publish(mag_msg);
+    }
+
+    // Wrist camera IMU
+    double ang_vel2[3], lin_acc2[3], mag_field2[3], orientation2[4];
+    InteractiveSimulator::get_instance().get_wrist_cam_imu_data(
+      ang_vel2, lin_acc2, mag_field2, orientation2);
+
+    if (imu2_pub_) {
+      sensor_msgs::msg::Imu imu2_msg;
+      imu2_msg.header.frame_id = "mujoco_wrist_cam";
+      imu2_msg.header.stamp    = rclcpp::Clock().now();
+      imu2_msg.angular_velocity.x = ang_vel2[0];
+      imu2_msg.angular_velocity.y = ang_vel2[1];
+      imu2_msg.angular_velocity.z = ang_vel2[2];
+      imu2_msg.linear_acceleration.x = lin_acc2[0];
+      imu2_msg.linear_acceleration.y = lin_acc2[1];
+      imu2_msg.linear_acceleration.z = lin_acc2[2];
+      imu2_msg.orientation.w = orientation2[0];
+      imu2_msg.orientation.x = orientation2[1];
+      imu2_msg.orientation.y = orientation2[2];
+      imu2_msg.orientation.z = orientation2[3];
+      imu2_msg.orientation_covariance[0]         = -1.0;
+      imu2_msg.angular_velocity_covariance[0]    = -1.0;
+      imu2_msg.linear_acceleration_covariance[0] = -1.0;
+      imu2_pub_->publish(imu2_msg);
+    }
+
+    if (mag2_pub_) {
+      sensor_msgs::msg::MagneticField mag2_msg;
+      mag2_msg.header.frame_id = "mujoco_wrist_cam";
+      mag2_msg.header.stamp    = rclcpp::Clock().now();
+      mag2_msg.magnetic_field.x = mag_field2[0];
+      mag2_msg.magnetic_field.y = mag_field2[1];
+      mag2_msg.magnetic_field.z = mag_field2[2];
+      mag2_msg.magnetic_field_covariance[0] = -1.0;
+      mag2_pub_->publish(mag2_msg);
     }
   }
 

@@ -143,10 +143,14 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr motion_obj_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr motion_cam_sub_;
 
-  // IMU and simulation time publishers
+  // IMU and simulation time publishers (front camera)
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
   rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr sim_time_pub_;
+
+  // Wrist camera IMU publishers
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu2_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag2_pub_;
 
   int pose_pub_counter_;
   int imu_pub_counter_;

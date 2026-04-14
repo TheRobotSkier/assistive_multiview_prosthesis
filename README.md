@@ -70,21 +70,25 @@ For the motion topics the **duration in seconds** is encoded in `header.stamp` (
 **Simulation time** (`std_msgs/Float64`, ~10 Hz):
 - `/mujoco/sim_time` — MuJoCo simulation time in seconds. Use this with the pose topics to compute velocities (`Δpos / Δt`).
 
-**IMU** (camera body, clean/noiseless):
-- `/mujoco/imu` (`sensor_msgs/Imu`, ~100 Hz) — angular velocity, linear acceleration, and orientation in camera frame. Linear acceleration includes the gravity correction (at rest it reads ≈ +9.81 m/s² upward in camera frame).
-- `/mujoco/imu/magnetic_field` (`sensor_msgs/MagneticField`, ~100 Hz) — simulated magnetometer. World X+ direction projected into camera frame (arbitrary "north").
+**IMU — front camera** (`depth_cam_body`, clean/noiseless):
+- `/mujoco/front_cam/imu` (`sensor_msgs/Imu`, ~100 Hz) — angular velocity, linear acceleration, and orientation in front camera frame. Linear acceleration includes gravity correction (at rest reads ≈ +9.81 m/s² upward in camera frame).
+- `/mujoco/front_cam/imu/magnetic_field` (`sensor_msgs/MagneticField`, ~100 Hz) — simulated magnetometer. World X+ projected into front camera frame (arbitrary "north").
+
+**IMU — wrist camera** (`wrist_cam_body`, fixed to back of hand, clean/noiseless):
+- `/mujoco/wrist_cam/imu` (`sensor_msgs/Imu`, ~100 Hz) — same convention as front camera IMU, but in wrist camera frame.
+- `/mujoco/wrist_cam/imu/magnetic_field` (`sensor_msgs/MagneticField`, ~100 Hz) — magnetometer in wrist camera frame.
 
 **Point cloud / depth** (published by the depth pipeline, not ros2_control):
 - `/mujoco/depth/image` — raw depth image
 - `/mujoco/depth/camera_info` — camera intrinsics
 - `/segmented_object_cloud` — segmented object point cloud (`sensor_msgs/PointCloud2`)
 
-All topics use `frame_id = "mujoco_front_depth_cam"` for the camera-frame data.
+All topics use `frame_id = "mujoco_front_depth_cam"` for front camera data and `frame_id = "mujoco_wrist_cam"` for wrist camera data.
 
-**Terminal example** — read the current IMU data once:
+**Terminal example** — read the current front camera IMU data once:
 
 ```bash
-ros2 topic echo --once /mujoco/imu
+ros2 topic echo --once /mujoco/front_cam/imu
 ```
 
 **Python example** — read sim_time and hand pose to compute hand velocity:
