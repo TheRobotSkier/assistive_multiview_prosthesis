@@ -166,6 +166,11 @@ node.destroy_node()
 rclpy.shutdown()
 ```
 
+A cylinder variant of the dynamic scene is available at
+`docker_ws/dev/mujoco/scenes/scene_right_cylinder.xml`. It is identical
+to the dynamic scene except the target object is a red upright cylinder
+(radius 0.03 m, height 0.12 m) rather than a sphere.
+
 ### For the dynamic simulation:
 
 Run
