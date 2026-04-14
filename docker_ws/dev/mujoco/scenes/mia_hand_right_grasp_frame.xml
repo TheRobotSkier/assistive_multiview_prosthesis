@@ -123,7 +123,7 @@
       <!-- Wrist-mounted camera: fixed to back of hand, at knuckle level, pointing toward fingertips.
            pos=[0, 0.08, -0.04] in palm_r frame: Y≈0.08 (knuckle row), Z≈-0.04 (~1.5cm above dorsum).
            Camera looks along palm_r +Y (fingertip direction): euler="-1.5708 0 0" rotates -Z → +Y. -->
-      <body name="wrist_cam_body" pos="0 0.08 -0.04">
+      <body name="wrist_cam_body" pos="0 0.095 -0.04">
         <site name="wrist_imu_site" pos="0 0 0" size="0.005" rgba="0 0 0 0"/>
         <camera name="wrist_cam" pos="0 0 0" euler="-1.5708 0 0" fovy="60"/>
         <geom name="wrist_cam_visual" type="mesh" mesh="d435_body"
