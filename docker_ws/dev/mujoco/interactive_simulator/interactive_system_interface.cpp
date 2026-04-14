@@ -9,11 +9,10 @@
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/logging.hpp"
-
 namespace mia_hand_mujoco
 {
 InteractiveSystemInterface::InteractiveSystemInterface()
-: pose_pub_counter_(0)
+: pose_pub_counter_(0), imu_pub_counter_(0)
 {
 }
 
@@ -147,6 +146,14 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
     std::bind(&InteractiveSystemInterface::on_camera_motion_msg, this, std::placeholders::_1));
 
   pose_pub_counter_ = 0;
+  imu_pub_counter_  = 0;
+
+  imu_pub_      = node->create_publisher<sensor_msgs::msg::Imu>(
+    "/mujoco/imu", 10);
+  mag_pub_      = node->create_publisher<sensor_msgs::msg::MagneticField>(
+    "/mujoco/imu/magnetic_field", 10);
+  sim_time_pub_ = node->create_publisher<std_msgs::msg::Float64>(
+    "/mujoco/sim_time", 10);
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -164,6 +171,9 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_deactivate(
   motion_hand_sub_.reset();
   motion_obj_sub_.reset();
   motion_cam_sub_.reset();
+  imu_pub_.reset();
+  mag_pub_.reset();
+  sim_time_pub_.reset();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -309,6 +319,56 @@ hardware_interface::return_type InteractiveSystemInterface::read(
     publish_pose(object_pose_pub_, pos, quat);
     InteractiveSimulator::get_instance().get_camera_pose(pos, quat);
     publish_pose(camera_pose_pub_, pos, quat);
+
+    // Publish simulation time at same ~10 Hz rate
+    double ang_vel[3], lin_acc[3], mag_field[3], orientation[4], sim_time;
+    InteractiveSimulator::get_instance().get_imu_data(
+      ang_vel, lin_acc, mag_field, orientation, sim_time);
+    if (sim_time_pub_) {
+      std_msgs::msg::Float64 t_msg;
+      t_msg.data = sim_time;
+      sim_time_pub_->publish(t_msg);
+    }
+  }
+
+  // Publish IMU at ~100 Hz (every 10 calls)
+  if (++imu_pub_counter_ >= 10) {
+    imu_pub_counter_ = 0;
+    double ang_vel[3], lin_acc[3], mag_field[3], orientation[4], sim_time;
+    InteractiveSimulator::get_instance().get_imu_data(
+      ang_vel, lin_acc, mag_field, orientation, sim_time);
+
+    if (imu_pub_) {
+      sensor_msgs::msg::Imu imu_msg;
+      imu_msg.header.frame_id = "mujoco_front_depth_cam";
+      imu_msg.header.stamp    = rclcpp::Clock().now();
+      imu_msg.angular_velocity.x = ang_vel[0];
+      imu_msg.angular_velocity.y = ang_vel[1];
+      imu_msg.angular_velocity.z = ang_vel[2];
+      imu_msg.linear_acceleration.x = lin_acc[0];
+      imu_msg.linear_acceleration.y = lin_acc[1];
+      imu_msg.linear_acceleration.z = lin_acc[2];
+      imu_msg.orientation.w = orientation[0];
+      imu_msg.orientation.x = orientation[1];
+      imu_msg.orientation.y = orientation[2];
+      imu_msg.orientation.z = orientation[3];
+      // -1 = covariance unknown (we publish perfect sim values)
+      imu_msg.orientation_covariance[0]         = -1.0;
+      imu_msg.angular_velocity_covariance[0]    = -1.0;
+      imu_msg.linear_acceleration_covariance[0] = -1.0;
+      imu_pub_->publish(imu_msg);
+    }
+
+    if (mag_pub_) {
+      sensor_msgs::msg::MagneticField mag_msg;
+      mag_msg.header.frame_id = "mujoco_front_depth_cam";
+      mag_msg.header.stamp    = rclcpp::Clock().now();
+      mag_msg.magnetic_field.x = mag_field[0];
+      mag_msg.magnetic_field.y = mag_field[1];
+      mag_msg.magnetic_field.z = mag_field[2];
+      mag_msg.magnetic_field_covariance[0] = -1.0;
+      mag_pub_->publish(mag_msg);
+    }
   }
 
   return hardware_interface::return_type::OK;

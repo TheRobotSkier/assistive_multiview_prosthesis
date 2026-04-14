@@ -43,6 +43,19 @@ public:
   void get_object_pose(double pos[3], double quat_wxyz[4]) const;
   void get_camera_pose(double pos[3], double quat_wxyz[4]) const;
 
+  // IMU data from camera body (numerical differentiation, updated every physics step)
+  // ang_vel:      angular velocity in camera body frame (rad/s)
+  // lin_acc:      linear acceleration in camera body frame incl. -gravity (m/s^2)
+  // mag_field:    world X+ unit vector expressed in camera body frame (T, arbitrary scale=1)
+  // orientation:  camera body orientation quaternion (wxyz) in world frame
+  // sim_time:     MuJoCo simulation time (d->time, seconds)
+  void get_imu_data(
+    double ang_vel[3],
+    double lin_acc[3],
+    double mag_field[3],
+    double orientation_wxyz[4],
+    double& sim_time) const;
+
   // Smooth motion: move the named entity to target pose over duration_s seconds.
   // May be called from any thread (e.g. a ROS subscription callback).
   void request_hand_move(const double pos[3], const double quat_wxyz[4], double duration_s);
@@ -174,7 +187,7 @@ private:
   double jnt_pos_state_[3];
   double jnt_pos_cmd_[3];
 
-  std::mutex sim_mtx_;
+  mutable std::mutex sim_mtx_;
 
   // Grasp Planner UI state
   int planner_sect_id_;
@@ -236,6 +249,18 @@ private:
   MotionState motion_cam_state_;
 
   int motion_sect_id_;
+
+  // IMU data: computed every physics step, stored under sim_mtx_
+  double imu_ang_vel_[3];
+  double imu_lin_acc_[3];
+  double imu_mag_field_[3];
+  double imu_orientation_wxyz_[4];
+  double sim_time_;
+  // Previous-step values for numerical differentiation
+  mjtNum imu_prev_pos_[3];
+  mjtNum imu_prev_lin_vel_[3];
+  mjtNum imu_prev_quat_[4];
+  bool imu_initialized_;
 };
 }  // namespace mia_hand_mujoco
 

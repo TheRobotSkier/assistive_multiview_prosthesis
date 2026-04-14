@@ -67,6 +67,60 @@ For the motion topics the **duration in seconds** is encoded in `header.stamp` (
 **Current poses** are published at ~10 Hz on:
 - `/mujoco/hand_pose`, `/mujoco/object_pose`, `/mujoco/camera_pose`
 
+**Simulation time** (`std_msgs/Float64`, ~10 Hz):
+- `/mujoco/sim_time` — MuJoCo simulation time in seconds. Use this with the pose topics to compute velocities (`Δpos / Δt`).
+
+**IMU** (camera body, clean/noiseless):
+- `/mujoco/imu` (`sensor_msgs/Imu`, ~100 Hz) — angular velocity, linear acceleration, and orientation in camera frame. Linear acceleration includes the gravity correction (at rest it reads ≈ +9.81 m/s² upward in camera frame).
+- `/mujoco/imu/magnetic_field` (`sensor_msgs/MagneticField`, ~100 Hz) — simulated magnetometer. World X+ direction projected into camera frame (arbitrary "north").
+
+**Point cloud / depth** (published by the depth pipeline, not ros2_control):
+- `/mujoco/depth/image` — raw depth image
+- `/mujoco/depth/camera_info` — camera intrinsics
+- `/segmented_object_cloud` — segmented object point cloud (`sensor_msgs/PointCloud2`)
+
+All topics use `frame_id = "mujoco_front_depth_cam"` for the camera-frame data.
+
+**Terminal example** — read the current IMU data once:
+
+```bash
+ros2 topic echo --once /mujoco/imu
+```
+
+**Python example** — read sim_time and hand pose to compute hand velocity:
+
+```python
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import Pose
+from std_msgs.msg import Float64
+
+class VelocityEstimator(Node):
+    def __init__(self):
+        super().__init__('vel_estimator')
+        self.last_pos  = None
+        self.last_time = None
+        self.create_subscription(Pose,    '/mujoco/hand_pose', self.on_pose, 10)
+        self.create_subscription(Float64, '/mujoco/sim_time',  self.on_time, 10)
+
+    def on_time(self, msg):
+        self.last_time = msg.data
+
+    def on_pose(self, msg):
+        pos = (msg.position.x, msg.position.y, msg.position.z)
+        if self.last_pos and self.last_time:
+            dt = self.last_time - getattr(self, '_prev_t', self.last_time)
+            if dt > 0:
+                vel = tuple((pos[i] - self.last_pos[i]) / dt for i in range(3))
+                self.get_logger().info(f'hand velocity: {vel}')
+        self._prev_t  = self.last_time
+        self.last_pos = pos
+
+rclpy.init()
+node = VelocityEstimator()
+rclpy.spin(node)
+```
+
 ### ASGER: I have not actually tested these examples! I did not have time. But, the motion control UI is tested and works perfectly.
 
 **Terminal example** — move the hand to (x=0.0, y=0.1, z=0.3) over 2 seconds:

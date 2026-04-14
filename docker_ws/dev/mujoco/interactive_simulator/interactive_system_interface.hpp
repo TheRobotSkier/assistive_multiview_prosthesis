@@ -16,6 +16,9 @@
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/subscription.hpp"
 #include "rclcpp_lifecycle/state.hpp"
+#include "sensor_msgs/msg/imu.hpp"
+#include "sensor_msgs/msg/magnetic_field.hpp"
+#include "std_msgs/msg/float64.hpp"
 
 #include "interactive_simulator.hpp"
 
@@ -140,7 +143,13 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr motion_obj_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr motion_cam_sub_;
 
+  // IMU and simulation time publishers
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr sim_time_pub_;
+
   int pose_pub_counter_;
+  int imu_pub_counter_;
 };
 }  // namespace mia_hand_mujoco
 

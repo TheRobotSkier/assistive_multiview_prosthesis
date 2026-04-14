@@ -205,6 +205,24 @@ InteractiveSimulator::InteractiveSimulator()
   ros_hand_pending_ = {{0,0,0},{1,0,0,0},false};
   ros_obj_pending_  = {{0,0,0},{1,0,0,0},false};
   ros_cam_pending_  = {{0,0,0},{1,0,0,0},false};
+
+  for (int i = 0; i < 3; ++i) {
+    imu_ang_vel_[i]    = 0.0;
+    imu_lin_acc_[i]    = 0.0;
+    imu_mag_field_[i]  = 0.0;
+    imu_prev_pos_[i]   = 0.0;
+    imu_prev_lin_vel_[i] = 0.0;
+  }
+  imu_orientation_wxyz_[0] = 1.0;
+  imu_orientation_wxyz_[1] = 0.0;
+  imu_orientation_wxyz_[2] = 0.0;
+  imu_orientation_wxyz_[3] = 0.0;
+  imu_prev_quat_[0] = 1.0;
+  imu_prev_quat_[1] = 0.0;
+  imu_prev_quat_[2] = 0.0;
+  imu_prev_quat_[3] = 0.0;
+  sim_time_       = 0.0;
+  imu_initialized_ = false;
 }
 
 void InteractiveSimulator::control_cb(const mjModel* model, mjData* data)
@@ -355,6 +373,85 @@ void InteractiveSimulator::physics_thread_fn(
           jnt_vel_state_[0] = mj_data_->qvel[1];
           jnt_vel_state_[1] = mj_data_->qvel[2];
           jnt_vel_state_[2] = mj_data_->qvel[3];
+
+          // Update IMU data from camera body state
+          if (cam_body_id_ >= 0) {
+            const mjtNum dt = mj_model_->opt.timestep;
+            const mjtNum* pos  = &mj_data_->xpos[cam_body_id_ * 3];
+            const mjtNum* quat = &mj_data_->xquat[cam_body_id_ * 4]; // wxyz
+            const mjtNum* R    = &mj_data_->xmat[cam_body_id_ * 9];  // row-major
+
+            if (!imu_initialized_) {
+              // First step: seed previous values, report zero velocity/accel
+              for (int i = 0; i < 3; ++i) {
+                imu_prev_pos_[i]     = pos[i];
+                imu_prev_lin_vel_[i] = 0.0;
+              }
+              for (int i = 0; i < 4; ++i) imu_prev_quat_[i] = quat[i];
+              imu_initialized_ = true;
+            }
+
+            // --- Angular velocity (body frame) via quaternion finite-difference ---
+            // delta_q = q_prev^{-1} * q_new  (rotation increment expressed in prev frame)
+            // For unit quaternions: inv(q) = q* = [w, -x, -y, -z]
+            mjtNum inv_prev[4] = {imu_prev_quat_[0], -imu_prev_quat_[1],
+                                  -imu_prev_quat_[2], -imu_prev_quat_[3]};
+            mjtNum delta_q[4];
+            mju_mulQuat(delta_q, inv_prev, quat);
+            // Ensure positive scalar part (shortest-path convention)
+            if (delta_q[0] < 0) {
+              for (int i = 0; i < 4; ++i) delta_q[i] = -delta_q[i];
+            }
+            // omega_body ≈ 2 * delta_q[1:4] / dt  (small-angle approximation)
+            mjtNum omega_body[3] = {
+              2.0 * delta_q[1] / dt,
+              2.0 * delta_q[2] / dt,
+              2.0 * delta_q[3] / dt
+            };
+
+            // --- Linear acceleration (world frame) via position second derivative ---
+            mjtNum lin_vel_new[3], lin_acc_world[3];
+            for (int i = 0; i < 3; ++i) {
+              lin_vel_new[i]   = (pos[i] - imu_prev_pos_[i]) / dt;
+              lin_acc_world[i] = (lin_vel_new[i] - imu_prev_lin_vel_[i]) / dt;
+            }
+            // Subtract gravity so at-rest reads +|g| along the gravity-opposite axis
+            const mjtNum* grav = mj_model_->opt.gravity;
+            mjtNum a_imu_world[3] = {
+              lin_acc_world[0] - grav[0],
+              lin_acc_world[1] - grav[1],
+              lin_acc_world[2] - grav[2]
+            };
+            // Rotate to camera body frame: v_body[i] = R^T * v_world
+            // R is row-major (R[row*3+col]); R^T * v means: v_body[i] = sum_j R[j*3+i]*v[j]
+            mjtNum a_imu_body[3];
+            for (int i = 0; i < 3; ++i) {
+              a_imu_body[i] = R[0*3+i]*a_imu_world[0]
+                            + R[1*3+i]*a_imu_world[1]
+                            + R[2*3+i]*a_imu_world[2];
+            }
+
+            // --- Magnetometer: world X+ expressed in camera body frame ---
+            mjtNum mag_body[3] = {R[0*3+0], R[1*3+0], R[2*3+0]};  // R^T * [1,0,0]
+
+            // Store results (under sim_mtx_ which we already hold)
+            for (int i = 0; i < 3; ++i) {
+              imu_ang_vel_[i]   = static_cast<double>(omega_body[i]);
+              imu_lin_acc_[i]   = static_cast<double>(a_imu_body[i]);
+              imu_mag_field_[i] = static_cast<double>(mag_body[i]);
+            }
+            for (int i = 0; i < 4; ++i) {
+              imu_orientation_wxyz_[i] = static_cast<double>(quat[i]);
+            }
+            sim_time_ = mj_data_->time;
+
+            // Update prev values for next step
+            for (int i = 0; i < 3; ++i) {
+              imu_prev_pos_[i]     = pos[i];
+              imu_prev_lin_vel_[i] = lin_vel_new[i];
+            }
+            for (int i = 0; i < 4; ++i) imu_prev_quat_[i] = quat[i];
+          }
         }
       }
     }  // release sim_->mtx
@@ -927,6 +1024,23 @@ void InteractiveSimulator::get_camera_pose(double pos[3], double quat_wxyz[4]) c
   mjtNum q[4];
   rpy_to_quat(scene_cam_rpy_, q);
   for (int i = 0; i < 4; ++i) quat_wxyz[i] = static_cast<double>(q[i]);
+}
+
+void InteractiveSimulator::get_imu_data(
+  double ang_vel[3],
+  double lin_acc[3],
+  double mag_field[3],
+  double orientation_wxyz[4],
+  double& sim_time) const
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  for (int i = 0; i < 3; ++i) {
+    ang_vel[i]   = imu_ang_vel_[i];
+    lin_acc[i]   = imu_lin_acc_[i];
+    mag_field[i] = imu_mag_field_[i];
+  }
+  for (int i = 0; i < 4; ++i) orientation_wxyz[i] = imu_orientation_wxyz_[i];
+  sim_time = sim_time_;
 }
 
 void InteractiveSimulator::request_hand_move(
