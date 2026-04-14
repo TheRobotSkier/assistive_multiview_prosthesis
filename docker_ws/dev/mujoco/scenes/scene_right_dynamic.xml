@@ -39,7 +39,7 @@
          rather than any static camera transform constants. -->
     <body name="depth_cam_body" pos="-0.08 -0.46 0.36" euler="-1.67079632679 0 0">
       <!-- Named site used as the IMU reference point (origin of depth_cam_body) -->
-      <site name="imu_site" pos="0 0 0" size="0.005"/>
+      <site name="imu_site" pos="0 0 0" size="0.005" rgba="0 0 0 0"/>
       <camera
         name="front_depth_cam"
         pos="0 0 0"
