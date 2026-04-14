@@ -18,6 +18,7 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/magnetic_field.hpp"
+#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64.hpp"
 
 #include "interactive_simulator.hpp"
@@ -151,6 +152,9 @@ private:
   // Wrist camera IMU publishers
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu2_pub_;
   rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag2_pub_;
+
+  // Grasp start signal
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr grasp_start_pub_;
 
   int pose_pub_counter_;
   int imu_pub_counter_;

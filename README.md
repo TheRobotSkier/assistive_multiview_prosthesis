@@ -70,6 +70,9 @@ For the motion topics the **duration in seconds** is encoded in `header.stamp` (
 **Simulation time** (`std_msgs/Float64`, ~10 Hz):
 - `/mujoco/sim_time` — MuJoCo simulation time in seconds. Use this with the pose topics to compute velocities (`Δpos / Δt`).
 
+**Grasp start signal** (`std_msgs/Bool`):
+- `/mujoco/grasp_start` — reserved topic for triggering the autonomous grasping algorithm. Published when the simulation starts; no messages are sent yet.
+
 **IMU — front camera** (`depth_cam_body`, clean/noiseless):
 - `/mujoco/front_cam/imu` (`sensor_msgs/Imu`, ~100 Hz) — angular velocity, linear acceleration, and orientation in front camera frame. Linear acceleration includes gravity correction (at rest reads ≈ +9.81 m/s² upward in camera frame).
 - `/mujoco/front_cam/imu/magnetic_field` (`sensor_msgs/MagneticField`, ~100 Hz) — simulated magnetometer. World X+ projected into front camera frame (arbitrary "north").
