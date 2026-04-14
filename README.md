@@ -38,6 +38,18 @@ Run
 docker compose run --build --rm mujoco_interactive
 ```
 
+#### Environment Variables
+
+| Variable | Values | Default | Description |
+|---|---|---|---|
+| `MUJOCO_OBJECT` | `sphere`, `cylinder` | `sphere` | Target object type. Selects the scene XML and point-cloud target geom. |
+| `MUJOCO_PC_MODE` | `object`, `full` | `object` | Point cloud mode. `object` publishes only points from the target geom; `full` publishes the full scene. |
+
+**Examples:**
+```bash
+MUJOCO_OBJECT=cylinder MUJOCO_PC_MODE=full docker compose run --rm mujoco_interactive
+```
+
 This launches an interactive MuJoCo simulation based on the upstream MuJoCo `simulate` viewer. It includes:
 - A full MuJoCo GUI with physics controls, rendering options, and joint/actuator sliders
 - A **Grasp Planner** panel for triggering the grasping pipeline and selecting grasp modes

@@ -52,10 +52,12 @@ def launch_fun(context, *args, **kwargs):
     # Resolve xml_model_path from scene arg when no explicit path was given
     if not xml_model_path:
         scene_file_map = {
-            'default': 'scene_right.xml',
-            'custom':  'scene_right_static.xml',
-            'static':  'scene_right_static.xml',
-            'dynamic': 'scene_right_dynamic.xml',
+            'default':  'scene_right.xml',
+            'custom':   'scene_right_static.xml',
+            'static':   'scene_right_static.xml',
+            'dynamic':  'scene_right_dynamic.xml',
+            'sphere':   'scene_right_dynamic.xml',
+            'cylinder': 'scene_right_cylinder.xml',
         }
         scene_filename = scene_file_map.get(scene, 'scene_right.xml')
         xml_model_path = PathJoinSubstitution([
@@ -64,7 +66,9 @@ def launch_fun(context, *args, **kwargs):
             scene_filename
         ]).perform(context)
 
-    scene_is_dynamic = scene == 'dynamic'
+    depth_pc_mode = LaunchConfiguration('depth_pc_mode').perform(context)
+
+    scene_is_dynamic = scene in ('dynamic', 'sphere', 'cylinder')
     publish_tf = scene_is_dynamic or as_bool(depth_publish_tf)
     publish_depth = as_bool(enable_depth_publisher_value)
     start_scene_state_publisher = publish_tf or publish_depth
@@ -205,6 +209,7 @@ def launch_fun(context, *args, **kwargs):
             'pointcloud_stride': depth_pointcloud_stride,
             'joint_state_topic': depth_joint_state_topic,
             'target_geom_name': depth_target_geom_name,
+            'pc_mode': depth_pc_mode,
             'laterality': laterality,
             'prefix': prefix,
             'camera_frame_convention': camera_frame_convention,
@@ -256,11 +261,13 @@ def generate_launch_description():
     scene_arg = DeclareLaunchArgument(
         'scene',
         default_value='static',
-        choices=['default', 'custom', 'static', 'dynamic'],
+        choices=['default', 'custom', 'static', 'dynamic', 'sphere', 'cylinder'],
         description='MuJoCo scene to load. "default" uses scene_right.xml, '
                     '"static" is the renamed successor to the old custom scene, '
-                    '"custom" remains as a compatibility alias, and "dynamic" '
-                    'enables TF-driven dynamic alignment.'
+                    '"custom" remains as a compatibility alias, "dynamic" '
+                    'enables TF-driven dynamic alignment, "sphere" loads the '
+                    'dynamic scene with a sphere object, and "cylinder" loads '
+                    'scene_right_cylinder.xml with a cylinder object.'
     )
 
     xml_model_path_arg = DeclareLaunchArgument(
@@ -370,6 +377,13 @@ def generate_launch_description():
         default_value='target_sphere'
     )
 
+    depth_pc_mode_arg = DeclareLaunchArgument(
+        'depth_pc_mode',
+        default_value='object',
+        choices=['object', 'full'],
+        description='Point cloud mode: "object" filters to target geom only, "full" publishes the entire scene point cloud.'
+    )
+
     depth_output_dir_arg = DeclareLaunchArgument(
         'depth_output_dir',
         default_value='/tmp/mia_hand_mujoco_depth'
@@ -416,6 +430,7 @@ def generate_launch_description():
         depth_camera_pointcloud_topic_arg,
         depth_segmented_pointcloud_topic_arg,
         depth_target_geom_name_arg,
+        depth_pc_mode_arg,
         depth_output_dir_arg,
         depth_publish_tf_arg,
         depth_camera_frame_convention_arg,
