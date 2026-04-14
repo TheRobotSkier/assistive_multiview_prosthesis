@@ -355,10 +355,11 @@ class ImuEkfState:
 
         # IMU process noise settings
         # These are reasonable starting values, not final tuned values.
-        self.gyro_noise_std_rps = 0.02
-        self.accel_noise_std_mps2 = 0.20
-        self.gyro_bias_random_walk_std = 0.001
-        self.accel_bias_random_walk_std = 0.01
+        self.gyro_noise_std_rps = 0.005
+        self.accel_noise_std_mps2 = 0.15
+        self.gyro_bias_random_walk_std = 0.00005
+        self.accel_bias_random_walk_std = 0.005
+        self.accel_meas_std = 0.05
 
     def predict_covariance(self, gyro_unbiased_rps, accel_unbiased_mps2, dt):
         """

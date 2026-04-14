@@ -248,3 +248,117 @@ ros2 bag record \
   /tf_static \
   -o /home/robotlab/Documents/multiview_prosthesis/jetson_folder/ros_bag_recordings/d435_rgb_depth_pointcloud_01
 ```
+
+
+# IMU stationary logging and quick-look plotting
+
+This folder contains two scripts for collecting and checking stationary IMU data from the GY-91 / MPU-9250.
+
+Purpose:
+- log stationary IMU data to CSV at a controlled sample rate
+- quickly inspect the logged data before doing a long recording
+- later use the CSV files to estimate EKF noise parameters
+
+## Files
+
+- `imu_stationary_logger.py`
+  - reads accelerometer, gyroscope, temperature, and raw IMU values
+  - writes one CSV row per sample
+  - intended for stationary noise logging
+
+- `plot_imu_csv_quicklook.py`
+  - reads a logged CSV file
+  - creates quick-look plots
+  - helps check timing, noise, spikes, and general data quality
+
+## Recommended folder structure
+
+Scripts:
+- `/Documents/multiview_prosthesis/jetson_folder/imu_stationary_logger.py`
+- `/Documents/multiview_prosthesis/jetson_folder/plot_imu_csv_quicklook.py`
+
+CSV output folder:
+- `/Documents/multiview_prosthesis/jetson_folder/csv_logging_files`
+
+## Recommended workflow
+
+Do not start with a long recording immediately.
+
+Recommended order:
+1. run a short test, for example 2 to 5 minutes
+2. inspect the plots
+3. if the data looks good, run a long test, for example 45 minutes
+
+This avoids wasting time on a long recording if there is a problem with:
+- timing
+- file writing
+- wrong sample rate
+- unstable setup
+- accidental motion during logging
+
+## Important measurement conditions
+
+For stationary noise logging:
+- place the IMU on a stable surface
+- do not hold it in your hand
+- avoid touching the table during the recording
+- avoid cable movement if possible
+- keep the IMU orientation fixed during each test
+
+For the current noise-estimation step, one stable orientation is enough.
+A simple choice is:
+- `z-up`
+
+## Sampling rate
+
+The logger is intended to run at:
+- `200 Hz`
+
+This matches the current IMU configuration reasonably well.
+
+Do not use “as fast as possible” sampling for this test.
+A controlled rate is better for:
+- cleaner timing
+- easier analysis
+- avoiding repeated reads of the same sensor state
+
+## Run a short test
+
+Example: 2-minute stationary logging test at 200 Hz
+
+```bash
+cd /Documents/multiview_prosthesis/jetson_folder
+
+python3 imu_stationary_logger.py \
+  --output csv_logging_files/imu_short_test.csv \
+  --duration-sec 120 \
+  --rate-hz 200
+```
+
+
+## Plot the short test
+```bash
+cd /Documents/multiview_prosthesis/jetson_folder
+
+python3 plot_imu_csv_quicklook.py /home/robotlab/Documents/multiview_prosthesis/jetson_folder/csv_logging_files/imu_short_test.csv
+```
+
+## Run a long test
+Example: 45-minute stationary logging test at 200 Hz
+```bash
+cd /Documents/multiview_prosthesis/jetson_folder
+
+python3 imu_stationary_logger.py \
+  --output csv_logging_files/imu_long_test.csv \
+  --duration-sec 2700 \
+  --rate-hz 200
+```
+
+## Plot the long test
+```bash
+cd /Documents/multiview_prosthesis/jetson_folder
+
+python3 plot_imu_csv_quicklook.py \
+  /Documents/multiview_prosthesis/jetson_folder/csv_logging_files/imu_long_test.csv \
+  --max-seconds 300
+```
