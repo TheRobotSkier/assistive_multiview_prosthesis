@@ -230,6 +230,7 @@ def apply_small_angle_quat_correction(quat, dtheta):
     return quat_normalize(quat_mul(quat, delta_quat))
 
 
+
 def skew_symmetric(vec3):
     """
     Return the 3x3 skew-symmetric matrix of a 3D vector.
@@ -246,6 +247,20 @@ def skew_symmetric(vec3):
         [z,   0.0, -x],
         [-y,  x,   0.0]
     ], dtype=np.float64)
+
+
+def apply_axis_remap(raw_vec, remap_matrix):
+    """
+    Convert a 3D vector from sensor frame into chosen body frame.
+
+    remap_matrix must be a 3x3 matrix containing only:
+    - 0
+    - +1
+    - -1
+
+    with exactly one nonzero element per row and column.
+    """
+    return remap_matrix @ raw_vec
 
 
 # ============================================================
@@ -654,6 +669,10 @@ def initialize_ekf_from_startup(ekf, config, startup_samples, startup_metrics):
 
             ekf.bias_gyro = np.array(startup_metrics["gyro_mean_rps"], dtype=np.float64)
 
+            # Update gravity magnitude from measured stationary startup norm
+            ekf.gravity_mps2 = float(startup_metrics["accel_norm_mean_mps2"])
+            ekf.gravity_world = np.array([0.0, 0.0, -ekf.gravity_mps2], dtype=np.float64)
+
             if config.use_user_initial_pose:
                 yaw_rad = math.radians(config.initial_rpy_deg[2])
             else:
@@ -682,7 +701,7 @@ def initialize_ekf_from_startup(ekf, config, startup_samples, startup_metrics):
         ekf.bias_gyro = np.zeros(3, dtype=np.float64)
         ekf.bias_acc = np.zeros(3, dtype=np.float64)
         return init_report
-
+    
     raise ValueError(f"Unknown startup_mode: {config.startup_mode}")
 
 
@@ -703,6 +722,10 @@ class Mpu9250Reader:
     def __init__(self, i2c_bus, i2c_addr=MPU9250_I2C_ADDR):
         self.i2c_bus = i2c_bus
         self.i2c_addr = i2c_addr
+
+        # Axis remapping from sensor frame to body frame.
+        self.accel_remap_matrix = np.eye(3, dtype=np.float64)
+        self.gyro_remap_matrix = np.eye(3, dtype=np.float64)
 
     def write_u8(self, register_addr, value):
         self.i2c_bus.write_byte_data(self.i2c_addr, register_addr, value)
@@ -792,6 +815,10 @@ class Mpu9250Reader:
         ], dtype=np.float64)
 
         temperature_c = (raw_temp / 333.87) + 21.0
+
+        # Apply axis remapping to convert from sensor frame into body frame.
+        accel_mps2 = apply_axis_remap(accel_mps2, self.accel_remap_matrix)
+        gyro_rps = apply_axis_remap(gyro_rps, self.gyro_remap_matrix)
 
         return {
             "timestamp_sec": timestamp_sec,
