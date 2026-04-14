@@ -43,6 +43,7 @@
     <mesh name="thumb_cover" content_type="model/obj" file="thumb_cover_r.obj" scale="0.000999988 0.000999987 0.000999987"/>
     <mesh name="thumb_frame" content_type="model/obj" file="thumb_frame_r.obj" scale="0.000999988 0.000999987 0.000999987"/>
     <mesh name="thumb_metacarpus" content_type="model/obj" file="thumb_metacarpus_r.obj" scale="0.000999987 0.000999987 0.000999987"/>
+    <mesh name="d435_body" file="d435.stl" scale="0.001 0.001 0.001"/>
   </asset>
 
   <worldbody>

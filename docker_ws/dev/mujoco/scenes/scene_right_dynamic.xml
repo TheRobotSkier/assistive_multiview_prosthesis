@@ -43,6 +43,9 @@
         pos="0 0 0"
         euler="3.14 0 0"
         fovy="58"/>
+      <geom name="d435_visual" type="mesh" mesh="d435_body"
+        pos="0 0 0" euler="0 0 3.14159"
+        contype="0" conaffinity="0" group="0" rgba="0.2 0.2 0.2 1"/>
     </body>
   </worldbody>
 </mujoco>

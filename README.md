@@ -44,6 +44,7 @@ This launches an interactive MuJoCo simulation based on the upstream MuJoCo `sim
 - A **Scene Control** panel for instantly repositioning the hand base, object (sphere), and depth camera by typing position/orientation values; changes are also available via ROS topics (`/mujoco/set_hand_pose`, `/mujoco/set_object_pose`, `/mujoco/set_camera_pose`)
 - A **Motion Control** panel for smoothly interpolating the hand, object, or camera to a target pose over a set duration (in seconds); each entity has its own target position/RPY fields and a *Move* button — also available via ROS topics (see below)
 - The built-in **Rendering** panel (left sidebar) contains a *Camera* dropdown listing all cameras in the scene — select the depth camera entry to switch the viewport to the depth camera's point of view
+- A realistic **Intel RealSense D435** mesh is shown as the camera body (decimated to ~180 k faces for MuJoCo compatibility)
 
 Logs for the grasp planner can be found under `docker_ws/dev/mujoco/log/`
 

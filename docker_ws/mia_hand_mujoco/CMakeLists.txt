@@ -219,6 +219,12 @@ install(FILES
   DESTINATION share/${PROJECT_NAME}/mia_hand
 )
 
+# Installing RealSense D435 mesh asset
+install(FILES
+  ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/assets/RealSenseD435/d435.stl
+  DESTINATION share/${PROJECT_NAME}/mia_hand/assets
+)
+
 # Installing Python helper scripts
 install(PROGRAMS
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/mujoco_scene_state_publisher_node.py
