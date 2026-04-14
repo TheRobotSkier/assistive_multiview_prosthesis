@@ -160,6 +160,9 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
   mag2_pub_ = node->create_publisher<sensor_msgs::msg::MagneticField>(
     "/mujoco/wrist_cam/imu/magnetic_field", 10);
 
+  grasp_start_pub_ = node->create_publisher<std_msgs::msg::Bool>(
+    "/mujoco/grasp_start", 10);
+
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -181,6 +184,7 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_deactivate(
   sim_time_pub_.reset();
   imu2_pub_.reset();
   mag2_pub_.reset();
+  grasp_start_pub_.reset();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
