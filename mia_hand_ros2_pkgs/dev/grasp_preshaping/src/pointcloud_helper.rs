@@ -1,216 +1,17 @@
-use nalgebra::{Matrix4, Vector3};
-use serde::Deserialize;
-use std::cmp::Ordering;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
-use std::sync::RwLock;
+use nalgebra::Vector3;
+use rayon::prelude::*;
+use std::collections::VecDeque;
 
-#[derive(Debug, Clone)]
-pub struct PointCloud {
-    points: Vec<Vector3<f64>>,
+const RAY_ALIGNMENT_THRESHOLD: f32 = 0.8;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Aabb {
+    pub min: Vector3<f32>,
+    pub max: Vector3<f32>,
 }
 
-impl PointCloud {
-    pub fn new(points: Vec<Vector3<f64>>) -> Self {
-        Self { points }
-    }
-
-    pub fn from_xyz_file(path: impl AsRef<Path>) -> Result<Self, String> {
-        let file = File::open(path.as_ref()).map_err(|e| {
-            format!(
-                "Failed to open .xyz file {}: {}",
-                path.as_ref().display(),
-                e
-            )
-        })?;
-        let reader = BufReader::new(file);
-        Self::from_xyz_reader(reader)
-    }
-
-    pub fn from_xyz_reader<R: BufRead>(reader: R) -> Result<Self, String> {
-        let mut points = Vec::new();
-
-        for (line_idx, line) in reader.lines().enumerate() {
-            let line = line.map_err(|e| format!("Failed to read line {}: {}", line_idx + 1, e))?;
-            let trimmed = line.trim();
-
-            if trimmed.is_empty() || trimmed.starts_with('#') {
-                continue;
-            }
-
-            let mut parts = trimmed.split_whitespace();
-            let x = parts
-                .next()
-                .ok_or_else(|| format!("Missing x value at line {}", line_idx + 1))?
-                .parse::<f64>()
-                .map_err(|e| format!("Invalid x value at line {}: {}", line_idx + 1, e))?;
-            let y = parts
-                .next()
-                .ok_or_else(|| format!("Missing y value at line {}", line_idx + 1))?
-                .parse::<f64>()
-                .map_err(|e| format!("Invalid y value at line {}: {}", line_idx + 1, e))?;
-            let z = parts
-                .next()
-                .ok_or_else(|| format!("Missing z value at line {}", line_idx + 1))?
-                .parse::<f64>()
-                .map_err(|e| format!("Invalid z value at line {}: {}", line_idx + 1, e))?;
-
-            points.push(Vector3::new(x, y, z));
-        }
-
-        Ok(Self::new(points))
-    }
-
-    pub fn from_pointcloud2_yaml(yaml: &str) -> Result<Self, String> {
-        let msg: PointCloud2Yaml = serde_yaml::from_str(yaml)
-            .map_err(|e| format!("Failed to parse PointCloud2 YAML: {}", e))?;
-
-        if msg.point_step == 0 {
-            return Err("PointCloud2 point_step is zero".to_string());
-        }
-
-        let x_field = find_field(&msg.fields, "x")?;
-        let y_field = find_field(&msg.fields, "y")?;
-        let z_field = find_field(&msg.fields, "z")?;
-
-        let point_count_by_data = msg.data.len() / msg.point_step as usize;
-        let point_count_by_dims = (msg.width as usize) * (msg.height as usize);
-        let point_count = point_count_by_data.min(point_count_by_dims.max(1));
-
-        let mut points = Vec::with_capacity(point_count);
-        for i in 0..point_count {
-            let base = i * msg.point_step as usize;
-            let x = read_point_field(&msg.data, base, x_field, msg.is_bigendian)?;
-            let y = read_point_field(&msg.data, base, y_field, msg.is_bigendian)?;
-            let z = read_point_field(&msg.data, base, z_field, msg.is_bigendian)?;
-            if x.is_finite() && y.is_finite() && z.is_finite() {
-                points.push(Vector3::new(x, y, z));
-            }
-        }
-
-        Ok(Self::new(points))
-    }
-
-    pub fn len(&self) -> usize {
-        self.points.len()
-    }
-
-    pub fn scaled(&self, factor: f64) -> Self {
-        if (factor - 1.0).abs() < f64::EPSILON {
-            return self.clone();
-        }
-
-        let points = self.points.iter().map(|p| p * factor).collect();
-        Self::new(points)
-    }
-
-    pub fn transformed(&self, transform: &Matrix4<f64>) -> Self {
-        let points = self
-            .points
-            .iter()
-            .map(|p| {
-                let x = transform[(0, 0)] * p.x
-                    + transform[(0, 1)] * p.y
-                    + transform[(0, 2)] * p.z
-                    + transform[(0, 3)];
-                let y = transform[(1, 0)] * p.x
-                    + transform[(1, 1)] * p.y
-                    + transform[(1, 2)] * p.z
-                    + transform[(1, 3)];
-                let z = transform[(2, 0)] * p.x
-                    + transform[(2, 1)] * p.y
-                    + transform[(2, 2)] * p.z
-                    + transform[(2, 3)];
-                Vector3::new(x, y, z)
-            })
-            .collect();
-        Self::new(points)
-    }
-
-    #[cfg(test)]
-    pub fn points(&self) -> &[Vector3<f64>] {
-        &self.points
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct PointCloud2Yaml {
-    height: u32,
-    width: u32,
-    fields: Vec<PointFieldYaml>,
-    is_bigendian: bool,
-    point_step: u32,
-    data: Vec<u8>,
-}
-
-#[derive(Debug, Deserialize)]
-struct PointFieldYaml {
-    name: String,
-    offset: u32,
-    datatype: u8,
-}
-
-fn find_field<'a>(fields: &'a [PointFieldYaml], name: &str) -> Result<&'a PointFieldYaml, String> {
-    fields
-        .iter()
-        .find(|f| f.name == name)
-        .ok_or_else(|| format!("PointCloud2 field '{}' not found", name))
-}
-
-fn read_point_field(
-    data: &[u8],
-    point_base: usize,
-    field: &PointFieldYaml,
-    is_bigendian: bool,
-) -> Result<f64, String> {
-    let off = point_base + field.offset as usize;
-    match field.datatype {
-        // sensor_msgs/PointField FLOAT32
-        7 => {
-            let end = off + 4;
-            if end > data.len() {
-                return Err("PointCloud2 FLOAT32 field exceeds buffer".to_string());
-            }
-            let mut bytes = [0_u8; 4];
-            bytes.copy_from_slice(&data[off..end]);
-            let value = if is_bigendian {
-                f32::from_be_bytes(bytes)
-            } else {
-                f32::from_le_bytes(bytes)
-            };
-            Ok(value as f64)
-        }
-        // sensor_msgs/PointField FLOAT64
-        8 => {
-            let end = off + 8;
-            if end > data.len() {
-                return Err("PointCloud2 FLOAT64 field exceeds buffer".to_string());
-            }
-            let mut bytes = [0_u8; 8];
-            bytes.copy_from_slice(&data[off..end]);
-            let value = if is_bigendian {
-                f64::from_be_bytes(bytes)
-            } else {
-                f64::from_le_bytes(bytes)
-            };
-            Ok(value)
-        }
-        other => Err(format!(
-            "Unsupported PointCloud2 datatype {} for field {}",
-            other, field.name
-        )),
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AabbMask {
-    pub min: Vector3<f64>,
-    pub max: Vector3<f64>,
-}
-
-impl AabbMask {
-    pub fn contains(&self, p: &Vector3<f64>) -> bool {
+impl Aabb {
+    pub fn contains(&self, p: &Vector3<f32>) -> bool {
         p.x >= self.min.x
             && p.x <= self.max.x
             && p.y >= self.min.y
@@ -221,422 +22,509 @@ impl AabbMask {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProximityQuery {
-    pub base_transform: Matrix4<f64>,
-    pub finger_transform: Matrix4<f64>,
-    pub mask: Option<AabbMask>,
+pub struct Camera {
+    pub position: Vector3<f32>,
 }
 
 #[derive(Debug, Clone)]
-pub struct NearestDistanceResult {
-    pub world_tip: Vector3<f64>,
-    pub nearest_distance: Option<f64>,
-    pub candidates_checked: usize,
+pub struct PointCloud {
+    pub points: Vec<Vector3<f32>>,
 }
 
-pub struct PointCloudProximityChecker {
-    cloud: PointCloud,
-    sorted_x_indices: Vec<usize>,
-    sorted_x_values: Vec<f64>,
-    full_cloud_aabb: Option<AabbMask>,
-    cached_user_mask_aabb: RwLock<Option<(AabbMask, Option<AabbMask>)>>,
+impl PointCloud {
+    pub fn new(points: Vec<Vector3<f32>>) -> Self {
+        Self { points }
+    }
+
+    pub fn len(&self) -> usize {
+        self.points.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.points.is_empty()
+    }
 }
 
-impl PointCloudProximityChecker {
-    pub fn new(cloud: PointCloud) -> Self {
-        let mut sorted_x_indices: Vec<usize> = (0..cloud.points.len()).collect();
-        sorted_x_indices.sort_by(|a, b| {
-            cloud.points[*a]
-                .x
-                .partial_cmp(&cloud.points[*b].x)
-                .unwrap_or(Ordering::Equal)
-        });
-        let sorted_x_values = sorted_x_indices
-            .iter()
-            .map(|idx| cloud.points[*idx].x)
-            .collect();
-        let full_cloud_aabb = compute_tight_aabb(cloud.points.iter());
+#[derive(Debug, Clone)]
+pub struct MortonPoint {
+    pub morton_id: u64,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
 
-        Self {
-            cloud,
-            sorted_x_indices,
-            sorted_x_values,
-            full_cloud_aabb,
-            cached_user_mask_aabb: RwLock::new(None),
-        }
-    }
+pub struct Tsdf {
+    data: Vec<f32>,
+    width: usize,
+    height: usize,
+    depth: usize,
+    resolution_mm: f32,
+    origin: Vector3<f32>,
+}
 
-    pub fn nearest_distance(&self, query: &ProximityQuery) -> NearestDistanceResult {
-        let world_tip = compose_tip_position(&query.base_transform, &query.finger_transform);
+impl Tsdf {
+    pub fn get_distance(&self, x: f32, y: f32, z: f32) -> f32 {
+        let gx = (x - self.origin.x) / self.resolution_mm;
+        let gy = (y - self.origin.y) / self.resolution_mm;
+        let gz = (z - self.origin.z) / self.resolution_mm;
 
-        let effective_aabb = self.effective_aabb(query.mask);
+        let gx = gx.max(0.0).min((self.width - 1) as f32);
+        let gy = gy.max(0.0).min((self.height - 1) as f32);
+        let gz = gz.max(0.0).min((self.depth - 1) as f32);
 
-        let Some(effective_aabb) = effective_aabb else {
-            return NearestDistanceResult {
-                world_tip,
-                nearest_distance: None,
-                candidates_checked: 0,
-            };
-        };
+        let x0 = (gx.floor() as usize).min(self.width - 1);
+        let y0 = (gy.floor() as usize).min(self.height - 1);
+        let z0 = (gz.floor() as usize).min(self.depth - 1);
+        let x1 = (x0 + 1).min(self.width - 1);
+        let y1 = (y0 + 1).min(self.height - 1);
+        let z1 = (z0 + 1).min(self.depth - 1);
 
-        /*if !effective_aabb.contains(&world_tip) {
-            return NearestDistanceResult {
-                world_tip,
-                nearest_distance: None,
-                candidates_checked: 0,
-            };
-        }*/
+        let tx = (gx - x0 as f32).clamp(0.0, 1.0);
+        let ty = (gy - y0 as f32).clamp(0.0, 1.0);
+        let tz = (gz - z0 as f32).clamp(0.0, 1.0);
 
-        let mut best_sq: Option<f64> = None;
-        let mut candidates_checked = 0usize;
+        let stride_y = self.width;
+        let stride_z = self.width * self.height;
 
-        match query.mask {
-            Some(mask) => {
-                let left = lower_bound(&self.sorted_x_values, effective_aabb.min.x);
-                let right = upper_bound(&self.sorted_x_values, effective_aabb.max.x);
+        let c000 = self.data[x0 + y0 * stride_y + z0 * stride_z];
+        let c100 = self.data[x1 + y0 * stride_y + z0 * stride_z];
+        let c010 = self.data[x0 + y1 * stride_y + z0 * stride_z];
+        let c110 = self.data[x1 + y1 * stride_y + z0 * stride_z];
+        let c001 = self.data[x0 + y0 * stride_y + z1 * stride_z];
+        let c101 = self.data[x1 + y0 * stride_y + z1 * stride_z];
+        let c011 = self.data[x0 + y1 * stride_y + z1 * stride_z];
+        let c111 = self.data[x1 + y1 * stride_y + z1 * stride_z];
 
-                for sorted_pos in left..right {
-                    let point_idx = self.sorted_x_indices[sorted_pos];
-                    let point = &self.cloud.points[point_idx];
-
-                    if !mask.contains(point) {
-                        continue;
-                    }
-
-                    candidates_checked += 1;
-                    let sq = (point - world_tip).norm_squared();
-                    best_sq = Some(best_sq.map_or(sq, |current| current.min(sq)));
-                }
-            }
-            None => {
-                for point in &self.cloud.points {
-                    candidates_checked += 1;
-                    let sq = (point - world_tip).norm_squared();
-                    best_sq = Some(best_sq.map_or(sq, |current| current.min(sq)));
-                }
-            }
-        }
-
-        NearestDistanceResult {
-            world_tip,
-            nearest_distance: best_sq.map(f64::sqrt),
-            candidates_checked,
-        }
-    }
-
-    fn effective_aabb(&self, mask: Option<AabbMask>) -> Option<AabbMask> {
-        let Some(mask) = mask else {
-            return self.full_cloud_aabb;
-        };
-
+        if c000 == f32::MAX
+            || c100 == f32::MAX
+            || c010 == f32::MAX
+            || c110 == f32::MAX
+            || c001 == f32::MAX
+            || c101 == f32::MAX
+            || c011 == f32::MAX
+            || c111 == f32::MAX
         {
-            let cached = self
-                .cached_user_mask_aabb
-                .read()
-                .expect("aabb cache lock poisoned");
-            if let Some((cached_mask, cached_aabb)) = *cached {
-                if cached_mask == mask {
-                    return cached_aabb;
-                }
+            return f32::MAX;
+        }
+
+        let lerp = |a: f32, b: f32, t: f32| a + (b - a) * t;
+
+        let c00 = lerp(c000, c100, tx);
+        let c10 = lerp(c010, c110, tx);
+        let c01 = lerp(c001, c101, tx);
+        let c11 = lerp(c011, c111, tx);
+
+        let c0 = lerp(c00, c10, ty);
+        let c1 = lerp(c01, c11, ty);
+
+        lerp(c0, c1, tz)
+    }
+
+    pub fn get_surface_normal(&self, x: f32, y: f32, z: f32) -> Vector3<f32> {
+        let h = self.resolution_mm * 0.5;
+
+        let d_xp = self.get_distance(x + h, y, z);
+        let d_xn = self.get_distance(x - h, y, z);
+        let d_yp = self.get_distance(x, y + h, z);
+        let d_yn = self.get_distance(x, y - h, z);
+        let d_zp = self.get_distance(x, y, z + h);
+        let d_zn = self.get_distance(x, y, z - h);
+
+        if d_xp == f32::MAX
+            || d_xn == f32::MAX
+            || d_yp == f32::MAX
+            || d_yn == f32::MAX
+            || d_zp == f32::MAX
+            || d_zn == f32::MAX
+        {
+            return Vector3::new(0.0, 0.0, 1.0);
+        }
+
+        let grad = Vector3::new(d_xp - d_xn, d_yp - d_yn, d_zp - d_zn);
+        let norm = grad.norm();
+        if norm < 1e-10 {
+            Vector3::new(0.0, 0.0, 1.0)
+        } else {
+            grad / norm
+        }
+    }
+}
+
+pub fn prune(pc: &PointCloud, aabb: Option<Aabb>) -> PointCloud {
+    match aabb {
+        Some(aabb) => {
+            let points: Vec<Vector3<f32>> = pc
+                .points
+                .par_iter()
+                .filter(|p| aabb.contains(p))
+                .copied()
+                .collect();
+            PointCloud::new(points)
+        }
+        None => pc.clone(),
+    }
+}
+
+fn split_by_3(x: u16) -> u64 {
+    let mut result: u64 = 0;
+    for i in 0..16 {
+        result |= (((x >> i) & 1) as u64) << (3 * i);
+    }
+    result
+}
+
+fn decode_morton(morton: u64) -> (u16, u16, u16) {
+    let mut gx = 0u16;
+    let mut gy = 0u16;
+    let mut gz = 0u16;
+    for i in 0..16 {
+        gx |= (((morton >> (3 * i)) & 1) as u16) << i;
+        gy |= (((morton >> (3 * i + 1)) & 1) as u16) << i;
+        gz |= (((morton >> (3 * i + 2)) & 1) as u16) << i;
+    }
+    (gx, gy, gz)
+}
+
+pub fn morton(pc: &PointCloud, resolution_mm: f32) -> (Vec<MortonPoint>, Vec<usize>, Vector3<f32>) {
+    assert!(!pc.is_empty(), "empty point cloud");
+    assert!(resolution_mm > 0.0, "resolution must be positive");
+
+    let mut min = pc.points[0];
+    let mut max = pc.points[0];
+    for p in &pc.points {
+        min.x = min.x.min(p.x);
+        min.y = min.y.min(p.y);
+        min.z = min.z.min(p.z);
+        max.x = max.x.max(p.x);
+        max.y = max.y.max(p.y);
+        max.z = max.z.max(p.z);
+    }
+
+    let mut morton_points: Vec<MortonPoint> = pc
+        .points
+        .par_iter()
+        .map(|p| {
+            let gx = ((p.x - min.x) / resolution_mm)
+                .floor()
+                .max(0.0)
+                .min(65535.0) as u16;
+            let gy = ((p.y - min.y) / resolution_mm)
+                .floor()
+                .max(0.0)
+                .min(65535.0) as u16;
+            let gz = ((p.z - min.z) / resolution_mm)
+                .floor()
+                .max(0.0)
+                .min(65535.0) as u16;
+            let morton_id = split_by_3(gx) | (split_by_3(gy) << 1) | (split_by_3(gz) << 2);
+            MortonPoint {
+                morton_id,
+                x: p.x,
+                y: p.y,
+                z: p.z,
+            }
+        })
+        .collect();
+
+    morton_points.par_sort_by_key(|mp| mp.morton_id);
+
+    let mut offsets = Vec::new();
+    offsets.push(0);
+    for i in 1..morton_points.len() {
+        if morton_points[i].morton_id != morton_points[i - 1].morton_id {
+            offsets.push(i);
+        }
+    }
+    offsets.push(morton_points.len());
+
+    (morton_points, offsets, min)
+}
+
+pub fn get_tsdf(
+    morton_array: &[MortonPoint],
+    offsets: &[usize],
+    truncation_cells: usize,
+    start_coords: Vector3<f32>,
+    resolution_mm: f32,
+    cameras: &[Camera],
+) -> Tsdf {
+    assert!(!morton_array.is_empty(), "empty morton array");
+    assert!(resolution_mm > 0.0, "resolution must be positive");
+
+    let mut max_gx: usize = 0;
+    let mut max_gy: usize = 0;
+    let mut max_gz: usize = 0;
+    for group in 0..offsets.len() - 1 {
+        let (gx, gy, gz) = decode_morton(morton_array[offsets[group]].morton_id);
+        max_gx = max_gx.max(gx as usize);
+        max_gy = max_gy.max(gy as usize);
+        max_gz = max_gz.max(gz as usize);
+    }
+
+    let trunc = truncation_cells;
+    let width = max_gx + 1 + 2 * trunc;
+    let height = max_gy + 1 + 2 * trunc;
+    let depth = max_gz + 1 + 2 * trunc;
+    let total = width * height * depth;
+
+    let origin =
+        start_coords - Vector3::new(trunc as f32, trunc as f32, trunc as f32) * resolution_mm;
+
+    let mut distance = vec![f32::MAX; total];
+    let mut nearest = vec![0u32; total];
+
+    let stride_y = width;
+    let stride_z = width * height;
+
+    let mut queue = VecDeque::with_capacity(total / 4);
+    for group in 0..offsets.len() - 1 {
+        let start = offsets[group];
+        let (gx, gy, gz) = decode_morton(morton_array[start].morton_id);
+        let px = gx as usize + trunc;
+        let py = gy as usize + trunc;
+        let pz = gz as usize + trunc;
+        let idx = px + py * stride_y + pz * stride_z;
+        distance[idx] = 0.0;
+        nearest[idx] = start as u32;
+        queue.push_back((px, py, pz));
+    }
+
+    let neighbor_offsets: [(isize, isize, isize); 6] = [
+        (1, 0, 0),
+        (-1, 0, 0),
+        (0, 1, 0),
+        (0, -1, 0),
+        (0, 0, 1),
+        (0, 0, -1),
+    ];
+
+    while let Some((cx, cy, cz)) = queue.pop_front() {
+        let cidx = cx + cy * stride_y + cz * stride_z;
+        let cdist = distance[cidx];
+        if cdist >= truncation_cells as f32 {
+            continue;
+        }
+
+        for &(dx, dy, dz) in &neighbor_offsets {
+            let nx = cx as isize + dx;
+            let ny = cy as isize + dy;
+            let nz = cz as isize + dz;
+            if nx < 0 || ny < 0 || nz < 0 {
+                continue;
+            }
+            let (nx, ny, nz) = (nx as usize, ny as usize, nz as usize);
+            if nx >= width || ny >= height || nz >= depth {
+                continue;
+            }
+            let nidx = nx + ny * stride_y + nz * stride_z;
+            let new_dist = cdist + 1.0;
+            if new_dist < distance[nidx] {
+                distance[nidx] = new_dist;
+                nearest[nidx] = nearest[cidx];
+                queue.push_back((nx, ny, nz));
             }
         }
-
-        let computed = self.tight_aabb_inside_mask(&mask);
-        let mut cached = self
-            .cached_user_mask_aabb
-            .write()
-            .expect("aabb cache lock poisoned");
-        *cached = Some((mask, computed));
-        computed
     }
 
-    fn tight_aabb_inside_mask(&self, mask: &AabbMask) -> Option<AabbMask> {
-        let left = lower_bound(&self.sorted_x_values, mask.min.x);
-        let right = upper_bound(&self.sorted_x_values, mask.max.x);
-        compute_tight_aabb(
-            self.sorted_x_indices[left..right]
-                .iter()
-                .map(|idx| &self.cloud.points[*idx])
-                .filter(|point| mask.contains(point)),
-        )
+    let n_cams = cameras.len();
+    if n_cams > 0 {
+        distance
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(flat_idx, dist)| {
+                if *dist == f32::MAX || *dist == 0.0 {
+                    return;
+                }
+
+                let gz = flat_idx / stride_z;
+                let rem = flat_idx - gz * stride_z;
+                let gy = rem / stride_y;
+                let gx = rem % stride_y;
+
+                let vw = origin + Vector3::new(gx as f32, gy as f32, gz as f32) * resolution_mm;
+
+                let mp = &morton_array[nearest[flat_idx] as usize];
+                let pw = Vector3::new(mp.x, mp.y, mp.z);
+
+                let mut behind_count = 0usize;
+                let mut inside_votes = 0usize;
+
+                for cam in cameras {
+                    let d_cv = (vw - cam.position).norm_squared();
+                    let d_cp = (pw - cam.position).norm_squared();
+                    if d_cv > d_cp {
+                        behind_count += 1;
+                        let to_voxel = vw - pw;
+                        let ray_dir = vw - cam.position;
+                        let to_voxel_len = to_voxel.norm();
+                        let ray_dir_len = ray_dir.norm();
+                        if to_voxel_len > 1e-10 && ray_dir_len > 1e-10 {
+                            let alignment = (ray_dir / ray_dir_len).dot(&(to_voxel / to_voxel_len));
+                            if alignment > RAY_ALIGNMENT_THRESHOLD {
+                                inside_votes += 1;
+                            }
+                        }
+                    }
+                }
+
+                if behind_count > n_cams / 2 && inside_votes > behind_count / 2 {
+                    *dist = -*dist;
+                }
+            });
     }
-}
 
-fn compute_tight_aabb<'a>(points: impl Iterator<Item = &'a Vector3<f64>>) -> Option<AabbMask> {
-    let mut iter = points;
-    let first = iter.next()?;
-
-    let mut min = *first;
-    let mut max = *first;
-    for point in iter {
-        min.x = min.x.min(point.x);
-        min.y = min.y.min(point.y);
-        min.z = min.z.min(point.z);
-        max.x = max.x.max(point.x);
-        max.y = max.y.max(point.y);
-        max.z = max.z.max(point.z);
+    Tsdf {
+        data: distance,
+        width,
+        height,
+        depth,
+        resolution_mm,
+        origin,
     }
-
-    Some(AabbMask { min, max })
-}
-
-pub fn compose_tip_position(
-    base_transform: &Matrix4<f64>,
-    finger_transform: &Matrix4<f64>,
-) -> Vector3<f64> {
-    let world_tip_tf = base_transform * finger_transform;
-    Vector3::new(
-        world_tip_tf[(0, 3)],
-        world_tip_tf[(1, 3)],
-        world_tip_tf[(2, 3)],
-    )
-}
-
-fn lower_bound(values: &[f64], needle: f64) -> usize {
-    let mut lo = 0usize;
-    let mut hi = values.len();
-    while lo < hi {
-        let mid = lo + (hi - lo) / 2;
-        if values[mid] < needle {
-            lo = mid + 1;
-        } else {
-            hi = mid;
-        }
-    }
-    lo
-}
-
-fn upper_bound(values: &[f64], needle: f64) -> usize {
-    let mut lo = 0usize;
-    let mut hi = values.len();
-    while lo < hi {
-        let mid = lo + (hi - lo) / 2;
-        if values[mid] <= needle {
-            lo = mid + 1;
-        } else {
-            hi = mid;
-        }
-    }
-    lo
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn t_xyz(x: f64, y: f64, z: f64) -> Matrix4<f64> {
-        let mut m = Matrix4::identity();
-        m[(0, 3)] = x;
-        m[(1, 3)] = y;
-        m[(2, 3)] = z;
-        m
+    #[test]
+    fn prune_without_aabb_returns_clone() {
+        let pc = PointCloud::new(vec![
+            Vector3::new(1.0, 2.0, 3.0),
+            Vector3::new(4.0, 5.0, 6.0),
+        ]);
+        let pruned = prune(&pc, None);
+        assert_eq!(pruned.len(), 2);
     }
 
     #[test]
-    fn compose_tip_position_uses_base_times_finger() {
-        let base = t_xyz(1.0, 2.0, 3.0);
-        let finger = t_xyz(0.5, -1.0, 2.0);
-        let world_tip = compose_tip_position(&base, &finger);
-
-        assert!((world_tip.x - 1.5).abs() < 1e-12);
-        assert!((world_tip.y - 1.0).abs() < 1e-12);
-        assert!((world_tip.z - 5.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn nearest_distance_without_mask_scans_all_points() {
-        let cloud = PointCloud::new(vec![
+    fn prune_with_aabb_filters_points() {
+        let pc = PointCloud::new(vec![
             Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 0.0, 0.0),
-            Vector3::new(3.0, 0.0, 0.0),
-        ]);
-        let checker = PointCloudProximityChecker::new(cloud);
-
-        let query = ProximityQuery {
-            base_transform: Matrix4::identity(),
-            finger_transform: t_xyz(2.0, 0.0, 0.0),
-            mask: None,
-        };
-
-        let result = checker.nearest_distance(&query);
-        assert_eq!(result.candidates_checked, 3);
-        assert_eq!(result.nearest_distance, Some(1.0));
-    }
-
-    #[test]
-    fn nearest_distance_with_mask_limits_candidates() {
-        let cloud = PointCloud::new(vec![
-            Vector3::new(-10.0, 0.0, 0.0),
-            Vector3::new(1.5, 0.0, 0.0),
-            Vector3::new(2.5, 0.0, 0.0),
-            Vector3::new(10.0, 0.0, 0.0),
-        ]);
-        let checker = PointCloudProximityChecker::new(cloud);
-
-        let query = ProximityQuery {
-            base_transform: Matrix4::identity(),
-            finger_transform: t_xyz(2.0, 0.0, 0.0),
-            mask: Some(AabbMask {
-                min: Vector3::new(1.0, -1.0, -1.0),
-                max: Vector3::new(3.0, 1.0, 1.0),
-            }),
-        };
-
-        let result = checker.nearest_distance(&query);
-        assert_eq!(result.candidates_checked, 2);
-        assert_eq!(result.nearest_distance, Some(0.5));
-    }
-
-    #[test]
-    fn nearest_distance_with_mask_can_return_none() {
-        let cloud = PointCloud::new(vec![
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 1.0, 1.0),
-        ]);
-        let checker = PointCloudProximityChecker::new(cloud);
-
-        let query = ProximityQuery {
-            base_transform: Matrix4::identity(),
-            finger_transform: Matrix4::identity(),
-            mask: Some(AabbMask {
-                min: Vector3::new(5.0, 5.0, 5.0),
-                max: Vector3::new(6.0, 6.0, 6.0),
-            }),
-        };
-
-        let result = checker.nearest_distance(&query);
-        assert_eq!(result.candidates_checked, 0);
-        assert_eq!(result.nearest_distance, None);
-    }
-
-    #[test]
-    fn nearest_distance_without_mask_skips_when_tip_outside_cloud_aabb() {
-        let cloud = PointCloud::new(vec![
-            Vector3::new(0.0, 0.0, 0.0),
-            Vector3::new(1.0, 1.0, 1.0),
-        ]);
-        let checker = PointCloudProximityChecker::new(cloud);
-
-        let query = ProximityQuery {
-            base_transform: Matrix4::identity(),
-            finger_transform: t_xyz(10.0, 10.0, 10.0),
-            mask: None,
-        };
-
-        let result = checker.nearest_distance(&query);
-        assert_eq!(result.candidates_checked, 0);
-        assert_eq!(result.nearest_distance, None);
-    }
-
-    #[test]
-    fn nearest_distance_with_mask_uses_tight_subset_for_tip_gate() {
-        let cloud = PointCloud::new(vec![
+            Vector3::new(5.0, 5.0, 5.0),
             Vector3::new(10.0, 10.0, 10.0),
-            Vector3::new(11.0, 11.0, 11.0),
-            Vector3::new(50.0, 50.0, 50.0),
         ]);
-        let checker = PointCloudProximityChecker::new(cloud);
-
-        let query = ProximityQuery {
-            base_transform: Matrix4::identity(),
-            finger_transform: t_xyz(5.0, 5.0, 5.0),
-            mask: Some(AabbMask {
-                min: Vector3::new(0.0, 0.0, 0.0),
-                max: Vector3::new(20.0, 20.0, 20.0),
-            }),
+        let aabb = Aabb {
+            min: Vector3::new(-1.0, -1.0, -1.0),
+            max: Vector3::new(6.0, 6.0, 6.0),
         };
-
-        let result = checker.nearest_distance(&query);
-        assert_eq!(result.candidates_checked, 0);
-        assert_eq!(result.nearest_distance, None);
+        let pruned = prune(&pc, Some(aabb));
+        assert_eq!(pruned.len(), 2);
     }
 
     #[test]
-    fn nearest_distance_tip_on_computed_aabb_boundary_is_included() {
-        let cloud = PointCloud::new(vec![
+    fn morton_code_roundtrip() {
+        for gx in [0u16, 1, 100, 255, 1000, 65535] {
+            for gy in [0u16, 1, 42, 999] {
+                for gz in [0u16, 1, 7, 5432] {
+                    let code = split_by_3(gx) | (split_by_3(gy) << 1) | (split_by_3(gz) << 2);
+                    let (rx, ry, rz) = decode_morton(code);
+                    assert_eq!(rx, gx, "gx mismatch for ({}, {}, {})", gx, gy, gz);
+                    assert_eq!(ry, gy, "gy mismatch for ({}, {}, {})", gx, gy, gz);
+                    assert_eq!(rz, gz, "gz mismatch for ({}, {}, {})", gx, gy, gz);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn morton_sorts_by_code_and_builds_offsets() {
+        let pc = PointCloud::new(vec![
             Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.5, 0.0, 0.0),
             Vector3::new(2.0, 0.0, 0.0),
         ]);
-        let checker = PointCloudProximityChecker::new(cloud);
-
-        let query = ProximityQuery {
-            base_transform: Matrix4::identity(),
-            finger_transform: t_xyz(0.0, 0.0, 0.0),
-            mask: None,
-        };
-
-        let result = checker.nearest_distance(&query);
-        assert_eq!(result.candidates_checked, 2);
-        assert_eq!(result.nearest_distance, Some(0.0));
+        let (sorted, offsets, _start) = morton(&pc, 1.0);
+        assert_eq!(sorted.len(), 3);
+        assert!(offsets.len() >= 2);
+        for i in 1..sorted.len() {
+            assert!(sorted[i].morton_id >= sorted[i - 1].morton_id);
+        }
+        assert_eq!(*offsets.last().unwrap(), sorted.len());
     }
 
     #[test]
-    fn xyz_reader_ignores_comments_and_blank_lines() {
-        let raw = "\n# header\n0 0 0\n\n1 2 3\n";
-        let reader = BufReader::new(raw.as_bytes());
-        let cloud = PointCloud::from_xyz_reader(reader).expect("xyz parsing should succeed");
-        assert_eq!(cloud.points().len(), 2);
+    fn tsdf_surface_voxels_have_zero_distance() {
+        let pc = PointCloud::new(vec![Vector3::new(5.0, 5.0, 5.0)]);
+        let (morton_arr, offsets, start) = morton(&pc, 1.0);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 3, start, 1.0, &[]);
+
+        let d = tsdf.get_distance(5.0, 5.0, 5.0);
+        assert!(d.abs() < 0.01, "surface distance should be ~0, got {}", d);
     }
 
     #[test]
-    fn pointcloud2_yaml_parses_float32_xyz() {
-        // Two points: (1,2,3) and (4,5,6) packed as little-endian float32 xyz.
-        let yaml = "height: 1
-width: 2
-fields:
-  - {name: x, offset: 0, datatype: 7}
-  - {name: y, offset: 4, datatype: 7}
-  - {name: z, offset: 8, datatype: 7}
-is_bigendian: false
-point_step: 12
-data: [0,0,128,63,0,0,0,64,0,0,64,64,0,0,128,64,0,0,160,64,0,0,192,64]
-";
+    fn tsdf_distance_increases_away_from_surface() {
+        let pc = PointCloud::new(vec![Vector3::new(10.0, 10.0, 10.0)]);
+        let (morton_arr, offsets, start) = morton(&pc, 1.0);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &[]);
 
-        let cloud = PointCloud::from_pointcloud2_yaml(yaml).expect("PointCloud2 parse should work");
-        assert_eq!(cloud.points().len(), 2);
-
-        let p0 = cloud.points()[0];
-        let p1 = cloud.points()[1];
-        assert!((p0.x - 1.0).abs() < 1e-9);
-        assert!((p0.y - 2.0).abs() < 1e-9);
-        assert!((p0.z - 3.0).abs() < 1e-9);
-        assert!((p1.x - 4.0).abs() < 1e-9);
-        assert!((p1.y - 5.0).abs() < 1e-9);
-        assert!((p1.z - 6.0).abs() < 1e-9);
+        let d0 = tsdf.get_distance(10.0, 10.0, 10.0);
+        let d1 = tsdf.get_distance(11.0, 10.0, 10.0);
+        let d2 = tsdf.get_distance(12.0, 10.0, 10.0);
+        assert!(d0.abs() < 0.01, "d0 = {}", d0);
+        assert!(d1 > 0.5, "d1 = {}", d1);
+        assert!(d2 > d1, "d2 = {}, d1 = {}", d2, d1);
     }
 
     #[test]
-    fn scaled_multiplies_all_points() {
-        let cloud = PointCloud::new(vec![Vector3::new(1.0, -2.0, 3.0), Vector3::new(0.5, 1.0, -1.5)]);
-        let scaled = cloud.scaled(0.01);
+    fn tsdf_truncation_bounds_distance() {
+        let pc = PointCloud::new(vec![Vector3::new(20.0, 20.0, 20.0)]);
+        let trunc = 3;
+        let (morton_arr, offsets, start) = morton(&pc, 1.0);
+        let tsdf = get_tsdf(&morton_arr, &offsets, trunc, start, 1.0, &[]);
 
-        let p0 = scaled.points()[0];
-        let p1 = scaled.points()[1];
-        assert!((p0.x - 0.01).abs() < 1e-12);
-        assert!((p0.y + 0.02).abs() < 1e-12);
-        assert!((p0.z - 0.03).abs() < 1e-12);
-        assert!((p1.x - 0.005).abs() < 1e-12);
-        assert!((p1.y - 0.01).abs() < 1e-12);
-        assert!((p1.z + 0.015).abs() < 1e-12);
+        let d_far = tsdf.get_distance(30.0, 20.0, 20.0);
+        assert_eq!(d_far, f32::MAX, "beyond truncation should be f32::MAX");
     }
 
     #[test]
-    fn transformed_applies_rigid_translation() {
-        let cloud = PointCloud::new(vec![Vector3::new(1.0, -2.0, 3.0), Vector3::new(0.5, 1.0, -1.5)]);
-        let mut tf = Matrix4::identity();
-        tf[(0, 3)] = -0.1;
-        tf[(1, 3)] = 0.2;
-        tf[(2, 3)] = 0.3;
+    fn tsdf_sign_negative_inside_with_cameras() {
+        let pc = PointCloud::new(vec![
+            Vector3::new(10.0, 10.0, 10.0),
+            Vector3::new(12.0, 10.0, 10.0),
+            Vector3::new(10.0, 12.0, 10.0),
+            Vector3::new(10.0, 10.0, 12.0),
+            Vector3::new(12.0, 12.0, 10.0),
+            Vector3::new(12.0, 10.0, 12.0),
+            Vector3::new(10.0, 12.0, 12.0),
+            Vector3::new(12.0, 12.0, 12.0),
+        ]);
+        let cameras = vec![
+            Camera {
+                position: Vector3::new(11.0, 11.0, 8.0),
+            },
+            Camera {
+                position: Vector3::new(11.0, 8.0, 11.0),
+            },
+            Camera {
+                position: Vector3::new(8.0, 11.0, 11.0),
+            },
+        ];
+        let (morton_arr, offsets, start) = morton(&pc, 1.0);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &cameras);
 
-        let transformed = cloud.transformed(&tf);
+        let d_inside = tsdf.get_distance(11.0, 11.0, 11.0);
+        assert!(
+            d_inside < 0.0,
+            "point inside cube shell should be negative, got {}",
+            d_inside
+        );
+    }
 
-        let p0 = transformed.points()[0];
-        let p1 = transformed.points()[1];
-        assert!((p0.x - 0.9).abs() < 1e-12);
-        assert!((p0.y + 1.8).abs() < 1e-12);
-        assert!((p0.z - 3.3).abs() < 1e-12);
-        assert!((p1.x - 0.4).abs() < 1e-12);
-        assert!((p1.y - 1.2).abs() < 1e-12);
-        assert!((p1.z + 1.2).abs() < 1e-12);
+    #[test]
+    fn surface_normal_points_outward() {
+        let pc = PointCloud::new(vec![Vector3::new(10.0, 10.0, 10.0)]);
+        let (morton_arr, offsets, start) = morton(&pc, 1.0);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &[]);
+
+        let normal = tsdf.get_surface_normal(12.0, 10.0, 10.0);
+        let dir = Vector3::new(1.0, 0.0, 0.0);
+        let dot = normal.dot(&dir);
+        assert!(
+            dot > 0.5,
+            "normal should point roughly in +x away from surface, dot = {}",
+            dot
+        );
     }
 }

@@ -81,10 +81,10 @@ fn get_subscription_count(topic: &str) -> Result<u32, String> {
         .output()
         .map_err(|e| format!("Failed to run 'ros2 topic info {}': {}", topic, e))?;
 
-    let stdout =
-        String::from_utf8(output.stdout).map_err(|e| format!("Invalid UTF-8 in ros2 stdout: {}", e))?;
-    let stderr =
-        String::from_utf8(output.stderr).map_err(|e| format!("Invalid UTF-8 in ros2 stderr: {}", e))?;
+    let stdout = String::from_utf8(output.stdout)
+        .map_err(|e| format!("Invalid UTF-8 in ros2 stdout: {}", e))?;
+    let stderr = String::from_utf8(output.stderr)
+        .map_err(|e| format!("Invalid UTF-8 in ros2 stderr: {}", e))?;
 
     if !output.status.success() {
         return Err(format!(

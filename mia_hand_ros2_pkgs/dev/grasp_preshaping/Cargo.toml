@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 npyz = { version = "0.8", features = ["npz"] }
 nalgebra = "0.32"
+rayon = "1.10"
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"

@@ -13,3 +13,6 @@ Cargo.lock
 
 # ignore python cache
 __pycache__/
+
+# llm stuff
+.kilo/

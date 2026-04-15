@@ -176,12 +176,21 @@ impl FingerLUT {
         let thumb_abd_raw = Self::read_numeric_array(&mut npz, "thumb_opp_mode1_table");
         let palm_raw = Self::read_numeric_array(&mut npz, "palm_table");
 
-        let index_table = Self::decode_table(&index_raw, resolution, Self::INDEX_CONTACTS, "index_table");
+        let index_table =
+            Self::decode_table(&index_raw, resolution, Self::INDEX_CONTACTS, "index_table");
         let mrl_table = Self::decode_table(&mrl_raw, resolution, Self::MRL_CONTACTS, "mrl_table");
-        let thumb_add_table =
-            Self::decode_table(&thumb_add_raw, resolution, Self::THUMB_CONTACTS, "thumb_opp_mode0_table");
-        let thumb_abd_table =
-            Self::decode_table(&thumb_abd_raw, resolution, Self::THUMB_CONTACTS, "thumb_opp_mode1_table");
+        let thumb_add_table = Self::decode_table(
+            &thumb_add_raw,
+            resolution,
+            Self::THUMB_CONTACTS,
+            "thumb_opp_mode0_table",
+        );
+        let thumb_abd_table = Self::decode_table(
+            &thumb_abd_raw,
+            resolution,
+            Self::THUMB_CONTACTS,
+            "thumb_opp_mode1_table",
+        );
         let palm_table = Self::decode_palm_table(&palm_raw, Self::PALM_CONTACTS, "palm_table");
 
         Self {
@@ -235,19 +244,31 @@ impl FingerLUT {
         let spec = Self::contact_spec(contact);
         match spec.table {
             ContactTable::Index => {
-                assert!(sample < self.resolution, "sample out of range for index table");
+                assert!(
+                    sample < self.resolution,
+                    "sample out of range for index table"
+                );
                 self.index_table[sample * Self::INDEX_CONTACTS + spec.index]
             }
             ContactTable::Mrl => {
-                assert!(sample < self.resolution, "sample out of range for mrl table");
+                assert!(
+                    sample < self.resolution,
+                    "sample out of range for mrl table"
+                );
                 self.mrl_table[sample * Self::MRL_CONTACTS + spec.index]
             }
             ContactTable::ThumbAdd => {
-                assert!(sample < self.resolution, "sample out of range for thumb add table");
+                assert!(
+                    sample < self.resolution,
+                    "sample out of range for thumb add table"
+                );
                 self.thumb_add_table[sample * Self::THUMB_CONTACTS + spec.index]
             }
             ContactTable::ThumbAbd => {
-                assert!(sample < self.resolution, "sample out of range for thumb abd table");
+                assert!(
+                    sample < self.resolution,
+                    "sample out of range for thumb abd table"
+                );
                 self.thumb_abd_table[sample * Self::THUMB_CONTACTS + spec.index]
             }
             ContactTable::Palm => self.palm_table[spec.index],
@@ -259,7 +280,10 @@ impl FingerLUT {
     }
 
     pub fn get_control(&self, sample: usize) -> f64 {
-        assert!(sample < self.resolution, "sample out of range in get_control");
+        assert!(
+            sample < self.resolution,
+            "sample out of range in get_control"
+        );
         if self.resolution <= 1 {
             0.0
         } else {
@@ -317,7 +341,12 @@ impl FingerLUT {
             .unwrap_or_else(|_| panic!("failed to decode {} as f32 or f64", name))
     }
 
-    fn decode_table(data: &[f64], samples: usize, contacts: usize, name: &str) -> Vec<DualQuaternion> {
+    fn decode_table(
+        data: &[f64],
+        samples: usize,
+        contacts: usize,
+        name: &str,
+    ) -> Vec<DualQuaternion> {
         let expected = samples * contacts * 8;
         assert_eq!(
             data.len(),
@@ -328,7 +357,9 @@ impl FingerLUT {
             expected
         );
 
-        data.chunks_exact(8).map(DualQuaternion::from_slice).collect()
+        data.chunks_exact(8)
+            .map(DualQuaternion::from_slice)
+            .collect()
     }
 
     fn decode_palm_table(data: &[f64], contacts: usize, name: &str) -> Vec<DualQuaternion> {
@@ -342,7 +373,9 @@ impl FingerLUT {
             expected
         );
 
-        data.chunks_exact(8).map(DualQuaternion::from_slice).collect()
+        data.chunks_exact(8)
+            .map(DualQuaternion::from_slice)
+            .collect()
     }
 
     fn contact_spec(contact: Contact) -> ContactSpec {
@@ -473,14 +506,22 @@ mod tests {
         let mut index_table = Vec::new();
         for s in 0..resolution {
             for c in 0..8 {
-                index_table.push(DualQuaternion::from_translation_xyz(s as f64 + c as f64, 0.0, 0.0));
+                index_table.push(DualQuaternion::from_translation_xyz(
+                    s as f64 + c as f64,
+                    0.0,
+                    0.0,
+                ));
             }
         }
 
         let mut mrl_table = Vec::new();
         for s in 0..resolution {
             for c in 0..10 {
-                mrl_table.push(DualQuaternion::from_translation_xyz(100.0 + s as f64 + c as f64, 0.0, 0.0));
+                mrl_table.push(DualQuaternion::from_translation_xyz(
+                    100.0 + s as f64 + c as f64,
+                    0.0,
+                    0.0,
+                ));
             }
         }
 
@@ -488,8 +529,16 @@ mod tests {
         let mut thumb_abd_table = Vec::new();
         for s in 0..resolution {
             for c in 0..3 {
-                thumb_add_table.push(DualQuaternion::from_translation_xyz(200.0 + s as f64 + c as f64, 0.0, 0.0));
-                thumb_abd_table.push(DualQuaternion::from_translation_xyz(300.0 + s as f64 + c as f64, 0.0, 0.0));
+                thumb_add_table.push(DualQuaternion::from_translation_xyz(
+                    200.0 + s as f64 + c as f64,
+                    0.0,
+                    0.0,
+                ));
+                thumb_abd_table.push(DualQuaternion::from_translation_xyz(
+                    300.0 + s as f64 + c as f64,
+                    0.0,
+                    0.0,
+                ));
             }
         }
 

@@ -1,5 +1,5 @@
-use crate::lut_helper::{FingerLUT, FingerType, LutError};
-use crate::pointcloud_helper::{AabbMask, PointCloudProximityChecker, ProximityQuery};
+use crate::lut_helper::{FingerLUT, Contact};
+use crate::pointcloud_helper::Tsdf;
 use nalgebra::Matrix4;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -13,54 +13,19 @@ const ORDERED_FINGERS: [FingerType; 5] = [
 ];
 
 #[derive(Debug, Clone)]
-pub struct PlannerConfig {
-    pub base_transform: Matrix4<f64>,
-    pub collision_tol: f64,
-    pub thumb_opp_sample: usize,
-    pub mask: Option<AabbMask>,
-    pub distal_proximal_offset: f64,
-    pub palmar_dorsal_offset: f64,
+pub struct ScoreResult {
+    pub alignment_score: f64,
+    pub force_closure_score: f64,
+    pub closure_amount: f64,
 }
 
-impl Default for PlannerConfig {
-    fn default() -> Self {
-        Self {
-            base_transform: Matrix4::identity(),
-            collision_tol: 0.005,
-            thumb_opp_sample: 0,
-            mask: None,
-            distal_proximal_offset: 0.0,
-            palmar_dorsal_offset: 0.0,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct PreshapeControls {
-    pub thumb: f64,
-    pub index: f64,
-    pub mrl: f64,
-}
-
-#[derive(Debug, Clone)]
-pub struct PreshapeResult {
-    pub thumb_sample: Option<usize>,
-    pub index_sample: Option<usize>,
-    pub middle_sample: Option<usize>,
-    pub ring_sample: Option<usize>,
-    pub little_sample: Option<usize>,
-    pub controls: PreshapeControls,
-    pub closest_distance: f64,
-    pub used_aabb_mask: bool,
-}
-
-pub fn compute_preshape(
+pub fn get_score(
     lut: &FingerLUT,
-    checker: &PointCloudProximityChecker,
-    config: &PlannerConfig,
-) -> Result<PreshapeResult, LutError> {
-    let closest_distance = Arc::new(Mutex::new(f64::INFINITY));
-    let finger_offset_tf = make_finger_offset_transform(config);
+    checker: &Tsdf,
+    base_transform: &Matrix4<f64>,
+) -> ScoreResult {
+    // this is where i got
+    let closest_distance = Arc::new(Mutex::new(f32::INFINITY));
 
     let collisions: Vec<Option<usize>> = thread::scope(|scope| {
         let mut handles = Vec::new();
@@ -153,13 +118,4 @@ fn sample_to_control(sample: usize, resolution: usize) -> f64 {
         return 0.0;
     }
     sample as f64 / (resolution - 1) as f64
-}
-
-fn make_finger_offset_transform(config: &PlannerConfig) -> Matrix4<f64> {
-    let mut tf = Matrix4::identity();
-    // Local finger axes convention used here:
-    // +X: distal/proximal axis, +Z: palmar/dorsal axis.
-    tf[(0, 3)] = config.distal_proximal_offset;
-    tf[(2, 3)] = config.palmar_dorsal_offset;
-    tf
 }
