@@ -358,7 +358,12 @@ python3 imu_stationary_logger.py \
 ```bash
 cd /Documents/multiview_prosthesis/jetson_folder
 
-python3 plot_imu_csv_quicklook.py \
-  /Documents/multiview_prosthesis/jetson_folder/csv_logging_files/imu_long_test.csv \
-  --max-seconds 300
+python3 plot_imu_csv_quicklook.py /home/robotlab/Documents/multiview_prosthesis/jetson_folder/csv_logging_files/imu_long_test.csv
+```
+
+## The analysis script that reads the CSV and computes the noise stats for the EKF
+```bash
+cd /Documents/multiview_prosthesis/jetson_folder
+
+python3 analyze_imu_noise_stats.py csv_logging_files/imu_long_test.csv
 ```

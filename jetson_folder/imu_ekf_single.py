@@ -248,6 +248,61 @@ def skew_symmetric(vec3):
         [-y,  x,   0.0]
     ], dtype=np.float64)
 
+def compute_expected_gravity_dir_body_from_quat(quat, gravity_world):
+    """
+    Compute expected normalized gravity direction in the body frame
+    from the current quaternion and world gravity vector.
+    """
+    rotation_world_from_body = quat_to_rotmat(quat)
+    rotation_body_from_world = rotation_world_from_body.T
+
+    gravity_dir_world = -gravity_world / np.linalg.norm(gravity_world)
+    expected_dir_body = rotation_body_from_world @ gravity_dir_world
+    expected_dir_body = expected_dir_body / np.linalg.norm(expected_dir_body)
+
+    return expected_dir_body
+
+
+def compute_accel_measurement_jacobian_numerical(quat, gravity_world, eps=1e-6):
+    """
+    Numerical Jacobian of expected gravity direction in body frame
+    with respect to the 3D small-angle attitude error dtheta.
+
+    Returns:
+        H_theta_num shape (3, 3)
+    """
+    expected_dir_body = compute_expected_gravity_dir_body_from_quat(quat, gravity_world)
+
+    H_theta_num = np.zeros((3, 3), dtype=np.float64)
+
+    for axis_index in range(3):
+        dtheta = np.zeros(3, dtype=np.float64)
+        dtheta[axis_index] = eps
+
+        perturbed_quat = apply_small_angle_quat_correction(quat, dtheta)
+        perturbed_expected_dir_body = compute_expected_gravity_dir_body_from_quat(
+            perturbed_quat,
+            gravity_world
+        )
+
+        H_theta_num[:, axis_index] = (
+            perturbed_expected_dir_body - expected_dir_body
+        ) / eps
+
+    return H_theta_num
+
+
+def compute_accel_measurement_jacobian_analytic(quat, gravity_world):
+    """
+    Analytic Jacobian of expected gravity direction in body frame
+    with respect to the 3D small-angle attitude error dtheta.
+
+    This matches the current implementation convention:
+        q <- q * dq
+    """
+    expected_dir_body = compute_expected_gravity_dir_body_from_quat(quat, gravity_world)
+    H_theta_analytic = skew_symmetric(expected_dir_body)
+    return H_theta_analytic
 
 def apply_axis_remap(raw_vec, remap_matrix):
     """
@@ -351,15 +406,24 @@ class ImuEkfState:
         # Accelerometer update settings
         self.accel_update_min_mps2 = 8.0
         self.accel_update_max_mps2 = 11.5
-        self.accel_meas_std = 0.08
 
         # IMU process noise settings
-        # These are reasonable starting values, not final tuned values.
-        self.gyro_noise_std_rps = 0.005
-        self.accel_noise_std_mps2 = 0.15
-        self.gyro_bias_random_walk_std = 0.00005
-        self.accel_bias_random_walk_std = 0.005
-        self.accel_meas_std = 0.05
+            # These values are based on mesurementes from 60 min. test logged with imu_stationary_logger.py
+            # and analysed with analyze_imu_noise_stats.py
+        self.gyro_noise_std_rps = 0.00096
+        self.accel_noise_std_mps2 = 0.0162
+        self.accel_meas_std = 0.0020 #0.00110 is plausible from the stationary data, but with current filter structure it may still be too aggressive
+
+        # These values are based on output from interpret_imu_allan_for_ekf.py which is based on the same 60 min. test as above 
+        # and uses the output from analyze_imu_allan.py.
+        self.gyro_bias_random_walk_std = 4.07e-06
+        self.accel_bias_random_walk_std = 1.05e-04
+
+        # Debug option:
+        # If True, compare analytic vs numerical accel Jacobian occasionally.
+        self.debug_compare_accel_jacobian = False
+        self.debug_compare_accel_jacobian_every_n_updates = 200
+        self.accel_update_counter = 0
 
     def predict_covariance(self, gyro_unbiased_rps, accel_unbiased_mps2, dt):
         """
@@ -512,8 +576,27 @@ class ImuEkfState:
         - roll
         - pitch
 
-        What it does NOT correct:
+        What it does NOT directly correct:
         - yaw
+        - position
+        - velocity
+        - accelerometer bias
+
+        Notes
+        -----
+        We use an observability-consistent update:
+        - gravity direction only constrains tilt
+        - the correction component around the gravity axis is projected out
+        - position, velocity, and accelerometer bias are not directly corrected
+        by this gravity-direction measurement
+
+        Jacobian note
+        -------------
+        The attitude Jacobian below is a first-order small-angle linearization.
+        This is the standard choice in EKF / error-state EKF implementations.
+        For the right-multiplicative quaternion error convention used here
+        (q <- q * dq), the correct sign for the rotated body-frame gravity
+        vector is +skew(expected_dir_body).
         """
         accel_mps2 = imu_sample["accel_mps2"] - self.bias_acc
 
@@ -521,11 +604,14 @@ class ImuEkfState:
         if accel_norm < 1e-12:
             return
 
+        # Only trust accel as gravity direction when close to 1 g
         if not (self.accel_update_min_mps2 <= accel_norm <= self.accel_update_max_mps2):
             return
 
+        # Measured gravity direction in body frame
         measured_dir_body = accel_mps2 / accel_norm
 
+        # Expected gravity direction in body frame from current orientation
         rotation_world_from_body = quat_to_rotmat(self.quat)
         rotation_body_from_world = rotation_world_from_body.T
 
@@ -533,40 +619,90 @@ class ImuEkfState:
         expected_dir_body = rotation_body_from_world @ gravity_dir_world
         expected_dir_body = expected_dir_body / np.linalg.norm(expected_dir_body)
 
-        innovation = measured_dir_body - expected_dir_body
-
-        # Numerical measurement Jacobian H for now.
-        # Later we can replace this with an analytic Jacobian.
-        H = np.zeros((3, 15), dtype=np.float64)
-
-        eps = 1e-6
-        for axis_index in range(3):
-            dtheta = np.zeros(3, dtype=np.float64)
-            dtheta[axis_index] = eps
-
-            perturbed_quat = apply_small_angle_quat_correction(self.quat, dtheta)
-            perturbed_rot_world_from_body = quat_to_rotmat(perturbed_quat)
-            perturbed_rot_body_from_world = perturbed_rot_world_from_body.T
-
-            perturbed_expected_dir_body = perturbed_rot_body_from_world @ gravity_dir_world
-            perturbed_expected_dir_body = (
-                perturbed_expected_dir_body / np.linalg.norm(perturbed_expected_dir_body)
+        # --------------------------------------------------------
+        # Optional debug: compare analytic vs numerical attitude Jacobian
+        # --------------------------------------------------------
+        self.accel_update_counter += 1
+        if (
+            self.debug_compare_accel_jacobian
+            and self.accel_update_counter % self.debug_compare_accel_jacobian_every_n_updates == 0
+        ):
+            H_theta_num = compute_accel_measurement_jacobian_numerical(
+                self.quat,
+                self.gravity_world,
+                eps=1e-6
+            )
+            H_theta_analytic = compute_accel_measurement_jacobian_analytic(
+                self.quat,
+                self.gravity_world
             )
 
-            H[:, 6 + axis_index] = (
-                perturbed_expected_dir_body - expected_dir_body
-            ) / eps
+            H_diff = H_theta_num - H_theta_analytic
+
+            print("\n[Jacobian check] accel gravity-direction Jacobian")
+            print("H_theta_numerical:")
+            print(H_theta_num)
+            print("H_theta_analytic:")
+            print(H_theta_analytic)
+            print("difference (numerical - analytic):")
+            print(H_diff)
+            print("max abs diff:", np.max(np.abs(H_diff)))
+            print("frobenius norm diff:", np.linalg.norm(H_diff))
+            print("-" * 80)
+
+        # Innovation
+        innovation = measured_dir_body - expected_dir_body
+
+        # --------------------------------------------------------
+        # Analytic measurement Jacobian
+        #
+        # First-order small-angle linearization for the chosen
+        # right-multiplicative attitude error convention.
+        #
+        # First-order small-angle linearization of the gravity-direction measurement.
+        # This is the standard EKF / error-state EKF approximation.
+        # The sign depends on the chosen attitude-error convention.
+        # For this implementation we use right-multiplicative correction:
+        #     q <- q * dq
+        # so the attitude Jacobian is +skew(expected_dir_body).
+        # --------------------------------------------------------
+        H = np.zeros((3, 15), dtype=np.float64)
+        H[:, 6:9] = skew_symmetric(expected_dir_body)
 
         R_meas = np.eye(3, dtype=np.float64) * (self.accel_meas_std ** 2)
 
         S = H @ self.cov @ H.T + R_meas
         K = self.cov @ H.T @ np.linalg.inv(S)
 
-        error_state = K @ innovation
+        # --------------------------------------------------------
+        # Observability-consistent correction projection
+        #
+        # Gravity-direction update should not directly correct:
+        # - position
+        # - velocity
+        # - accelerometer bias
+        #
+        # Also, rotation around the gravity direction is unobservable
+        # from gravity alone, so we project that component out of:
+        # - attitude correction
+        # - gyro bias correction
+        # --------------------------------------------------------
+        gravity_axis_body = expected_dir_body / np.linalg.norm(expected_dir_body)
+        tilt_projector = np.eye(3, dtype=np.float64) - np.outer(gravity_axis_body, gravity_axis_body)
 
+        correction_projector = np.zeros((15, 15), dtype=np.float64)
+        correction_projector[6:9, 6:9] = tilt_projector
+        correction_projector[9:12, 9:12] = tilt_projector
+
+        K_eff = correction_projector @ K
+        error_state = K_eff @ innovation
+
+        # --------------------------------------------------------
+        # Joseph covariance update using the same effective gain
+        # --------------------------------------------------------
         identity = np.eye(15, dtype=np.float64)
-        temp = identity - K @ H
-        self.cov = temp @ self.cov @ temp.T + K @ R_meas @ K.T
+        temp = identity - K_eff @ H
+        self.cov = temp @ self.cov @ temp.T + K_eff @ R_meas @ K_eff.T
         self.cov = 0.5 * (self.cov + self.cov.T)
 
         self.inject_error_state(error_state)
@@ -728,6 +864,19 @@ class Mpu9250Reader:
         self.accel_remap_matrix = np.eye(3, dtype=np.float64)
         self.gyro_remap_matrix = np.eye(3, dtype=np.float64)
 
+        # Accelerometer calibration from six-pose static test
+            # made with imu_calibration_logger.py (120 s for the 6 axis aligend poses) 
+            # and analyzed with analyze_accel_six_pose_calibration.py
+        self.accel_bias_vec_mps2 = np.array(
+            [0.060705097, -0.080021347, 0.136866529],
+            dtype=np.float64
+        )
+
+        self.accel_scale_vec = np.array(
+            [0.995836574, 0.996978119, 1.006539360],
+            dtype=np.float64
+        )
+
     def write_u8(self, register_addr, value):
         self.i2c_bus.write_byte_data(self.i2c_addr, register_addr, value)
 
@@ -796,13 +945,24 @@ class Mpu9250Reader:
         accel_y_g = raw_accel_y / 16384.0
         accel_z_g = raw_accel_z / 16384.0
 
+        # Use standard gravity here for raw unit conversion from g to m/s^2.
+        # Do not replace this with local gravity unless the full calibration
+        # pipeline is redone consistently.
+        #
+        # The EKF later estimates/uses the effective local gravity magnitude
+        # from stationary startup data.
         g0 = 9.80665
 
-        accel_mps2 = np.array([
+        accel_mps2_raw = np.array([
             accel_x_g * g0,
             accel_y_g * g0,
             accel_z_g * g0
         ], dtype=np.float64)
+
+        # Apply accelerometer bias and per-axis scale calibration
+        accel_mps2 = (
+            accel_mps2_raw - self.accel_bias_vec_mps2
+        ) / self.accel_scale_vec
 
         gyro_x_dps = raw_gyro_x / 131.0
         gyro_y_dps = raw_gyro_y / 131.0
@@ -824,6 +984,7 @@ class Mpu9250Reader:
         return {
             "timestamp_sec": timestamp_sec,
             "accel_mps2": accel_mps2,
+            "accel_mps2_raw": accel_mps2_raw,
             "gyro_rps": gyro_rps,
             "temperature_c": temperature_c,
             "raw_accel": np.array([raw_accel_x, raw_accel_y, raw_accel_z], dtype=np.int32),
