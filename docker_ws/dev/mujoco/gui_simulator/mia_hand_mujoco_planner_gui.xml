@@ -1,0 +1,11 @@
+<library path="mia_hand_mujoco_planner_gui">
+  <class
+    name="mia_hand_mujoco/PlannerGuiSystemInterface"
+    type="mia_hand_mujoco::PlannerGuiSystemInterface"
+    base_class_type="hardware_interface::SystemInterface">
+
+    <description>
+      Mia Hand MuJoCo system interface with built-in MuJoCo grasp planner UI.
+    </description>
+  </class>
+</library>

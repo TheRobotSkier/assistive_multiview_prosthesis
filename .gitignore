@@ -1,8 +1,12 @@
 build/
 install/
 log/
+docker_ws/dev/mujoco/log/*
+!docker_ws/dev/mujoco/log/.gitkeep
 .env
 .vscode
+.github/
+agent.md
 
 # ignore rust files
 target/
