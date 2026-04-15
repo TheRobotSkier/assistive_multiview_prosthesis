@@ -1,20 +1,18 @@
-use nalgebra::{Matrix4, Quaternion, UnitQuaternion, Vector3};
-use preshaping::lut_helper::FingerLUT;
-use preshaping::planner::{compute_preshape, PlannerConfig, PreshapeResult};
-use preshaping::pointcloud_helper::{AabbMask, PointCloud, PointCloudProximityChecker};
-use preshaping::ros_command_helper::{
-    publish_float64_multi_array_once,
-    publish_joint_trajectory_once,
+use nalgebra::{Matrix4, Vector3};
+use preshaping::lut_helper::{Contact, DualQuaternion, FingerLUT};
+use preshaping::planner::{
+    score_cylindrical, score_lateral, score_pinch, GraspScoreResult, GraspWeights,
 };
-use std::env;
+use preshaping::pointcloud_helper::{get_tsdf, morton, prune, Aabb, PointCloud};
+use preshaping::predictor::{
+    predict_roi_with_samples, read_pose_from_ros2, read_twist_from_ros2, PredictionConfig,
+    SampledPose, Twist6, TwistCovariance,
+};
+use preshaping::ros_command_helper::publish_joint_trajectory_once;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
-
-const TOPIC_POS_FF_THUMB: &str = "/thumb_pos_ff_controller/commands";
-const TOPIC_POS_FF_INDEX: &str = "/index_pos_ff_controller/commands";
-const TOPIC_POS_FF_MRL: &str = "/mrl_pos_ff_controller/commands";
 
 const TOPIC_TRAJECTORY_THUMB: &str = "/thumb_trajectory_controller/joint_trajectory";
 const TOPIC_TRAJECTORY_INDEX: &str = "/index_trajectory_controller/joint_trajectory";
@@ -25,290 +23,45 @@ const JOINT_INDEX: &str = "j_index_fle";
 const JOINT_MRL: &str = "j_mrl_fle";
 
 const TRAJECTORY_COMMAND_TIME_FROM_START_SEC: f64 = 1.0;
-const TOPIC_POINTCLOUD: &str = "/segmented_object_cloud";
 
-const DEFAULT_MUJOCO_RIGHT_HAND_POS_X: f64 = -0.1;
-const DEFAULT_MUJOCO_RIGHT_HAND_POS_Y: f64 = 0.0;
-const DEFAULT_MUJOCO_RIGHT_HAND_POS_Z: f64 = 0.2;
-const DEFAULT_MUJOCO_RIGHT_HAND_QUAT_W: f64 = 0.707388;
-const DEFAULT_MUJOCO_RIGHT_HAND_QUAT_X: f64 = 0.706825;
-const DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Y: f64 = 0.0;
-const DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Z: f64 = 0.0;
+const LUT_PATH: &str = "./data/finger_contact_lut.npz";
+const POSE_TOPIC: &str = "/hand_pose";
+const TWIST_TOPIC: &str = "/hand_twist";
+const POINTCLOUD_TOPIC: &str = "/segmented_object_cloud";
 
-const DEFAULT_CUSTOM_SCENE_OBJECT_POS_X: f64 = -0.1;
-const DEFAULT_CUSTOM_SCENE_OBJECT_POS_Y: f64 = -0.049_912_4;
-const DEFAULT_CUSTOM_SCENE_OBJECT_POS_Z: f64 = 0.310_039_8;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PointCloudMode {
-    File,
-    Ros,
-}
+const TSDF_RESOLUTION_MM: f32 = 5.0;
+const TRUNCATION_CELLS: usize = 4;
+const COLLISION_TOL_MM: f32 = 5.0;
+const HORIZON: f64 = 5.0;
+const SAMPLES: usize = 1000;
+const FREQUENCY_HZ: f64 = 1.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum CommandBackend {
-    Trajectory,
-    PosFf,
+enum Mode {
+    Demo,
+    Normal,
+    OneShot,
 }
 
-#[derive(Debug, Clone)]
-struct CliArgs {
-    mode: PointCloudMode,
-    lut_path: String,
-    xyz_cloud_path: String,
-    pointcloud_topic: String,
-    pointcloud_scale: f64,
-    collision_tol: f64,
-    frequency_hz: f64,
-    iterations: usize,
-    publish_commands: bool,
-    command_backend: CommandBackend,
-    search_base_transform: bool,
-    base_search_step: f64,
-    base_search_span: f64,
-    aabb_mask: Option<AabbMask>,
-    distal_proximal_offset: f64,
-    palmar_dorsal_offset: f64,
-}
-
-impl Default for CliArgs {
-    fn default() -> Self {
-        Self {
-            mode: PointCloudMode::File,
-            lut_path: "./data/finger_tip_lut.npz".to_string(),
-            xyz_cloud_path: "./data/sphere.xyz".to_string(),
-            pointcloud_topic: TOPIC_POINTCLOUD.to_string(),
-            pointcloud_scale: 0.03,
-            collision_tol: 0.005,
-            frequency_hz: 1.0,
-            iterations: 1,
-            publish_commands: false,
-            command_backend: CommandBackend::Trajectory,
-            search_base_transform: false,
-            base_search_step: 0.01,
-            base_search_span: 0.2,
-            aabb_mask: None,
-            distal_proximal_offset: 0.0,
-            palmar_dorsal_offset: 0.0,
-        }
-    }
-}
-
-fn parse_cli_args() -> Result<CliArgs, String> {
-    let mut cfg = CliArgs::default();
-    let mut iter = env::args().skip(1);
-
-    while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--mode" => {
-                let raw = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --mode".to_string())?;
-                cfg.mode = match raw.as_str() {
-                    "file" => PointCloudMode::File,
-                    "ros" => PointCloudMode::Ros,
-                    _ => {
-                        return Err(format!(
-                            "Invalid --mode value '{}'. Supported: file|ros",
-                            raw
-                        ));
-                    }
-                };
-            }
-            "--lut" => {
-                cfg.lut_path = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --lut".to_string())?;
-            }
-            "--cloud" => {
-                cfg.xyz_cloud_path = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --cloud".to_string())?;
-            }
-            "--collision-tol" => {
-                let raw = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --collision-tol".to_string())?;
-                cfg.collision_tol = raw
-                    .parse::<f64>()
-                    .map_err(|e| format!("Invalid --collision-tol value {}: {}", raw, e))?;
-            }
-            "--pointcloud-topic" => {
-                cfg.pointcloud_topic = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --pointcloud-topic".to_string())?;
-            }
-            "--pc-scale" | "--pointcloud-scale" => {
-                let raw = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --pc-scale".to_string())?;
-                cfg.pointcloud_scale = raw
-                    .parse::<f64>()
-                    .map_err(|e| format!("Invalid --pc-scale value {}: {}", raw, e))?;
-            }
-            "--frequency-hz" => {
-                let raw = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --frequency-hz".to_string())?;
-                cfg.frequency_hz = raw
-                    .parse::<f64>()
-                    .map_err(|e| format!("Invalid --frequency-hz value {}: {}", raw, e))?;
-            }
-            "--iterations" => {
-                let raw = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --iterations".to_string())?;
-                cfg.iterations = raw
-                    .parse::<usize>()
-                    .map_err(|e| format!("Invalid --iterations value {}: {}", raw, e))?;
-            }
-            "--publish-commands" => {
-                cfg.publish_commands = true;
-            }
-            "--command-backend" => {
-                let raw = iter
-                    .next()
-                    .ok_or_else(|| "Missing value for --command-backend".to_string())?;
-                cfg.command_backend = match raw.as_str() {
-                    "trajectory" => CommandBackend::Trajectory,
-                    "pos_ff" | "pos-ff" => CommandBackend::PosFf,
-                    _ => {
-                        return Err(format!(
-                            "Invalid --command-backend value '{}'. Supported: trajectory|pos_ff",
-                            raw
-                        ));
-                    }
-                };
-            }
-            "--search-base-transform" => {
-                cfg.search_base_transform = true;
-            }
-            "--base-search-step" => {
-                cfg.base_search_step = parse_next_f64(&mut iter, "--base-search-step")?;
-            }
-            "--base-search-span" => {
-                cfg.base_search_span = parse_next_f64(&mut iter, "--base-search-span")?;
-            }
-            "--aabb" => {
-                let xmin = parse_next_f64(&mut iter, "--aabb xmin")?;
-                let ymin = parse_next_f64(&mut iter, "--aabb ymin")?;
-                let zmin = parse_next_f64(&mut iter, "--aabb zmin")?;
-                let xmax = parse_next_f64(&mut iter, "--aabb xmax")?;
-                let ymax = parse_next_f64(&mut iter, "--aabb ymax")?;
-                let zmax = parse_next_f64(&mut iter, "--aabb zmax")?;
-
-                cfg.aabb_mask = Some(AabbMask {
-                    min: Vector3::new(xmin, ymin, zmin),
-                    max: Vector3::new(xmax, ymax, zmax),
-                });
-            }
-            "--offset-distal-proximal" => {
-                cfg.distal_proximal_offset = parse_next_f64(&mut iter, "--offset-distal-proximal")?;
-            }
-            "--offset-palmar-dorsal" => {
-                cfg.palmar_dorsal_offset = parse_next_f64(&mut iter, "--offset-palmar-dorsal")?;
-            }
-            "--help" | "-h" => {
-                print_usage();
-                std::process::exit(0);
-            }
-            unknown => {
-                return Err(format!("Unknown argument: {}", unknown));
-            }
-        }
-    }
-
-    if cfg.frequency_hz <= 0.0 {
-        return Err("--frequency-hz must be > 0".to_string());
-    }
-
-    if !cfg.pointcloud_scale.is_finite() || cfg.pointcloud_scale <= 0.0 {
-        return Err("--pc-scale must be a finite value > 0".to_string());
-    }
-
-    if !cfg.base_search_step.is_finite() || cfg.base_search_step <= 0.0 {
-        return Err("--base-search-step must be a finite value > 0".to_string());
-    }
-
-    if !cfg.base_search_span.is_finite() || cfg.base_search_span < 0.0 {
-        return Err("--base-search-span must be a finite value >= 0".to_string());
-    }
-
-    if let Some(mask) = cfg.aabb_mask {
-        if mask.min.x > mask.max.x || mask.min.y > mask.max.y || mask.min.z > mask.max.z {
-            return Err(
-                "--aabb requires xmin <= xmax, ymin <= ymax, and zmin <= zmax".to_string(),
+fn parse_mode() -> Mode {
+    let args: Vec<String> = std::env::args().collect();
+    let mode_str = if args.len() > 1 {
+        args[1].as_str()
+    } else {
+        "demo"
+    };
+    match mode_str {
+        "demo" => Mode::Demo,
+        "normal" => Mode::Normal,
+        "one-shot" => Mode::OneShot,
+        other => {
+            eprintln!(
+                "Unknown mode '{}'. Usage: preshaping [demo|normal|one-shot]",
+                other
             );
+            std::process::exit(2);
         }
     }
-
-    Ok(cfg)
-}
-
-fn parse_next_f64(
-    iter: &mut impl Iterator<Item = String>,
-    label: &str,
-) -> Result<f64, String> {
-    let raw = iter
-        .next()
-        .ok_or_else(|| format!("Missing value for {}", label))?;
-    raw.parse::<f64>()
-        .map_err(|e| format!("Invalid value for {} ({}): {}", label, raw, e))
-}
-
-fn print_usage() {
-    println!("Usage: cargo run -- [options]");
-    println!("  --mode file|ros        point cloud source mode (default: file)");
-    println!("  --lut PATH             LUT file (default: ./data/finger_tip_lut.npz)");
-    println!("  --cloud PATH           point cloud .xyz file (default: ./data/sphere.xyz)");
-    println!("  --pointcloud-topic TOPIC point cloud topic for --mode ros (default: /segmented_object_cloud)");
-    println!("  --pc-scale VALUE       isotropic point cloud scale factor (default: 0.03)");
-    println!("  --collision-tol VALUE  collision tolerance in meters (default: 0.005)");
-    println!("  --frequency-hz VALUE   execution frequency in Hz (default: 1.0)");
-    println!("  --iterations N         number of iterations (0 => run forever, default: 1)");
-    println!("  --command-backend trajectory|pos_ff");
-    println!("                         controller command target when --publish-commands is used (default: trajectory)");
-    println!("  Default hand pose matches mia_hand_mujoco/mia_hand/mia_hand_right.xml:");
-    println!("    pos=({:.3}, {:.3}, {:.3}), quat(wxyz)=({:.6}, {:.6}, {:.6}, {:.6})",
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_X,
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_Y,
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_Z,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_W,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_X,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Y,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Z,
-    );
-    println!("  --search-base-transform run a 3D grid search over base translation around the default MuJoCo hand pose");
-    println!("  --base-search-step VALUE  translation increment in meters (default: 0.01)");
-    println!("  --base-search-span VALUE  search span in each axis, [-span,+span] (default: 0.2)");
-    println!("  --aabb xmin ymin zmin xmax ymax zmax");
-    println!("                         limit collision checks to points inside the axis-aligned box");
-    println!("  --offset-distal-proximal VALUE  finger-local X translation in meters");
-    println!("  --offset-palmar-dorsal VALUE    finger-local Z translation in meters");
-    println!("  --publish-commands     publish commands to the selected backend topics");
-}
-
-fn default_mujoco_right_hand_base_transform() -> Matrix4<f64> {
-    let rotation = UnitQuaternion::new_normalize(Quaternion::new(
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_W,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_X,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Y,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Z,
-    ));
-
-    let mut transform = rotation.to_homogeneous();
-    transform[(0, 3)] = DEFAULT_MUJOCO_RIGHT_HAND_POS_X;
-    transform[(1, 3)] = DEFAULT_MUJOCO_RIGHT_HAND_POS_Y;
-    transform[(2, 3)] = DEFAULT_MUJOCO_RIGHT_HAND_POS_Z;
-    transform
-}
-
-fn default_custom_scene_object_transform() -> Matrix4<f64> {
-    let mut transform = Matrix4::identity();
-    transform[(0, 3)] = DEFAULT_CUSTOM_SCENE_OBJECT_POS_X;
-    transform[(1, 3)] = DEFAULT_CUSTOM_SCENE_OBJECT_POS_Y;
-    transform[(2, 3)] = DEFAULT_CUSTOM_SCENE_OBJECT_POS_Z;
-    transform
 }
 
 fn read_ros_pointcloud(topic: &str) -> Result<PointCloud, String> {
@@ -324,7 +77,7 @@ fn read_ros_pointcloud(topic: &str) -> Result<PointCloud, String> {
 
     if !output.status.success() {
         return Err(format!(
-            "ros2 topic echo failed on topic '{}' with code {:?}",
+            "ros2 topic echo failed on '{}' with code {:?}",
             topic,
             output.status.code()
         ));
@@ -332,341 +85,484 @@ fn read_ros_pointcloud(topic: &str) -> Result<PointCloud, String> {
 
     let raw = String::from_utf8(output.stdout)
         .map_err(|e| format!("PointCloud2 output is not valid UTF-8: {}", e))?;
-    let normalized = raw
-        .lines()
-        .skip_while(|line| {
-            let trimmed = line.trim();
-            trimmed.is_empty() || trimmed == "---" || trimmed == "..."
-        })
-        .take_while(|line| {
-            let trimmed = line.trim();
-            trimmed != "---" && trimmed != "..."
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
 
-    PointCloud::from_pointcloud2_yaml(&normalized)
-}
+    let mut width: usize = 0;
+    let mut height: usize = 0;
+    let mut point_step: usize = 0;
+    let mut data_bytes: Vec<u8> = Vec::new();
+    let mut fields: Vec<(String, usize, usize)> = Vec::new();
+    let mut in_fields = false;
+    let mut field_name = String::new();
+    let mut field_offset: usize = 0;
+    let mut field_count: usize = 1;
+    let mut in_data = false;
 
-fn count_collisions(result: &PreshapeResult) -> usize {
-    [
-        result.thumb_sample,
-        result.index_sample,
-        result.middle_sample,
-        result.ring_sample,
-        result.little_sample,
-    ]
-    .iter()
-    .filter(|sample| sample.is_some())
-    .count()
-}
-
-fn select_better_result(
-    best: &(Matrix4<f64>, PreshapeResult),
-    candidate: &(Matrix4<f64>, PreshapeResult),
-) -> bool {
-    let best_collisions = count_collisions(&best.1);
-    let candidate_collisions = count_collisions(&candidate.1);
-    if candidate_collisions != best_collisions {
-        return candidate_collisions > best_collisions;
-    }
-
-    if (candidate.1.closest_distance - best.1.closest_distance).abs() > f64::EPSILON {
-        return candidate.1.closest_distance < best.1.closest_distance;
-    }
-
-    let best_norm_sq = best.0[(0, 3)].powi(2) + best.0[(1, 3)].powi(2) + best.0[(2, 3)].powi(2);
-    let candidate_norm_sq =
-        candidate.0[(0, 3)].powi(2) + candidate.0[(1, 3)].powi(2) + candidate.0[(2, 3)].powi(2);
-    candidate_norm_sq < best_norm_sq
-}
-
-fn search_best_base_transform(
-    lut: &FingerLUT,
-    checker: &PointCloudProximityChecker,
-    planner_cfg: &PlannerConfig,
-    step: f64,
-    span: f64,
-) -> Result<(Matrix4<f64>, PreshapeResult, usize), String> {
-    let cells_per_axis = (span / step).floor() as isize;
-    let mut best: Option<(Matrix4<f64>, PreshapeResult)> = None;
-    let mut evaluated = 0usize;
-
-    for ix in -cells_per_axis..=cells_per_axis {
-        for iy in -cells_per_axis..=cells_per_axis {
-            for iz in -cells_per_axis..=cells_per_axis {
-                let tx = ix as f64 * step;
-                let ty = iy as f64 * step;
-                let tz = iz as f64 * step;
-
-                let mut cfg = planner_cfg.clone();
-                let mut tf = planner_cfg.base_transform;
-                tf[(0, 3)] += tx;
-                tf[(1, 3)] += ty;
-                tf[(2, 3)] += tz;
-                cfg.base_transform = tf;
-
-                let result = compute_preshape(lut, checker, &cfg)
-                    .map_err(|e| format!("Grid-search planning failed: {}", e))?;
-                let candidate = (tf, result);
-                evaluated += 1;
-
-                if let Some(current_best) = &best {
-                    if select_better_result(current_best, &candidate) {
-                        best = Some(candidate);
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("fields:") {
+            in_fields = true;
+            in_data = false;
+            continue;
+        }
+        if trimmed.starts_with("is_bigendian:") {
+            in_fields = false;
+        }
+        if trimmed.starts_with("width:") {
+            let v: usize = trimmed
+                .strip_prefix("width:")
+                .unwrap()
+                .trim()
+                .parse()
+                .unwrap_or(0);
+            width = v;
+        }
+        if trimmed.starts_with("height:") {
+            let v: usize = trimmed
+                .strip_prefix("height:")
+                .unwrap()
+                .trim()
+                .parse()
+                .unwrap_or(0);
+            height = v;
+        }
+        if trimmed.starts_with("point_step:") {
+            let v: usize = trimmed
+                .strip_prefix("point_step:")
+                .unwrap()
+                .trim()
+                .parse()
+                .unwrap_or(0);
+            point_step = v;
+        }
+        if trimmed.starts_with("data:") {
+            in_fields = false;
+            in_data = true;
+            let rest = trimmed.strip_prefix("data:").unwrap().trim();
+            let rest = rest.strip_prefix('[').unwrap_or(rest);
+            let rest = rest.strip_suffix(']').unwrap_or(rest);
+            if !rest.is_empty() {
+                for val in rest.split(',') {
+                    if let Ok(b) = val.trim().parse::<u8>() {
+                        data_bytes.push(b);
                     }
-                } else {
-                    best = Some(candidate);
                 }
+            }
+            continue;
+        }
+        if in_data {
+            let cleaned = trimmed.trim_end_matches(']');
+            for val in cleaned.split(',') {
+                if let Ok(b) = val.trim().parse::<u8>() {
+                    data_bytes.push(b);
+                }
+            }
+            if trimmed.ends_with(']') {
+                in_data = false;
+            }
+            continue;
+        }
+        if in_fields {
+            if let Some(rest) = trimmed.strip_prefix("name:") {
+                field_name = rest.trim().trim_matches('\'').trim_matches('"').to_string();
+            }
+            if let Some(rest) = trimmed.strip_prefix("offset:") {
+                field_offset = rest.trim().parse().unwrap_or(0);
+            }
+            if let Some(rest) = trimmed.strip_prefix("count:") {
+                field_count = rest.trim().parse().unwrap_or(1);
+            }
+            if trimmed.starts_with('-') && !field_name.is_empty() {
+                if field_count == 1 {
+                    fields.push((field_name.clone(), field_offset, field_count));
+                }
+                field_name = String::new();
+                field_offset = 0;
+                field_count = 1;
             }
         }
     }
 
-    let (best_tf, best_result) = best.ok_or_else(|| "Grid search had no candidates".to_string())?;
-    Ok((best_tf, best_result, evaluated))
+    if !field_name.is_empty() && field_count == 1 {
+        fields.push((field_name, field_offset, field_count));
+    }
+
+    let x_off = fields.iter().find(|(n, _, _)| n == "x").map(|(_, o, _)| *o);
+    let y_off = fields.iter().find(|(n, _, _)| n == "y").map(|(_, o, _)| *o);
+    let z_off = fields.iter().find(|(n, _, _)| n == "z").map(|(_, o, _)| *o);
+
+    let (x_off, y_off, z_off) = match (x_off, y_off, z_off) {
+        (Some(x), Some(y), Some(z)) => (x, y, z),
+        _ => return Err("PointCloud2 missing x/y/z fields".into()),
+    };
+
+    if point_step == 0 {
+        return Err("PointCloud2 has point_step=0".into());
+    }
+
+    let n_points = width * height;
+    let mut points = Vec::with_capacity(n_points);
+
+    for i in 0..n_points {
+        let base = i * point_step;
+        if base + z_off + 4 > data_bytes.len() {
+            break;
+        }
+        let x = f32::from_le_bytes([
+            data_bytes[base + x_off],
+            data_bytes[base + x_off + 1],
+            data_bytes[base + x_off + 2],
+            data_bytes[base + x_off + 3],
+        ]);
+        let y = f32::from_le_bytes([
+            data_bytes[base + y_off],
+            data_bytes[base + y_off + 1],
+            data_bytes[base + y_off + 2],
+            data_bytes[base + y_off + 3],
+        ]);
+        let z = f32::from_le_bytes([
+            data_bytes[base + z_off],
+            data_bytes[base + z_off + 1],
+            data_bytes[base + z_off + 2],
+            data_bytes[base + z_off + 3],
+        ]);
+        points.push(Vector3::new(x, y, z));
+    }
+
+    if points.is_empty() {
+        return Err("No valid points parsed from PointCloud2".into());
+    }
+
+    Ok(PointCloud::new(points))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GraspType {
+    Cylindrical,
+    Pinch,
+    Lateral,
+}
+
+impl std::fmt::Display for GraspType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GraspType::Cylindrical => write!(f, "cylindrical"),
+            GraspType::Pinch => write!(f, "pinch"),
+            GraspType::Lateral => write!(f, "lateral"),
+        }
+    }
+}
+
+struct ScoredGrasp {
+    grasp_type: GraspType,
+    sample_pose: DualQuaternion,
+    sample_probability: f64,
+    result: GraspScoreResult,
+    weights: GraspWeights,
+    combined: f64,
+}
+
+type ScorerFn =
+    fn(&FingerLUT, &preshaping::pointcloud_helper::Tsdf, &Matrix4<f64>, f32) -> GraspScoreResult;
+
+struct GraspScorer {
+    grasp_type: GraspType,
+    scorer: ScorerFn,
+    weights: GraspWeights,
+}
+
+fn grasp_scorers() -> Vec<GraspScorer> {
+    vec![
+        GraspScorer {
+            grasp_type: GraspType::Cylindrical,
+            scorer: score_cylindrical,
+            weights: GraspWeights::cylindrical(),
+        },
+        GraspScorer {
+            grasp_type: GraspType::Pinch,
+            scorer: score_pinch,
+            weights: GraspWeights::pinch(),
+        },
+        GraspScorer {
+            grasp_type: GraspType::Lateral,
+            scorer: score_lateral,
+            weights: GraspWeights::lateral(),
+        },
+    ]
+}
+
+fn score_all_samples(
+    lut: &FingerLUT,
+    tsdf: &preshaping::pointcloud_helper::Tsdf,
+    samples: &[SampledPose],
+    collision_tol: f32,
+) -> Vec<ScoredGrasp> {
+    let scorers = grasp_scorers();
+    let mut results = Vec::new();
+
+    for sp in samples {
+        let base_transform = sp.pose.to_se3();
+        for gs in &scorers {
+            let result = (gs.scorer)(lut, tsdf, &base_transform, collision_tol);
+            let combined = result.combined_score(&gs.weights, sp.sample_probability);
+            results.push(ScoredGrasp {
+                grasp_type: gs.grasp_type,
+                sample_pose: sp.pose,
+                sample_probability: sp.sample_probability,
+                result,
+                weights: gs.weights,
+                combined,
+            });
+        }
+    }
+
+    results
+}
+
+fn select_best_grasp(scored: &[ScoredGrasp]) -> &ScoredGrasp {
+    scored
+        .iter()
+        .max_by(|a, b| {
+            a.combined
+                .partial_cmp(&b.combined)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .expect("at least one grasp")
+}
+
+fn print_aabb(label: &str, aabb: &Aabb) {
+    let size = aabb.max - aabb.min;
+    println!(
+        "  {} min=({:.4}, {:.4}, {:.4}) max=({:.4}, {:.4}, {:.4}) size=({:.4}, {:.4}, {:.4})",
+        label,
+        aabb.min.x,
+        aabb.min.y,
+        aabb.min.z,
+        aabb.max.x,
+        aabb.max.y,
+        aabb.max.z,
+        size.x,
+        size.y,
+        size.z,
+    );
+}
+
+fn identity_pose() -> DualQuaternion {
+    DualQuaternion::from_se3(&Matrix4::identity())
+}
+
+fn run_iteration(lut: &FingerLUT, mode: Mode, pred_config: &PredictionConfig, iter_idx: usize) {
+    let current_pose = match mode {
+        Mode::Demo => identity_pose(),
+        Mode::Normal | Mode::OneShot => read_pose_from_ros2(POSE_TOPIC).unwrap_or_else(|e| {
+            eprintln!("Failed to read pose from ROS2: {}", e);
+            std::process::exit(1);
+        }),
+    };
+
+    let (roi, samples) = match mode {
+        Mode::Demo => predict_roi_with_samples(
+            &current_pose,
+            &Twist6::dummy(),
+            &TwistCovariance::dummy(),
+            &lut.get_location(Contact::IndexTip, 0.0),
+            pred_config,
+        ),
+        Mode::Normal | Mode::OneShot => {
+            let twist_and_cov = read_twist_from_ros2(TWIST_TOPIC).unwrap_or_else(|e| {
+                eprintln!("Failed to read twist from ROS2: {}", e);
+                std::process::exit(1);
+            });
+            predict_roi_with_samples(
+                &current_pose,
+                &twist_and_cov.twist,
+                &twist_and_cov.covariance,
+                &lut.get_location(Contact::IndexTip, 0.0),
+                pred_config,
+            )
+        }
+    };
+
+    println!("[iter {}] Predicted ROI:", iter_idx);
+    print_aabb("ROI", &roi);
+    println!(
+        "[iter {}] Generated {} candidate grasp poses",
+        iter_idx,
+        samples.len()
+    );
+
+    let pc = match mode {
+        Mode::Demo => {
+            let center = current_pose.location();
+            PointCloud::demo_sphere(
+                Vector3::new(center.x as f32, center.y as f32, center.z as f32 + 0.05),
+                0.02,
+                5000,
+            )
+        }
+        Mode::Normal | Mode::OneShot => read_ros_pointcloud(POINTCLOUD_TOPIC).unwrap_or_else(|e| {
+            eprintln!("Failed to read PointCloud2: {}", e);
+            std::process::exit(1);
+        }),
+    };
+
+    println!("[iter {}] Point cloud: {} points", iter_idx, pc.len());
+
+    let pruned = prune(&pc, Some(roi));
+    let n_pruned = pruned.len();
+    println!(
+        "[iter {}] Points in ROI (used for TSDF): {}",
+        iter_idx, n_pruned
+    );
+
+    let tsdf = if pruned.is_empty() {
+        eprintln!(
+            "[iter {}] Warning: no points in ROI, skipping scoring",
+            iter_idx
+        );
+        return;
+    } else {
+        let (morton_arr, offsets, start) = morton(&pruned, TSDF_RESOLUTION_MM);
+        get_tsdf(
+            &morton_arr,
+            &offsets,
+            TRUNCATION_CELLS,
+            start,
+            TSDF_RESOLUTION_MM,
+            &[],
+        )
+    };
+
+    let collision_tol = COLLISION_TOL_MM / 1000.0;
+
+    let scoring_start = Instant::now();
+    let scored = score_all_samples(lut, &tsdf, &samples, collision_tol);
+
+    println!(
+        "[iter {}] Scored {} (sample, grasp) combinations",
+        iter_idx,
+        scored.len()
+    );
+    for sg in &scored {
+        println!(
+            "  {}: closure={:.4} alignment={:.4} force_closure={:.4} prob={:.4} combined={:.4}",
+            sg.grasp_type,
+            sg.result.closure_amount,
+            sg.result.alignment_score,
+            sg.result.force_closure_score,
+            sg.sample_probability,
+            sg.combined,
+        );
+    }
+
+    let best = select_best_grasp(&scored);
+    let best_loc = best.sample_pose.location();
+    println!(
+        "[iter {}] Best: {} at ({:.4}, {:.4}, {:.4}) combined={:.4} (closure={:.4}, alignment={:.4}, prob={:.4})",
+        iter_idx,
+        best.grasp_type,
+        best_loc.x,
+        best_loc.y,
+        best_loc.z,
+        best.combined,
+        best.result.closure_amount,
+        best.result.alignment_score,
+        best.sample_probability,
+    );
+    println!(
+        "[iter {}] Scoring time: {:.2?}",
+        iter_idx,
+        scoring_start.elapsed()
+    );
+
+    if mode == Mode::Normal || mode == Mode::OneShot {
+        let ctrl = best.result.closure_amount;
+        publish_joint_trajectory_once(
+            TOPIC_TRAJECTORY_THUMB,
+            JOINT_THUMB,
+            ctrl,
+            TRAJECTORY_COMMAND_TIME_FROM_START_SEC,
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        });
+        publish_joint_trajectory_once(
+            TOPIC_TRAJECTORY_INDEX,
+            JOINT_INDEX,
+            ctrl,
+            TRAJECTORY_COMMAND_TIME_FROM_START_SEC,
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        });
+        publish_joint_trajectory_once(
+            TOPIC_TRAJECTORY_MRL,
+            JOINT_MRL,
+            ctrl,
+            TRAJECTORY_COMMAND_TIME_FROM_START_SEC,
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("{}", e);
+            std::process::exit(1);
+        });
+        println!("[iter {}] Published trajectory commands.", iter_idx);
+    }
 }
 
 fn main() {
-    let cli = parse_cli_args().unwrap_or_else(|e| {
-        eprintln!("{}", e);
-        print_usage();
-        std::process::exit(2);
-    });
+    let mode = parse_mode();
+    println!("Mode: {:?}", mode);
 
     let now = Instant::now();
-    let lut = FingerLUT::load(&cli.lut_path).unwrap_or_else(|e| {
-        eprintln!("Failed to load LUT file: {}", e);
-        std::process::exit(1);
-    });
-    println!("\nLUT loaded with resolution: {}", lut.get_resolution());
-    println!("Available fingers: {:?}", lut.get_available_fingers());
+    let lut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| FingerLUT::load(LUT_PATH)))
+        .unwrap_or_else(|_| {
+            eprintln!("Failed to load LUT file: {}", LUT_PATH);
+            std::process::exit(1);
+        });
+    println!("LUT loaded: resolution={}", lut.get_resolution());
 
-    let mut planner_cfg = PlannerConfig::default();
-    planner_cfg.collision_tol = cli.collision_tol;
-    if let Some(mask) = cli.aabb_mask {
-        println!(
-            "Using AABB mask: min=({:.4}, {:.4}, {:.4}), max=({:.4}, {:.4}, {:.4})",
-            mask.min.x,
-            mask.min.y,
-            mask.min.z,
-            mask.max.x,
-            mask.max.y,
-            mask.max.z,
-        );
-    }
-    planner_cfg.mask = cli.aabb_mask;
-    planner_cfg.distal_proximal_offset = cli.distal_proximal_offset;
-    planner_cfg.palmar_dorsal_offset = cli.palmar_dorsal_offset;
-    planner_cfg.base_transform = default_mujoco_right_hand_base_transform();
-
+    let index_tip_local = lut.get_location(Contact::IndexTip, 0.0);
     println!(
-        "Using hardcoded MuJoCo default hand pose: pos=({:.3}, {:.3}, {:.3}), quat(wxyz)=({:.6}, {:.6}, {:.6}, {:.6})",
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_X,
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_Y,
-        DEFAULT_MUJOCO_RIGHT_HAND_POS_Z,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_W,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_X,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Y,
-        DEFAULT_MUJOCO_RIGHT_HAND_QUAT_Z,
+        "Index tip local (open hand): ({:.4}, {:.4}, {:.4})",
+        index_tip_local.x, index_tip_local.y, index_tip_local.z
     );
 
-    if cli.publish_commands {
-        println!(
-            "Command publishing backend: {}",
-            match cli.command_backend {
-                CommandBackend::Trajectory => "trajectory",
-                CommandBackend::PosFf => "pos_ff",
-            }
-        );
-    }
+    let pred_config = PredictionConfig {
+        t_max: HORIZON,
+        n_samples: SAMPLES,
+        ..Default::default()
+    };
 
-    println!("Time taken for setup: {:.2?}", now.elapsed());
-    let period = Duration::from_secs_f64(1.0 / cli.frequency_hz);
-    let run_forever = cli.iterations == 0;
-    let mut iter_idx: usize = 0;
+    println!("Setup time: {:.2?}", now.elapsed());
 
-    loop {
-        if !run_forever && iter_idx >= cli.iterations {
-            break;
+    match mode {
+        Mode::Demo => {
+            run_iteration(&lut, mode, &pred_config, 1);
+            println!("[iter 1] Total time: {:.2?}", now.elapsed());
         }
-        iter_idx += 1;
-
-        let tick_start = Instant::now();
-
-        let pc = match cli.mode {
-            PointCloudMode::File => PointCloud::from_xyz_file(&cli.xyz_cloud_path).unwrap_or_else(|e| {
-                eprintln!(
-                    "Failed to load point cloud from '{}': {}",
-                    cli.xyz_cloud_path,
-                    e
-                );
-                std::process::exit(1);
-            }),
-            PointCloudMode::Ros => read_ros_pointcloud(&cli.pointcloud_topic).unwrap_or_else(|e| {
-                eprintln!("Failed to read PointCloud2 from ROS topic: {}", e);
-                std::process::exit(1);
-            }),
-        };
-
-        let pc = pc.scaled(cli.pointcloud_scale);
-        let pc = match cli.mode {
-            PointCloudMode::File => {
-                let transform = default_custom_scene_object_transform();
-                println!(
-                    "[iter {}] Applying fixed file-cloud world translation: x={:.4}, y={:.4}, z={:.4}",
-                    iter_idx,
-                    transform[(0, 3)],
-                    transform[(1, 3)],
-                    transform[(2, 3)],
-                );
-                pc.transformed(&transform)
-            }
-            PointCloudMode::Ros => pc,
-        };
-
-        println!(
-            "[iter {}] Point cloud loaded with {} points (scale {:.6})",
-            iter_idx,
-            pc.len(),
-            cli.pointcloud_scale
-        );
-        let checker = PointCloudProximityChecker::new(pc);
-
-        let collision_start = Instant::now();
-
-        let (active_base_tf, result, evaluated_candidates) = if cli.search_base_transform {
-            search_best_base_transform(
-                &lut,
-                &checker,
-                &planner_cfg,
-                cli.base_search_step,
-                cli.base_search_span,
-            )
-            .map(|(tf, res, n)| (tf, res, n))
-            .unwrap_or_else(|e| {
-                eprintln!("Base-transform grid search failed: {}", e);
-                std::process::exit(1);
-            })
-        } else {
-            let res = compute_preshape(&lut, &checker, &planner_cfg).unwrap_or_else(|e| {
-                eprintln!("Planning failed: {}", e);
-                std::process::exit(1);
-            });
-            (planner_cfg.base_transform, res, 1)
-        };
-
-        println!(
-            "[iter {}] Time taken for collision checking: {:.2?}",
-            iter_idx,
-            collision_start.elapsed()
-        );
-        println!(
-            "[iter {}] Base transform search candidates evaluated: {}",
-            iter_idx, evaluated_candidates
-        );
-        println!(
-            "[iter {}] Active base translation: x={:.4}, y={:.4}, z={:.4}",
-            iter_idx,
-            active_base_tf[(0, 3)],
-            active_base_tf[(1, 3)],
-            active_base_tf[(2, 3)]
-        );
-        println!(
-            "[iter {}] Finger collisions in best result: {}/5",
-            iter_idx,
-            count_collisions(&result)
-        );
-        println!("Closest distance found: {:.4} m", result.closest_distance);
-        println!(
-            "Collision samples: thumb={:?}, index={:?}, middle={:?}, ring={:?}, little={:?}",
-            result.thumb_sample,
-            result.index_sample,
-            result.middle_sample,
-            result.ring_sample,
-            result.little_sample
-        );
-        println!(
-            "AABB mask active: {}",
-            if result.used_aabb_mask { "yes" } else { "no (full cloud)" }
-        );
-        println!(
-            "Selected controls: thumb={:.4}, index={:.4}, mrl={:.4}",
-            result.controls.thumb,
-            result.controls.index,
-            result.controls.mrl
-        );
-
-        if cli.publish_commands {
-            match cli.command_backend {
-                CommandBackend::Trajectory => {
-                    publish_joint_trajectory_once(
-                        TOPIC_TRAJECTORY_THUMB,
-                        JOINT_THUMB,
-                        result.controls.thumb,
-                        TRAJECTORY_COMMAND_TIME_FROM_START_SEC,
-                    )
-                    .unwrap_or_else(|e| {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    });
-                    publish_joint_trajectory_once(
-                        TOPIC_TRAJECTORY_INDEX,
-                        JOINT_INDEX,
-                        result.controls.index,
-                        TRAJECTORY_COMMAND_TIME_FROM_START_SEC,
-                    )
-                    .unwrap_or_else(|e| {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    });
-                    publish_joint_trajectory_once(
-                        TOPIC_TRAJECTORY_MRL,
-                        JOINT_MRL,
-                        result.controls.mrl,
-                        TRAJECTORY_COMMAND_TIME_FROM_START_SEC,
-                    )
-                    .unwrap_or_else(|e| {
-                        eprintln!("{}", e);
-                        std::process::exit(1);
-                    });
-                    println!("Published trajectory commands to controller topics.");
-                }
-                CommandBackend::PosFf => {
-                    publish_float64_multi_array_once(TOPIC_POS_FF_THUMB, result.controls.thumb)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(1);
-                        });
-                    publish_float64_multi_array_once(TOPIC_POS_FF_INDEX, result.controls.index)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(1);
-                        });
-                    publish_float64_multi_array_once(TOPIC_POS_FF_MRL, result.controls.mrl)
-                        .unwrap_or_else(|e| {
-                            eprintln!("{}", e);
-                            std::process::exit(1);
-                        });
-                    println!("Published pos_ff commands to controller topics.");
+        Mode::Normal => {
+            let period = Duration::from_secs_f64(1.0 / FREQUENCY_HZ);
+            let mut iter_idx: usize = 0;
+            loop {
+                iter_idx += 1;
+                let tick_start = Instant::now();
+                run_iteration(&lut, mode, &pred_config, iter_idx);
+                let elapsed = tick_start.elapsed();
+                println!("[iter {}] Total time: {:.2?}", iter_idx, elapsed);
+                if elapsed < period {
+                    thread::sleep(period - elapsed);
+                } else {
+                    eprintln!(
+                        "Loop overrun: {:.2?} exceeds period {:.2?}",
+                        elapsed, period
+                    );
                 }
             }
-        } else {
-            println!("Dry-run only. Use --publish-commands to send commands.");
         }
-
-        let elapsed = tick_start.elapsed();
-        println!(
-            "[iter {}] Total time for iteration: {:.2?}",
-            iter_idx, elapsed
-        );
-        if elapsed < period {
-            thread::sleep(period - elapsed);
-        } else {
-            eprintln!(
-                "Loop overrun: compute took {:.2?} which exceeds period {:.2?}",
-                elapsed,
-                period
-            );
+        Mode::OneShot => {
+            run_iteration(&lut, mode, &pred_config, 1);
+            println!("[iter 1] Total time: {:.2?}", now.elapsed());
         }
     }
 }

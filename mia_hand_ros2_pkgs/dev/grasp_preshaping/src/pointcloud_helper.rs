@@ -19,6 +19,67 @@ impl Aabb {
             && p.z >= self.min.z
             && p.z <= self.max.z
     }
+
+    pub fn from_points(points: &[Vector3<f32>]) -> Self {
+        assert!(
+            !points.is_empty(),
+            "cannot compute AABB from empty point set"
+        );
+        let mut min = points[0];
+        let mut max = points[0];
+        for p in &points[1..] {
+            min.x = min.x.min(p.x);
+            min.y = min.y.min(p.y);
+            min.z = min.z.min(p.z);
+            max.x = max.x.max(p.x);
+            max.y = max.y.max(p.y);
+            max.z = max.z.max(p.z);
+        }
+        Self { min, max }
+    }
+
+    pub fn inflate(&mut self, radius: f32) {
+        self.min.x -= radius;
+        self.min.y -= radius;
+        self.min.z -= radius;
+        self.max.x += radius;
+        self.max.y += radius;
+        self.max.z += radius;
+    }
+
+    pub fn enforce_min_dims(&mut self, min_dims: &Vector3<f32>) {
+        let center = (self.min + self.max) * 0.5;
+        let half = (self.max - self.min) * 0.5;
+
+        let new_half = Vector3::new(
+            half.x.max(min_dims.x * 0.5),
+            half.y.max(min_dims.y * 0.5),
+            half.z.max(min_dims.z * 0.5),
+        );
+
+        self.min = center - new_half;
+        self.max = center + new_half;
+    }
+
+    pub fn clip_max_dims(&mut self, max_dims: &Vector3<f32>, anchor: &Vector3<f32>) {
+        for (axis, max_dim) in [(0, max_dims.x), (1, max_dims.y), (2, max_dims.z)] {
+            let size = self.max[axis] - self.min[axis];
+            if size <= max_dim {
+                continue;
+            }
+            let a = anchor[axis];
+            let lo = self.min[axis];
+            let hi = self.max[axis];
+            if a >= lo && a <= lo + max_dim {
+                self.max[axis] = lo + max_dim;
+            } else if a >= hi - max_dim && a <= hi {
+                self.min[axis] = hi - max_dim;
+            } else {
+                self.min[axis] = a - max_dim * 0.5;
+                self.max[axis] = a + max_dim * 0.5;
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -42,6 +103,50 @@ impl PointCloud {
 
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
+    }
+
+    pub fn from_xyz_file(path: &str) -> Result<Self, String> {
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read '{}': {}", path, e))?;
+        let mut points = Vec::new();
+        for (line_num, line) in content.lines().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            if parts.len() < 3 {
+                continue;
+            }
+            let x: f32 = parts[0]
+                .parse()
+                .map_err(|e| format!("{}:{}: invalid x: {}", path, line_num + 1, e))?;
+            let y: f32 = parts[1]
+                .parse()
+                .map_err(|e| format!("{}:{}: invalid y: {}", path, line_num + 1, e))?;
+            let z: f32 = parts[2]
+                .parse()
+                .map_err(|e| format!("{}:{}: invalid z: {}", path, line_num + 1, e))?;
+            points.push(Vector3::new(x, y, z));
+        }
+        if points.is_empty() {
+            return Err(format!("No valid points found in '{}'", path));
+        }
+        Ok(Self { points })
+    }
+
+    pub fn demo_sphere(center: Vector3<f32>, radius: f32, n_points: usize) -> Self {
+        let mut points = Vec::with_capacity(n_points);
+        let golden_ratio = (1.0 + 5f32.sqrt()) / 2.0;
+        for i in 0..n_points {
+            let theta = 2.0 * std::f32::consts::PI * (i as f32 / golden_ratio);
+            let phi = (1.0 - 2.0 * (i as f32 + 0.5) / n_points as f32).acos();
+            let x = center.x + radius * phi.sin() * theta.cos();
+            let y = center.y + radius * phi.sin() * theta.sin();
+            let z = center.z + radius * phi.cos();
+            points.push(Vector3::new(x, y, z));
+        }
+        Self { points }
     }
 }
 
@@ -526,5 +631,164 @@ mod tests {
             "normal should point roughly in +x away from surface, dot = {}",
             dot
         );
+    }
+
+    #[test]
+    fn aabb_from_points_computes_bounds() {
+        let points = vec![
+            Vector3::new(1.0, 2.0, 3.0),
+            Vector3::new(-1.0, 5.0, 0.0),
+            Vector3::new(4.0, 1.0, 7.0),
+        ];
+        let aabb = Aabb::from_points(&points);
+        assert_eq!(aabb.min.x, -1.0);
+        assert_eq!(aabb.min.y, 1.0);
+        assert_eq!(aabb.min.z, 0.0);
+        assert_eq!(aabb.max.x, 4.0);
+        assert_eq!(aabb.max.y, 5.0);
+        assert_eq!(aabb.max.z, 7.0);
+    }
+
+    #[test]
+    fn aabb_inflate_expands_uniformly() {
+        let aabb = Aabb {
+            min: Vector3::new(0.0, 0.0, 0.0),
+            max: Vector3::new(1.0, 1.0, 1.0),
+        };
+        let mut aabb = aabb;
+        aabb.inflate(0.5);
+        assert_eq!(aabb.min.x, -0.5);
+        assert_eq!(aabb.max.x, 1.5);
+        assert_eq!(aabb.min.y, -0.5);
+        assert_eq!(aabb.max.z, 1.5);
+    }
+
+    #[test]
+    fn aabb_enforce_min_dims_centers_when_too_small() {
+        let aabb = Aabb {
+            min: Vector3::new(0.0, 0.0, 0.0),
+            max: Vector3::new(0.01, 0.01, 0.01),
+        };
+        let mut aabb = aabb;
+        aabb.enforce_min_dims(&Vector3::new(0.1, 0.1, 0.1));
+        let size = aabb.max - aabb.min;
+        assert!((size.x - 0.1).abs() < 1e-6);
+        assert!((size.y - 0.1).abs() < 1e-6);
+        assert!((size.z - 0.1).abs() < 1e-6);
+        let center = (aabb.min + aabb.max) * 0.5;
+        assert!((center.x - 0.005).abs() < 1e-6);
+    }
+
+    #[test]
+    fn prune_and_build_tsdf_in_roi() {
+        let pc = PointCloud::new(vec![
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(10.0, 10.0, 10.0),
+            Vector3::new(100.0, 100.0, 100.0),
+        ]);
+        let roi = Aabb {
+            min: Vector3::new(-1.0, -1.0, -1.0),
+            max: Vector3::new(11.0, 11.0, 11.0),
+        };
+        let pruned = prune(&pc, Some(roi));
+        assert_eq!(pruned.len(), 2);
+        let (morton_arr, offsets, start) = morton(&pruned, 1.0);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 3, start, 1.0, &[]);
+        let d0 = tsdf.get_distance(0.0, 0.0, 0.0);
+        let d10 = tsdf.get_distance(10.0, 10.0, 10.0);
+        assert!(
+            d0.abs() < 0.01,
+            "surface point should have ~0 distance, got {}",
+            d0
+        );
+        assert!(
+            d10.abs() < 0.01,
+            "surface point should have ~0 distance, got {}",
+            d10
+        );
+    }
+
+    #[test]
+    fn prune_empty_yields_no_tsdf_points() {
+        let pc = PointCloud::new(vec![Vector3::new(100.0, 100.0, 100.0)]);
+        let roi = Aabb {
+            min: Vector3::new(0.0, 0.0, 0.0),
+            max: Vector3::new(1.0, 1.0, 1.0),
+        };
+        let pruned = prune(&pc, Some(roi));
+        assert!(pruned.is_empty());
+    }
+
+    #[test]
+    fn aabb_clip_max_dims_no_clip_when_within() {
+        let mut aabb = Aabb {
+            min: Vector3::new(0.0, 0.0, 0.0),
+            max: Vector3::new(0.1, 0.1, 0.1),
+        };
+        let anchor = Vector3::new(0.05, 0.05, 0.05);
+        aabb.clip_max_dims(&Vector3::new(0.3, 0.3, 0.3), &anchor);
+        assert!((aabb.max.x - 0.1).abs() < 1e-6);
+        assert!((aabb.min.x - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn aabb_clip_max_dims_clips_anchored_at_min() {
+        let mut aabb = Aabb {
+            min: Vector3::new(0.0, 0.0, 0.0),
+            max: Vector3::new(1.0, 1.0, 1.0),
+        };
+        let anchor = Vector3::new(0.0, 0.0, 0.0);
+        aabb.clip_max_dims(&Vector3::new(0.3, 0.3, 0.3), &anchor);
+        assert!((aabb.max.x - 0.3).abs() < 1e-6, "max.x = {}", aabb.max.x);
+        assert!((aabb.min.x - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn aabb_clip_max_dims_clips_anchored_at_max() {
+        let mut aabb = Aabb {
+            min: Vector3::new(0.0, 0.0, 0.0),
+            max: Vector3::new(1.0, 1.0, 1.0),
+        };
+        let anchor = Vector3::new(1.0, 1.0, 1.0);
+        aabb.clip_max_dims(&Vector3::new(0.3, 0.3, 0.3), &anchor);
+        assert!((aabb.min.x - 0.7).abs() < 1e-6, "min.x = {}", aabb.min.x);
+        assert!((aabb.max.x - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn aabb_clip_max_dims_centers_on_anchor_when_middle() {
+        let mut aabb = Aabb {
+            min: Vector3::new(-1.0, -1.0, -1.0),
+            max: Vector3::new(1.0, 1.0, 1.0),
+        };
+        let anchor = Vector3::new(0.0, 0.0, 0.0);
+        aabb.clip_max_dims(&Vector3::new(0.2, 0.2, 0.2), &anchor);
+        assert!((aabb.min.x - (-0.1)).abs() < 1e-6, "min.x = {}", aabb.min.x);
+        assert!((aabb.max.x - 0.1).abs() < 1e-6, "max.x = {}", aabb.max.x);
+    }
+
+    #[test]
+    fn from_xyz_file_loads_sphere() {
+        let pc = PointCloud::from_xyz_file("./data/sphere.xyz").unwrap();
+        assert!(pc.len() > 100, "sphere.xyz should have many points");
+        for p in &pc.points {
+            assert!(p.x.is_finite() && p.y.is_finite() && p.z.is_finite());
+        }
+    }
+
+    #[test]
+    fn from_xyz_file_missing_file_returns_error() {
+        let result = PointCloud::from_xyz_file("./data/nonexistent.xyz");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn demo_sphere_generates_points() {
+        let pc = PointCloud::demo_sphere(Vector3::new(0.1, 0.2, 0.3), 0.05, 100);
+        assert_eq!(pc.len(), 100);
+        let center = pc.points.iter().fold(Vector3::zeros(), |acc, p| acc + p) / pc.len() as f32;
+        assert!((center.x - 0.1).abs() < 0.01, "center x = {}", center.x);
+        assert!((center.y - 0.2).abs() < 0.01, "center y = {}", center.y);
+        assert!((center.z - 0.3).abs() < 0.01, "center z = {}", center.z);
     }
 }

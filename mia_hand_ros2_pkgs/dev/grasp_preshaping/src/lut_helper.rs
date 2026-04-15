@@ -1,4 +1,4 @@
-use nalgebra::{Matrix4, Quaternion, UnitQuaternion, Vector3};
+use nalgebra::{Matrix4, Quaternion, Rotation3, UnitQuaternion, Vector3, Vector4};
 use npyz::npz::NpzArchive;
 use std::io::{Read, Seek};
 
@@ -78,6 +78,54 @@ impl DualQuaternion {
         };
         dq.normalize_in_place();
         dq
+    }
+
+    pub fn identity() -> Self {
+        Self {
+            real: [1.0, 0.0, 0.0, 0.0],
+            dual: [0.0, 0.0, 0.0, 0.0],
+        }
+    }
+
+    pub fn multiply(&self, other: &DualQuaternion) -> DualQuaternion {
+        let qr1 = Quaternion::new(self.real[0], self.real[1], self.real[2], self.real[3]);
+        let qd1 = Quaternion::new(self.dual[0], self.dual[1], self.dual[2], self.dual[3]);
+        let qr2 = Quaternion::new(other.real[0], other.real[1], other.real[2], other.real[3]);
+        let qd2 = Quaternion::new(other.dual[0], other.dual[1], other.dual[2], other.dual[3]);
+
+        let qr_out = qr1 * qr2;
+        let qd_out = qr1 * qd2 + qd1 * qr2;
+
+        let mut dq = DualQuaternion {
+            real: [qr_out.w, qr_out.i, qr_out.j, qr_out.k],
+            dual: [qd_out.w, qd_out.i, qd_out.j, qd_out.k],
+        };
+        dq.normalize_in_place();
+        dq
+    }
+
+    pub fn from_se3(m: &Matrix4<f64>) -> Self {
+        let rot = m.fixed_view::<3, 3>(0, 0);
+        let rot3 = Rotation3::from_matrix_unchecked(rot.clone_owned());
+        let uq = UnitQuaternion::from_rotation_matrix(&rot3);
+        let qr = uq.quaternion();
+
+        let tx = m[(0, 3)];
+        let ty = m[(1, 3)];
+        let tz = m[(2, 3)];
+        let t_pure = Quaternion::new(0.0, tx, ty, tz);
+        let qd = t_pure * qr * 0.5;
+
+        Self {
+            real: [qr.w, qr.i, qr.j, qr.k],
+            dual: [qd.w, qd.i, qd.j, qd.k],
+        }
+    }
+
+    pub fn transform_point(&self, p: &Vector3<f64>) -> Vector3<f64> {
+        let se3 = self.to_se3();
+        let homo = se3 * Vector4::new(p.x, p.y, p.z, 1.0);
+        Vector3::new(homo.x, homo.y, homo.z)
     }
 
     fn normalize_in_place(&mut self) {
@@ -499,6 +547,7 @@ impl FingerLUT {
 #[cfg(test)]
 mod tests {
     use super::{Contact, DualQuaternion, FingerLUT};
+    use nalgebra::{Matrix4, UnitQuaternion, Vector3, Vector4};
 
     fn build_test_lut() -> FingerLUT {
         let resolution = 5;
@@ -605,5 +654,76 @@ mod tests {
         let add = lut.get_location_sample(Contact::ThumbAddTip, 2);
         let abd = lut.get_location_sample(Contact::ThumbAbdTip, 2);
         assert!(abd[0] > add[0]);
+    }
+
+    #[test]
+    fn identity_multiply_is_noop() {
+        let a = DualQuaternion::from_translation_xyz(1.0, 2.0, 3.0);
+        let id = DualQuaternion::identity();
+        let result = a.multiply(&id);
+        let loc = result.location();
+        assert!((loc[0] - 1.0).abs() < 1e-9);
+        assert!((loc[1] - 2.0).abs() < 1e-9);
+        assert!((loc[2] - 3.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn multiply_composes_translations() {
+        let a = DualQuaternion::from_translation_xyz(1.0, 0.0, 0.0);
+        let b = DualQuaternion::from_translation_xyz(0.0, 2.0, 0.0);
+        let result = a.multiply(&b);
+        let loc = result.location();
+        assert!((loc[0] - 1.0).abs() < 1e-9);
+        assert!((loc[1] - 2.0).abs() < 1e-9);
+        assert!((loc[2] - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn from_se3_to_se3_roundtrip() {
+        let mut m = Matrix4::identity();
+        m[(0, 3)] = 1.5;
+        m[(1, 3)] = -2.0;
+        m[(2, 3)] = 0.5;
+        let rot = UnitQuaternion::from_euler_angles(0.3, 0.5, 0.7);
+        m.fixed_view_mut::<3, 3>(0, 0)
+            .copy_from(rot.to_rotation_matrix().matrix());
+
+        let dq = DualQuaternion::from_se3(&m);
+        let m_back = dq.to_se3();
+
+        for i in 0..4 {
+            for j in 0..4 {
+                assert!(
+                    (m[(i, j)] - m_back[(i, j)]).abs() < 1e-9,
+                    "mismatch at ({}, {}): {} vs {}",
+                    i,
+                    j,
+                    m[(i, j)],
+                    m_back[(i, j)]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn transform_point_matches_matrix() {
+        let mut m = Matrix4::identity();
+        m[(0, 3)] = 1.0;
+        m[(1, 3)] = 2.0;
+        m[(2, 3)] = 3.0;
+        let rot = UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3);
+        m.fixed_view_mut::<3, 3>(0, 0)
+            .copy_from(rot.to_rotation_matrix().matrix());
+
+        let dq = DualQuaternion::from_se3(&m);
+        let p = Vector3::new(0.5, -0.5, 1.0);
+
+        let result_dq = dq.transform_point(&p);
+        let homo = m * Vector4::new(p.x, p.y, p.z, 1.0);
+        let result_mat = Vector3::new(homo.x, homo.y, homo.z);
+
+        assert!((result_dq.x - result_mat.x).abs() < 1e-9);
+        assert!((result_dq.y - result_mat.y).abs() < 1e-9);
+        assert!((result_dq.z - result_mat.z).abs() < 1e-9);
     }
 }

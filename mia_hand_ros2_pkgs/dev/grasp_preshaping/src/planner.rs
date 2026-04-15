@@ -11,6 +11,52 @@ pub struct GraspScoreResult {
     pub force_closure_score: f64,
 }
 
+impl GraspScoreResult {
+    pub fn combined_score(&self, weights: &GraspWeights, sample_probability: f64) -> f64 {
+        let denom = weights.w_probability + weights.w_alignment + weights.w_force_closure;
+        if denom.abs() < 1e-12 {
+            return 0.0;
+        }
+        (weights.w_probability * sample_probability
+            + weights.w_alignment * self.alignment_score
+            + weights.w_force_closure * self.force_closure_score)
+            / denom
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GraspWeights {
+    pub w_probability: f64,
+    pub w_alignment: f64,
+    pub w_force_closure: f64,
+}
+
+impl GraspWeights {
+    pub fn cylindrical() -> Self {
+        Self {
+            w_probability: 1.0,
+            w_alignment: 1.0,
+            w_force_closure: 1.0,
+        }
+    }
+
+    pub fn pinch() -> Self {
+        Self {
+            w_probability: 1.0,
+            w_alignment: 1.0,
+            w_force_closure: 1.0,
+        }
+    }
+
+    pub fn lateral() -> Self {
+        Self {
+            w_probability: 1.0,
+            w_alignment: 1.0,
+            w_force_closure: 1.0,
+        }
+    }
+}
+
 struct ActiveContact {
     surface_normal: Vector3<f32>,
     force_direction: Vector3<f64>,
