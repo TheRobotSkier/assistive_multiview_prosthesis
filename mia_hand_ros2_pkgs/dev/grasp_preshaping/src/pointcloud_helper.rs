@@ -589,23 +589,16 @@ mod tests {
             Vector3::new(10.0, 10.0, 10.0),
             Vector3::new(12.0, 10.0, 10.0),
             Vector3::new(10.0, 12.0, 10.0),
-            Vector3::new(10.0, 10.0, 12.0),
             Vector3::new(12.0, 12.0, 10.0),
+            Vector3::new(10.0, 10.0, 12.0),
             Vector3::new(12.0, 10.0, 12.0),
             Vector3::new(10.0, 12.0, 12.0),
             Vector3::new(12.0, 12.0, 12.0),
+            Vector3::new(11.0, 11.0, 10.0),
         ]);
-        let cameras = vec![
-            Camera {
-                position: Vector3::new(11.0, 11.0, 8.0),
-            },
-            Camera {
-                position: Vector3::new(11.0, 8.0, 11.0),
-            },
-            Camera {
-                position: Vector3::new(8.0, 11.0, 11.0),
-            },
-        ];
+        let cameras = vec![Camera {
+            position: Vector3::new(11.0, 11.0, 8.0),
+        }];
         let (morton_arr, offsets, start) = morton(&pc, 1.0);
         let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &cameras);
 

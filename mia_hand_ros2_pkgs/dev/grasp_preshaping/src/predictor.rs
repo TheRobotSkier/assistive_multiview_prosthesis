@@ -11,12 +11,8 @@ pub struct SampledPose {
     pub sample_probability: f64,
 }
 
-pub const PREDICTION_HORIZON: f64 = 5.0;
-pub const PREDICTION_SAMPLES: usize = 50;
 pub const HAND_RADIUS: f64 = 0.05;
-pub const MIN_TSDF_DIM_X: f64 = 0.1;
-pub const MIN_TSDF_DIM_Y: f64 = 0.1;
-pub const MIN_TSDF_DIM_Z: f64 = 0.1;
+pub const MIN_TSDF_DIM: f64 = 0.1;
 pub const MAX_TSDF_DIM: f64 = 0.3;
 
 #[derive(Debug, Clone)]
@@ -43,10 +39,10 @@ pub struct PredictionConfig {
 impl Default for PredictionConfig {
     fn default() -> Self {
         Self {
-            t_max: PREDICTION_HORIZON,
-            n_samples: PREDICTION_SAMPLES,
+            t_max: 5.0,
+            n_samples: 50,
             hand_radius: HAND_RADIUS,
-            min_tsdf_dims: Vector3::new(MIN_TSDF_DIM_X, MIN_TSDF_DIM_Y, MIN_TSDF_DIM_Z),
+            min_tsdf_dims: Vector3::new(MIN_TSDF_DIM, MIN_TSDF_DIM, MIN_TSDF_DIM),
             max_tsdf_dims: Vector3::new(MAX_TSDF_DIM, MAX_TSDF_DIM, MAX_TSDF_DIM),
         }
     }

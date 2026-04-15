@@ -36,6 +36,10 @@ const HORIZON: f64 = 5.0;
 const SAMPLES: usize = 1000;
 const FREQUENCY_HZ: f64 = 1.0;
 
+const PREDICTION_HAND_RADIUS_M: f64 = 0.05;
+const MIN_TSDF_DIM_M: f32 = 0.1;
+const MAX_TSDF_DIM_M: f32 = 0.3;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Demo,
@@ -257,7 +261,6 @@ struct ScoredGrasp {
     sample_pose: DualQuaternion,
     sample_probability: f64,
     result: GraspScoreResult,
-    weights: GraspWeights,
     combined: f64,
 }
 
@@ -309,7 +312,6 @@ fn score_all_samples(
                 sample_pose: sp.pose,
                 sample_probability: sp.sample_probability,
                 result,
-                weights: gs.weights,
                 combined,
             });
         }
@@ -346,15 +348,29 @@ fn print_aabb(label: &str, aabb: &Aabb) {
     );
 }
 
+fn tag(cycle: Option<usize>) -> String {
+    match cycle {
+        Some(n) => format!("[cycle {}]", n),
+        None => String::new(),
+    }
+}
+
 fn identity_pose() -> DualQuaternion {
     DualQuaternion::from_se3(&Matrix4::identity())
 }
 
-fn run_iteration(lut: &FingerLUT, mode: Mode, pred_config: &PredictionConfig, iter_idx: usize) {
+fn run_iteration(
+    lut: &FingerLUT,
+    mode: Mode,
+    pred_config: &PredictionConfig,
+    cycle: Option<usize>,
+) {
+    let t = tag(cycle);
+
     let current_pose = match mode {
         Mode::Demo => identity_pose(),
         Mode::Normal | Mode::OneShot => read_pose_from_ros2(POSE_TOPIC).unwrap_or_else(|e| {
-            eprintln!("Failed to read pose from ROS2: {}", e);
+            eprintln!("{}Failed to read pose from ROS2: {}", t, e);
             std::process::exit(1);
         }),
     };
@@ -369,7 +385,7 @@ fn run_iteration(lut: &FingerLUT, mode: Mode, pred_config: &PredictionConfig, it
         ),
         Mode::Normal | Mode::OneShot => {
             let twist_and_cov = read_twist_from_ros2(TWIST_TOPIC).unwrap_or_else(|e| {
-                eprintln!("Failed to read twist from ROS2: {}", e);
+                eprintln!("{}Failed to read twist from ROS2: {}", t, e);
                 std::process::exit(1);
             });
             predict_roi_with_samples(
@@ -382,13 +398,9 @@ fn run_iteration(lut: &FingerLUT, mode: Mode, pred_config: &PredictionConfig, it
         }
     };
 
-    println!("[iter {}] Predicted ROI:", iter_idx);
+    println!("{}Predicted ROI:", t);
     print_aabb("ROI", &roi);
-    println!(
-        "[iter {}] Generated {} candidate grasp poses",
-        iter_idx,
-        samples.len()
-    );
+    println!("{}Generated {} candidate grasp poses", t, samples.len());
 
     let pc = match mode {
         Mode::Demo => {
@@ -400,25 +412,19 @@ fn run_iteration(lut: &FingerLUT, mode: Mode, pred_config: &PredictionConfig, it
             )
         }
         Mode::Normal | Mode::OneShot => read_ros_pointcloud(POINTCLOUD_TOPIC).unwrap_or_else(|e| {
-            eprintln!("Failed to read PointCloud2: {}", e);
+            eprintln!("{}Failed to read PointCloud2: {}", t, e);
             std::process::exit(1);
         }),
     };
 
-    println!("[iter {}] Point cloud: {} points", iter_idx, pc.len());
+    println!("{}Point cloud: {} points", t, pc.len());
 
     let pruned = prune(&pc, Some(roi));
     let n_pruned = pruned.len();
-    println!(
-        "[iter {}] Points in ROI (used for TSDF): {}",
-        iter_idx, n_pruned
-    );
+    println!("{}Points in ROI (used for TSDF): {}", t, n_pruned);
 
     let tsdf = if pruned.is_empty() {
-        eprintln!(
-            "[iter {}] Warning: no points in ROI, skipping scoring",
-            iter_idx
-        );
+        eprintln!("{}Warning: no points in ROI, skipping scoring", t);
         return;
     } else {
         let (morton_arr, offsets, start) = morton(&pruned, TSDF_RESOLUTION_MM);
@@ -437,28 +443,13 @@ fn run_iteration(lut: &FingerLUT, mode: Mode, pred_config: &PredictionConfig, it
     let scoring_start = Instant::now();
     let scored = score_all_samples(lut, &tsdf, &samples, collision_tol);
 
-    println!(
-        "[iter {}] Scored {} (sample, grasp) combinations",
-        iter_idx,
-        scored.len()
-    );
-    for sg in &scored {
-        println!(
-            "  {}: closure={:.4} alignment={:.4} force_closure={:.4} prob={:.4} combined={:.4}",
-            sg.grasp_type,
-            sg.result.closure_amount,
-            sg.result.alignment_score,
-            sg.result.force_closure_score,
-            sg.sample_probability,
-            sg.combined,
-        );
-    }
+    println!("{}Scored {} (sample, grasp) combinations", t, scored.len());
 
     let best = select_best_grasp(&scored);
     let best_loc = best.sample_pose.location();
     println!(
-        "[iter {}] Best: {} at ({:.4}, {:.4}, {:.4}) combined={:.4} (closure={:.4}, alignment={:.4}, prob={:.4})",
-        iter_idx,
+        "{}Best: {} at ({:.4}, {:.4}, {:.4}) combined={:.4} (closure_amount={:.4}, alignment={:.4}, force_closure={:.4}, prob={:.4})",
+        t,
         best.grasp_type,
         best_loc.x,
         best_loc.y,
@@ -466,13 +457,10 @@ fn run_iteration(lut: &FingerLUT, mode: Mode, pred_config: &PredictionConfig, it
         best.combined,
         best.result.closure_amount,
         best.result.alignment_score,
+        best.result.force_closure_score,
         best.sample_probability,
     );
-    println!(
-        "[iter {}] Scoring time: {:.2?}",
-        iter_idx,
-        scoring_start.elapsed()
-    );
+    println!("{}Scoring time: {:.2?}", t, scoring_start.elapsed());
 
     if mode == Mode::Normal || mode == Mode::OneShot {
         let ctrl = best.result.closure_amount;
@@ -506,7 +494,7 @@ fn run_iteration(lut: &FingerLUT, mode: Mode, pred_config: &PredictionConfig, it
             eprintln!("{}", e);
             std::process::exit(1);
         });
-        println!("[iter {}] Published trajectory commands.", iter_idx);
+        println!("{}Published trajectory commands.", t);
     }
 }
 
@@ -531,25 +519,35 @@ fn main() {
     let pred_config = PredictionConfig {
         t_max: HORIZON,
         n_samples: SAMPLES,
-        ..Default::default()
+        hand_radius: PREDICTION_HAND_RADIUS_M,
+        min_tsdf_dims: Vector3::new(
+            MIN_TSDF_DIM_M as f64,
+            MIN_TSDF_DIM_M as f64,
+            MIN_TSDF_DIM_M as f64,
+        ),
+        max_tsdf_dims: Vector3::new(
+            MAX_TSDF_DIM_M as f64,
+            MAX_TSDF_DIM_M as f64,
+            MAX_TSDF_DIM_M as f64,
+        ),
     };
 
     println!("Setup time: {:.2?}", now.elapsed());
 
     match mode {
         Mode::Demo => {
-            run_iteration(&lut, mode, &pred_config, 1);
-            println!("[iter 1] Total time: {:.2?}", now.elapsed());
+            run_iteration(&lut, mode, &pred_config, None);
+            println!("Total time: {:.2?}", now.elapsed());
         }
         Mode::Normal => {
             let period = Duration::from_secs_f64(1.0 / FREQUENCY_HZ);
-            let mut iter_idx: usize = 0;
+            let mut cycle_idx: usize = 0;
             loop {
-                iter_idx += 1;
+                cycle_idx += 1;
                 let tick_start = Instant::now();
-                run_iteration(&lut, mode, &pred_config, iter_idx);
+                run_iteration(&lut, mode, &pred_config, Some(cycle_idx));
                 let elapsed = tick_start.elapsed();
-                println!("[iter {}] Total time: {:.2?}", iter_idx, elapsed);
+                println!("[cycle {}] Total time: {:.2?}", cycle_idx, elapsed);
                 if elapsed < period {
                     thread::sleep(period - elapsed);
                 } else {
@@ -561,8 +559,8 @@ fn main() {
             }
         }
         Mode::OneShot => {
-            run_iteration(&lut, mode, &pred_config, 1);
-            println!("[iter 1] Total time: {:.2?}", now.elapsed());
+            run_iteration(&lut, mode, &pred_config, None);
+            println!("Total time: {:.2?}", now.elapsed());
         }
     }
 }
