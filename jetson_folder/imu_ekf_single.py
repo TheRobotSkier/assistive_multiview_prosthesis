@@ -31,6 +31,7 @@ import time
 import math
 import numpy as np
 from smbus2 import SMBus
+from collections import deque
 
 
 # ============================================================
@@ -357,6 +358,35 @@ class ImuEkfConfig:
         # Logging behavior
         self.print_interval_sec = 0.20
 
+        # --------------------------------------------------------
+        # Runtime stationary detection settings
+        # --------------------------------------------------------
+        # Window length for online stationary detection
+        self.runtime_stationary_window_size = 40
+
+        # Thresholds for deciding if the IMU is currently stationary
+        self.runtime_stationary_gyro_norm_max_rps = 0.06
+        self.runtime_stationary_accel_norm_error_max_mps2 = 0.20
+        self.runtime_stationary_accel_std_max_mps2 = 0.05
+        self.runtime_stationary_gyro_std_max_rps = 0.01
+
+        # --------------------------------------------------------
+        # Zero-velocity update (ZUPT)
+        # --------------------------------------------------------
+        self.use_zupt = True
+
+        # Velocity measurement standard deviation [m/s]
+        # Smaller means stronger pull toward zero during stationary periods.
+        self.zupt_velocity_meas_std_mps = 0.02
+
+        # --------------------------------------------------------
+        # Stationary gyro-bias refinement
+        # --------------------------------------------------------
+        self.use_stationary_bias_refinement = True
+
+        # Small blending factor for slow bias adaptation during stationary periods
+        self.stationary_bias_blend = 0.01
+
 
 # ============================================================
 # EKF state
@@ -380,7 +410,14 @@ class ImuEkfState:
         [dpos, dvel, dtheta, dbias_gyro, dbias_acc]
     """
 
-    def __init__(self):
+    def __init__(self, config):
+        # Store config for use in methods that need thresholds, etc.
+        self.config = config
+
+        #
+        self.prev_gyro_unbiased_rps = None
+        self.prev_accel_unbiased_mps2 = None
+        
         # Nominal state
         self.pos = np.zeros(3, dtype=np.float64)
         self.vel = np.zeros(3, dtype=np.float64)
@@ -418,6 +455,18 @@ class ImuEkfState:
         # and uses the output from analyze_imu_allan.py.
         self.gyro_bias_random_walk_std = 4.07e-06
         self.accel_bias_random_walk_std = 1.05e-04
+
+        # --------------------------------------------------------
+        # Runtime stationary detection buffers
+        # --------------------------------------------------------
+        self.stationary_accel_buffer = deque(
+            maxlen=self.config.runtime_stationary_window_size
+        )
+        self.stationary_gyro_buffer = deque(
+            maxlen=self.config.runtime_stationary_window_size
+        )
+
+        self.is_currently_stationary = False
 
         # Debug option:
         # If True, compare analytic vs numerical accel Jacobian occasionally.
@@ -481,20 +530,108 @@ class ImuEkfState:
         self.cov = Phi @ self.cov @ Phi.T + Qd
         self.cov = 0.5 * (self.cov + self.cov.T)
 
+    def update_runtime_stationary_detector(self, accel_mps2, gyro_rps):
+        """
+        Update rolling-window stationary detection using recent IMU samples.
+
+        Logic:
+        - gyro norm must be small
+        - accel norm must stay close to gravity magnitude
+        - accel variation must be small
+        - gyro variation must be small
+        """
+        self.stationary_accel_buffer.append(np.array(accel_mps2, dtype=np.float64))
+        self.stationary_gyro_buffer.append(np.array(gyro_rps, dtype=np.float64))
+
+        if len(self.stationary_accel_buffer) < self.config.runtime_stationary_window_size:
+            self.is_currently_stationary = False
+            return self.is_currently_stationary
+
+        accel_array = np.array(self.stationary_accel_buffer, dtype=np.float64)
+        gyro_array = np.array(self.stationary_gyro_buffer, dtype=np.float64)
+
+        accel_norm_array = np.linalg.norm(accel_array, axis=1)
+        gyro_norm_array = np.linalg.norm(gyro_array, axis=1)
+
+        accel_norm_mean = float(np.mean(accel_norm_array))
+        accel_norm_std = float(np.std(accel_norm_array))
+        gyro_norm_mean = float(np.mean(gyro_norm_array))
+
+        gyro_std_vec = np.std(gyro_array, axis=0)
+        gyro_std_norm = float(np.linalg.norm(gyro_std_vec))
+
+        accel_norm_error = abs(accel_norm_mean - self.gravity_mps2)
+
+        gyro_ok = gyro_norm_mean <= self.config.runtime_stationary_gyro_norm_max_rps
+        accel_mean_ok = accel_norm_error <= self.config.runtime_stationary_accel_norm_error_max_mps2
+        accel_std_ok = accel_norm_std <= self.config.runtime_stationary_accel_std_max_mps2
+        gyro_std_ok = gyro_std_norm <= self.config.runtime_stationary_gyro_std_max_rps
+
+        self.is_currently_stationary = gyro_ok and accel_mean_ok and accel_std_ok and gyro_std_ok
+        return self.is_currently_stationary
+
+
+    def refine_gyro_bias_if_stationary(self, gyro_rps):
+        """
+        Slowly refine gyro bias during confidently stationary periods.
+
+        Since true angular rate should be near zero when stationary,
+        the measured gyro mainly reflects bias plus noise.
+        """
+        if not self.config.use_stationary_bias_refinement:
+            return
+
+        blend = self.config.stationary_bias_blend
+        self.bias_gyro = (1.0 - blend) * self.bias_gyro + blend * gyro_rps
+
+
+    def update_zero_velocity(self):
+        """
+        Zero-velocity update (ZUPT).
+
+        When the IMU is stationary, world-frame velocity should be near zero.
+        This directly constrains the velocity states and indirectly helps
+        reduce drift through state correlations.
+
+        Measurement model:
+            z = 0
+            h(x) = vel
+            innovation = z - vel = -vel
+        """
+        if not self.config.use_zupt:
+            return
+
+        H = np.zeros((3, 15), dtype=np.float64)
+        H[:, 3:6] = np.eye(3, dtype=np.float64)
+
+        innovation = -self.vel
+
+        R_meas = np.eye(3, dtype=np.float64) * (
+            self.config.zupt_velocity_meas_std_mps ** 2
+        )
+
+        S = H @ self.cov @ H.T + R_meas
+        K = self.cov @ H.T @ np.linalg.inv(S)
+
+        error_state = K @ innovation
+
+        identity = np.eye(15, dtype=np.float64)
+        temp = identity - K @ H
+        self.cov = temp @ self.cov @ temp.T + K @ R_meas @ K.T
+        self.cov = 0.5 * (self.cov + self.cov.T)
+
+        self.inject_error_state(error_state)
+
+
     def predict_from_imu(self, imu_sample):
         """
         Prediction step using one IMU sample.
 
-        Inputs from imu_sample:
-            imu_sample["timestamp_sec"]
-            imu_sample["gyro_rps"]
-            imu_sample["accel_mps2"]
+        Uses midpoint / trapezoidal integration in the nominal state:
+        - midpoint gyro for quaternion propagation
+        - average of world-frame linear acceleration for vel/pos propagation
 
-        This method updates:
-            self.quat
-            self.vel
-            self.pos
-            self.cov
+        This is a better nominal-state integrator than simple first-order Euler.
         """
         timestamp_sec = imu_sample["timestamp_sec"]
         gyro_rps = imu_sample["gyro_rps"]
@@ -502,44 +639,119 @@ class ImuEkfState:
 
         if self.last_timestamp_sec is None:
             self.last_timestamp_sec = timestamp_sec
+            self.update_runtime_stationary_detector(accel_mps2, gyro_rps)
+
+            # Initialize previous unbiased signals on first sample
+            gyro_unbiased_rps = gyro_rps - self.bias_gyro
+            accel_unbiased_mps2 = accel_mps2 - self.bias_acc
+            self.prev_gyro_unbiased_rps = gyro_unbiased_rps.copy()
+            self.prev_accel_unbiased_mps2 = accel_unbiased_mps2.copy()
             return
 
         dt = timestamp_sec - self.last_timestamp_sec
         self.last_timestamp_sec = timestamp_sec
 
         if dt <= 0.0 or dt > 0.1:
+            self.update_runtime_stationary_detector(accel_mps2, gyro_rps)
+
+            gyro_unbiased_rps = gyro_rps - self.bias_gyro
+            accel_unbiased_mps2 = accel_mps2 - self.bias_acc
+            self.prev_gyro_unbiased_rps = gyro_unbiased_rps.copy()
+            self.prev_accel_unbiased_mps2 = accel_unbiased_mps2.copy()
             return
 
-        # 1) Bias-correct gyro and accel
+        # --------------------------------------------------------
+        # Runtime stationary detection
+        # --------------------------------------------------------
+        stationary_now = self.update_runtime_stationary_detector(accel_mps2, gyro_rps)
+
+        # Optional slow gyro-bias refinement during stationary periods
+        if stationary_now:
+            self.refine_gyro_bias_if_stationary(gyro_rps)
+
+        # --------------------------------------------------------
+        # Current bias-corrected IMU
+        # --------------------------------------------------------
         gyro_unbiased_rps = gyro_rps - self.bias_gyro
         accel_unbiased_mps2 = accel_mps2 - self.bias_acc
 
-        # 2) Propagate nominal orientation
-        delta_theta = gyro_unbiased_rps * dt
+        # If previous values are not yet initialized, fall back gracefully
+        if self.prev_gyro_unbiased_rps is None:
+            self.prev_gyro_unbiased_rps = gyro_unbiased_rps.copy()
+        if self.prev_accel_unbiased_mps2 is None:
+            self.prev_accel_unbiased_mps2 = accel_unbiased_mps2.copy()
+
+        # Save old nominal state for trapezoidal integration
+        quat_old = self.quat.copy()
+        vel_old = self.vel.copy()
+        pos_old = self.pos.copy()
+
+        # --------------------------------------------------------
+        # 1) Midpoint gyro integration for orientation
+        # --------------------------------------------------------
+        gyro_mid_rps = 0.5 * (self.prev_gyro_unbiased_rps + gyro_unbiased_rps)
+        delta_theta = gyro_mid_rps * dt
         delta_quat = quat_from_small_angle(delta_theta)
-        self.quat = quat_normalize(quat_mul(self.quat, delta_quat))
+        quat_new = quat_normalize(quat_mul(quat_old, delta_quat))
+        self.quat = quat_new
 
-        # 3) Rotate body-frame acceleration into world frame
-        rotation_world_from_body = quat_to_rotmat(self.quat)
-        accel_world_mps2 = rotation_world_from_body @ accel_unbiased_mps2
+        # --------------------------------------------------------
+        # 2) Compute linear acceleration at old and new attitude
+        # --------------------------------------------------------
+        R_old = quat_to_rotmat(quat_old)
+        R_new = quat_to_rotmat(quat_new)
 
-        # 4) Recover world-frame linear acceleration
-        linear_accel_world_mps2 = accel_world_mps2 + self.gravity_world
+        accel_world_old_mps2 = R_old @ self.prev_accel_unbiased_mps2
+        accel_world_new_mps2 = R_new @ accel_unbiased_mps2
 
-        # 5) Integrate velocity and position
-        old_vel = self.vel.copy()
-        self.vel = self.vel + linear_accel_world_mps2 * dt
-        self.pos = self.pos + old_vel * dt + 0.5 * linear_accel_world_mps2 * dt * dt
+        linear_accel_world_old_mps2 = accel_world_old_mps2 + self.gravity_world
+        linear_accel_world_new_mps2 = accel_world_new_mps2 + self.gravity_world
 
-        # 6) Propagate covariance
+        linear_accel_world_mid_mps2 = 0.5 * (
+            linear_accel_world_old_mps2 + linear_accel_world_new_mps2
+        )
+
+        # --------------------------------------------------------
+        # 3) Trapezoidal / midpoint integration for vel and pos
+        # --------------------------------------------------------
+        vel_new = vel_old + linear_accel_world_mid_mps2 * dt
+        pos_new = pos_old + 0.5 * (vel_old + vel_new) * dt
+
+        self.vel = vel_new
+        self.pos = pos_new
+
+        # --------------------------------------------------------
+        # 4) Covariance propagation
+        #
+        # Keep covariance model first-order for now, but drive it using
+        # midpoint inputs so it is more consistent with nominal propagation.
+        # --------------------------------------------------------
+        accel_unbiased_mid_mps2 = 0.5 * (
+            self.prev_accel_unbiased_mps2 + accel_unbiased_mps2
+        )
+
         self.predict_covariance(
-            gyro_unbiased_rps=gyro_unbiased_rps,
-            accel_unbiased_mps2=accel_unbiased_mps2,
+            gyro_unbiased_rps=gyro_mid_rps,
+            accel_unbiased_mps2=accel_unbiased_mid_mps2,
             dt=dt
         )
 
-        # 7) Accelerometer update
+        # --------------------------------------------------------
+        # 5) Accelerometer gravity-direction update
+        # --------------------------------------------------------
         self.update_from_accel(imu_sample)
+
+        # --------------------------------------------------------
+        # 6) Zero-velocity update if stationary
+        # --------------------------------------------------------
+        if stationary_now:
+            self.update_zero_velocity()
+
+        # --------------------------------------------------------
+        # 7) Store current unbiased IMU for next midpoint step
+        # --------------------------------------------------------
+        self.prev_gyro_unbiased_rps = gyro_unbiased_rps.copy()
+        self.prev_accel_unbiased_mps2 = accel_unbiased_mps2.copy()
 
     def inject_error_state(self, error_state):
         """
@@ -1002,7 +1214,7 @@ def main():
     config = ImuEkfConfig()
     config.startup_mode = "stationary_calibration"
 
-    ekf = ImuEkfState()
+    ekf = ImuEkfState(config)
 
     print("\nStartup configuration:")
     print("startup_mode:", config.startup_mode)
@@ -1106,7 +1318,7 @@ def main():
                     att_cov_diag = np.diag(ekf.cov)[6:9]
                     gyro_bias_cov_diag = np.diag(ekf.cov)[9:12]
                     accel_bias_cov_diag = np.diag(ekf.cov)[12:15]
-
+                    
                     print(
                         f"RPY deg: "
                         f"{roll_deg:+7.2f} {pitch_deg:+7.2f} {yaw_deg:+7.2f} | "
@@ -1114,8 +1326,14 @@ def main():
                         f"accel_norm mps2: {accel_norm:8.4f}"
                     )
                     print(
+                        #f"pos m: {ekf.pos} | "
+                        f"pos cm: {ekf.pos*100} | "
+                        f"vel mps: {ekf.vel}"
+                    )
+                    print(
                         f"bias_gyro rps: {ekf.bias_gyro} | "
-                        f"bias_acc mps2: {ekf.bias_acc}"
+                        f"bias_acc mps2: {ekf.bias_acc} | "
+                        f"stationary: {ekf.is_currently_stationary}"
                     )
                     print(
                         f"att_cov diag: {att_cov_diag} | "

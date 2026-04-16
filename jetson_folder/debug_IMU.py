@@ -1,84 +1,125 @@
 #!/usr/bin/env python3
-from smbus2 import SMBus
 import time
+from smbus2 import SMBus
 
-BUS = 1          # change to 7 for the other board
-MPU = 0x68
-MAG = 0x0C
+BUS_NUM = 7          # change if needed
+MPU_ADDR = 0x68
+AK_ADDR  = 0x0C
 
 # MPU registers
-WHO_AM_I     = 0x75
-PWR_MGMT_1   = 0x6B
-USER_CTRL    = 0x6A
-INT_PIN_CFG  = 0x37
-I2C_MST_CTRL = 0x24
+PWR_MGMT_1  = 0x6B
+USER_CTRL   = 0x6A
+INT_PIN_CFG = 0x37
+WHO_AM_I_MPU = 0x75
 
-I2C_SLV0_ADDR = 0x25
-I2C_SLV0_REG  = 0x26
-I2C_SLV0_CTRL = 0x27
-EXT_SENS_DATA_00 = 0x49
+# AK8963 registers
+WHO_AM_I_AK   = 0x00
+AK_ST1        = 0x02
+AK_XOUT_L     = 0x03
+AK_CNTL1      = 0x0A
+AK_ASAX       = 0x10
+AK_ST2        = 0x09
 
-def rb(bus, reg):
-    return bus.read_byte_data(MPU, reg)
+def read_u8(bus, addr, reg):
+    return bus.read_byte_data(addr, reg)
 
-def wb(bus, reg, val):
-    bus.write_byte_data(MPU, reg, val)
+def write_u8(bus, addr, reg, val):
+    bus.write_byte_data(addr, reg, val)
+    time.sleep(0.01)
 
-def try_direct_mpu(bus):
-    who = rb(bus, WHO_AM_I)
+def read_block(bus, addr, reg, length):
+    return bus.read_i2c_block_data(addr, reg, length)
+
+def to_int16(lo, hi):
+    value = (hi << 8) | lo
+    if value & 0x8000:
+        value -= 65536
+    return value
+
+def setup_mpu_bypass(bus):
+    # Wake MPU
+    write_u8(bus, MPU_ADDR, PWR_MGMT_1, 0x00)
+    time.sleep(0.1)
+
+    who = read_u8(bus, MPU_ADDR, WHO_AM_I_MPU)
     print(f"MPU WHO_AM_I: 0x{who:02X}")
 
-def read_ext_sens(bus, slave_addr, slave_reg, length=1, delay=0.05):
-    # Set slave 0 to read from external I2C slave
-    # Bit7=1 means read, lower 7 bits are address
-    wb(bus, I2C_SLV0_ADDR, 0x80 | (slave_addr & 0x7F))
-    wb(bus, I2C_SLV0_REG, slave_reg)
-    wb(bus, I2C_SLV0_CTRL, 0x80 | (length & 0x0F))  # enable + length
-    time.sleep(delay)
+    # Disable internal I2C master, enable bypass
+    write_u8(bus, MPU_ADDR, USER_CTRL, 0x00)
+    write_u8(bus, MPU_ADDR, INT_PIN_CFG, 0x02)
+    time.sleep(0.05)
 
-    data = bus.read_i2c_block_data(MPU, EXT_SENS_DATA_00, length)
+    return who
 
-    # disable slave after read
-    wb(bus, I2C_SLV0_CTRL, 0x00)
-    return data
+def init_ak8963(bus):
+    who = read_u8(bus, AK_ADDR, WHO_AM_I_AK)
+    print(f"AK8963 WHO_AM_I: 0x{who:02X}")
+    if who != 0x48:
+        raise RuntimeError("AK8963 not detected at 0x0C")
+
+    # Power down
+    write_u8(bus, AK_ADDR, AK_CNTL1, 0x00)
+    time.sleep(0.01)
+
+    # Enter Fuse ROM access mode to read sensitivity adjustment
+    write_u8(bus, AK_ADDR, AK_CNTL1, 0x0F)
+    time.sleep(0.01)
+
+    asa = read_block(bus, AK_ADDR, AK_ASAX, 3)
+    adj = [((x - 128) / 256.0) + 1.0 for x in asa]
+    print(f"AK8963 ASA: {asa}, adj={adj}")
+
+    # Power down again
+    write_u8(bus, AK_ADDR, AK_CNTL1, 0x00)
+    time.sleep(0.01)
+
+    # Continuous measurement mode 2, 16-bit output, 100 Hz
+    write_u8(bus, AK_ADDR, AK_CNTL1, 0x16)
+    time.sleep(0.01)
+
+    return adj
+
+def read_mag(bus, adj):
+    st1 = read_u8(bus, AK_ADDR, AK_ST1)
+    if (st1 & 0x01) == 0:
+        return None
+
+    data = read_block(bus, AK_ADDR, AK_XOUT_L, 7)
+    mx = to_int16(data[0], data[1])
+    my = to_int16(data[2], data[3])
+    mz = to_int16(data[4], data[5])
+    st2 = data[6]
+
+    # Check magnetic sensor overflow
+    if st2 & 0x08:
+        print("Mag overflow")
+        return None
+
+    # Convert to adjusted raw counts
+    mx_adj = mx * adj[0]
+    my_adj = my * adj[1]
+    mz_adj = mz * adj[2]
+
+    return mx_adj, my_adj, mz_adj
 
 def main():
-    with SMBus(BUS) as bus:
-        print(f"Using bus {BUS}")
+    with SMBus(BUS_NUM) as bus:
+        who = setup_mpu_bypass(bus)
 
-        # wake device
-        wb(bus, PWR_MGMT_1, 0x00)
-        time.sleep(0.1)
+        if who not in (0x71, 0x73):
+            print("Warning: IMU is not identifying as MPU-9250/9255.")
+            print("If WHO_AM_I is 0x70, it is likely MPU-6500 and has no AK8963.")
+            return
 
-        try_direct_mpu(bus)
+        adj = init_ak8963(bus)
 
-        # turn OFF bypass, turn ON internal I2C master
-        wb(bus, INT_PIN_CFG, 0x00)
-        time.sleep(0.01)
-
-        # USER_CTRL:
-        # bit 5 = I2C_MST_EN
-        wb(bus, USER_CTRL, 0x20)
-        time.sleep(0.01)
-
-        # set I2C master clock
-        wb(bus, I2C_MST_CTRL, 0x0D)
-        time.sleep(0.01)
-
-        print("Trying internal-master read from candidate AK8963 at 0x0C...")
-
-        try:
-            data = read_ext_sens(bus, MAG, 0x00, 1)
-            print(f"Read via EXT_SENS_DATA_00: 0x{data[0]:02X}")
-
-            if data[0] == 0x48:
-                print("AK8963 detected.")
-            elif data[0] in (0x00, 0xFF):
-                print("No convincing AK8963 response.")
-            else:
-                print("Got a byte back, but it does not match AK8963 WHO_AM_I=0x48.")
-        except OSError as e:
-            print(f"Internal-master read failed: {e}")
+        print("Reading magnetometer. Move the board around...")
+        while True:
+            mag = read_mag(bus, adj)
+            if mag is not None:
+                mx, my, mz = mag
+                print(f"MAG: X={mx:8.2f}  Y={my:8.2f}  Z={mz:8.2f}")
+            time.sleep(0.1)
 
 if __name__ == "__main__":
     main()
