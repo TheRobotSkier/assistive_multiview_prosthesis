@@ -1,0 +1,83 @@
+python3 imu_i2c_rate_test_logger.py \
+  --output logs/test_200hz_120s.csv \
+  --duration-sec 120 \
+  --rate-hz 200
+MPU WHO_AM_I: 0x70
+Requested rate:           200.000 Hz
+Requested period:         5.000 ms
+Configured sensor rate:   200.000 Hz
+Configured sensor period: 5.000 ms
+Duration:                 120.0 s
+Output CSV:               logs/test_200hz_120s.csv
+
+samples=1001 | achieved=200.17 Hz | errors=0 | deadline_misses=1001 | dt_std=0.092 ms | read_p99=0.786 ms
+samples=2001 | achieved=200.08 Hz | errors=0 | deadline_misses=2001 | dt_std=0.166 ms | read_p99=0.756 ms
+samples=3002 | achieved=200.06 Hz | errors=0 | deadline_misses=3002 | dt_std=0.194 ms | read_p99=0.731 ms
+samples=4003 | achieved=200.04 Hz | errors=0 | deadline_misses=4003 | dt_std=0.244 ms | read_p99=0.727 ms
+samples=5004 | achieved=200.03 Hz | errors=0 | deadline_misses=5004 | dt_std=0.319 ms | read_p99=0.727 ms
+samples=6004 | achieved=200.03 Hz | errors=0 | deadline_misses=6004 | dt_std=0.358 ms | read_p99=0.725 ms
+samples=7004 | achieved=200.02 Hz | errors=0 | deadline_misses=7004 | dt_std=0.422 ms | read_p99=0.726 ms
+samples=8005 | achieved=200.02 Hz | errors=0 | deadline_misses=8005 | dt_std=0.461 ms | read_p99=0.725 ms
+samples=9006 | achieved=200.02 Hz | errors=0 | deadline_misses=9006 | dt_std=0.508 ms | read_p99=0.719 ms
+samples=10006 | achieved=200.02 Hz | errors=0 | deadline_misses=10006 | dt_std=0.559 ms | read_p99=0.717 ms
+samples=11007 | achieved=200.01 Hz | errors=0 | deadline_misses=11007 | dt_std=0.611 ms | read_p99=0.716 ms
+samples=12008 | achieved=200.01 Hz | errors=0 | deadline_misses=12008 | dt_std=0.675 ms | read_p99=0.712 ms
+samples=13008 | achieved=200.01 Hz | errors=0 | deadline_misses=13008 | dt_std=0.754 ms | read_p99=0.710 ms
+samples=14008 | achieved=200.01 Hz | errors=0 | deadline_misses=14008 | dt_std=0.794 ms | read_p99=0.711 ms
+samples=15009 | achieved=200.01 Hz | errors=0 | deadline_misses=15009 | dt_std=0.849 ms | read_p99=0.711 ms
+samples=16010 | achieved=200.01 Hz | errors=0 | deadline_misses=16010 | dt_std=0.909 ms | read_p99=0.714 ms
+samples=17010 | achieved=200.01 Hz | errors=0 | deadline_misses=17010 | dt_std=0.954 ms | read_p99=0.712 ms
+samples=18011 | achieved=200.01 Hz | errors=0 | deadline_misses=18011 | dt_std=1.022 ms | read_p99=0.711 ms
+samples=19012 | achieved=200.01 Hz | errors=0 | deadline_misses=19012 | dt_std=1.078 ms | read_p99=0.710 ms
+samples=20012 | achieved=200.01 Hz | errors=0 | deadline_misses=20012 | dt_std=1.121 ms | read_p99=0.710 ms
+samples=21012 | achieved=200.01 Hz | errors=0 | deadline_misses=21012 | dt_std=1.171 ms | read_p99=0.711 ms
+samples=22013 | achieved=200.01 Hz | errors=0 | deadline_misses=22013 | dt_std=1.222 ms | read_p99=0.711 ms
+samples=23014 | achieved=200.01 Hz | errors=0 | deadline_misses=23014 | dt_std=1.264 ms | read_p99=0.709 ms
+
+Test finished.
+Total scheduled samples:              24001
+Total elapsed time:                   120.001 s
+Average achieved schedule rate:       200.007 Hz
+Read errors:                          0
+Deadline misses:                      24001
+Late by > half a requested period:    196
+Max consecutive read error burst:     0
+dt mean:                              4.999985 ms
+dt std:                               1.319685 ms
+dt p99:                               5.173836 ms
+dt p99.9:                             11.019066 ms
+dt max:                               71.705257 ms
+read duration mean:                   0.580442 ms
+read duration p99:                    0.709879 ms
+read duration p99.9:                  1.054114 ms
+read duration max:                    10.279784 ms
+schedule lag p99:                     0.281476 ms
+schedule lag p99.9:                   45.794530 ms
+positive schedule lag mean:           0.277338 ms
+
+
+----
+
+python3 analyze_imu_rate_test.py logs/test_200hz_120s.csv
+File:                         logs/test_200hz_120s.csv
+Requested rate:               200.000 Hz
+Configured sensor rate:       200.000 Hz
+Scheduled rows:               24001
+Successful reads:             24001
+Read errors:                  0
+Deadline misses:              24001
+Late by > half period:        196
+dt mean:                      4.999985 ms
+dt std:                       1.319685 ms
+dt p99:                       5.173836 ms
+dt p99.9:                     11.019066 ms
+dt max:                       71.705257 ms
+read duration mean:           0.580442 ms
+read duration p99:            0.709879 ms
+read duration p99.9:          1.054114 ms
+read duration max:            10.279784 ms
+schedule lag p99:             0.281476 ms
+schedule lag p99.9:           45.794530 ms
+accel norm mean/std:          10.095913 / 0.016318 m/s^2
+gyro norm mean/std:           0.041710 / 0.000993 rad/s
+Verdict:                      UNSTABLE: more than 1% deadline misses; frequent wakeups later than half a period; large worst-case dt outlier
