@@ -35,6 +35,10 @@ public:
   void set_jnt_vel(uint_fast8_t jnt, double vel);
   void stop_jnt(uint_fast8_t jnt);
 
+  // Planner trigger handshake used by system interface service client.
+  bool consume_planner_request();
+  void report_planner_result(bool success, const std::string& message);
+
   // Scene pose control (thread-safe; called from ROS callbacks or scripts)
   void set_hand_pose(const double pos[3], const double quat_wxyz[4]);
   void set_object_pose(const double pos[3], const double quat_wxyz[4]);
@@ -70,24 +74,9 @@ public:
   void request_camera_move(const double pos[3], const double quat_wxyz[4], double duration_s);
 
 private:
-  enum class PlannerTransformMode
-  {
-    kDynamicTf = 0,
-    kLegacyStatic = 1,
-  };
-
-  enum class PlannerExecutionMode
-  {
-    kDryRun = 0,
-    kTrajectory = 1,
-    kPosFf = 2,
-  };
-
   // item indices within the "Grasp Planner" section (SECTION header not counted)
-  static constexpr int kPlannerItemTransformMode = 1;
-  static constexpr int kPlannerItemExecutionMode = 3;
-  static constexpr int kPlannerItemRunPlanner    = 5;
-  static constexpr int kPlannerItemStatus        = 7;
+  static constexpr int kPlannerItemRunPlanner = 0;
+  static constexpr int kPlannerItemStatus = 1;
 
   // item indices within the "Scene Control" section (SECTION header not counted)
   // Hand: separator(0), X(1), Y(2), Z(3), Roll(4), Pitch(5), Yaw(6)
@@ -129,15 +118,7 @@ private:
   void handle_custom_event(mujoco::Simulate* sim, int sectionid, int itemid);
   void sync_custom_status(mujoco::Simulate* sim);
   void set_status(const std::string& status);
-  void launch_planner(PlannerTransformMode transform_mode,
-                      PlannerExecutionMode execution_mode);
-  void run_planner_worker(PlannerTransformMode transform_mode,
-                          PlannerExecutionMode execution_mode);
-  std::string build_planner_command(PlannerTransformMode transform_mode,
-                                    PlannerExecutionMode execution_mode,
-                                    const std::string& log_path) const;
-  std::string make_log_path() const;
-  static std::string shell_quote(const std::string& value);
+  void launch_planner();
 
   // Scene Control UI
   void add_scene_section(mujoco::Simulate* sim);
@@ -198,9 +179,8 @@ private:
 
   // Grasp Planner UI state
   int planner_sect_id_;
-  int planner_transform_mode_value_;
-  int planner_execution_mode_value_;
   std::atomic<bool> planner_running_;
+  std::atomic<bool> planner_request_pending_;
   std::mutex planner_status_mtx_;
   std::string planner_status_pending_;
   bool planner_status_dirty_;

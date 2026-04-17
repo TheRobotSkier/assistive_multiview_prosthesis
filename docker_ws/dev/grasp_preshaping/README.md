@@ -1,104 +1,46 @@
 # grasp_preshaping
 
-This crate currently provides a preshaping solver core and a CLI entrypoint.
+This crate provides the preshaping solver core and a ROS2 Trigger service node.
 
-## What is implemented
+## ROS2 service node
 
-- LUT-driven preshape solving extracted into a reusable planner module.
-- Optional AABB masking to limit collision checks to a user-provided point-cloud subset.
-- Configurable execution frequency and iteration count.
-- Dual point cloud input mode: file (`.xyz`) or ROS2 PointCloud2 topic.
-- Global fingertip offset with two parameters (distal/proximal and palmar/dorsal), applied once in finger-local frame.
-- Optional direct publication of ROS command topics (`ros2 topic pub --once`) with explicit backend selection.
+- Binary: `ros_node` (built with feature `ros`)
+- Service: `/grasp_preshaping/compute_grasp`
+- Type: `std_srvs/srv/Trigger`
 
-## Run examples
+On each service call, the node:
 
-Dry-run with full point cloud (default when AABB is not set):
+1. Uses the latest cached ROS messages from:
+- `/hand_pose` (`geometry_msgs/msg/PoseStamped`)
+- `/hand_twist` (`geometry_msgs/msg/TwistWithCovarianceStamped`)
+- `/segmented_object_cloud` (`sensor_msgs/msg/PointCloud2`)
+2. Runs the preshaping pipeline.
+3. Publishes controller commands to:
+- `/thumb_pos_ff_controller/commands`
+- `/index_pos_ff_controller/commands`
+- `/mrl_pos_ff_controller/commands`
 
-```bash
-cargo run --
-```
+## Build and run (container)
 
-Run at 2 Hz for 10 iterations:
-
-```bash
-cargo run -- --frequency-hz 2 --iterations 10
-```
-
-Dry-run with AABB enabled:
+Build the ROS node with ROS feature enabled:
 
 ```bash
-cargo run -- --aabb -0.2 -0.2 -0.2 0.2 0.2 0.2
+cargo build --release --features ros --bin ros_node
 ```
 
-Apply fingertip offsets in finger-local frame:
+Run the node:
 
 ```bash
-cargo run -- --offset-distal-proximal 0.01 --offset-palmar-dorsal -0.005
+cargo run --release --features ros --bin ros_node
 ```
 
-Use ROS PointCloud2 input mode (expects a publisher on the topic):
+Trigger one preshaping request:
 
 ```bash
-cargo run -- --mode ros --pointcloud-topic /segmented_object_cloud --frequency-hz 5 --iterations 0
+ros2 service call /grasp_preshaping/compute_grasp std_srvs/srv/Trigger {}
 ```
 
-Compute and publish controller commands:
+## Notes
 
-```bash
-cargo run -- --publish-commands
-```
-
-By default, `--publish-commands` targets trajectory controllers.
-
-Compute and publish with AABB:
-
-```bash
-cargo run -- --aabb -0.2 -0.2 -0.2 0.2 0.2 0.2 --publish-commands
-```
-
-Compute, offset, and publish at frequency:
-
-```bash
-cargo run -- --frequency-hz 5 --iterations 0 --offset-distal-proximal 0.005 --publish-commands
-```
-
-Publish to legacy `pos_ff` command topics explicitly:
-
-```bash
-cargo run -- --publish-commands --command-backend pos_ff
-```
-```
-
-## CLI summary
-
-- `--mode file|ros`: point cloud source mode.
-- `--cloud PATH`: `.xyz` path for file mode.
-- `--pointcloud-topic TOPIC`: ROS PointCloud2 topic for ros mode.
-- `--frequency-hz VALUE`: execution frequency.
-- `--iterations N`: iteration count (`0` means run forever).
-- `--aabb xmin ymin zmin xmax ymax zmax`: restrict collision checks to points inside the given axis-aligned bounding box.
-- `--offset-distal-proximal VALUE`: local +X fingertip offset in meters.
-- `--offset-palmar-dorsal VALUE`: local +Z fingertip offset in meters.
-- `--publish-commands`: send commands to MuJoCo controller topics.
-- `--command-backend trajectory|pos_ff`: command topic backend for `--publish-commands` (default: `trajectory`).
-
-## Current command topics
-
-Default (`--command-backend trajectory`):
-
-- /thumb_trajectory_controller/joint_trajectory
-- /index_trajectory_controller/joint_trajectory
-- /mrl_trajectory_controller/joint_trajectory
-
-Legacy (`--command-backend pos_ff`):
-
-- /thumb_pos_ff_controller/commands
-- /index_pos_ff_controller/commands
-- /mrl_pos_ff_controller/commands
-
-## Note
-
-ROS mode currently pulls one PointCloud2 message per cycle via `ros2 topic echo --once` and converts it internally. This keeps standard ROS2 message compatibility while the dedicated in-process ROS node wrapper is built.
-
-Before each publish, the crate checks that the target topic has at least one active subscriber and fails fast with a clear error if not.
+- This package no longer uses the old planner CLI flow used by MuJoCo wrappers.
+- If required inputs are missing, the Trigger response returns `success=false` with a descriptive message.

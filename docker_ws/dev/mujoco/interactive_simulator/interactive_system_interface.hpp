@@ -1,6 +1,7 @@
 #ifndef MIA_HAND_MUJOCO_INTERACTIVE_SYSTEM_INTERFACE_HPP
 #define MIA_HAND_MUJOCO_INTERACTIVE_SYSTEM_INTERFACE_HPP
 
+#include <atomic>
 #include <array>
 #include <memory>
 #include <string>
@@ -12,14 +13,15 @@
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
+#include "rclcpp/client.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/subscription.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/magnetic_field.hpp"
-#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
 #include "interactive_simulator.hpp"
 
@@ -91,6 +93,8 @@ private:
     const geometry_msgs::msg::Pose& msg,
     double pos[3], double quat_wxyz[4]);
 
+  void trigger_preshaping_service();
+
   std::unique_ptr<rclcpp::Logger> logger_;
 
   std::string xml_model_path_;
@@ -153,8 +157,9 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu2_pub_;
   rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag2_pub_;
 
-  // Grasp start signal
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr grasp_start_pub_;
+  // Preshaping Trigger service client
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr preshaping_client_;
+  std::atomic<bool> preshaping_call_running_;
 
   int pose_pub_counter_;
   int imu_pub_counter_;

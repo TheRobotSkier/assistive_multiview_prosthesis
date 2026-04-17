@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, OpaqueFunction,
+from launch.actions import (DeclareLaunchArgument, ExecuteProcess, OpaqueFunction,
                             RegisterEventHandler)
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
@@ -39,6 +39,8 @@ def launch_fun(context, *args, **kwargs):
     depth_publish_tf = LaunchConfiguration('depth_publish_tf').perform(context)
     depth_camera_frame_convention = LaunchConfiguration('depth_camera_frame_convention').perform(context)
     tf_publish_hz = LaunchConfiguration('tf_publish_hz')
+    enable_preshaping_service = LaunchConfiguration('enable_preshaping_service')
+    preshaping_service_command = LaunchConfiguration('preshaping_service_command')
 
     internal_depth_image_topic = '/mujoco/internal/depth/image'
     internal_depth_camera_info_topic = '/mujoco/internal/depth/camera_info'
@@ -246,6 +248,13 @@ def launch_fun(context, *args, **kwargs):
         condition = IfCondition(TextSubstitution(text = str(publish_tf).lower())),
     )
 
+    preshaping_service_process = ExecuteProcess(
+        cmd = ['bash', '-lc', preshaping_service_command],
+        output = 'screen',
+        shell = False,
+        condition = IfCondition(enable_preshaping_service),
+    )
+
     return [
         ros2_control_node,
         robot_state_publisher,
@@ -254,6 +263,7 @@ def launch_fun(context, *args, **kwargs):
         scene_state_publisher_node,
         depth_publisher_node,
         tf_publisher_node,
+        preshaping_service_process,
     ]
 
 def generate_launch_description():
@@ -408,6 +418,18 @@ def generate_launch_description():
         description='Publish rate for the dedicated MuJoCo TF publisher node.'
     )
 
+    enable_preshaping_service_arg = DeclareLaunchArgument(
+        'enable_preshaping_service',
+        default_value='true',
+        description='Start the standalone grasp preshaping ROS service node with the simulation launch.'
+    )
+
+    preshaping_service_command_arg = DeclareLaunchArgument(
+        'preshaping_service_command',
+        default_value='cd /miahand_ws/src/dev/grasp_preshaping && cargo run --release --features ros --bin ros_node',
+        description='Command used to start the grasp preshaping service process.'
+    )
+
     return LaunchDescription([
         scene_arg,
         xml_model_path_arg,
@@ -435,5 +457,7 @@ def generate_launch_description():
         depth_publish_tf_arg,
         depth_camera_frame_convention_arg,
         tf_publish_hz_arg,
+        enable_preshaping_service_arg,
+        preshaping_service_command_arg,
         OpaqueFunction(function = launch_fun)
     ])

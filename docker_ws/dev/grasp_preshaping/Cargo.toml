@@ -1,5 +1,5 @@
 [package]
-name = "preshaping"
+name = "grasp_preshaping"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,10 +8,31 @@ npyz = { version = "0.8", features = ["npz"] }
 nalgebra = "0.32"
 rayon = "1.10"
 thiserror = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
 rand = "0.9"
 rand_distr = "0.5"
+anyhow = { version = "1", features = ["backtrace"] }
+
+# ROS dependencies are feature-gated so non-ROS builds remain lightweight.
+rclrs = { version = "0.7", optional = true }
+rosidl_runtime_rs = { version = "0.6", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "pipeline"
+harness = false
+
+[[bin]]
+name = "ros_node"
+required-features = ["ros"]
+
+[features]
+default = []
+ros = [
+	"dep:rclrs",
+	"dep:rosidl_runtime_rs",
+]  # Feature for ROS service-node builds in Docker
 
 [profile.release]
 opt-level = 3

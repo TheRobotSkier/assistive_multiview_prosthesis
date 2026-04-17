@@ -33,28 +33,16 @@ public:
   void set_jnt_vel(uint_fast8_t jnt, double vel);
   void stop_jnt(uint_fast8_t jnt);
 
+  bool consume_planner_request();
+  void report_planner_result(bool success, const std::string& message);
+
 private:
-  enum class PlannerTransformMode
-  {
-    kDynamicTf = 0,
-    kLegacyStatic = 1,
-  };
-
-  enum class PlannerExecutionMode
-  {
-    kDryRun = 0,
-    kTrajectory = 1,
-    kPosFf = 2,
-  };
-
   static constexpr int kUiRectMain = 0;
   static constexpr int kUiRectPanel = 1;
   static constexpr int kUiRectViewport = 2;
   static constexpr int kUiSectionPlanner = 0;
-  static constexpr int kUiItemTransformMode = 1;
-  static constexpr int kUiItemExecutionMode = 3;
-  static constexpr int kUiItemRunPlanner = 5;
-  static constexpr int kUiItemStatus = 7;
+  static constexpr int kUiItemRunPlanner = 0;
+  static constexpr int kUiItemStatus = 1;
 
   PlannerGuiSimulator();
 
@@ -81,17 +69,7 @@ private:
                          double scroll_x, double scroll_y, int mods);
   void handle_ui_item(mjuiItem* item);
   void set_status(const std::string& status);
-  void launch_planner(PlannerTransformMode transform_mode,
-                      PlannerExecutionMode execution_mode);
-  void run_planner_worker(PlannerTransformMode transform_mode,
-                          PlannerExecutionMode execution_mode);
-  std::string build_planner_command(PlannerTransformMode transform_mode,
-                                    PlannerExecutionMode execution_mode,
-                                    const std::string& log_path) const;
-  std::string make_log_path() const;
-  static std::string shell_quote(const std::string& value);
-  static const char* transform_mode_label(PlannerTransformMode mode);
-  static const char* execution_mode_label(PlannerExecutionMode mode);
+  void launch_planner();
 
   mjModel* mj_model_;
   mjData* mj_data_;
@@ -108,8 +86,6 @@ private:
   bool ui_initialized_;
   int ui_last_width_;
   int ui_last_height_;
-  int planner_transform_mode_value_;
-  int planner_execution_mode_value_;
   bool ui_mouse_capture_;
 
   mjtMouse mjt_action_;
@@ -146,6 +122,7 @@ private:
   std::mutex sim_mtx_;
 
   std::atomic<bool> planner_running_;
+  std::atomic<bool> planner_request_pending_;
   std::mutex planner_status_mtx_;
   std::string planner_status_pending_;
   bool planner_status_dirty_;

@@ -1,7 +1,9 @@
 #include "planner_gui_system_interface.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <exception>
 #include <future>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
@@ -11,6 +13,7 @@
 namespace mia_hand_mujoco
 {
 PlannerGuiSystemInterface::PlannerGuiSystemInterface()
+: preshaping_call_running_(false)
 {
 }
 
@@ -114,6 +117,11 @@ hardware_interface::CallbackReturn PlannerGuiSystemInterface::on_activate(
   const rclcpp_lifecycle::State& /* previous state */)
 {
   RCLCPP_INFO(*logger_, "Activating planner GUI simulator...");
+
+  auto node = get_node();
+  preshaping_client_ = node->create_client<std_srvs::srv::Trigger>(
+    "/grasp_preshaping/compute_grasp");
+
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -121,6 +129,8 @@ hardware_interface::CallbackReturn PlannerGuiSystemInterface::on_deactivate(
   const rclcpp_lifecycle::State& /* previous state */)
 {
   RCLCPP_INFO(*logger_, "Deactivating planner GUI simulator...");
+  preshaping_client_.reset();
+  preshaping_call_running_.store(false);
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -247,6 +257,11 @@ PlannerGuiSystemInterface::prepare_command_mode_switch(
 hardware_interface::return_type PlannerGuiSystemInterface::read(
   const rclcpp::Time& /* time */, const rclcpp::Duration& /* period */)
 {
+  if (PlannerGuiSimulator::get_instance().consume_planner_request())
+  {
+    trigger_preshaping_service();
+  }
+
   PlannerGuiSimulator::get_instance().read_jnt_vel(
     jnt_vel_state_[0], jnt_vel_state_[1], jnt_vel_state_[2]);
 
@@ -405,6 +420,67 @@ void PlannerGuiSystemInterface::read_rviz2_joints_info(
         jnt_name_to_find.c_str());
     }
   }
+}
+
+void PlannerGuiSystemInterface::trigger_preshaping_service()
+{
+  if (!preshaping_client_)
+  {
+    PlannerGuiSimulator::get_instance().report_planner_result(
+      false, "Service client not initialized");
+    return;
+  }
+
+  bool expected = false;
+  if (!preshaping_call_running_.compare_exchange_strong(expected, true))
+  {
+    PlannerGuiSimulator::get_instance().report_planner_result(
+      false, "Service call already in flight");
+    return;
+  }
+
+  auto client = preshaping_client_;
+  rclcpp::Logger* logger = logger_.get();
+
+  std::thread([client, logger, this]() {
+    using namespace std::chrono_literals;
+
+    auto finish = [this](bool success, const std::string& message) {
+      PlannerGuiSimulator::get_instance().report_planner_result(success, message);
+      preshaping_call_running_.store(false);
+    };
+
+    if (!client->wait_for_service(2s))
+    {
+      finish(false, "Preshaping service unavailable");
+      return;
+    }
+
+    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+    auto future = client->async_send_request(request);
+    if (future.wait_for(15s) != std::future_status::ready)
+    {
+      finish(false, "Preshaping service timeout");
+      return;
+    }
+
+    try
+    {
+      auto response = future.get();
+      const std::string message = response->message.empty()
+        ? (response->success ? "Preshaping completed" : "Preshaping failed")
+        : response->message;
+      finish(response->success, message);
+    }
+    catch (const std::exception& e)
+    {
+      if (logger)
+      {
+        RCLCPP_ERROR(*logger, "Preshaping service call exception: %s", e.what());
+      }
+      finish(false, "Preshaping service exception");
+    }
+  }).detach();
 }
 }  // namespace mia_hand_mujoco
 

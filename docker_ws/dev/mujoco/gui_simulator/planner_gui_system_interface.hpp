@@ -1,6 +1,7 @@
 #ifndef MIA_HAND_MUJOCO_PLANNER_GUI_SYSTEM_INTERFACE_HPP
 #define MIA_HAND_MUJOCO_PLANNER_GUI_SYSTEM_INTERFACE_HPP
 
+#include <atomic>
 #include <array>
 #include <memory>
 #include <string>
@@ -9,8 +10,10 @@
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
+#include "rclcpp/client.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp_lifecycle/state.hpp"
+#include "std_srvs/srv/trigger.hpp"
 
 #include "planner_gui_simulator.hpp"
 
@@ -67,6 +70,8 @@ private:
   void read_rviz2_joints_info(
     const std::vector<hardware_interface::ComponentInfo>& jnt_info);
 
+  void trigger_preshaping_service();
+
   std::unique_ptr<rclcpp::Logger> logger_;
 
   std::string xml_model_path_;
@@ -105,6 +110,9 @@ private:
   std::array<Rviz2JointInfo, 3> rviz2_joints_;
 
   std::thread sim_trd_;
+
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr preshaping_client_;
+  std::atomic<bool> preshaping_call_running_;
 };
 }  // namespace mia_hand_mujoco
 

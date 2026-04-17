@@ -18,6 +18,7 @@ find_package(glfw3 REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 if(DEFINED ENV{MUJOCO_DIR})
 
@@ -118,6 +119,7 @@ ament_target_dependencies(${PROJECT_NAME}_planner_gui PUBLIC
   hardware_interface
   pluginlib
   glfw3
+  std_srvs
 )
 
 ament_target_dependencies(${PROJECT_NAME}_interactive PUBLIC
@@ -129,6 +131,7 @@ ament_target_dependencies(${PROJECT_NAME}_interactive PUBLIC
   geometry_msgs
   sensor_msgs
   std_msgs
+  std_srvs
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC

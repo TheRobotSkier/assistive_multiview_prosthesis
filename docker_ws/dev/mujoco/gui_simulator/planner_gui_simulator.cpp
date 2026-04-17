@@ -20,69 +20,6 @@
 
 namespace
 {
-constexpr const char* kPlannerWorkdir = "/miahand_ws/src/dev/grasp_preshaping";
-constexpr const char* kPlannerManifest = "/miahand_ws/src/dev/grasp_preshaping/Cargo.toml";
-constexpr const char* kPlannerBinary = "/miahand_ws/src/dev/grasp_preshaping/target/release/preshaping";
-constexpr const char* kPlannerPointcloudTopic = "/segmented_object_cloud";
-constexpr const char* kPlannerLogDir = "/miahand_ws/src/dev/mujoco/log";
-constexpr const char* kPlannerMostRecentLog = "/miahand_ws/src/dev/mujoco/log/most_recent.txt";
-
-namespace fs = std::filesystem;
-
-std::string log_display_name(const std::string& log_path)
-{
-  const std::string stem = fs::path(log_path).stem().string();
-  const std::smatch match = [&stem]() {
-    std::smatch local_match;
-    std::regex_match(stem, local_match, std::regex(R"(^grasp_log_(\d{3,})$)"));
-    return local_match;
-  }();
-  if (match.size() == 2)
-  {
-    return std::string("log_") + match[1].str();
-  }
-
-  return stem;
-}
-
-std::string short_execution_mode_label(const int execution_mode)
-{
-  switch (execution_mode)
-  {
-    case 0:
-      return "dry";
-    case 1:
-      return "traj";
-    case 2:
-      return "pos";
-    default:
-      return "unk";
-  }
-}
-
-bool write_log_header(const std::string& log_path)
-{
-  std::ofstream log_stream(log_path, std::ios::trunc);
-  if (!log_stream.is_open())
-  {
-    return false;
-  }
-
-  const auto now = std::chrono::system_clock::now();
-  const std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-  std::tm local_tm {};
-  localtime_r(&now_time, &local_tm);
-  log_stream << "Timestamp: " << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S") << '\n';
-  return true;
-}
-
-bool copy_to_most_recent_log(const std::string& log_path)
-{
-  std::error_code error;
-  fs::copy_file(log_path, kPlannerMostRecentLog, fs::copy_options::overwrite_existing, error);
-  return !error;
-}
-
 int map_glfw_button(int button)
 {
   switch (button)
@@ -177,6 +114,24 @@ void PlannerGuiSimulator::stop_jnt(uint_fast8_t jnt)
   jnt_pos_cmd_[jnt] = mj_data_->qpos[jnt];
 }
 
+bool PlannerGuiSimulator::consume_planner_request()
+{
+  return planner_request_pending_.exchange(false);
+}
+
+void PlannerGuiSimulator::report_planner_result(bool success, const std::string& message)
+{
+  if (success)
+  {
+    set_status(std::string("OK: ") + message);
+  }
+  else
+  {
+    set_status(std::string("FAIL: ") + message);
+  }
+  planner_running_.store(false);
+}
+
 PlannerGuiSimulator::PlannerGuiSimulator()
 : mj_model_(nullptr),
   mj_data_(nullptr),
@@ -184,8 +139,6 @@ PlannerGuiSimulator::PlannerGuiSimulator()
   ui_initialized_(false),
   ui_last_width_(0),
   ui_last_height_(0),
-  planner_transform_mode_value_(0),
-  planner_execution_mode_value_(0),
   ui_mouse_capture_(false),
   mjt_sim_t0_(0.0),
   mjt_sim_dt_(1.0 / 60.0),
@@ -202,6 +155,7 @@ PlannerGuiSimulator::PlannerGuiSimulator()
   shift_key_pressed_(false),
   plugin_instance_(-1),
   planner_running_(false),
+  planner_request_pending_(false),
   planner_status_pending_("Idle"),
   planner_status_dirty_(true)
 {
@@ -558,8 +512,6 @@ void PlannerGuiSimulator::init_ui()
   std::memset(&ui_state_, 0, sizeof(ui_state_));
   std::memset(&ui_, 0, sizeof(ui_));
 
-  planner_transform_mode_value_ = static_cast<int>(PlannerTransformMode::kDynamicTf);
-  planner_execution_mode_value_ = static_cast<int>(PlannerExecutionMode::kDryRun);
   ui_mouse_capture_ = false;
 
   ui_state_.userdata = this;
@@ -577,13 +529,7 @@ void PlannerGuiSimulator::init_ui()
 
   const mjuiDef planner_def[] = {
     {mjITEM_SECTION,   "Grasp Planner", mjPRESERVE, nullptr,                       "", 0},
-    {mjITEM_SEPARATOR, "Pose Source",   1,          nullptr,                       "", 0},
-    {mjITEM_RADIO,     "Pose",          1,          &planner_transform_mode_value_, "Dynamic TF\nLegacy static", 0},
-    {mjITEM_SEPARATOR, "Execution",     1,          nullptr,                       "", 0},
-    {mjITEM_RADIO,     "Mode",          1,          &planner_execution_mode_value_, "Dry run\nTrajectory\nPos FF", 0},
-    {mjITEM_SEPARATOR, "",              1,          nullptr,                       "", 0},
     {mjITEM_BUTTON,    "Run Planner",   1,          nullptr,                       "", 0},
-    {mjITEM_SEPARATOR, "",              1,          nullptr,                       "", 0},
     {mjITEM_STATIC,    "Status",        1,          nullptr,                       "Idle", 0},
     {mjITEM_END,       "",              0,          nullptr,                       "", 0}
   };
@@ -759,22 +705,7 @@ void PlannerGuiSimulator::handle_ui_item(mjuiItem* item)
 
   if (item->itemid == kUiItemRunPlanner)
   {
-    const PlannerTransformMode transform_mode =
-      (planner_transform_mode_value_ == static_cast<int>(PlannerTransformMode::kLegacyStatic))
-        ? PlannerTransformMode::kLegacyStatic
-        : PlannerTransformMode::kDynamicTf;
-
-    PlannerExecutionMode execution_mode = PlannerExecutionMode::kDryRun;
-    if (planner_execution_mode_value_ == static_cast<int>(PlannerExecutionMode::kTrajectory))
-    {
-      execution_mode = PlannerExecutionMode::kTrajectory;
-    }
-    else if (planner_execution_mode_value_ == static_cast<int>(PlannerExecutionMode::kPosFf))
-    {
-      execution_mode = PlannerExecutionMode::kPosFf;
-    }
-
-    launch_planner(transform_mode, execution_mode);
+    launch_planner();
   }
 }
 
@@ -785,8 +716,7 @@ void PlannerGuiSimulator::set_status(const std::string& status)
   planner_status_dirty_ = true;
 }
 
-void PlannerGuiSimulator::launch_planner(
-  PlannerTransformMode transform_mode, PlannerExecutionMode execution_mode)
+void PlannerGuiSimulator::launch_planner()
 {
   bool expected = false;
   if (!planner_running_.compare_exchange_strong(expected, true))
@@ -795,192 +725,7 @@ void PlannerGuiSimulator::launch_planner(
     return;
   }
 
-  set_status("Preparing planner");
-
-  std::thread(
-    &PlannerGuiSimulator::run_planner_worker, this, transform_mode, execution_mode).detach();
-}
-
-void PlannerGuiSimulator::run_planner_worker(
-  PlannerTransformMode transform_mode, PlannerExecutionMode execution_mode)
-{
-  const std::string log_path = make_log_path();
-  const std::string log_name = log_display_name(log_path);
-
-  if (!write_log_header(log_path))
-  {
-    set_status("Log init failed");
-    planner_running_.store(false);
-    return;
-  }
-
-  set_status(
-    std::string("Run ") + short_execution_mode_label(static_cast<int>(execution_mode)) +
-    " " + log_name);
-
-  const std::string command = build_planner_command(transform_mode, execution_mode, log_path);
-
-  const int result = std::system(command.c_str());
-  copy_to_most_recent_log(log_path);
-
-  if (result == -1)
-  {
-    set_status(std::string("ERR ") + log_name);
-  }
-  else if (WIFEXITED(result) && WEXITSTATUS(result) == 0)
-  {
-    set_status(std::string("OK ") + log_name);
-  }
-  else if (WIFEXITED(result))
-  {
-    set_status(
-      std::string("FAIL") + std::to_string(WEXITSTATUS(result)) + " " + log_name);
-  }
-  else
-  {
-    set_status(std::string("TERM ") + log_name);
-  }
-
-  planner_running_.store(false);
-}
-
-std::string PlannerGuiSimulator::build_planner_command(
-  PlannerTransformMode transform_mode,
-  PlannerExecutionMode execution_mode,
-  const std::string& log_path) const
-{
-  std::ostringstream cmd;
-  cmd << "cd " << shell_quote(kPlannerWorkdir) << " && ";
-
-  if (execution_mode == PlannerExecutionMode::kTrajectory)
-  {
-    cmd << "ros2 control switch_controllers -c /controller_manager"
-        << " --deactivate thumb_pos_ff_controller index_pos_ff_controller mrl_pos_ff_controller"
-        << " --activate thumb_trajectory_controller index_trajectory_controller"
-        << " mrl_trajectory_controller"
-        << " >> " << shell_quote(log_path) << " 2>&1 && ";
-  }
-  else if (execution_mode == PlannerExecutionMode::kPosFf)
-  {
-    cmd << "ros2 control switch_controllers -c /controller_manager"
-        << " --deactivate thumb_trajectory_controller index_trajectory_controller"
-        << " mrl_trajectory_controller"
-        << " --activate thumb_pos_ff_controller index_pos_ff_controller mrl_pos_ff_controller"
-        << " >> " << shell_quote(log_path) << " 2>&1 && ";
-  }
-
-  if (access(kPlannerBinary, X_OK) == 0)
-  {
-    cmd << shell_quote(kPlannerBinary);
-  }
-  else
-  {
-    cmd << "cargo run --release --manifest-path " << shell_quote(kPlannerManifest) << " --";
-  }
-
-  cmd << " --mode ros"
-      << " --pointcloud-topic " << shell_quote(kPlannerPointcloudTopic)
-      << " --iterations 1"
-      << " --frequency-hz 1"
-      << " --pc-scale 1.0";
-
-  if (transform_mode == PlannerTransformMode::kDynamicTf)
-  {
-    cmd << " --base-transform-mode tf"
-        << " --base-parent-frame world"
-        << " --base-child-frame mujoco_palm_r";
-  }
-  else
-  {
-    cmd << " --base-transform-mode static";
-  }
-
-  if (execution_mode != PlannerExecutionMode::kDryRun)
-  {
-    cmd << " --publish-commands --command-backend "
-        << ((execution_mode == PlannerExecutionMode::kPosFf) ? "pos_ff" : "trajectory");
-  }
-
-  cmd << " >> " << shell_quote(log_path) << " 2>&1";
-  return cmd.str();
-}
-
-std::string PlannerGuiSimulator::make_log_path() const
-{
-  std::error_code error;
-  fs::create_directories(kPlannerLogDir, error);
-
-  int max_log_number = 0;
-  const std::regex log_pattern(R"(^grasp_log_(\d{3,})\.txt$)");
-  if (!error)
-  {
-    for (const fs::directory_entry& entry : fs::directory_iterator(kPlannerLogDir, error))
-    {
-      if (error || !entry.is_regular_file())
-      {
-        continue;
-      }
-
-      const std::string filename = entry.path().filename().string();
-      std::smatch match;
-      if (std::regex_match(filename, match, log_pattern) && match.size() == 2)
-      {
-        max_log_number = std::max(max_log_number, std::stoi(match[1].str()));
-      }
-    }
-  }
-
-  std::ostringstream filename;
-  filename << "grasp_log_" << std::setw(3) << std::setfill('0') << (max_log_number + 1)
-           << ".txt";
-  return (fs::path(kPlannerLogDir) / filename.str()).string();
-}
-
-std::string PlannerGuiSimulator::shell_quote(const std::string& value)
-{
-  std::string result;
-  result.reserve(value.size() + 2);
-  result.push_back('\'');
-  for (char c : value)
-  {
-    if (c == '\'')
-    {
-      result += "'\\''";
-    }
-    else
-    {
-      result.push_back(c);
-    }
-  }
-  result.push_back('\'');
-  return result;
-}
-
-const char* PlannerGuiSimulator::transform_mode_label(PlannerTransformMode mode)
-{
-  switch (mode)
-  {
-    case PlannerTransformMode::kDynamicTf:
-      return "dynamic TF";
-    case PlannerTransformMode::kLegacyStatic:
-      return "legacy static";
-    default:
-      return "unknown";
-  }
-}
-
-const char* PlannerGuiSimulator::execution_mode_label(PlannerExecutionMode mode)
-{
-  switch (mode)
-  {
-    case PlannerExecutionMode::kDryRun:
-      return "dry-run";
-    case PlannerExecutionMode::kTrajectory:
-      return "trajectory";
-    case PlannerExecutionMode::kPosFf:
-      return "pos_ff";
-    default:
-      return "unknown";
-  }
+  planner_request_pending_.store(true);
+  set_status("Calling preshaping service");
 }
 }  // namespace mia_hand_mujoco

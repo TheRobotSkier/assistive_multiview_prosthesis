@@ -1,7 +1,9 @@
 #include "interactive_system_interface.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <exception>
 #include <future>
 #include <functional>
 
@@ -12,7 +14,9 @@
 namespace mia_hand_mujoco
 {
 InteractiveSystemInterface::InteractiveSystemInterface()
-: pose_pub_counter_(0), imu_pub_counter_(0)
+: preshaping_call_running_(false),
+  pose_pub_counter_(0),
+  imu_pub_counter_(0)
 {
 }
 
@@ -160,8 +164,8 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
   mag2_pub_ = node->create_publisher<sensor_msgs::msg::MagneticField>(
     "/mujoco/wrist_cam/imu/magnetic_field", 10);
 
-  grasp_start_pub_ = node->create_publisher<std_msgs::msg::Bool>(
-    "/mujoco/grasp_start", 10);
+  preshaping_client_ = node->create_client<std_srvs::srv::Trigger>(
+    "/grasp_preshaping/compute_grasp");
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -184,7 +188,8 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_deactivate(
   sim_time_pub_.reset();
   imu2_pub_.reset();
   mag2_pub_.reset();
-  grasp_start_pub_.reset();
+  preshaping_client_.reset();
+  preshaping_call_running_.store(false);
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -287,6 +292,10 @@ InteractiveSystemInterface::prepare_command_mode_switch(
 hardware_interface::return_type InteractiveSystemInterface::read(
   const rclcpp::Time& /* time */, const rclcpp::Duration& /* period */)
 {
+  if (InteractiveSimulator::get_instance().consume_planner_request()) {
+    trigger_preshaping_service();
+  }
+
   InteractiveSimulator::get_instance().read_jnt_vel(
     jnt_vel_state_[0], jnt_vel_state_[1], jnt_vel_state_[2]);
 
@@ -599,6 +608,59 @@ void InteractiveSystemInterface::on_camera_motion_msg(
   pose_msg_to_sim(msg->pose, pos, quat);
   InteractiveSimulator::get_instance().request_camera_move(
     pos, quat, duration_from_stamp(msg->header.stamp));
+}
+
+void InteractiveSystemInterface::trigger_preshaping_service()
+{
+  if (!preshaping_client_) {
+    InteractiveSimulator::get_instance().report_planner_result(
+      false, "Service client not initialized");
+    return;
+  }
+
+  bool expected = false;
+  if (!preshaping_call_running_.compare_exchange_strong(expected, true)) {
+    InteractiveSimulator::get_instance().report_planner_result(
+      false, "Service call already in flight");
+    return;
+  }
+
+  auto client = preshaping_client_;
+  rclcpp::Logger* logger = logger_.get();
+
+  std::thread([client, logger, this]() {
+    using namespace std::chrono_literals;
+
+    auto finish = [this](bool success, const std::string& message) {
+      InteractiveSimulator::get_instance().report_planner_result(success, message);
+      preshaping_call_running_.store(false);
+    };
+
+    if (!client->wait_for_service(2s)) {
+      finish(false, "Preshaping service unavailable");
+      return;
+    }
+
+    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+    auto future = client->async_send_request(request);
+    if (future.wait_for(15s) != std::future_status::ready) {
+      finish(false, "Preshaping service timeout");
+      return;
+    }
+
+    try {
+      auto response = future.get();
+      const std::string message = response->message.empty()
+        ? (response->success ? "Preshaping completed" : "Preshaping failed")
+        : response->message;
+      finish(response->success, message);
+    } catch (const std::exception& e) {
+      if (logger) {
+        RCLCPP_ERROR(*logger, "Preshaping service call exception: %s", e.what());
+      }
+      finish(false, "Preshaping service exception");
+    }
+  }).detach();
 }
 
 }  // namespace mia_hand_mujoco

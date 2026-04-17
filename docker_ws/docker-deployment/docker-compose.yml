@@ -10,7 +10,8 @@ services:
     network_mode: "host"
     # device_cgroup_rules:
     #   - "c 188:* rmw"
-    privileged: true
+    # Rootless Podman cannot run privileged containers.
+    privileged: false
     tty: true
     stdin_open: true
     volumes:
@@ -29,7 +30,7 @@ services:
       RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp} #added LINUX
 
     user: "1000:1000"                  # UID/GID must match the host user for socket access
-    userns_mode: "keep-id"             # rootless Podman: preserve host UID mapping for bind-mounted auth files
+    # userns_mode intentionally omitted: host networking + userns remap is incompatible on rootless Podman
     # ipc: host                        # Recommended to avoid X11 rendering glitches
     command: /bin/bash
 

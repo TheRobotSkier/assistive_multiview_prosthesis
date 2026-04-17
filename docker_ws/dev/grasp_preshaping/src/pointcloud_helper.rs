@@ -762,7 +762,8 @@ mod tests {
 
     #[test]
     fn from_xyz_file_loads_sphere() {
-        let pc = PointCloud::from_xyz_file("./data/sphere.xyz").unwrap();
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../data/sphere.xyz");
+        let pc = PointCloud::from_xyz_file(path).unwrap();
         assert!(pc.len() > 100, "sphere.xyz should have many points");
         for p in &pc.points {
             assert!(p.x.is_finite() && p.y.is_finite() && p.z.is_finite());
@@ -771,7 +772,7 @@ mod tests {
 
     #[test]
     fn from_xyz_file_missing_file_returns_error() {
-        let result = PointCloud::from_xyz_file("./data/nonexistent.xyz");
+        let result = PointCloud::from_xyz_file("/nonexistent/path/sphere.xyz");
         assert!(result.is_err());
     }
 
