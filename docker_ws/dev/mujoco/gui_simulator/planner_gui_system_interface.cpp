@@ -13,7 +13,8 @@
 namespace mia_hand_mujoco
 {
 PlannerGuiSystemInterface::PlannerGuiSystemInterface()
-: preshaping_call_running_(false)
+: pose_pub_counter_(0),
+  preshaping_call_running_(false)
 {
 }
 
@@ -119,7 +120,11 @@ hardware_interface::CallbackReturn PlannerGuiSystemInterface::on_activate(
   RCLCPP_INFO(*logger_, "Activating planner GUI simulator...");
 
   auto node = get_node();
-  preshaping_client_ = node->create_client<std_srvs::srv::Trigger>(
+  hand_pose_pub_ = node->create_publisher<geometry_msgs::msg::Pose>("/mujoco/hand_pose", 10);
+  hand_pose_alias_pub_ = node->create_publisher<geometry_msgs::msg::Pose>("/hand_pose", 10);
+  hand_twist_pub_ = node->create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
+    "/hand_twist", 10);
+  preshaping_trigger_client_ = node->create_client<std_srvs::srv::Trigger>(
     "/grasp_preshaping/compute_grasp");
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -129,7 +134,10 @@ hardware_interface::CallbackReturn PlannerGuiSystemInterface::on_deactivate(
   const rclcpp_lifecycle::State& /* previous state */)
 {
   RCLCPP_INFO(*logger_, "Deactivating planner GUI simulator...");
-  preshaping_client_.reset();
+  hand_pose_pub_.reset();
+  hand_pose_alias_pub_.reset();
+  hand_twist_pub_.reset();
+  preshaping_trigger_client_.reset();
   preshaping_call_running_.store(false);
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -257,6 +265,56 @@ PlannerGuiSystemInterface::prepare_command_mode_switch(
 hardware_interface::return_type PlannerGuiSystemInterface::read(
   const rclcpp::Time& /* time */, const rclcpp::Duration& /* period */)
 {
+  if (++pose_pub_counter_ >= 10)
+  {
+    pose_pub_counter_ = 0;
+
+    double pos[3], quat[4];
+    PlannerGuiSimulator::get_instance().get_hand_pose(pos, quat);
+
+    geometry_msgs::msg::Pose pose_msg;
+    pose_msg.position.x = pos[0];
+    pose_msg.position.y = pos[1];
+    pose_msg.position.z = pos[2];
+    pose_msg.orientation.w = quat[0];
+    pose_msg.orientation.x = quat[1];
+    pose_msg.orientation.y = quat[2];
+    pose_msg.orientation.z = quat[3];
+
+    if (hand_pose_pub_)
+    {
+      hand_pose_pub_->publish(pose_msg);
+    }
+    if (hand_pose_alias_pub_)
+    {
+      hand_pose_alias_pub_->publish(pose_msg);
+    }
+
+    if (hand_twist_pub_)
+    {
+      geometry_msgs::msg::TwistWithCovarianceStamped twist_msg;
+      twist_msg.header.frame_id = "palm_r";
+      twist_msg.header.stamp = rclcpp::Clock().now();
+      twist_msg.twist.twist.linear.x = 0.0;
+      twist_msg.twist.twist.linear.y = 0.0;
+      twist_msg.twist.twist.linear.z = 0.0;
+      twist_msg.twist.twist.angular.x = 0.0;
+      twist_msg.twist.twist.angular.y = 0.0;
+      twist_msg.twist.twist.angular.z = 0.0;
+      for (double& covariance_value : twist_msg.twist.covariance)
+      {
+        covariance_value = 0.0;
+      }
+      twist_msg.twist.covariance[0] = 1e-6;
+      twist_msg.twist.covariance[7] = 1e-6;
+      twist_msg.twist.covariance[14] = 1e-6;
+      twist_msg.twist.covariance[21] = 1e-6;
+      twist_msg.twist.covariance[28] = 1e-6;
+      twist_msg.twist.covariance[35] = 1e-6;
+      hand_twist_pub_->publish(twist_msg);
+    }
+  }
+
   if (PlannerGuiSimulator::get_instance().consume_planner_request())
   {
     trigger_preshaping_service();
@@ -424,10 +482,10 @@ void PlannerGuiSystemInterface::read_rviz2_joints_info(
 
 void PlannerGuiSystemInterface::trigger_preshaping_service()
 {
-  if (!preshaping_client_)
+  if (!preshaping_trigger_client_)
   {
     PlannerGuiSimulator::get_instance().report_planner_result(
-      false, "Service client not initialized");
+      false, "Preshaping service client not initialized");
     return;
   }
 
@@ -435,14 +493,14 @@ void PlannerGuiSystemInterface::trigger_preshaping_service()
   if (!preshaping_call_running_.compare_exchange_strong(expected, true))
   {
     PlannerGuiSimulator::get_instance().report_planner_result(
-      false, "Service call already in flight");
+      false, "Preshaping call already in flight");
     return;
   }
 
-  auto client = preshaping_client_;
-  rclcpp::Logger* logger = logger_.get();
+  auto client = preshaping_trigger_client_;
+  auto logger = logger_.get();
 
-  std::thread([client, logger, this]() {
+  std::thread([this, client, logger]() {
     using namespace std::chrono_literals;
 
     auto finish = [this](bool success, const std::string& message) {
@@ -452,34 +510,29 @@ void PlannerGuiSystemInterface::trigger_preshaping_service()
 
     if (!client->wait_for_service(2s))
     {
+      if (logger)
+      {
+        RCLCPP_ERROR(*logger, "Preshaping service /grasp_preshaping/compute_grasp unavailable");
+      }
       finish(false, "Preshaping service unavailable");
       return;
     }
 
-    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-    auto future = client->async_send_request(request);
-    if (future.wait_for(15s) != std::future_status::ready)
-    {
-      finish(false, "Preshaping service timeout");
-      return;
-    }
-
-    try
-    {
-      auto response = future.get();
-      const std::string message = response->message.empty()
-        ? (response->success ? "Preshaping completed" : "Preshaping failed")
-        : response->message;
-      finish(response->success, message);
-    }
-    catch (const std::exception& e)
+    auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+    auto future = client->async_send_request(req);
+    constexpr auto kTotalTimeout = 15s;
+    if (future.wait_for(kTotalTimeout) != std::future_status::ready)
     {
       if (logger)
       {
-        RCLCPP_ERROR(*logger, "Preshaping service call exception: %s", e.what());
+        RCLCPP_ERROR(*logger, "Preshaping service timeout");
       }
-      finish(false, "Preshaping service exception");
+      finish(false, "Preshaping timeout");
+      return;
     }
+
+    const auto response = future.get();
+    finish(response->success, response->message);
   }).detach();
 }
 }  // namespace mia_hand_mujoco

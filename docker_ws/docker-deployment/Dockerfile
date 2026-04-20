@@ -51,10 +51,11 @@ RUN apt-get update && \
         libserial-dev \
         setserial \
         libglfw3-dev \
+        xauth \
+        xvfb \
         libegl1 \
         libgl1 \
         libgomp1 \
-        libclang-dev \
         ros-${ROS_DISTRO}-joint-state-publisher-gui \
         ros-${ROS_DISTRO}-hardware-interface \
         ros-${ROS_DISTRO}-transmission-interface \
@@ -72,7 +73,6 @@ RUN apt-get update && \
         ros-${ROS_DISTRO}-rqt \
         ros-${ROS_DISTRO}-rqt-graph \
         ros-${ROS_DISTRO}-example-interfaces \
-        # ros-${ROS_DISTRO}-test-msgs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -93,13 +93,11 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no
 # ============================================================================
 # LAYER 6: PYTHON DEPENDENCIES - Consolidated pip layer
 # ============================================================================
-RUN python3 -m pip install --no-cache-dir --default-timeout=1000 --break-system-packages \
-    open3d
+#RUN python3 -m pip install --no-cache-dir --default-timeout=1000 --break-system-packages \
+#    open3d
 
 RUN python3 -m pip install --no-cache-dir --default-timeout=1000 --break-system-packages \
-    mujoco==${MUJOCO_VERSION} \
-    colcon-cargo \
-    colcon-ros-cargo
+    mujoco==${MUJOCO_VERSION}
 
 # ============================================================================
 # LAYER 7: BASHRC SETUP - User environment configuration
@@ -124,15 +122,8 @@ WORKDIR /miahand_ws
 COPY --chown=$USERNAME:$USERNAME . /miahand_ws/src/
 
 # ============================================================================
-# LAYER 10: DEPENDENCY RESOLUTION & BUILD - ROS packages + colcon build
+# LAYER 10: DEPENDENCY RESOLUTION & BUILD - ROS packages + colcon build (stuff was changed here)
 # ============================================================================
-RUN cd /miahand_ws/src && \
-    git clone -b jazzy https://github.com/ros2/common_interfaces.git src_common_interfaces && \
-    git clone -b jazzy https://github.com/ros2/rcl_interfaces.git src_rcl_interfaces && \
-    git clone -b jazzy https://github.com/ros2/rosidl_core.git src_rosidl_core && \
-    git clone -b jazzy https://github.com/ros2/rosidl_defaults.git src_rosidl_defaults && \
-    git clone -b jazzy https://github.com/ros2/unique_identifier_msgs.git src_unique_identifier_msgs && \
-    git clone https://github.com/ros2-rust/rosidl_rust.git src_rosidl_rust
 
 RUN sudo chown -R $USERNAME:$USERNAME /miahand_ws
 
@@ -145,9 +136,9 @@ RUN rosdep update && \
         --dependency-types buildtool_export \
         --dependency-types build \
         --dependency-types exec \
-        --skip-keys "rclrs rosidl_runtime_rs colcon-cargo colcon-ros-cargo test_interface_files" && \
+        --skip-keys "test_interface_files" && \
     . "/opt/ros/${ROS_DISTRO}/setup.sh" && \
-    cd /miahand_ws && colcon build --parallel-workers $(nproc) --packages-skip test_msgs && \
+    cd /miahand_ws && colcon build --parallel-workers $(nproc) && \
     echo "source install/setup.bash" >> /home/$USERNAME/.bashrc
 
 # ============================================================================

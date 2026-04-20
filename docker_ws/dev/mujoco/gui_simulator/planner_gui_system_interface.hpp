@@ -10,8 +10,11 @@
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
-#include "rclcpp/client.hpp"
+#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/twist_with_covariance_stamped.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/client.hpp"
+#include "rclcpp/publisher.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
@@ -111,7 +114,14 @@ private:
 
   std::thread sim_trd_;
 
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr preshaping_client_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr hand_pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr hand_pose_alias_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr hand_twist_pub_;
+
+  int pose_pub_counter_;
+
+  // Preshaping Trigger service client
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr preshaping_trigger_client_;
   std::atomic<bool> preshaping_call_running_;
 };
 }  // namespace mia_hand_mujoco

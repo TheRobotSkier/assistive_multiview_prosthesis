@@ -762,9 +762,27 @@ mod tests {
 
     #[test]
     fn from_xyz_file_loads_sphere() {
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../data/sphere.xyz");
-        let pc = PointCloud::from_xyz_file(path).unwrap();
-        assert!(pc.len() > 100, "sphere.xyz should have many points");
+        let tmp_path = std::env::temp_dir().join(format!(
+            "grasp_preshaping_sphere_{}_{}.xyz",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+
+        let content = "# synthetic sphere sample\n\
+0.10 0.00 0.00\n\
+0.00 0.10 0.00\n\
+0.00 0.00 0.10\n\
+-0.10 0.00 0.00\n\
+0.00 -0.10 0.00\n\
+0.00 0.00 -0.10\n";
+        std::fs::write(&tmp_path, content).unwrap();
+
+        let pc = PointCloud::from_xyz_file(tmp_path.to_str().unwrap()).unwrap();
+        let _ = std::fs::remove_file(&tmp_path);
+        assert_eq!(pc.len(), 6, "synthetic xyz fixture should parse six points");
         for p in &pc.points {
             assert!(p.x.is_finite() && p.y.is_finite() && p.z.is_finite());
         }
@@ -772,7 +790,7 @@ mod tests {
 
     #[test]
     fn from_xyz_file_missing_file_returns_error() {
-        let result = PointCloud::from_xyz_file("/nonexistent/path/sphere.xyz");
+        let result = PointCloud::from_xyz_file("/nonexistent/path/input.xyz");
         assert!(result.is_err());
     }
 

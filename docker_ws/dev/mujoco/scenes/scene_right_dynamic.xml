@@ -4,7 +4,7 @@
      to use published TFs and live MuJoCo-derived frame information instead of
      hardcoded transforms.
      Relative sphere position in hand frame: (0, 0.11, 0.05)
-     Sphere radius = 0.03 m = sphere.xyz unit radius × default pointcloud_scale (0.03). -->
+    Sphere radius = 0.03 m = unit-sphere radius × default pointcloud_scale (0.03). -->
 <mujoco model="mia_hand_right dynamic scene">
   <include file="mia_hand_right_grasp_frame.xml"/>
 

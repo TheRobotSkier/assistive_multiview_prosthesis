@@ -16,6 +16,12 @@ For Linux Wayland, also run:
 echo "XAUTHORITY=${XAUTHORITY:-$HOME/.Xauthority}" >> docker_ws/docker-deployment/.env
 ```
 
+If you are using Podman Desktop on WSL/WSLg, also run:
+
+```bash
+echo "X11_SOCKET_DIR=/mnt/wslg/.X11-unix" >> docker_ws/docker-deployment/.env
+```
+
 Linux note: if not using bash shell, use
 
 ```bash

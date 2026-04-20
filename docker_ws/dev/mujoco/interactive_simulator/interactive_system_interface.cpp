@@ -18,6 +18,15 @@ InteractiveSystemInterface::InteractiveSystemInterface()
   pose_pub_counter_(0),
   imu_pub_counter_(0)
 {
+  hand_twist_prev_pos_[0] = 0.0;
+  hand_twist_prev_pos_[1] = 0.0;
+  hand_twist_prev_pos_[2] = 0.0;
+  hand_twist_prev_quat_[0] = 1.0;
+  hand_twist_prev_quat_[1] = 0.0;
+  hand_twist_prev_quat_[2] = 0.0;
+  hand_twist_prev_quat_[3] = 0.0;
+  hand_twist_prev_sim_time_ = 0.0;
+  hand_twist_initialized_ = false;
 }
 
 hardware_interface::CallbackReturn InteractiveSystemInterface::on_init(
@@ -135,6 +144,9 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
     std::bind(&InteractiveSystemInterface::on_camera_pose_msg, this, std::placeholders::_1));
 
   hand_pose_pub_   = node->create_publisher<Pose>("/mujoco/hand_pose",   10);
+  hand_pose_alias_pub_ = node->create_publisher<Pose>("/hand_pose", 10);
+  hand_twist_pub_  = node->create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
+    "/hand_twist", 10);
   object_pose_pub_ = node->create_publisher<Pose>("/mujoco/object_pose", 10);
   camera_pose_pub_ = node->create_publisher<Pose>("/mujoco/camera_pose", 10);
 
@@ -164,7 +176,7 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
   mag2_pub_ = node->create_publisher<sensor_msgs::msg::MagneticField>(
     "/mujoco/wrist_cam/imu/magnetic_field", 10);
 
-  preshaping_client_ = node->create_client<std_srvs::srv::Trigger>(
+  preshaping_trigger_client_ = node->create_client<std_srvs::srv::Trigger>(
     "/grasp_preshaping/compute_grasp");
 
   return hardware_interface::CallbackReturn::SUCCESS;
@@ -178,6 +190,8 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_deactivate(
   object_pose_sub_.reset();
   camera_pose_sub_.reset();
   hand_pose_pub_.reset();
+  hand_pose_alias_pub_.reset();
+  hand_twist_pub_.reset();
   object_pose_pub_.reset();
   camera_pose_pub_.reset();
   motion_hand_sub_.reset();
@@ -188,7 +202,7 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_deactivate(
   sim_time_pub_.reset();
   imu2_pub_.reset();
   mag2_pub_.reset();
-  preshaping_client_.reset();
+  preshaping_trigger_client_.reset();
   preshaping_call_running_.store(false);
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -335,6 +349,94 @@ hardware_interface::return_type InteractiveSystemInterface::read(
     double pos[3], quat[4];
     InteractiveSimulator::get_instance().get_hand_pose(pos, quat);
     publish_pose(hand_pose_pub_, pos, quat);
+    publish_pose(hand_pose_alias_pub_, pos, quat);
+
+    if (hand_twist_pub_) {
+      geometry_msgs::msg::TwistWithCovarianceStamped twist_msg;
+      twist_msg.header.frame_id = "palm_r";
+      twist_msg.header.stamp = rclcpp::Clock().now();
+
+      double hand_ang_vel[3], hand_lin_acc[3], hand_mag_field[3], hand_orientation[4], sim_time;
+      InteractiveSimulator::get_instance().get_imu_data(
+        hand_ang_vel, hand_lin_acc, hand_mag_field, hand_orientation, sim_time);
+
+      if (!hand_twist_initialized_) {
+        for (int i = 0; i < 3; ++i) {
+          hand_twist_prev_pos_[i] = pos[i];
+        }
+        for (int i = 0; i < 4; ++i) {
+          hand_twist_prev_quat_[i] = quat[i];
+        }
+        hand_twist_prev_sim_time_ = sim_time;
+        hand_twist_initialized_ = true;
+      } else {
+        const double dt = sim_time - hand_twist_prev_sim_time_;
+        if (dt > 1e-6) {
+          double delta_q[4] = {
+            hand_twist_prev_quat_[0] * quat[0] + hand_twist_prev_quat_[1] * quat[1]
+              + hand_twist_prev_quat_[2] * quat[2] + hand_twist_prev_quat_[3] * quat[3],
+            -hand_twist_prev_quat_[1] * quat[0] + hand_twist_prev_quat_[0] * quat[1]
+              - hand_twist_prev_quat_[3] * quat[2] + hand_twist_prev_quat_[2] * quat[3],
+            -hand_twist_prev_quat_[2] * quat[0] + hand_twist_prev_quat_[3] * quat[1]
+              + hand_twist_prev_quat_[0] * quat[2] - hand_twist_prev_quat_[1] * quat[3],
+            -hand_twist_prev_quat_[3] * quat[0] - hand_twist_prev_quat_[2] * quat[1]
+              + hand_twist_prev_quat_[1] * quat[2] + hand_twist_prev_quat_[0] * quat[3],
+          };
+          if (delta_q[0] < 0.0) {
+            for (double& value : delta_q) {
+              value = -value;
+            }
+          }
+
+          const double world_lin_vel[3] = {
+            (pos[0] - hand_twist_prev_pos_[0]) / dt,
+            (pos[1] - hand_twist_prev_pos_[1]) / dt,
+            (pos[2] - hand_twist_prev_pos_[2]) / dt,
+          };
+
+          const double q_w = quat[0];
+          const double q_x = quat[1];
+          const double q_y = quat[2];
+          const double q_z = quat[3];
+          const double r00 = 1.0 - 2.0 * (q_y * q_y + q_z * q_z);
+          const double r01 = 2.0 * (q_x * q_y - q_z * q_w);
+          const double r02 = 2.0 * (q_x * q_z + q_y * q_w);
+          const double r10 = 2.0 * (q_x * q_y + q_z * q_w);
+          const double r11 = 1.0 - 2.0 * (q_x * q_x + q_z * q_z);
+          const double r12 = 2.0 * (q_y * q_z - q_x * q_w);
+          const double r20 = 2.0 * (q_x * q_z - q_y * q_w);
+          const double r21 = 2.0 * (q_y * q_z + q_x * q_w);
+          const double r22 = 1.0 - 2.0 * (q_x * q_x + q_y * q_y);
+
+          twist_msg.twist.twist.linear.x = r00 * world_lin_vel[0] + r10 * world_lin_vel[1] + r20 * world_lin_vel[2];
+          twist_msg.twist.twist.linear.y = r01 * world_lin_vel[0] + r11 * world_lin_vel[1] + r21 * world_lin_vel[2];
+          twist_msg.twist.twist.linear.z = r02 * world_lin_vel[0] + r12 * world_lin_vel[1] + r22 * world_lin_vel[2];
+
+          twist_msg.twist.twist.angular.x = 2.0 * delta_q[1] / dt;
+          twist_msg.twist.twist.angular.y = 2.0 * delta_q[2] / dt;
+          twist_msg.twist.twist.angular.z = 2.0 * delta_q[3] / dt;
+        }
+        hand_twist_prev_sim_time_ = sim_time;
+        for (int i = 0; i < 3; ++i) {
+          hand_twist_prev_pos_[i] = pos[i];
+        }
+        for (int i = 0; i < 4; ++i) {
+          hand_twist_prev_quat_[i] = quat[i];
+        }
+      }
+
+      for (double& covariance_value : twist_msg.twist.covariance) {
+        covariance_value = 0.0;
+      }
+      twist_msg.twist.covariance[0] = 1e-6;
+      twist_msg.twist.covariance[7] = 1e-6;
+      twist_msg.twist.covariance[14] = 1e-6;
+      twist_msg.twist.covariance[21] = 1e-6;
+      twist_msg.twist.covariance[28] = 1e-6;
+      twist_msg.twist.covariance[35] = 1e-6;
+      hand_twist_pub_->publish(twist_msg);
+    }
+
     InteractiveSimulator::get_instance().get_object_pose(pos, quat);
     publish_pose(object_pose_pub_, pos, quat);
     InteractiveSimulator::get_instance().get_camera_pose(pos, quat);
@@ -612,23 +714,23 @@ void InteractiveSystemInterface::on_camera_motion_msg(
 
 void InteractiveSystemInterface::trigger_preshaping_service()
 {
-  if (!preshaping_client_) {
+  if (!preshaping_trigger_client_) {
     InteractiveSimulator::get_instance().report_planner_result(
-      false, "Service client not initialized");
+      false, "Preshaping service client not initialized");
     return;
   }
 
   bool expected = false;
   if (!preshaping_call_running_.compare_exchange_strong(expected, true)) {
     InteractiveSimulator::get_instance().report_planner_result(
-      false, "Service call already in flight");
+      false, "Preshaping call already in flight");
     return;
   }
 
-  auto client = preshaping_client_;
-  rclcpp::Logger* logger = logger_.get();
+  auto client = preshaping_trigger_client_;
+  auto logger = logger_.get();
 
-  std::thread([client, logger, this]() {
+  std::thread([this, client, logger]() {
     using namespace std::chrono_literals;
 
     auto finish = [this](bool success, const std::string& message) {
@@ -637,29 +739,26 @@ void InteractiveSystemInterface::trigger_preshaping_service()
     };
 
     if (!client->wait_for_service(2s)) {
+      if (logger) {
+        RCLCPP_ERROR(*logger, "Preshaping service /grasp_preshaping/compute_grasp unavailable");
+      }
       finish(false, "Preshaping service unavailable");
       return;
     }
 
-    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
-    auto future = client->async_send_request(request);
-    if (future.wait_for(15s) != std::future_status::ready) {
-      finish(false, "Preshaping service timeout");
+    auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+    auto future = client->async_send_request(req);
+    constexpr auto kTotalTimeout = 15s;
+    if (future.wait_for(kTotalTimeout) != std::future_status::ready) {
+      if (logger) {
+        RCLCPP_ERROR(*logger, "Preshaping service timeout");
+      }
+      finish(false, "Preshaping timeout");
       return;
     }
 
-    try {
-      auto response = future.get();
-      const std::string message = response->message.empty()
-        ? (response->success ? "Preshaping completed" : "Preshaping failed")
-        : response->message;
-      finish(response->success, message);
-    } catch (const std::exception& e) {
-      if (logger) {
-        RCLCPP_ERROR(*logger, "Preshaping service call exception: %s", e.what());
-      }
-      finish(false, "Preshaping service exception");
-    }
+    const auto response = future.get();
+    finish(response->success, response->message);
   }).detach();
 }
 

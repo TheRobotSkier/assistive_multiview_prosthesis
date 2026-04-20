@@ -29,6 +29,7 @@ public:
 
   void read_jnt_vel(double& thumb_vel, double& index_vel, double& mrl_vel);
   void read_jnt_pos(double& thumb_pos, double& index_pos, double& mrl_pos);
+  void get_hand_pose(double pos[3], double quat_wxyz[4]) const;
   void set_jnt_pos(uint_fast8_t jnt, double pos);
   void set_jnt_vel(uint_fast8_t jnt, double vel);
   void stop_jnt(uint_fast8_t jnt);
@@ -112,6 +113,7 @@ private:
   char err_msg_[256];
 
   int plugin_instance_;
+  int hand_body_id_;
 
   double jnt_vel_state_[3];
   double jnt_vel_cmd_[3];
@@ -119,7 +121,7 @@ private:
   double jnt_pos_state_[3];
   double jnt_pos_cmd_[3];
 
-  std::mutex sim_mtx_;
+  mutable std::mutex sim_mtx_;
 
   std::atomic<bool> planner_running_;
   std::atomic<bool> planner_request_pending_;

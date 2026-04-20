@@ -2,17 +2,13 @@
 <package format="3">
   <name>grasp_preshaping</name>
   <version>0.1.0</version>
-  <description>Rust grasp preshaping service node and core pipeline.</description>
+  <description>Rust grasp preshaping compute library and core pipeline.</description>
   <maintainer email="daniel@example.com">Daniel</maintainer>
   <license>MIT</license>
 
-  <depend>rclrs</depend>
-  <depend>geometry_msgs</depend>
-  <depend>sensor_msgs</depend>
-  <depend>std_msgs</depend>
-  <depend>std_srvs</depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
   <export>
-    <build_type>ament_cargo</build_type>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

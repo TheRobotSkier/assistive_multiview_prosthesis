@@ -1,46 +1,36 @@
 # grasp_preshaping
 
-This crate provides the preshaping solver core and a ROS2 Trigger service node.
+This crate provides the preshaping solver core and a C ABI entrypoint consumed by the C++ ROS2 wrapper.
 
-## ROS2 service node
+## Runtime architecture
 
-- Binary: `ros_node` (built with feature `ros`)
-- Service: `/grasp_preshaping/compute_grasp`
-- Type: `std_srvs/srv/Trigger`
+- Public ROS API: `/grasp_preshaping/compute_grasp` (`std_srvs/srv/Trigger`), implemented by `mia_hand_mujoco` C++ node.
+- Rust role: compute library only.
+- Entry points exported by this crate:
+	- `grasp_preshaping_api_version`
+	- `grasp_preshaping_compute`
 
-On each service call, the node:
+On each service call, the C++ node:
 
-1. Uses the latest cached ROS messages from:
-- `/hand_pose` (`geometry_msgs/msg/PoseStamped`)
-- `/hand_twist` (`geometry_msgs/msg/TwistWithCovarianceStamped`)
-- `/segmented_object_cloud` (`sensor_msgs/msg/PointCloud2`)
-2. Runs the preshaping pipeline.
+1. Uses the latest cached simulator messages from:
+- `/hand_pose`
+- `/hand_twist`
+- `/segmented_object_cloud`
+2. Calls `grasp_preshaping_compute` through FFI.
 3. Publishes controller commands to:
 - `/thumb_pos_ff_controller/commands`
 - `/index_pos_ff_controller/commands`
 - `/mrl_pos_ff_controller/commands`
 
-## Build and run (container)
+## Build
 
-Build the ROS node with ROS feature enabled:
-
-```bash
-cargo build --release --features ros --bin ros_node
-```
-
-Run the node:
+Build the Rust library (including `cdylib`):
 
 ```bash
-cargo run --release --features ros --bin ros_node
-```
-
-Trigger one preshaping request:
-
-```bash
-ros2 service call /grasp_preshaping/compute_grasp std_srvs/srv/Trigger {}
+cargo build --release --lib
 ```
 
 ## Notes
 
-- This package no longer uses the old planner CLI flow used by MuJoCo wrappers.
-- If required inputs are missing, the Trigger response returns `success=false` with a descriptive message.
+- This crate no longer hosts a ROS runtime node.
+- If required inputs are missing, the wrapper service returns `success=false` with a descriptive message.

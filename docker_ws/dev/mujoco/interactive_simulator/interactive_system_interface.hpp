@@ -10,11 +10,12 @@
 
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/twist_with_covariance_stamped.hpp"
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
-#include "rclcpp/client.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/client.hpp"
 #include "rclcpp/publisher.hpp"
 #include "rclcpp/subscription.hpp"
 #include "rclcpp_lifecycle/state.hpp"
@@ -140,6 +141,8 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr camera_pose_sub_;
 
   rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr hand_pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr hand_pose_alias_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr hand_twist_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr object_pose_pub_;
   rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr camera_pose_pub_;
 
@@ -153,12 +156,17 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr sim_time_pub_;
 
+  double hand_twist_prev_pos_[3];
+  double hand_twist_prev_quat_[4];
+  double hand_twist_prev_sim_time_;
+  bool hand_twist_initialized_;
+
   // Wrist camera IMU publishers
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu2_pub_;
   rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr mag2_pub_;
 
   // Preshaping Trigger service client
-  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr preshaping_client_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr preshaping_trigger_client_;
   std::atomic<bool> preshaping_call_running_;
 
   int pose_pub_counter_;

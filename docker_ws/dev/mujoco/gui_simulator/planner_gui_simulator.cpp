@@ -154,6 +154,7 @@ PlannerGuiSimulator::PlannerGuiSimulator()
   window_h_(0),
   shift_key_pressed_(false),
   plugin_instance_(-1),
+  hand_body_id_(-1),
   planner_running_(false),
   planner_request_pending_(false),
   planner_status_pending_("Idle"),
@@ -395,6 +396,11 @@ bool PlannerGuiSimulator::simulate_impl(
     }
   }
 
+  if (success)
+  {
+    hand_body_id_ = mj_name2id(mj_model_, mjOBJ_BODY, "palm_r");
+  }
+
   if (success && !glfwInit())
   {
     success = false;
@@ -486,6 +492,34 @@ bool PlannerGuiSimulator::simulate_impl(
   }
 
   return success;
+}
+
+void PlannerGuiSimulator::get_hand_pose(double pos[3], double quat_wxyz[4]) const
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+
+  if ((mj_model_ == nullptr) || (mj_data_ == nullptr) || (hand_body_id_ < 0))
+  {
+    pos[0] = 0.0;
+    pos[1] = 0.0;
+    pos[2] = 0.0;
+    quat_wxyz[0] = 1.0;
+    quat_wxyz[1] = 0.0;
+    quat_wxyz[2] = 0.0;
+    quat_wxyz[3] = 0.0;
+    return;
+  }
+
+  const mjtNum* hand_pos = &mj_data_->xpos[hand_body_id_ * 3];
+  const mjtNum* hand_quat = &mj_data_->xquat[hand_body_id_ * 4];
+  for (int i = 0; i < 3; ++i)
+  {
+    pos[i] = static_cast<double>(hand_pos[i]);
+  }
+  for (int i = 0; i < 4; ++i)
+  {
+    quat_wxyz[i] = static_cast<double>(hand_quat[i]);
+  }
 }
 
 bool PlannerGuiSimulator::get_plugin_instance(const mjModel* p_mjm)
