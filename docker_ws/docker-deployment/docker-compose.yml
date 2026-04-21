@@ -17,6 +17,8 @@ services:
       - ../:/miahand_ws/src
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${XAUTHORITY}:/tmp/.Xauthority:ro,z # added LINUX
+      - /dev/bus/usb:/dev/bus/usb
+      - /run/udev:/run/udev:ro
       #- ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/run/user/1000/${WAYLAND_DISPLAY} # added LINUX
     entrypoint: /ros_entrypoint.sh
     environment:
@@ -27,9 +29,11 @@ services:
       XAUTHORITY: /tmp/.Xauthority # added LINUX
       ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST #added LINUX
       RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp} #added LINUX
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
 
-    user: "1000:1000"                  # UID/GID must match the host user for socket access
-    userns_mode: "keep-id"             # rootless Podman: preserve host UID mapping for bind-mounted auth files
+    user: "${USER_UID}:${USER_GID}"    # UID/GID must match the host user for socket access
+    #userns_mode: "keep-id"             # rootless Podman: preserve host UID mapping for bind-mounted auth files
     # ipc: host                        # Recommended to avoid X11 rendering glitches
     command: /bin/bash
 
@@ -115,4 +119,13 @@ services:
         ros2 launch mia_hand_ros2_control mia_hand_system_interface_launch.py use_mock_hardware:=${USE_MOCK_HARDWARE:-true};
         /bin/bash
       "
-
+  realsense_camera:
+    extends: miahand_ros2
+    container_name: miahand_realsense_camera
+    command: >
+      bash -c "
+        source /opt/ros/jazzy/setup.bash &&
+        if [ -f /miahand_ws/install/setup.bash ]; then source /miahand_ws/install/setup.bash; fi &&
+        ros2 launch realsense2_camera rs_launch.py pointcloud.enable:=true align_depth.enable:=true;
+        /bin/bash
+      "

@@ -12,7 +12,8 @@ ARG USERNAME=user
 
 ## MuJuCo version
 ARG MUJOCO_VERSION=3.3.4
-ARG CPU_ARCH=x86_64
+#ARG CPU_ARCH=x86_64
+ARG CPU_ARCH=aarch64
 
 # Delete user if it exists in container 
 RUN if id -u $USER_UID ; then userdel `id -un $USER_UID` ; fi
@@ -31,6 +32,7 @@ RUN apt-get update && \
         setserial \
         python3-pip \
         wget \
+        curl \
         libglfw3-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -40,7 +42,7 @@ RUN apt-get update && \
 RUN apt-get update && apt-get install --no-install-recommends -y \
     libegl1 \
     libgl1 \
-    libgomp1 \
+    libgomp1 \          
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 ###
@@ -69,11 +71,13 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no
 
 # Setup user configuration
 # usermod --append --groups dialout $USERNAME 
-RUN groupadd --gid $USER_GID $USERNAME \
+RUN groupadd -f video \
+    && groupadd -f plugdev \
+    && groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && usermod -a -G dialout $USERNAME \ 
+    && usermod -a -G dialout,video,plugdev $USERNAME \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
-    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
     && echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /home/$USERNAME/.bashrc \
     && echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> /home/$USERNAME/.bashrc \
     && echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$MUJOCO_DIR/lib"  >> /home/$USERNAME/.bashrc \
@@ -99,6 +103,10 @@ RUN sudo apt-get update \
         ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
         ros-${ROS_DISTRO}-rqt \
         ros-${ROS_DISTRO}-rqt-graph \
+        ros-${ROS_DISTRO}-librealsense2 \
+        libopencv-dev \
+        ros-${ROS_DISTRO}-cv-bridge \
+        ros-${ROS_DISTRO}-image-transport \
     && sudo apt-get clean \
     && sudo rm -rf /var/lib/apt/lists/*
 
@@ -110,7 +118,7 @@ RUN sudo python3 -m pip install --no-cache-dir --break-system-packages mujoco==$
 
 ### OPEN3D
 # Install Open3D from the PyPI repositories
-RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
+# RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
 ###
 
 WORKDIR /miahand_ws
