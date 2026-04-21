@@ -1,0 +1,70 @@
+# CPU-only Docker image for MinkowskiEngine + InterObject3D inference
+# Build from repo root: docker build -f docker/Dockerfile.cpu -t interobject3d-cpu .
+
+FROM python:3.8-slim-bullseye
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Build tools + Open3D runtime libs
+RUN apt-get update && apt-get install -y \
+    git \
+    ninja-build \
+    cmake \
+    build-essential \
+    libopenblas-dev \
+    wget \
+    # Open3D headless runtime requirements
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin numpy<2 before torch to avoid ABI mismatch with torch 1.12
+RUN pip install --no-cache-dir "numpy<2"
+
+# PyTorch CPU-only (1.12.1 is the last 1.x patch release)
+RUN pip install --no-cache-dir \
+    torch==1.12.1+cpu \
+    torchvision==0.13.1+cpu \
+    -f https://download.pytorch.org/whl/torch_stable.html
+
+# Copy local MinkowskiEngine source so the image uses this checkout
+COPY . /MinkowskiEngine-src
+# For faster build; increase if more cores are available
+ENV MAX_JOBS=4
+RUN cd /MinkowskiEngine-src && \
+    python setup.py install --blas=openblas --cpu_only && \
+    cd / && rm -rf /MinkowskiEngine-src
+
+# Python inference dependencies
+RUN pip install --no-cache-dir \
+    "open3d>=0.12.0" \
+    trimesh \
+    pyviz3d \
+    scipy \
+    scikit-learn \
+    plyfile \
+    tqdm \
+    pandas \
+    transforms3d \
+    matplotlib
+
+# Clone InterObject3D (pinned to a known-good commit)
+RUN git clone https://github.com/theodorakontogianni/InterObject3D /app && \
+    cd /app && git checkout 827b350
+
+WORKDIR /app/InterObject3D/Minkowski/training
+
+# Weights are expected at /weights/weights_exp14_14.pth (mount a volume or
+# set DOWNLOAD_WEIGHTS=1 at build time via --build-arg to bake them in).
+ARG DOWNLOAD_WEIGHTS=0
+RUN if [ "$DOWNLOAD_WEIGHTS" = "1" ]; then \
+        mkdir -p /weights && \
+        wget -q \
+          https://omnomnom.vision.rwth-aachen.de/data/3d_inter_obj_seg/scannet_official/weights/weights_exp14_14.pth \
+          -O /weights/weights_exp14_14.pth; \
+    fi
+
+CMD ["python", "run_inter3d.py", "--help"]
