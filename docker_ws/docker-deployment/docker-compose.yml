@@ -114,3 +114,51 @@ services:
         /bin/bash
       "
 
+  # ── Segmentation: one-shot toy inference test (CPU, no ROS) ──────────────
+  # Downloads weights on first run, then runs a single toy instance to verify.
+  # Usage: docker compose run --rm segmentation_direct
+  segmentation_direct:
+    build:
+      context: ../dev/pc_segmentation
+      dockerfile: docker/Dockerfile.cpu
+    container_name: segmentation_direct
+    volumes:
+      - ../dev/pc_segmentation/weights:/weights
+    command: >
+      bash -c "
+        if [ ! -f /weights/weights_exp14_14.pth ]; then
+          mkdir -p /weights &&
+          wget -q https://omnomnom.vision.rwth-aachen.de/data/3d_inter_obj_seg/scannet_official/weights/weights_exp14_14.pth
+               -O /weights/weights_exp14_14.pth;
+        fi &&
+        python run_inter3d.py
+          --verbal=True
+          --instance_counter_id=0
+          --number_of_instances=1
+          --cubeedge=0.05
+          --pretraining_weights=/weights/weights_exp14_14.pth
+          --dataset=scannet
+      "
+
+  # ── Segmentation: live ROS2 node with always-warm inference server ────────
+  # Keeps the MinkowskiEngine model loaded; subscribes to:
+  #   /segmentation/input_cloud      (sensor_msgs/PointCloud2)
+  #   /segmentation/click_positive   (geometry_msgs/PointStamped)
+  #   /segmentation/click_negative   (geometry_msgs/PointStamped)
+  #   /segmentation/reset            (std_msgs/Empty)
+  # Publishes foreground points to:
+  #   /segmentation/object_cloud     (sensor_msgs/PointCloud2)
+  # Usage: docker compose run --rm segmentation_ros2
+  segmentation_ros2:
+    build:
+      context: ../dev/pc_segmentation
+      dockerfile: docker/Dockerfile.ros2
+    container_name: segmentation_ros2
+    network_mode: "host"
+    environment:
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
+    volumes:
+      - ../dev/pc_segmentation/weights:/weights
+    entrypoint: /entrypoint.sh
+
