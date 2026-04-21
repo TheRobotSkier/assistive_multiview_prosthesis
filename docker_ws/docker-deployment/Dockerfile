@@ -14,8 +14,10 @@ ARG USERNAME=user
 ARG MUJOCO_VERSION=3.3.4
 ARG CPU_ARCH=x86_64
 
-# Delete user if it exists in container 
-RUN if id -u $USER_UID ; then userdel `id -un $USER_UID` ; fi
+# Delete user if it exists in container (skip if USER_UID is 0/root or unset)
+RUN if [ -n "$USER_UID" ] && [ "$USER_UID" != "0" ] && id -u "$USER_UID" 2>/dev/null; then \
+        userdel "$(id -un "$USER_UID")"; \
+    fi
 
 # Install essential packages and ROS development tools
 RUN apt-get update && \
@@ -108,9 +110,9 @@ RUN sudo python3 -m pip install --no-cache-dir --break-system-packages mujoco==$
 
 
 
-### OPEN3D
+### OPEN3D + HTTP client for segmentation ROS2 node
 # Install Open3D from the PyPI repositories
-RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
+RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d requests
 ###
 
 WORKDIR /miahand_ws

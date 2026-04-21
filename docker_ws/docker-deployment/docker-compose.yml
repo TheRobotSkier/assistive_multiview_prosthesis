@@ -140,25 +140,56 @@ services:
           --dataset=scannet
       "
 
-  # ── Segmentation: live ROS2 node with always-warm inference server ────────
-  # Keeps the MinkowskiEngine model loaded; subscribes to:
+  # ── Segmentation: inference server (MinkowskiEngine, Python 3.8) ────────────
+  # Runs the Flask HTTP inference server on localhost:5678.
+  # Downloads weights automatically on first start.
+  # Usage (usually started via run_segmentation.sh): docker compose run --rm segmentation_inference
+  segmentation_inference:
+    build:
+      context: ../dev/pc_segmentation
+      dockerfile: docker/Dockerfile.cpu
+    container_name: segmentation_inference
+    network_mode: "host"
+    volumes:
+      - ../dev/pc_segmentation/weights:/weights
+
+  # ── Segmentation: ROS2 node (Python 3.12, calls inference server over HTTP) ──
+  # Subscribes to:
   #   /segmentation/input_cloud      (sensor_msgs/PointCloud2)
   #   /segmentation/click_positive   (geometry_msgs/PointStamped)
   #   /segmentation/click_negative   (geometry_msgs/PointStamped)
   #   /segmentation/reset            (std_msgs/Empty)
   # Publishes foreground points to:
   #   /segmentation/object_cloud     (sensor_msgs/PointCloud2)
-  # Usage: docker compose run --rm segmentation_ros2
+  # Start AFTER segmentation_inference is healthy (use run_segmentation.sh).
+  # Usage: ./run_segmentation.sh
   segmentation_ros2:
-    build:
-      context: ../dev/pc_segmentation
-      dockerfile: docker/Dockerfile.ros2
+    extends: miahand_ros2
     container_name: segmentation_ros2
-    network_mode: "host"
-    environment:
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
-      RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
-    volumes:
-      - ../dev/pc_segmentation/weights:/weights
-    entrypoint: /entrypoint.sh
+    command: |
+      bash -c "
+        source /opt/ros/jazzy/setup.bash;
+        source /miahand_ws/install/setup.bash 2>/dev/null;
+        python3 /miahand_ws/src/dev/pc_segmentation/nodes/segmentation_ros2_node.py
+      "
+
+  # ── Segmentation: interactive demo (RViz2 + cloud publisher + click relay) ─
+  # Publishes D435_img_1.ply, opens RViz2, relays clicks to the segmentation node.
+  # Requires X11 forwarding and segmentation_ros2 running (via run_segmentation.sh).
+  # Usage: docker compose run --rm segmentation_demo
+  # In the terminal that opens: p=positive mode, n=negative mode, r=reset, q=quit
+  segmentation_demo:
+    extends: miahand_ros2
+    container_name: segmentation_demo
+    stdin_open: true
+    tty: true
+    command: |
+      bash -c "
+        source /opt/ros/jazzy/setup.bash;
+        source /miahand_ws/install/setup.bash 2>/dev/null;
+        python3 /miahand_ws/src/dev/pc_segmentation/nodes/demo_cloud_publisher_node.py --ply /miahand_ws/src/dev/pc_segmentation/depth_images/D435_img_1.ply &
+        rviz2 -d /miahand_ws/src/dev/pc_segmentation/demo_config.rviz &
+        python3 /miahand_ws/src/dev/pc_segmentation/nodes/demo_click_relay_node.py;
+        wait
+      "
 

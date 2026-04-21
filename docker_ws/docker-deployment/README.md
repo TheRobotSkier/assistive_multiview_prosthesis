@@ -69,3 +69,28 @@ By this way, the command will run automatically whenever a new terminal session 
 ```bash
 echo "xhost +si:localuser:$(whoami) > /dev/null 2>&1" >> ~/.bashrc
 ```
+
+### Pointcloud segmentation usage
+
+Usage
+
+   cd docker_ws/docker-deployment
+   
+   # Build images (once, or after code changes):
+   docker compose build segmentation_inference
+   docker compose build miahand_ros2   # if not already built since requests was added
+   
+   # Start everything:
+   ./run_segmentation.sh
+   # → starts inference server (detached), waits for it to be ready
+   # → starts ROS2 segmentation node (foreground)
+   # → Ctrl+C stops and removes both containers
+   
+   # Demo (separate terminal, while segmentation is running):
+   docker compose run --rm segmentation_demo
+   
+   # One-shot CPU inference test (no ROS):
+   docker compose run --rm segmentation_direct
+
+   # RVIZ controls:
+   Use "publish point" (from top bar) and click somewhere to select an object to segment. Wait a bit, and it should show a green highlight of the segmented object. To reset, restart the container.
