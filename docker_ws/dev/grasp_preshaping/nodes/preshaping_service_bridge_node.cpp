@@ -1,4 +1,3 @@
-#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
@@ -10,71 +9,23 @@
 
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/twist_with_covariance_stamped.hpp"
+#include "grasp_preshaping/ffi_types.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_srvs/srv/trigger.hpp"
 
-namespace
-{
-struct GraspPoseFFI
-{
-  double px;
-  double py;
-  double pz;
-  double qx;
-  double qy;
-  double qz;
-  double qw;
-};
+// Import FFI types into the global namespace so the rest of the node code
+// does not need to be changed from the original version.
+using GraspComputeFn      = grasp_preshaping::GraspComputeFn;
+using GraspApiVersionFn   = grasp_preshaping::GraspApiVersionFn;
+using GraspPoseFFI        = grasp_preshaping::GraspPoseFFI;
+using GraspTwistFFI       = grasp_preshaping::GraspTwistFFI;
+using PointCloudViewFFI   = grasp_preshaping::PointCloudViewFFI;
+using GraspComputeRequestFFI  = grasp_preshaping::GraspComputeRequestFFI;
+using GraspComputeResponseFFI = grasp_preshaping::GraspComputeResponseFFI;
 
-struct GraspTwistFFI
-{
-  double lx;
-  double ly;
-  double lz;
-  double ax;
-  double ay;
-  double az;
-  std::array<double, 36> covariance;
-};
-
-struct PointCloudViewFFI
-{
-  size_t width;
-  size_t height;
-  size_t point_step;
-  size_t x_off;
-  size_t y_off;
-  size_t z_off;
-  const uint8_t * data_ptr;
-  size_t data_len;
-};
-
-struct GraspComputeRequestFFI
-{
-  GraspPoseFFI pose;
-  GraspTwistFFI twist;
-  PointCloudViewFFI cloud;
-};
-
-struct GraspComputeResponseFFI
-{
-  uint8_t success;
-  double closure_amount;
-  double combined_score;
-  int32_t grasp_type;
-};
-
-using GraspComputeFn = int (*) (
-  const GraspComputeRequestFFI *,
-  GraspComputeResponseFFI *,
-  char *,
-  size_t);
-using GraspApiVersionFn = uint32_t (*) ();
-
-constexpr int kGraspComputeOk = 0;
-}
+constexpr int kGraspComputeOk = grasp_preshaping::kGraspComputeOk;
 
 class PreshapingServiceBridgeNode : public rclcpp::Node
 {

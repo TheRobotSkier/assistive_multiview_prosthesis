@@ -248,7 +248,7 @@ def launch_fun(context, *args, **kwargs):
     )
 
     preshaping_service_bridge_node = Node(
-        package = 'mia_hand_mujoco',
+        package = 'grasp_preshaping',
         executable = 'preshaping_service_bridge_node',
         name = 'preshaping_service_bridge',
         output = 'screen',

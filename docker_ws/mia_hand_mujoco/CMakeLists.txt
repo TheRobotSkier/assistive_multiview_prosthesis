@@ -136,22 +136,6 @@ ament_target_dependencies(${PROJECT_NAME}_interactive PUBLIC
   std_srvs
 )
 
-add_executable(preshaping_service_bridge_node
-  src/preshaping_service_bridge_node.cpp
-)
-
-ament_target_dependencies(preshaping_service_bridge_node
-  rclcpp
-  geometry_msgs
-  sensor_msgs
-  std_msgs
-  std_srvs
-)
-
-target_link_libraries(preshaping_service_bridge_node
-  dl
-)
-
 target_link_libraries(${PROJECT_NAME} PUBLIC
     ${MUJOCO_LIBRARIES}
     miahanditactuator
@@ -213,10 +197,6 @@ install(TARGETS ${PROJECT_NAME}_interactive
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
-)
-
-install(TARGETS preshaping_service_bridge_node
-  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 # Installing header files.

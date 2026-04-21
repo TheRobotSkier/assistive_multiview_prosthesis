@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
 project(grasp_preshaping)
 
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
 find_package(ament_cmake REQUIRED)
 
+# ── Rust cdylib ────────────────────────────────────────────────────────────
 find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
 set(RUST_TARGET_DIR ${CMAKE_CURRENT_BINARY_DIR}/cargo-target)
@@ -41,6 +46,42 @@ install(FILES ${RUST_LIB_PATH}
 
 install(DIRECTORY data
   DESTINATION share/${PROJECT_NAME}
+)
+
+# ── C++ preshaping service bridge node ─────────────────────────────────────
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+
+add_executable(preshaping_service_bridge_node
+  nodes/preshaping_service_bridge_node.cpp
+)
+
+target_include_directories(preshaping_service_bridge_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(preshaping_service_bridge_node
+  rclcpp
+  geometry_msgs
+  sensor_msgs
+  std_msgs
+  std_srvs
+)
+
+target_link_libraries(preshaping_service_bridge_node
+  dl
+)
+
+install(TARGETS preshaping_service_bridge_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+  DESTINATION include
 )
 
 ament_package()
