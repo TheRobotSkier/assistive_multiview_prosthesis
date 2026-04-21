@@ -1,0 +1,6 @@
+dictionary = DICT_4X4_50
+squaresX = 5
+squaresY = 7
+squareLength = 0.035
+markerLength = 0.026
+board_frame = charuco_board

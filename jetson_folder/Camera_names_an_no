@@ -1,0 +1,32 @@
+Camera 1:
+829212072207
+
+Camera 2:
+827112072033
+
+
+############
+
+source /opt/ros/humble/setup.bash
+
+ros2 launch realsense2_camera rs_launch.py \
+  camera_namespace:=cam1 \
+  camera_name:=d435_1 \
+  serial_no:=_829212072207 \
+  enable_sync:=true \
+  align_depth.enable:=true \
+  depth_module.depth_profile:=640x480x15 \
+  rgb_camera.color_profile:=640x480x15
+  
+###########
+
+source /opt/ros/humble/setup.bash
+
+ros2 launch realsense2_camera rs_launch.py \
+  camera_namespace:=cam2 \
+  camera_name:=d435_2 \
+  serial_no:=_827112072033 \
+  enable_sync:=true \
+  align_depth.enable:=true \
+  depth_module.depth_profile:=640x480x15 \
+  rgb_camera.color_profile:=640x480x15

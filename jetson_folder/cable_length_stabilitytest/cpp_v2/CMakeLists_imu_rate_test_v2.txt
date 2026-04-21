@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.10)
+project(imu_rate_test_v2 CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable(imu_i2c_rate_test_logger_v2 imu_i2c_rate_test_logger_v2.cpp)
+add_executable(analyze_imu_rate_test_v2 analyze_imu_rate_test_v2.cpp)
