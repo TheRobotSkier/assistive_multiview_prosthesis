@@ -17,7 +17,6 @@ services:
       - ../:/miahand_ws/src
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${XAUTHORITY}:/tmp/.Xauthority:ro,z # added LINUX
-      #- ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/run/user/1000/${WAYLAND_DISPLAY} # added LINUX
     entrypoint: /ros_entrypoint.sh
     environment:
       tty: true
@@ -30,7 +29,6 @@ services:
 
     user: "1000:1000"                  # UID/GID must match the host user for socket access
     userns_mode: "keep-id"             # rootless Podman: preserve host UID mapping for bind-mounted auth files
-    # ipc: host                        # Recommended to avoid X11 rendering glitches
     command: /bin/bash
 
   miahand_description:
