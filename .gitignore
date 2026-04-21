@@ -11,3 +11,16 @@ agent.md
 # ignore rust files
 target/
 Cargo.lock
+
+# pc_segmentation related
+*.so
+*.[o,d,a]
+*.swo
+*.swp
+*.swn
+*.pyc
+
+build/
+objs/
+dist/
+MinkowskiEngine.egg-info/
