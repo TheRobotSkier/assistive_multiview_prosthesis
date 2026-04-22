@@ -74,4 +74,6 @@ Cargo.lock
 # Folders
 ros_bag_recordings/
 csv_logging_files/
-jetson_folder/cable_length_stabilitytest/cpp_v2/logs
+jetson_folder/cable_length_stabilitytest/cpp_v2/logs/
+jetson_folder/cable_length_stabilitytest/logs/
+old_stuff/
