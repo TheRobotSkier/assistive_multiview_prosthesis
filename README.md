@@ -250,21 +250,23 @@ Usage
 
    cd docker_ws/docker-deployment
    
-   # Build images (once, or after code changes):
+   #### Build images (once, or after code changes):
    docker compose build segmentation_inference
    docker compose build miahand_ros2   # if not already built since requests was added
    
-   # Start everything:
+   #### Start everything:
    ./run_segmentation.sh
-   # → starts inference server (detached), waits for it to be ready
-   # → starts ROS2 segmentation node (foreground)
-   # → Ctrl+C stops and removes both containers
+   → starts inference server (detached), waits for it to be ready
+   → starts ROS2 segmentation node (foreground)
+   → Ctrl+C stops and removes both containers
    
-   # Demo (separate terminal, while segmentation is running):
+   #### Demo (separate terminal, while segmentation is running):
    docker compose run --rm segmentation_demo
    
-   # One-shot CPU inference test (no ROS):
+   #### One-shot CPU inference test (no ROS):
    docker compose run --rm segmentation_direct
 
-   # RVIZ controls:
-   Use "publish point" (from top bar) and click somewhere to select an object to segment. Wait a bit, and it should show a green highlight of the segmented object. To reset, restart the container.
+   #### RVIZ controls:
+   p = positive mode | n = negative mode | r = reset | q = quit
+   Use "publish point" (from top bar) and click somewhere to select an object to segment. Wait a bit, and it should show a green highlight of the segmented object.
+   

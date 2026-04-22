@@ -8,7 +8,7 @@ Panels:
         - /Input Cloud1
         - /Segmented Object1
       Splitter Ratio: 0.5
-    Tree Height: 600
+    Tree Height: 245
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -45,12 +45,11 @@ Visualization Manager:
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
-      Size (m): 0.003
+      Size (m): 0.003000000026077032
       Style: Flat Squares
       Topic:
         Depth: 5
         Durability Policy: Transient Local
-        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /segmentation/input_cloud
@@ -79,18 +78,33 @@ Visualization Manager:
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 7
-      Size (m): 0.007
+      Size (m): 0.007000000216066837
       Style: Flat Squares
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Best Effort
         Value: /segmentation/object_cloud
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Class: rviz_default_plugins/TF
+      Enabled: false
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: false
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -130,29 +144,32 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /clicked_point
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
   Value: true
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 3
+      Distance: 3.6495959758758545
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: -2
+        X: 0.5938908457756042
+        Y: 0.9710636138916016
+        Z: 0.4537121653556824
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5
+      Pitch: 0.1950002759695053
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.785398163397448
+      Yaw: 5.068557262420654
     Saved: ~
 Window Geometry:
   Displays:
@@ -160,7 +177,7 @@ Window Geometry:
   Height: 900
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd000000040000000000000156000002d8fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb000000120056006900650077007300200050006100650000000249000000900000009400fffffffb000000200054006f006f006c002000500072006f007000650072007400690065007300000001eb000001500000009800fffffffb0000002000730065006c0065006300740069006f006e00000000fd00000470000000000000000000000001000001400000003afc0200000001fb0000000a0044006900730070006c00610079730000000000000001400000015c00ffffff000000010000012c000002d8fc0200000002fb000000360049006e00740065007200610063007400690076006500200050006f0069006e00740065007200200028005000750062006c00690073006800200050006f0069006e0074002900000001040000010c0000000000000000fb00000026004d006f0074006f0072002000430061006d006500720061000000015000000124000000010000000000000001000001400000003afc0200000000
+  QMainWindow State: 000000ff00000000fd00000001000000000000019b0000032efc0200000004fb000000100044006900730070006c006100790073010000003b00000130000000c700fffffffb0000001200530065006c0065006300740069006f006e0100000171000000940000005c00fffffffb0000001e0054006f006f006c002000500072006f0070006500720074006900650073010000020b000000950000005c00fffffffb0000000a0056006900650077007301000002a6000000c3000000a000ffffff0000030f0000032e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Tool Properties:

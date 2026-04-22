@@ -187,6 +187,7 @@ services:
       bash -c "
         source /opt/ros/jazzy/setup.bash;
         source /miahand_ws/install/setup.bash 2>/dev/null;
+        ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx 0.7071 --qy 0 --qz 0 --qw 0.7071 --frame-id map --child-frame-id ply_camera &
         python3 /miahand_ws/src/dev/pc_segmentation/nodes/demo_cloud_publisher_node.py --ply /miahand_ws/src/dev/pc_segmentation/depth_images/D435_img_1.ply &
         rviz2 -d /miahand_ws/src/dev/pc_segmentation/demo_config.rviz &
         python3 /miahand_ws/src/dev/pc_segmentation/nodes/demo_click_relay_node.py;

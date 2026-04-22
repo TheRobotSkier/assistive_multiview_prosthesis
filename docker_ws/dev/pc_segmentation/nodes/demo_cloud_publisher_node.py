@@ -103,7 +103,7 @@ class CloudPublisher(Node):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ply', default='/miahand_ws/src/dev/pc_segmentation/depth_images/D435_img_1.ply')
-    parser.add_argument('--frame', default='map')
+    parser.add_argument('--frame', default='ply_camera')
     parser.add_argument('--republish-period', type=float, default=5.0)
     args, ros_args = parser.parse_known_args()
 

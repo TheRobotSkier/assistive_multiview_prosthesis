@@ -10,23 +10,24 @@ Subscribe:
   /segmentation/input_cloud      sensor_msgs/PointCloud2
       The full scene point cloud (XYZ or XYZRGB).
   /segmentation/click_positive   geometry_msgs/PointStamped
-      A positive click (foreground) in the same frame as the cloud.
+      A positive click (foreground). Transformed to cloud frame via TF2.
   /segmentation/click_negative   geometry_msgs/PointStamped
-      A negative click (background).
+      A negative click (background). Transformed to cloud frame via TF2.
   /segmentation/reset            std_msgs/Empty
-      Clear all accumulated clicks.
+      Clear all accumulated clicks and the output cloud.
 
 Publish:
   /segmentation/object_cloud     sensor_msgs/PointCloud2
       Foreground points from the most recent segmentation.
+      An empty cloud is published on reset to clear RViz2.
 
 Parameters
 ----------
   cubeedge      (float, default 0.05) – half-width of the click cube in metres.
   inference_url (str,   default 'http://127.0.0.1:5678') – inference server URL.
 
-Inference is triggered automatically on every new click, and also re-runs
-whenever a new cloud arrives (if at least one click is already stored).
+Inference is triggered only on click changes (new click or reset-then-click),
+not on periodic cloud republishes.
 """
 
 import base64
@@ -39,6 +40,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import PointStamped
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import Empty
+from tf2_ros import Buffer, TransformListener
+import tf2_geometry_msgs  # noqa: F401 – registers PointStamped transform support
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +96,11 @@ def _build_pointcloud2(xyz: np.ndarray, header) -> PointCloud2:
     return msg
 
 
+def _empty_pointcloud2(header) -> PointCloud2:
+    """Return a zero-point PointCloud2 in the same frame (used to clear RViz2)."""
+    return _build_pointcloud2(np.zeros((0, 3), dtype=np.float32), header)
+
+
 # ---------------------------------------------------------------------------
 # Node
 # ---------------------------------------------------------------------------
@@ -112,6 +120,10 @@ class SegmentationNode(Node):
         self._pos_clicks: list[list[float]] = []
         self._neg_clicks: list[list[float]] = []
 
+        # TF2 listener — used to transform incoming clicks to the cloud frame
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
+
         self.create_subscription(
             PointCloud2, "/segmentation/input_cloud", self._cloud_cb, 10)
         self.create_subscription(
@@ -126,35 +138,63 @@ class SegmentationNode(Node):
 
         self.get_logger().info("Segmentation node ready.")
 
+    # --- helpers ------------------------------------------------------------
+
+    def _transform_click_to_cloud_frame(self, msg: PointStamped) -> list[float]:
+        """Return [x, y, z] of msg transformed into the current cloud frame.
+
+        Falls back to the raw coordinates if TF lookup fails or no cloud yet.
+        """
+        with self._lock:
+            cloud_frame = self._cloud_header.frame_id if self._cloud_header else None
+
+        if cloud_frame is None or msg.header.frame_id == cloud_frame:
+            return [msg.point.x, msg.point.y, msg.point.z]
+
+        try:
+            transformed = self._tf_buffer.transform(msg, cloud_frame, timeout=rclpy.duration.Duration(seconds=0.5))
+            return [transformed.point.x, transformed.point.y, transformed.point.z]
+        except Exception as exc:
+            self.get_logger().warn(
+                f"TF transform from '{msg.header.frame_id}' to '{cloud_frame}' failed: {exc}. "
+                "Using raw click coordinates.")
+            return [msg.point.x, msg.point.y, msg.point.z]
+
     # --- subscribers --------------------------------------------------------
 
     def _cloud_cb(self, msg: PointCloud2):
+        """Store incoming cloud. Does NOT trigger inference — that is click-driven."""
         xyz, rgb = _parse_pointcloud2(msg)
         with self._lock:
             self._cloud_xyz = xyz
             self._cloud_rgb = rgb
             self._cloud_header = msg.header
-            has_clicks = bool(self._pos_clicks or self._neg_clicks)
-        if has_clicks:
-            threading.Thread(target=self._run_inference, daemon=True).start()
 
     def _pos_click_cb(self, msg: PointStamped):
-        pt = [msg.point.x, msg.point.y, msg.point.z]
+        pt = self._transform_click_to_cloud_frame(msg)
         with self._lock:
             self._pos_clicks.append(pt)
+        self.get_logger().info(f"[+] positive click at ({pt[0]:.3f}, {pt[1]:.3f}, {pt[2]:.3f}) (cloud frame)")
         threading.Thread(target=self._run_inference, daemon=True).start()
 
     def _neg_click_cb(self, msg: PointStamped):
-        pt = [msg.point.x, msg.point.y, msg.point.z]
+        pt = self._transform_click_to_cloud_frame(msg)
         with self._lock:
             self._neg_clicks.append(pt)
+        self.get_logger().info(f"[-] negative click at ({pt[0]:.3f}, {pt[1]:.3f}, {pt[2]:.3f}) (cloud frame)")
         threading.Thread(target=self._run_inference, daemon=True).start()
 
     def _reset_cb(self, _msg):
         with self._lock:
             self._pos_clicks.clear()
             self._neg_clicks.clear()
+            header = self._cloud_header
         self.get_logger().info("Clicks reset.")
+        # Publish an empty cloud to clear the RViz2 display
+        if header is not None:
+            empty_msg = _empty_pointcloud2(header)
+            empty_msg.header.stamp = self.get_clock().now().to_msg()
+            self._pub.publish(empty_msg)
 
     # --- inference ----------------------------------------------------------
 
@@ -189,11 +229,15 @@ class SegmentationNode(Node):
             return
 
         fg_xyz = xyz[mask]
+        out_header = header
+        out_header.stamp = self.get_clock().now().to_msg()
+
         if len(fg_xyz) == 0:
             self.get_logger().warn("Segmentation returned no foreground points.")
+            self._pub.publish(_empty_pointcloud2(out_header))
             return
 
-        cloud_msg = _build_pointcloud2(fg_xyz, header)
+        cloud_msg = _build_pointcloud2(fg_xyz, out_header)
         self._pub.publish(cloud_msg)
         self.get_logger().info(
             f"Published segmented cloud: {len(fg_xyz)}/{len(xyz)} points.")
@@ -216,3 +260,4 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
+

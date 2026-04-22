@@ -98,6 +98,7 @@ RUN sudo apt-get update \
         ros-${ROS_DISTRO}-ros2-controllers-test-nodes \
         ros-${ROS_DISTRO}-moveit \
         ros-${ROS_DISTRO}-moveit-setup-assistant \
+        ros-${ROS_DISTRO}-tf2-geometry-msgs \
         ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
         ros-${ROS_DISTRO}-rqt \
         ros-${ROS_DISTRO}-rqt-graph \
