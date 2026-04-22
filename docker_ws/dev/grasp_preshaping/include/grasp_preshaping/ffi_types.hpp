@@ -51,11 +51,20 @@ struct PointCloudViewFFI
   std::size_t data_len;
 };
 
+struct CameraPositionFFI
+{
+  float x;
+  float y;
+  float z;
+};
+
 struct GraspComputeRequestFFI
 {
   GraspPoseFFI pose;
   GraspTwistFFI twist;
   PointCloudViewFFI cloud;
+  CameraPositionFFI cameras[4];
+  std::uint32_t n_cameras;
 };
 
 struct GraspComputeResponseFFI
@@ -64,6 +73,9 @@ struct GraspComputeResponseFFI
   double closure_amount;
   double combined_score;
   std::int32_t grasp_type;
+  double thumb_closure;
+  double index_closure;
+  double mrl_closure;
 };
 
 // Function-pointer types for the two exported Rust entry points.

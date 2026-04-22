@@ -59,6 +59,7 @@ def launch_fun(context, *args, **kwargs):
             'dynamic':  'scene_right_dynamic.xml',
             'sphere':   'scene_right_dynamic.xml',
             'cylinder': 'scene_right_cylinder.xml',
+            'approach': 'scene_right_approach.xml',
         }
         scene_filename = scene_file_map.get(scene, 'scene_right.xml')
         xml_model_path = PathJoinSubstitution([
@@ -69,7 +70,7 @@ def launch_fun(context, *args, **kwargs):
 
     depth_pc_mode = LaunchConfiguration('depth_pc_mode').perform(context)
 
-    scene_is_dynamic = scene in ('dynamic', 'sphere', 'cylinder')
+    scene_is_dynamic = scene in ('dynamic', 'sphere', 'cylinder', 'approach')
     publish_tf = scene_is_dynamic or as_bool(depth_publish_tf)
     publish_depth = as_bool(enable_depth_publisher_value)
     start_scene_state_publisher = publish_tf or publish_depth
@@ -255,6 +256,15 @@ def launch_fun(context, *args, **kwargs):
         condition = IfCondition(enable_preshaping_service),
     )
 
+    enable_approach_controller = LaunchConfiguration('enable_approach_controller')
+    approach_controller_node = Node(
+        package = 'mia_hand_mujoco',
+        executable = 'approach_controller_node.py',
+        name = 'approach_controller',
+        output = 'screen',
+        condition = IfCondition(enable_approach_controller),
+    )
+
     return [
         ros2_control_node,
         robot_state_publisher,
@@ -264,6 +274,7 @@ def launch_fun(context, *args, **kwargs):
         depth_publisher_node,
         tf_publisher_node,
         preshaping_service_bridge_node,
+        approach_controller_node,
     ]
 
 def generate_launch_description():
@@ -271,13 +282,14 @@ def generate_launch_description():
     scene_arg = DeclareLaunchArgument(
         'scene',
         default_value='static',
-        choices=['default', 'custom', 'static', 'dynamic', 'sphere', 'cylinder'],
+        choices=['default', 'custom', 'static', 'dynamic', 'sphere', 'cylinder', 'approach'],
         description='MuJoCo scene to load. "default" uses scene_right.xml, '
                     '"static" is the renamed successor to the old custom scene, '
                     '"custom" remains as a compatibility alias, "dynamic" '
                     'enables TF-driven dynamic alignment, "sphere" loads the '
-                    'dynamic scene with a sphere object, and "cylinder" loads '
-                    'scene_right_cylinder.xml with a cylinder object.'
+                    'dynamic scene with a sphere object, "cylinder" loads '
+                    'scene_right_cylinder.xml with a cylinder object, and '
+                    '"approach" loads the approach scene with a head-mounted camera.'
     )
 
     xml_model_path_arg = DeclareLaunchArgument(
@@ -424,6 +436,13 @@ def generate_launch_description():
         description='Start the standalone grasp preshaping ROS service node with the simulation launch.'
     )
 
+    enable_approach_controller_arg = DeclareLaunchArgument(
+        'enable_approach_controller',
+        default_value='false',
+        description='Start the approach-and-grasp controller node. '
+                    'Most useful with scene:=approach.'
+    )
+
     return LaunchDescription([
         scene_arg,
         xml_model_path_arg,
@@ -452,5 +471,6 @@ def generate_launch_description():
         depth_camera_frame_convention_arg,
         tf_publish_hz_arg,
         enable_preshaping_service_arg,
+        enable_approach_controller_arg,
         OpaqueFunction(function = launch_fun)
     ])

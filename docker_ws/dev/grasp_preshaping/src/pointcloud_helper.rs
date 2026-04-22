@@ -163,15 +163,15 @@ pub struct Tsdf {
     width: usize,
     height: usize,
     depth: usize,
-    resolution_mm: f32,
+    resolution_m: f32,
     origin: Vector3<f32>,
 }
 
 impl Tsdf {
     pub fn get_distance(&self, x: f32, y: f32, z: f32) -> f32 {
-        let gx = (x - self.origin.x) / self.resolution_mm;
-        let gy = (y - self.origin.y) / self.resolution_mm;
-        let gz = (z - self.origin.z) / self.resolution_mm;
+        let gx = (x - self.origin.x) / self.resolution_m;
+        let gy = (y - self.origin.y) / self.resolution_m;
+        let gz = (z - self.origin.z) / self.resolution_m;
 
         let gx = gx.max(0.0).min((self.width - 1) as f32);
         let gy = gy.max(0.0).min((self.height - 1) as f32);
@@ -226,7 +226,7 @@ impl Tsdf {
     }
 
     pub fn get_surface_normal(&self, x: f32, y: f32, z: f32) -> Vector3<f32> {
-        let h = self.resolution_mm * 0.5;
+        let h = self.resolution_m * 0.5;
 
         let d_xp = self.get_distance(x + h, y, z);
         let d_xn = self.get_distance(x - h, y, z);
@@ -290,9 +290,9 @@ fn decode_morton(morton: u64) -> (u16, u16, u16) {
     (gx, gy, gz)
 }
 
-pub fn morton(pc: &PointCloud, resolution_mm: f32) -> (Vec<MortonPoint>, Vec<usize>, Vector3<f32>) {
+pub fn morton(pc: &PointCloud, resolution_m: f32) -> (Vec<MortonPoint>, Vec<usize>, Vector3<f32>) {
     assert!(!pc.is_empty(), "empty point cloud");
-    assert!(resolution_mm > 0.0, "resolution must be positive");
+    assert!(resolution_m > 0.0, "resolution must be positive");
 
     let mut min = pc.points[0];
     let mut max = pc.points[0];
@@ -309,15 +309,15 @@ pub fn morton(pc: &PointCloud, resolution_mm: f32) -> (Vec<MortonPoint>, Vec<usi
         .points
         .par_iter()
         .map(|p| {
-            let gx = ((p.x - min.x) / resolution_mm)
+            let gx = ((p.x - min.x) / resolution_m)
                 .floor()
                 .max(0.0)
                 .min(65535.0) as u16;
-            let gy = ((p.y - min.y) / resolution_mm)
+            let gy = ((p.y - min.y) / resolution_m)
                 .floor()
                 .max(0.0)
                 .min(65535.0) as u16;
-            let gz = ((p.z - min.z) / resolution_mm)
+            let gz = ((p.z - min.z) / resolution_m)
                 .floor()
                 .max(0.0)
                 .min(65535.0) as u16;
@@ -350,11 +350,11 @@ pub fn get_tsdf(
     offsets: &[usize],
     truncation_cells: usize,
     start_coords: Vector3<f32>,
-    resolution_mm: f32,
+    resolution_m: f32,
     cameras: &[Camera],
 ) -> Tsdf {
     assert!(!morton_array.is_empty(), "empty morton array");
-    assert!(resolution_mm > 0.0, "resolution must be positive");
+    assert!(resolution_m > 0.0, "resolution must be positive");
 
     let mut max_gx: usize = 0;
     let mut max_gy: usize = 0;
@@ -373,7 +373,7 @@ pub fn get_tsdf(
     let total = width * height * depth;
 
     let origin =
-        start_coords - Vector3::new(trunc as f32, trunc as f32, trunc as f32) * resolution_mm;
+        start_coords - Vector3::new(trunc as f32, trunc as f32, trunc as f32) * resolution_m;
 
     let mut distance = vec![f32::MAX; total];
     let mut nearest = vec![0u32; total];
@@ -446,7 +446,7 @@ pub fn get_tsdf(
                 let gy = rem / stride_y;
                 let gx = rem % stride_y;
 
-                let vw = origin + Vector3::new(gx as f32, gy as f32, gz as f32) * resolution_mm;
+                let vw = origin + Vector3::new(gx as f32, gy as f32, gz as f32) * resolution_m;
 
                 let mp = &morton_array[nearest[flat_idx] as usize];
                 let pw = Vector3::new(mp.x, mp.y, mp.z);
@@ -483,7 +483,7 @@ pub fn get_tsdf(
         width,
         height,
         depth,
-        resolution_mm,
+        resolution_m,
         origin,
     }
 }

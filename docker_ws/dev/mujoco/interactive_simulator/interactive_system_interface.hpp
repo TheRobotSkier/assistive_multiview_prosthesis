@@ -23,7 +23,6 @@
 #include "sensor_msgs/msg/magnetic_field.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "std_srvs/srv/trigger.hpp"
-
 #include "interactive_simulator.hpp"
 
 namespace mia_hand_mujoco
@@ -168,6 +167,17 @@ private:
   // Preshaping Trigger service client
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr preshaping_trigger_client_;
   std::atomic<bool> preshaping_call_running_;
+
+  // Twist covariance configuration
+  enum class TwistCovarianceMode
+  {
+    kFixed = 0,
+    kVelocityScaled = 1
+  };
+  TwistCovarianceMode twist_cov_mode_{TwistCovarianceMode::kVelocityScaled};
+  double twist_cov_linear_base_{0.01};     // base linear velocity variance (m/s)^2
+  double twist_cov_angular_base_{0.005};   // base angular velocity variance (rad/s)^2
+  double twist_cov_velocity_scale_{2.0};   // scale factor for velocity-dependent covariance
 
   int pose_pub_counter_;
   int imu_pub_counter_;
