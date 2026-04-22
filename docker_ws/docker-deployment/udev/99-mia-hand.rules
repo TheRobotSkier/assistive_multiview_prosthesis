@@ -1,0 +1,13 @@
+# /etc/udev/rules.d/99-mia-hand.rules
+# Mia Hand USB serial device
+# Replace <MIA_VENDOR_ID> and <MIA_PRODUCT_ID> with actual values from lsusb
+# To discover: unplug device, run `lsusb`, plug device, run `lsusb`, note the new entry
+# Then set the vendor/product IDs below (4-digit hex, lowercase)
+#
+# Example for FTDI-based adapter: ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001"
+# Example for CP210x-based adapter: ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60"
+#
+# SUBSYSTEM=="tty", ATTRS{idVendor}=="<MIA_VENDOR_ID>", ATTRS{idProduct}=="<MIA_PRODUCT_ID>", SYMLINK+="mia_hand"
+#
+# Placeholder: matches any ttyUSB device as /dev/mia_hand (override after discovering IDs)
+# SUBSYSTEM=="tty", KERNEL=="ttyUSB*", ATTRS{devnum}=="1", SYMLINK+="mia_hand"

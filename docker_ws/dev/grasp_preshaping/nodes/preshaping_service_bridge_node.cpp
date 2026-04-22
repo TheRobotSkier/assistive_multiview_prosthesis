@@ -14,6 +14,8 @@
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_srvs/srv/trigger.hpp"
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
 
 // Import FFI types into the global namespace so the rest of the node code
 // does not need to be changed from the original version.
@@ -24,6 +26,7 @@ using GraspTwistFFI       = grasp_preshaping::GraspTwistFFI;
 using PointCloudViewFFI   = grasp_preshaping::PointCloudViewFFI;
 using GraspComputeRequestFFI  = grasp_preshaping::GraspComputeRequestFFI;
 using GraspComputeResponseFFI = grasp_preshaping::GraspComputeResponseFFI;
+using CameraPositionFFI       = grasp_preshaping::CameraPositionFFI;
 
 constexpr int kGraspComputeOk = grasp_preshaping::kGraspComputeOk;
 
@@ -39,6 +42,17 @@ public:
     rust_compute_fn_(nullptr),
     rust_api_version_fn_(nullptr)
   {
+    // TF2 buffer and listener for camera pose lookups
+    tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
+    // Configurable camera frame names
+    camera_frames_ = declare_parameter<std::vector<std::string>>(
+      "camera_frames",
+      std::vector<std::string>{
+        "mujoco_front_depth_cam",
+        "mujoco_camera_wrist_cam"
+      });
     hand_pose_sub_ = create_subscription<geometry_msgs::msg::Pose>(
       "/hand_pose", 10,
       [this](const geometry_msgs::msg::Pose::SharedPtr msg) {
@@ -149,12 +163,14 @@ private:
     throw std::runtime_error("Rust preshaping backend not found");
   }
 
-  void publish_joint_commands(double position)
+  void publish_joint_commands(double thumb, double index, double mrl)
   {
     std_msgs::msg::Float64MultiArray command;
-    command.data = {position};
+    command.data = {thumb};
     thumb_cmd_pub_->publish(command);
+    command.data = {index};
     index_cmd_pub_->publish(command);
+    command.data = {mrl};
     mrl_cmd_pub_->publish(command);
   }
 
@@ -223,6 +239,61 @@ private:
     request.cloud.data_ptr = cloud.data.data();
     request.cloud.data_len = cloud.data.size();
 
+    // Resolve camera positions from TF
+    uint32_t n_cameras = 0;
+    for (const auto & frame : camera_frames_) {
+      if (n_cameras >= 4) {break;}
+      try {
+        auto transform = tf_buffer_->lookupTransform(
+          "world", frame, tf2::TimePointZero);
+        request.cameras[n_cameras].x = static_cast<float>(
+          transform.transform.translation.x);
+        request.cameras[n_cameras].y = static_cast<float>(
+          transform.transform.translation.y);
+        request.cameras[n_cameras].z = static_cast<float>(
+          transform.transform.translation.z);
+        ++n_cameras;
+      } catch (const tf2::TransformException & ex) {
+        RCLCPP_WARN(
+          get_logger(),
+          "Could not lookup camera frame '%s': %s",
+          frame.c_str(), ex.what());
+      }
+    }
+
+    // Fallback: estimate camera from hand pose if no TF cameras found
+    if (n_cameras == 0) {
+      RCLCPP_WARN(
+        get_logger(),
+        "No camera TF resolved, estimating camera from hand pose");
+      // Estimate: camera_position = hand_position + hand_rotation * (-0.08, -0.46, 0.10)
+      const auto & p = pose.position;
+      const auto & q = pose.orientation;
+      // Rotate offset by hand orientation (simplified quaternion rotation)
+      double ox = -0.08, oy = -0.46, oz = 0.10;
+      // q * v + q_conj * v  (inline quaternion-vector multiply)
+      double qxx = q.x * q.x, qyy = q.y * q.y, qzz = q.z * q.z;
+      double qxy = q.x * q.y, qxz = q.x * q.z, qyz = q.y * q.z;
+      double qwx = q.w * q.x, qwy = q.w * q.y, qwz = q.w * q.z;
+      double rx = ox * (1.0 - 2.0 * (qyy + qzz)) + oy * (2.0 * (qxy - qwz)) + oz * (2.0 * (qxz + qwy));
+      double ry = ox * (2.0 * (qxy + qwz)) + oy * (1.0 - 2.0 * (qxx + qzz)) + oz * (2.0 * (qyz - qwx));
+      double rz = ox * (2.0 * (qxz - qwy)) + oy * (2.0 * (qyz + qwx)) + oz * (1.0 - 2.0 * (qxx + qyy));
+      request.cameras[0].x = static_cast<float>(p.x + rx);
+      request.cameras[0].y = static_cast<float>(p.y + ry);
+      request.cameras[0].z = static_cast<float>(p.z + rz);
+      n_cameras = 1;
+    }
+    request.n_cameras = n_cameras;
+
+    RCLCPP_INFO(
+      get_logger(),
+      "Planner called with %u camera(s):"
+      " cam0=(%.3f,%.3f,%.3f)",
+      n_cameras,
+      n_cameras > 0 ? request.cameras[0].x : 0.0f,
+      n_cameras > 0 ? request.cameras[0].y : 0.0f,
+      n_cameras > 0 ? request.cameras[0].z : 0.0f);
+
     GraspComputeResponseFFI ffi_response{};
     std::array<char, 512> ffi_message{};
     const int status = rust_compute_fn_(
@@ -244,7 +315,10 @@ private:
       return true;
     }
 
-    publish_joint_commands(ffi_response.closure_amount);
+    publish_joint_commands(
+      ffi_response.thumb_closure,
+      ffi_response.index_closure,
+      ffi_response.mrl_closure);
     response->success = true;
     response->message = message.empty() ? "Preshaping completed" : message;
     return true;
@@ -270,6 +344,10 @@ private:
   void * rust_lib_handle_;
   GraspComputeFn rust_compute_fn_;
   GraspApiVersionFn rust_api_version_fn_;
+
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  std::vector<std::string> camera_frames_;
 };
 
 int main(int argc, char ** argv)

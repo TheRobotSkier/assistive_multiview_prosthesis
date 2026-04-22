@@ -224,6 +224,8 @@ install(FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_custom.xml
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_static.xml
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_dynamic.xml
+  ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_cylinder.xml
+  ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_approach.xml
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/mia_hand_right_grasp_frame.xml
   DESTINATION share/${PROJECT_NAME}/mia_hand
 )
@@ -239,6 +241,7 @@ install(PROGRAMS
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/mujoco_scene_state_publisher_node.py
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/mujoco_depth_publisher_node.py
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/mujoco_tf_publisher_node.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/approach_controller_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -1,0 +1,397 @@
+# ------------------------------------- #
+# --- Controller manager parameters --- #
+# ------------------------------------- #
+
+controller_manager:
+  ros__parameters:
+    update_rate: 25  # Hz
+
+    #
+    # Joint state broadcaster
+    #
+    joint_state_broadcaster:
+        type: joint_state_broadcaster/JointStateBroadcaster
+
+    #
+    # Position feedforward controllers
+    #
+    thumb_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    index_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    mrl_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    group_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    wrist_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
+    #
+    # Velocity feedforward controllers
+    #
+    thumb_vel_ff_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+    index_vel_ff_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+    mrl_vel_ff_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+    group_vel_ff_controller:
+      type: velocity_controllers/JointGroupPositionController
+
+    wrist_vel_ff_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+    #
+    # Position-velocity PID controllers
+    #
+    thumb_pos_vel_controller:
+      type: pid_controller/PidController
+
+    index_pos_vel_controller:
+      type: pid_controller/PidController
+
+    mrl_pos_vel_controller:
+      type: pid_controller/PidController
+
+    group_pos_vel_controller:
+      type: pid_controller/PidController
+
+    wrist_pos_vel_controller:
+      type: pid_controller/PidController
+
+    #
+    # Trajectory controllers
+    #
+    thumb_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    index_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    mrl_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    group_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    wrist_trajectory_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+# ------------------------------------- #
+# --- Single controllers parameters --- #
+# ------------------------------------- #
+
+#
+# Joint state broadcaster
+#
+joint_state_broadcaster:
+  ros__parameters:
+    joints:
+      - j_thumb_fle
+      - j_index_fle
+      - j_mrl_fle
+      - j_thumb_opp
+      - wrist_rotation
+    interfaces:
+      - position
+      - velocity
+
+#
+# Position controllers
+#
+thumb_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - j_thumb_fle
+
+index_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - j_index_fle
+
+mrl_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - j_mrl_fle
+
+group_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - j_thumb_fle
+      - j_index_fle
+      - j_mrl_fle
+
+wrist_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - wrist_rotation
+
+#
+# Velocity controllers
+#
+thumb_vel_ff_controller:
+  ros__parameters:
+    joints:
+      - j_thumb_fle
+
+index_vel_ff_controller:
+  ros__parameters:
+    joints:
+      - j_index_fle
+
+mrl_vel_ff_controller:
+  ros__parameters:
+    joints:
+      - j_mrl_fle
+
+group_vel_ff_controller:
+  ros__parameters:
+    joints:
+      - j_thumb_fle
+      - j_index_fle
+      - j_mrl_fle
+
+wrist_vel_ff_controller:
+  ros__parameters:
+    joints:
+      - wrist_rotation
+
+#
+# Position-velocity PID controllers
+#
+thumb_pos_vel_controller:
+  ros__parameters:
+    dof_names:
+      - j_thumb_fle
+    command_interface: velocity
+    reference_and_state_interfaces: ["position"]
+    gains:
+      j_thumb_fle:
+        p: 5.5
+        i: 0.2
+        d: 0.0
+        antiwindup_strategy: "back_calculation"
+
+index_pos_vel_controller:
+  ros__parameters:
+    dof_names:
+      - j_index_fle
+    command_interface: velocity
+    reference_and_state_interfaces: ["position"]
+    gains:
+      j_index_fle:
+        p: 5.0
+        i: 0.01
+        d: 0.0
+        antiwindup_strategy: "back_calculation"
+
+mrl_pos_vel_controller:
+  ros__parameters:
+    dof_names:
+      - j_mrl_fle
+    command_interface: velocity
+    reference_and_state_interfaces: ["position"]
+    gains:
+      j_mrl_fle:
+        p: 5.0
+        i: 0.01
+        d: 0.0
+        antiwindup_strategy: "back_calculation"
+
+group_pos_vel_controller:
+  ros__parameters:
+    dof_names:
+      - j_thumb_fle
+      - j_index_fle
+      - j_mrl_fle
+    command_interface: velocity
+    reference_and_state_interfaces: ["position"]
+    gains:
+      j_thumb_fle:
+        p: 5.5
+        i: 0.2
+        d: 0.0
+        antiwindup_strategy: "back_calculation"
+      j_index_fle:
+        p: 5.0
+        i: 0.01
+        d: 0.0
+        antiwindup_strategy: "back_calculation"
+      j_mrl_fle:
+        p: 5.0
+        i: 0.01
+        d: 0.0
+        antiwindup_strategy: "back_calculation"
+
+wrist_pos_vel_controller:
+  ros__parameters:
+    dof_names:
+      - wrist_rotation
+    command_interface: velocity
+    reference_and_state_interfaces: ["position"]
+    gains:
+      wrist_rotation:
+        p: 8.0
+        i: 0.1
+        d: 0.0
+        antiwindup_strategy: "back_calculation"
+
+#
+# Trajectory controllers
+#
+thumb_trajectory_controller:
+  ros__parameters:
+    joints:
+      - j_thumb_fle
+    command_interfaces:
+      - velocity
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      stopped_velocity_tolerance: 0.0
+      goal_time: 4.0
+      j_thumb_fle:
+        trajectory: 1.0
+        goal: 0.5
+    gains:
+      j_thumb_fle:
+        p: 4.2
+        i: 3.0
+        d: 0.2
+        i_clamp_max: 0.5
+        i_clamp_min: -3.0
+        ff_velocity_scale: 1.4
+        antiwindup_strategy: "back_calculation"
+
+index_trajectory_controller:
+  ros__parameters:
+    joints:
+      - j_index_fle
+    command_interfaces:
+      - velocity
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      stopped_velocity_tolerance: 0.0
+      goal_time: 4.0
+      j_index_fle:
+        trajectory: 1.0
+        goal: 0.5
+    gains:
+      j_index_fle:
+        p: 4.2
+        i: 1.0
+        d: 0.24
+        i_clamp_max: 0.5
+        i_clamp_min: -3.0
+        ff_velocity_scale: 1.4
+        antiwindup_strategy: "back_calculation"
+    
+mrl_trajectory_controller:
+  ros__parameters:
+    joints:
+      - j_mrl_fle
+    command_interfaces:
+      - velocity
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      stopped_velocity_tolerance: 0.0
+      goal_time: 4.0
+      j_mrl_fle:
+        trajectory: 1.0
+        goal: 0.5
+    gains:
+      j_mrl_fle:
+        p: 4.0
+        i: 1.05
+        d: 0.2
+        i_clamp_max: 0.5
+        i_clamp_min: -3.0
+        ff_velocity_scale: 1.7
+        antiwindup_strategy: "back_calculation"
+
+group_trajectory_controller:
+  ros__parameters:
+    action_monitor_rate: 50.0  # Hz
+    joints:
+      - j_thumb_fle
+      - j_index_fle
+      - j_mrl_fle
+    command_interfaces:
+      - velocity
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      goal_time: 10.0
+      stopped_velocity_tolerance: 0.15
+      j_thumb_fle:
+        trajectory: 1.0
+        goal: 0.5
+      j_index_fle:
+        trajectory: 1.0
+        goal: 0.5
+      j_mrl_fle:
+        trajectory: 1.0
+        goal: 0.5
+    gains:
+      j_thumb_fle:
+        p: 4.2
+        i: 3.0
+        d: 0.2
+        i_clamp_max: 0.5
+        i_clamp_min: -3.0
+        ff_velocity_scale: 1.4
+        antiwindup_strategy: "back_calculation"
+      j_index_fle:
+        p: 4.2
+        i: 1.0
+        d: 0.24
+        i_clamp_max: 0.5
+        i_clamp_min: -3.0
+        ff_velocity_scale: 1.4
+        antiwindup_strategy: "back_calculation"
+      j_mrl_fle:
+        p: 4.0
+        i: 1.05
+        d: 0.2
+        i_clamp_max: 0.5
+        i_clamp_min: -3.0
+        ff_velocity_scale: 1.7
+        antiwindup_strategy: "back_calculation"
+
+wrist_trajectory_controller:
+  ros__parameters:
+    joints:
+      - wrist_rotation
+    command_interfaces:
+      - velocity
+    state_interfaces:
+      - position
+      - velocity
+    constraints:
+      stopped_velocity_tolerance: 0.0
+      goal_time: 4.0
+      wrist_rotation:
+        trajectory: 1.0
+        goal: 0.5
+    gains:
+      wrist_rotation:
+        p: 4.5
+        i: 2.0
+        d: 0.1
+        i_clamp_max: 0.5
+        i_clamp_min: -3.0
+        ff_velocity_scale: 1.5
+        antiwindup_strategy: "back_calculation"

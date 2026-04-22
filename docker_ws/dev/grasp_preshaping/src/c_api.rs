@@ -16,9 +16,9 @@ const LUT_PATH: &str = concat!(
     "/data/finger_contact_lut.npz"
 );
 
-const TSDF_RESOLUTION_MM: f32 = 5.0;
+const TSDF_RESOLUTION_M: f32 = 0.005;
 const TRUNCATION_CELLS: usize = 4;
-const COLLISION_TOL_MM: f32 = 5.0;
+const COLLISION_TOL_M: f32 = 0.005;
 const HORIZON: f64 = 5.0;
 const SAMPLES: usize = 1000;
 
@@ -74,10 +74,20 @@ pub struct PointCloudViewFFI {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+pub struct CameraPositionFFI {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct GraspComputeRequestFFI {
     pub pose: GraspPoseFFI,
     pub twist: GraspTwistFFI,
     pub cloud: PointCloudViewFFI,
+    pub cameras: [CameraPositionFFI; 4],
+    pub n_cameras: u32,
 }
 
 #[repr(C)]
@@ -87,6 +97,9 @@ pub struct GraspComputeResponseFFI {
     pub closure_amount: f64,
     pub combined_score: f64,
     pub grasp_type: i32,
+    pub thumb_closure: f64,
+    pub index_closure: f64,
+    pub mrl_closure: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,6 +154,18 @@ struct ComputeOutput {
     grasp_type: GraspType,
     closure_amount: f64,
     combined_score: f64,
+    found_collision: bool,
+    thumb_closure: f64,
+    index_closure: f64,
+    mrl_closure: f64,
+}
+
+fn compute_per_finger_output(grasp_type: GraspType, closure_amount: f64) -> (f64, f64, f64) {
+    match grasp_type {
+        GraspType::Cylindrical => (closure_amount, closure_amount, closure_amount),
+        GraspType::Pinch => (closure_amount, closure_amount, 0.0),
+        GraspType::Lateral => (closure_amount, closure_amount, 0.0),
+    }
 }
 
 static LUT: OnceLock<FingerLUT> = OnceLock::new();
@@ -180,7 +205,11 @@ fn score_all_samples(
         let base_transform = sp.pose.to_se3();
         for gs in &scorers {
             let result = (gs.scorer)(lut, tsdf, &base_transform, collision_tol);
-            let combined = result.combined_score(&gs.weights, sp.sample_probability);
+            let combined = if result.found_collision {
+                result.combined_score(&gs.weights, sp.sample_probability)
+            } else {
+                f64::NEG_INFINITY
+            };
             results.push(ScoredGrasp {
                 grasp_type: gs.grasp_type,
                 sample_pose: sp.pose,
@@ -335,27 +364,43 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         return Err("No points in ROI, cannot score grasps".into());
     }
 
-    let (morton_arr, offsets, start) = morton(&pruned, TSDF_RESOLUTION_MM);
+    let cameras: Vec<crate::pointcloud_helper::Camera> = request
+        .cameras
+        .iter()
+        .take(request.n_cameras as usize)
+        .map(|c| crate::pointcloud_helper::Camera {
+            position: Vector3::new(c.x, c.y, c.z),
+        })
+        .collect();
+
+    let (morton_arr, offsets, start) = morton(&pruned, TSDF_RESOLUTION_M);
     let tsdf = get_tsdf(
         &morton_arr,
         &offsets,
         TRUNCATION_CELLS,
         start,
-        TSDF_RESOLUTION_MM,
-        &[],
+        TSDF_RESOLUTION_M,
+        &cameras,
     );
 
-    let collision_tol = COLLISION_TOL_MM / 1000.0;
+    let collision_tol = COLLISION_TOL_M;
     let scored = score_all_samples(lut, &tsdf, &samples, collision_tol);
 
     let best = select_best_grasp(&scored).ok_or("No valid grasps found")?;
     let _best_loc = best.sample_pose.location();
     let _sample_prob = best.sample_probability;
 
+    let (thumb_closure, index_closure, mrl_closure) =
+        compute_per_finger_output(best.grasp_type, best.result.closure_amount);
+
     Ok(ComputeOutput {
         grasp_type: best.grasp_type,
         closure_amount: best.result.closure_amount,
         combined_score: best.combined,
+        found_collision: best.result.found_collision,
+        thumb_closure,
+        index_closure,
+        mrl_closure,
     })
 }
 
@@ -398,6 +443,9 @@ pub extern "C" fn grasp_preshaping_compute(
         closure_amount: 0.0,
         combined_score: 0.0,
         grasp_type: GRASP_TYPE_UNKNOWN,
+        thumb_closure: 0.0,
+        index_closure: 0.0,
+        mrl_closure: 0.0,
     };
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -410,9 +458,17 @@ pub extern "C" fn grasp_preshaping_compute(
             response_ref.closure_amount = output.closure_amount;
             response_ref.combined_score = output.combined_score;
             response_ref.grasp_type = output.grasp_type.to_ffi();
+            response_ref.thumb_closure = output.thumb_closure;
+            response_ref.index_closure = output.index_closure;
+            response_ref.mrl_closure = output.mrl_closure;
             let message = format!(
-                "{} grasp, closure={:.4}, combined={:.4}",
-                output.grasp_type, output.closure_amount, output.combined_score
+                "{} grasp, closure={:.4}, combined={:.4}, thumb={:.4}, index={:.4}, mrl={:.4}",
+                output.grasp_type,
+                output.closure_amount,
+                output.combined_score,
+                output.thumb_closure,
+                output.index_closure,
+                output.mrl_closure
             );
             write_message(message_out, message_out_len, &message);
             GRASP_COMPUTE_OK

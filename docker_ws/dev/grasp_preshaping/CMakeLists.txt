@@ -54,6 +54,8 @@ find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 add_executable(preshaping_service_bridge_node
   nodes/preshaping_service_bridge_node.cpp
@@ -70,6 +72,8 @@ ament_target_dependencies(preshaping_service_bridge_node
   sensor_msgs
   std_msgs
   std_srvs
+  tf2
+  tf2_ros
 )
 
 target_link_libraries(preshaping_service_bridge_node

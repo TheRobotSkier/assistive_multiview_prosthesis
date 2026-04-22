@@ -179,6 +179,28 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
   preshaping_trigger_client_ = node->create_client<std_srvs::srv::Trigger>(
     "/grasp_preshaping/compute_grasp");
 
+  // Read twist covariance parameters
+  node->declare_parameter("twist_covariance_mode", std::string("velocity_scaled"));
+  node->declare_parameter("twist_covariance_linear_base", 0.01);
+  node->declare_parameter("twist_covariance_angular_base", 0.005);
+  node->declare_parameter("twist_covariance_velocity_scale", 2.0);
+
+  const std::string cov_mode_str =
+    node->get_parameter("twist_covariance_mode").as_string();
+  if (cov_mode_str == "fixed") {
+    twist_cov_mode_ = TwistCovarianceMode::kFixed;
+  } else {
+    twist_cov_mode_ = TwistCovarianceMode::kVelocityScaled;
+  }
+  twist_cov_linear_base_ = node->get_parameter("twist_covariance_linear_base").as_double();
+  twist_cov_angular_base_ = node->get_parameter("twist_covariance_angular_base").as_double();
+  twist_cov_velocity_scale_ = node->get_parameter("twist_covariance_velocity_scale").as_double();
+
+  RCLCPP_INFO(*logger_,
+    "Twist covariance: mode=%s, linear_base=%.4f, angular_base=%.4f, vel_scale=%.2f",
+    cov_mode_str.c_str(), twist_cov_linear_base_, twist_cov_angular_base_,
+    twist_cov_velocity_scale_);
+
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -425,15 +447,34 @@ hardware_interface::return_type InteractiveSystemInterface::read(
         }
       }
 
+      // Compute velocity-dependent covariance
+      double cov_lin = twist_cov_linear_base_;
+      double cov_ang = twist_cov_angular_base_;
+
+      if (twist_cov_mode_ == TwistCovarianceMode::kVelocityScaled) {
+        // Use the computed twist magnitude to scale covariance.
+        // Faster motion → more uncertainty → wider sampling in the predictor.
+        const double lin_vel_mag = std::sqrt(
+          twist_msg.twist.twist.linear.x * twist_msg.twist.twist.linear.x +
+          twist_msg.twist.twist.linear.y * twist_msg.twist.twist.linear.y +
+          twist_msg.twist.twist.linear.z * twist_msg.twist.twist.linear.z);
+        const double ang_vel_mag = std::sqrt(
+          twist_msg.twist.twist.angular.x * twist_msg.twist.twist.angular.x +
+          twist_msg.twist.twist.angular.y * twist_msg.twist.twist.angular.y +
+          twist_msg.twist.twist.angular.z * twist_msg.twist.twist.angular.z);
+        cov_lin *= (1.0 + twist_cov_velocity_scale_ * lin_vel_mag);
+        cov_ang *= (1.0 + twist_cov_velocity_scale_ * ang_vel_mag);
+      }
+
       for (double& covariance_value : twist_msg.twist.covariance) {
         covariance_value = 0.0;
       }
-      twist_msg.twist.covariance[0] = 1e-6;
-      twist_msg.twist.covariance[7] = 1e-6;
-      twist_msg.twist.covariance[14] = 1e-6;
-      twist_msg.twist.covariance[21] = 1e-6;
-      twist_msg.twist.covariance[28] = 1e-6;
-      twist_msg.twist.covariance[35] = 1e-6;
+      twist_msg.twist.covariance[0]  = cov_ang;   // angular x
+      twist_msg.twist.covariance[7]  = cov_ang;   // angular y
+      twist_msg.twist.covariance[14] = cov_ang;   // angular z
+      twist_msg.twist.covariance[21] = cov_lin;   // linear x
+      twist_msg.twist.covariance[28] = cov_lin;   // linear y
+      twist_msg.twist.covariance[35] = cov_lin;   // linear z
       hand_twist_pub_->publish(twist_msg);
     }
 

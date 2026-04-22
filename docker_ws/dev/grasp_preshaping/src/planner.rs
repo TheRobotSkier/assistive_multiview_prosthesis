@@ -9,6 +9,7 @@ pub struct GraspScoreResult {
     pub closure_amount: f64,
     pub alignment_score: f64,
     pub force_closure_score: f64,
+    pub found_collision: bool,
 }
 
 impl GraspScoreResult {
@@ -274,14 +275,16 @@ fn score_grasp(
 ) -> GraspScoreResult {
     match sweep_for_collision(lut, tsdf, base_transform, &spec.sweep_points, collision_tol) {
         None => GraspScoreResult {
-            closure_amount: 1.0,
+            closure_amount: 0.0,
             alignment_score: 0.0,
             force_closure_score: 0.0,
+            found_collision: false,
         },
         Some(0) => GraspScoreResult {
             closure_amount: 0.0,
             alignment_score: 0.0,
             force_closure_score: 0.0,
+            found_collision: true,
         },
         Some(coll_sample) => {
             let lo_ctrl = lut.get_control(coll_sample - 1);
@@ -308,6 +311,7 @@ fn score_grasp(
                 closure_amount: lo,
                 alignment_score: compute_alignment(&active),
                 force_closure_score: compute_force_closure(&active),
+                found_collision: true,
             }
         }
     }
