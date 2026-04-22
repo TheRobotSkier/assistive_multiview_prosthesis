@@ -97,7 +97,9 @@ RUN sudo apt-get update \
 
 RUN echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/$USERNAME/.bashrc
 
-RUN sudo python3 -m pip install --no-cache-dir --break-system-packages mujoco==${MUJOCO_VERSION}
+RUN sudo python3 -m pip install --no-cache-dir --break-system-packages \
+    mujoco==${MUJOCO_VERSION} \
+    smbus2
 
 WORKDIR /miahand_ws
 
