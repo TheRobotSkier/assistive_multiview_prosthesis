@@ -8,8 +8,9 @@ services:
         - USER_GID=${USER_GID}
     container_name: miahand_ros2
     network_mode: "host"
-    # device_cgroup_rules:
-    #   - "c 188:* rmw"
+    device_cgroup_rules:
+      - "c 188:* rmw"   # ttyUSB* devices
+      - "c 166:* rmw"   # ttyACM* devices
     privileged: true
     tty: true
     stdin_open: true
@@ -113,5 +114,17 @@ services:
       bash -c "
         source install/setup.bash &&
         ros2 launch mia_hand_ros2_control mia_hand_system_interface_launch.py use_mock_hardware:=${USE_MOCK_HARDWARE:-true};
+        /bin/bash
+      "
+
+  miahand_hardware:
+    extends: miahand_ros2
+    container_name: miahand_ros2_hardware
+    environment:
+      - USE_MOCK_HARDWARE=false
+    command:  >
+      bash -c "
+        source install/setup.bash &&
+        ros2 launch mia_hand_ros2_control mia_hand_with_wrist_system_interface_launch.py serial_port:=/dev/mia_hand wrist_port:=/dev/wrist_motor use_mock_hardware:=false;
         /bin/bash
       "

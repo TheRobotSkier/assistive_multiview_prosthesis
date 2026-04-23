@@ -1,6 +1,5 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
-
 <package format="3">
 
   <name>mia_hand_ros2_control</name>
@@ -9,7 +8,7 @@
 
   <description>
   	Package for controlling Mia Hand devices through the ROS2 Control framework.
-	</description>
+  </description>
 
   <author email="andreabu@prensilia.com">Andrea Burani</author>
 
@@ -29,11 +28,17 @@
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_lifecycle</depend>
+  <exec_depend>dynamixel_hardware_interface</exec_depend>
+  <exec_depend>dynamixel_sdk</exec_depend>
+  <exec_depend>dynamixel_interfaces</exec_depend>
 
   <exec_depend>mia_hand_description</exec_depend>
   <exec_depend>ros2launch</exec_depend>
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>xacro</exec_depend>
+  <exec_depend>dynamixel_hardware_interface</exec_depend>
+  <exec_depend>dynamixel_sdk</exec_depend>
+  <exec_depend>dynamixel_interfaces</exec_depend>
 
   <doc_depend>doxygen</doc_depend>
 
