@@ -12,6 +12,20 @@ agent.md
 target/
 Cargo.lock
 
+# pc_segmentation related
+*.so
+*.[o,d,a]
+*.swo
+*.swp
+*.swn
+*.pyc
+
+build/
+objs/
+dist/
+MinkowskiEngine.egg-info/
+docker_ws/dev/pc_segmentation/weights/weights_exp14_14.pth
+
 # ignore old files
 *.old.*
 

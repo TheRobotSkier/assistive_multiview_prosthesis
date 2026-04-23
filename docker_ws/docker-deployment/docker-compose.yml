@@ -26,7 +26,7 @@ services:
       #RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp} #added LINUX
 
     user: "1000:1000"                  # UID/GID must match the host user for socket access
-    # ipc: host                        # Recommended to avoid X11 rendering glitches
+    userns_mode: "keep-id"             # rootless Podman: preserve host UID mapping for bind-mounted auth files
     command: /bin/bash
 
   miahand_description:
@@ -98,6 +98,23 @@ services:
         colcon build --packages-select grasp_preshaping mia_hand_mujoco &&
         source install/setup.bash &&
         ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=${MUJOCO_OBJECT:-sphere} depth_target_geom_name:=target_${MUJOCO_OBJECT:-sphere} depth_pc_mode:=${MUJOCO_PC_MODE:-object} enable_depth_publisher:=true hardware_plugin:=mia_hand_mujoco/InteractiveSystemInterface;
+        /bin/bash
+      "
+  mujoco_trajectory:
+    extends: miahand_ros2
+    container_name: miahand_ros2_mujoco_trajectory
+    environment:
+      - MUJOCO_OBJECT=${MUJOCO_OBJECT:-sphere}
+      - MUJOCO_PC_MODE=${MUJOCO_PC_MODE:-object}
+    command:  >
+      bash -c "
+        source install/setup.bash &&
+        ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=${MUJOCO_OBJECT:-sphere} depth_target_geom_name:=target_${MUJOCO_OBJECT:-sphere} depth_pc_mode:=${MUJOCO_PC_MODE:-object} enable_depth_publisher:=true hardware_plugin:=mia_hand_mujoco/InteractiveSystemInterface &
+        sleep 5 &&
+        source install/setup.bash &&
+        LAUNCH_PID=\$! &&
+        ros2 run mia_hand_mujoco mujoco_hand_trajectory_node.py ;
+        wait \$LAUNCH_PID ;
         /bin/bash
       "
   miahand_ros2_control:
