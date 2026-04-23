@@ -8,10 +8,6 @@ services:
         - USER_GID=${USER_GID}
     container_name: miahand_ros2
     network_mode: "host"
-    device_cgroup_rules:
-      - "c 188:* rmw"   # ttyUSB* devices
-      - "c 166:* rmw"   # ttyACM* devices
-    privileged: true
     tty: true
     stdin_open: true
     volumes:
@@ -30,7 +26,6 @@ services:
       #RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp} #added LINUX
 
     user: "1000:1000"                  # UID/GID must match the host user for socket access
-    userns_mode: "keep-id"             # rootless Podman: preserve host UID mapping for bind-mounted auth files
     # ipc: host                        # Recommended to avoid X11 rendering glitches
     command: /bin/bash
 
@@ -120,6 +115,11 @@ services:
   miahand_hardware:
     extends: miahand_ros2
     container_name: miahand_ros2_hardware
+    privileged: true
+    userns_mode: "host"                # required for rootful hardware access with device cgroup rules
+    device_cgroup_rules:
+      - "c 188:* rmw"                  # ttyUSB* devices
+      - "c 166:* rmw"                  # ttyACM* devices
     environment:
       - USE_MOCK_HARDWARE=false
     command:  >
