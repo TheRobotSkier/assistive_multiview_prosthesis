@@ -10,7 +10,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 import rclpy
-from geometry_msgs.msg import Pose, TransformStamped
+from geometry_msgs.msg import TransformStamped
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, JointState, PointCloud2, PointField
 from tf2_msgs.msg import TFMessage
@@ -144,13 +144,6 @@ class MujocoSceneStatePublisher(Node):
         self.declare_parameter("publish_camera_cloud", True)
         self.declare_parameter("wait_for_joint_state", True)
         self.declare_parameter("camera_frame_convention", "legacy")
-        self.declare_parameter("track_base_poses", True)
-        self.declare_parameter("hand_pose_topic", "/mujoco/hand_pose")
-        self.declare_parameter("object_pose_topic", "/mujoco/object_pose")
-        self.declare_parameter("camera_pose_topic", "/mujoco/camera_pose")
-        self.declare_parameter("hand_body_name", "palm_r")
-        self.declare_parameter("object_body_names", ["target_sphere_body", "target_cylinder_body"])
-        self.declare_parameter("camera_body_name", "depth_cam_body")
 
         xml_model_path_value = str(self.get_parameter("xml_model_path").value).strip()
         if not xml_model_path_value:
@@ -248,51 +241,6 @@ class MujocoSceneStatePublisher(Node):
         self.have_joint_state = False
         self.warned_waiting_for_joint_state = False
 
-        # Base pose tracking: subscribe to external pose updates for movable bodies.
-        # This keeps the shadow model in sync when the interactive simulator moves
-        # hand/object/camera via Scene Control or Motion Control.
-        self.track_base_poses = bool(self.get_parameter("track_base_poses").value)
-        self._latest_hand_pose: Pose | None = None
-        self._latest_object_pose: Pose | None = None
-        self._latest_camera_pose: Pose | None = None
-
-        # Resolve body IDs for base pose overrides
-        self._hand_body_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_BODY,
-            str(self.get_parameter("hand_body_name").value))
-        self._camera_body_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_BODY,
-            str(self.get_parameter("camera_body_name").value))
-        self._object_body_id = -1
-        for obj_name in self.get_parameter("object_body_names").value:
-            bid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, str(obj_name))
-            if bid >= 0:
-                self._object_body_id = bid
-                break
-
-        if self.track_base_poses:
-            self._hand_pose_sub = self.create_subscription(
-                Pose,
-                str(self.get_parameter("hand_pose_topic").value),
-                self._on_hand_pose, 10)
-            self._object_pose_sub = self.create_subscription(
-                Pose,
-                str(self.get_parameter("object_pose_topic").value),
-                self._on_object_pose, 10)
-            self._camera_pose_sub = self.create_subscription(
-                Pose,
-                str(self.get_parameter("camera_pose_topic").value),
-                self._on_camera_pose, 10)
-            tracked = []
-            if self._hand_body_id >= 0:
-                tracked.append(f"hand(palm_r)={self._hand_body_id}")
-            if self._object_body_id >= 0:
-                tracked.append(f"object={self._object_body_id}")
-            if self._camera_body_id >= 0:
-                tracked.append(f"camera={self._camera_body_id}")
-            self.get_logger().info(
-                f"Base pose tracking enabled for bodies: {', '.join(tracked)}")
-
         self.joint_state_sub = self.create_subscription(
             JointState,
             str(self.get_parameter("joint_state_topic").value),
@@ -381,54 +329,6 @@ class MujocoSceneStatePublisher(Node):
             float(self.model.jnt_range[joint_id][1]),
         )
 
-    # --- Base pose callbacks (thread-safe) ---
-
-    def _on_hand_pose(self, msg: Pose) -> None:
-        with self.state_lock:
-            self._latest_hand_pose = msg
-
-    def _on_object_pose(self, msg: Pose) -> None:
-        with self.state_lock:
-            self._latest_object_pose = msg
-
-    def _on_camera_pose(self, msg: Pose) -> None:
-        with self.state_lock:
-            self._latest_camera_pose = msg
-
-    @staticmethod
-    def _pose_to_pos_quat(msg: Pose) -> tuple[np.ndarray, np.ndarray]:
-        """Convert a Pose msg to (pos[3], quat_wxyz[4]) arrays."""
-        pos = np.array([msg.position.x, msg.position.y, msg.position.z], dtype=np.float64)
-        quat_wxyz = np.array([
-            msg.orientation.w, msg.orientation.x,
-            msg.orientation.y, msg.orientation.z,
-        ], dtype=np.float64)
-        # Normalize quaternion
-        n = np.linalg.norm(quat_wxyz)
-        if n > 1e-12:
-            quat_wxyz /= n
-        return pos, quat_wxyz
-
-    def _apply_base_pose_unlocked(
-        self, body_id: int, msg: Pose | None
-    ) -> None:
-        """Write a Pose message into the model's body_pos/body_quat arrays."""
-        if body_id < 0 or msg is None:
-            return
-        pos, quat_wxyz = self._pose_to_pos_quat(msg)
-        self.model.body_pos[body_id] = pos
-        self.model.body_quat[body_id] = quat_wxyz
-
-    def _apply_base_poses_unlocked(self) -> None:
-        """Apply all pending base pose overrides to the shadow model."""
-        if not self.track_base_poses:
-            return
-        self._apply_base_pose_unlocked(self._hand_body_id, self._latest_hand_pose)
-        self._apply_base_pose_unlocked(self._object_body_id, self._latest_object_pose)
-        self._apply_base_pose_unlocked(self._camera_body_id, self._latest_camera_pose)
-
-    # --- Joint state callback ---
-
     def on_joint_state(self, msg: JointState) -> None:
         with self.state_lock:
             self.latest_joint_positions = {
@@ -442,7 +342,6 @@ class MujocoSceneStatePublisher(Node):
             if not self._ensure_ready("depth image and cloud"):
                 return
             self._apply_joint_positions_unlocked()
-            self._apply_base_poses_unlocked()
             mujoco.mj_forward(self.model, self.data)
 
             self.renderer.update_scene(self.data, camera=self.camera_name)
@@ -470,7 +369,6 @@ class MujocoSceneStatePublisher(Node):
             if not self._ensure_ready("scene TF state"):
                 return
             self._apply_joint_positions_unlocked()
-            self._apply_base_poses_unlocked()
             mujoco.mj_forward(self.model, self.data)
             stamp = self.get_clock().now().to_msg()
             self.tf_message_pub.publish(TFMessage(transforms=self.build_scene_transforms(stamp)))
