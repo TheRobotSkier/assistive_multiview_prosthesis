@@ -114,3 +114,24 @@ services:
         /bin/bash
       "
 
+  mindrove_emg:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile
+    container_name: mindrove_emg
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+
+  mindrove_cpp:
+    build:
+      context: ../dev/mindrove_cpp
+      dockerfile: Dockerfile
+    container_name: mindrove_cpp
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove_cpp:/src:ro
+      - ../dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64:/sdk:ro
+
