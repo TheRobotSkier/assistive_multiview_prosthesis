@@ -5,34 +5,67 @@ use grasp_preshaping::pointcloud_helper::{get_tsdf, morton, prune, PointCloud};
 use grasp_preshaping::predictor::{
     predict_roi_with_samples, PredictionConfig, Twist6, TwistCovariance,
 };
+use grasp_preshaping::config;
 use nalgebra::{Matrix4, Vector3};
 
-const TSDF_RESOLUTION_MM: f32 = 5.0;
-const TRUNCATION_CELLS: usize = 4;
-const COLLISION_TOL_MM: f32 = 5.0;
-const HORIZON: f64 = 5.0;
-const SAMPLES: usize = 1000;
+fn create_pred_config() -> PredictionConfig {
+    PredictionConfig {
+        t_max: config::PREDICTION_HORIZON_S,
+        n_samples: config::PREDICTION_SAMPLES,
+        hand_radius: config::HAND_RADIUS_M,
+        min_tsdf_dims: Vector3::new(
+            config::MIN_TSDF_DIM_M as f64,
+            config::MIN_TSDF_DIM_M as f64,
+            config::MIN_TSDF_DIM_M as f64,
+        ),
+        max_tsdf_dims: Vector3::new(
+            config::MAX_TSDF_DIM_M as f64,
+            config::MAX_TSDF_DIM_M as f64,
+            config::MAX_TSDF_DIM_M as f64,
+        ),
+    }
+}
 
-const PREDICTION_HAND_RADIUS_M: f64 = 0.05;
-const MIN_TSDF_DIM_M: f32 = 0.1;
-const MAX_TSDF_DIM_M: f32 = 0.3;
+fn identity_pose() -> DualQuaternion {
+    DualQuaternion::from_se3(&Matrix4::identity())
+}
+
+fn dummy_twist() -> Twist6 {
+    Twist6 {
+        omega: Vector3::new(0.0, 0.0, 0.1),
+        v: Vector3::new(0.01, 0.0, 0.0),
+    }
+}
+
+fn demo_sphere(center: Vector3<f32>, radius: f32, n: usize) -> PointCloud {
+    use std::f32::consts::PI;
+    let golden = (1.0 + 5.0_f32.sqrt()) / 2.0;
+    let points: Vec<Vector3<f32>> = (0..n)
+        .map(|i| {
+            let theta = 2.0 * PI * (i as f32) / golden;
+            let phi = (1.0 - 1.0 - 2.0 * (i as f32 + 0.5) / n as f32).acos();
+            center + Vector3::new(
+                radius * phi.sin() * theta.cos(),
+                radius * phi.sin() * theta.sin(),
+                radius * phi.cos(),
+            )
+        })
+        .collect();
+    PointCloud::new(points)
+}
 
 fn lut_path() -> String {
-    // Try to find the LUT file in common locations
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     let candidates = vec![
         format!("{}/data/finger_contact_lut.npz", manifest_dir),
         format!("{}/../../../data/finger_contact_lut.npz", manifest_dir),
         "./data/finger_contact_lut.npz".to_string(),
     ];
-
     for path in candidates {
         if std::path::Path::new(&path).exists() {
             return path;
         }
     }
-
-    // Return the most likely location; test will skip if not found
     format!("{}/data/finger_contact_lut.npz", manifest_dir)
 }
 
@@ -41,29 +74,6 @@ fn load_lut_or_skip() -> Option<FingerLUT> {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| FingerLUT::load(&path))).ok()
 }
 
-fn identity_pose() -> DualQuaternion {
-    DualQuaternion::from_se3(&Matrix4::identity())
-}
-
-fn create_pred_config() -> PredictionConfig {
-    PredictionConfig {
-        t_max: HORIZON,
-        n_samples: SAMPLES,
-        hand_radius: PREDICTION_HAND_RADIUS_M,
-        min_tsdf_dims: Vector3::new(
-            MIN_TSDF_DIM_M as f64,
-            MIN_TSDF_DIM_M as f64,
-            MIN_TSDF_DIM_M as f64,
-        ),
-        max_tsdf_dims: Vector3::new(
-            MAX_TSDF_DIM_M as f64,
-            MAX_TSDF_DIM_M as f64,
-            MAX_TSDF_DIM_M as f64,
-        ),
-    }
-}
-
-/// Benchmark ROI prediction from pose and twist
 fn bench_roi_prediction(c: &mut Criterion) {
     let lut = match load_lut_or_skip() {
         Some(l) => l,
@@ -75,8 +85,8 @@ fn bench_roi_prediction(c: &mut Criterion) {
 
     let pred_config = black_box(create_pred_config());
     let pose = black_box(identity_pose());
-    let twist = black_box(Twist6::dummy());
-    let twist_cov = black_box(TwistCovariance::dummy());
+    let twist = black_box(dummy_twist());
+    let twist_cov = black_box(TwistCovariance::fixed());
     let index_tip = black_box(lut.get_location(Contact::IndexTip, 0.0));
 
     c.bench_function("roi_prediction_1000_samples", |b| {
@@ -84,9 +94,8 @@ fn bench_roi_prediction(c: &mut Criterion) {
     });
 }
 
-/// Benchmark point cloud pruning to ROI
 fn bench_pointcloud_pruning(c: &mut Criterion) {
-    let pc = PointCloud::demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 5000);
+    let pc = demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 5000);
 
     let lut = match load_lut_or_skip() {
         Some(l) => l,
@@ -95,8 +104,8 @@ fn bench_pointcloud_pruning(c: &mut Criterion) {
 
     let pred_config = create_pred_config();
     let pose = identity_pose();
-    let twist = Twist6::dummy();
-    let twist_cov = TwistCovariance::dummy();
+    let twist = dummy_twist();
+    let twist_cov = TwistCovariance::fixed();
     let index_tip = lut.get_location(Contact::IndexTip, 0.0);
 
     let (roi, _) = predict_roi_with_samples(&pose, &twist, &twist_cov, &index_tip, &pred_config);
@@ -106,27 +115,25 @@ fn bench_pointcloud_pruning(c: &mut Criterion) {
     });
 }
 
-/// Benchmark TSDF construction from point cloud
 fn bench_tsdf_construction(c: &mut Criterion) {
     let center = Vector3::new(0.0, 0.1, 0.05);
-    let pc = black_box(PointCloud::demo_sphere(center, 0.02, 5000));
+    let pc = black_box(demo_sphere(center, 0.02, 5000));
 
     c.bench_function("tsdf_construction_5000pts", |b| {
         b.iter(|| {
-            let (morton_arr, offsets, start) = morton(&pc, TSDF_RESOLUTION_MM);
+            let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
             get_tsdf(
                 &morton_arr,
                 &offsets,
-                TRUNCATION_CELLS,
+                config::TRUNCATION_CELLS,
                 start,
-                TSDF_RESOLUTION_MM,
+                config::TSDF_RESOLUTION_M,
                 &[],
             )
         })
     });
 }
 
-/// Benchmark full scoring pipeline: ROI -> TSDF -> score all grasps
 fn bench_full_pipeline(c: &mut Criterion) {
     let lut = match load_lut_or_skip() {
         Some(l) => l,
@@ -138,37 +145,33 @@ fn bench_full_pipeline(c: &mut Criterion) {
 
     let pred_config = create_pred_config();
     let pose = black_box(identity_pose());
-    let twist = black_box(Twist6::dummy());
-    let twist_cov = black_box(TwistCovariance::dummy());
+    let twist = black_box(dummy_twist());
+    let twist_cov = black_box(TwistCovariance::fixed());
     let index_tip = black_box(lut.get_location(Contact::IndexTip, 0.0));
 
-    let pc = black_box(PointCloud::demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 5000));
+    let pc = black_box(demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 5000));
 
     c.bench_function("full_pipeline_predict_to_score", |b| {
         b.iter(|| {
-            // Predict ROI and sample grasps
             let (roi, samples) =
                 predict_roi_with_samples(&pose, &twist, &twist_cov, &index_tip, &pred_config);
 
-            // Prune point cloud
             let pruned = prune(&pc, Some(roi));
             if pruned.is_empty() {
                 return ();
             }
 
-            // Build TSDF
-            let (morton_arr, offsets, start) = morton(&pruned, TSDF_RESOLUTION_MM);
+            let (morton_arr, offsets, start) = morton(&pruned, config::TSDF_RESOLUTION_M);
             let tsdf = get_tsdf(
                 &morton_arr,
                 &offsets,
-                TRUNCATION_CELLS,
+                config::TRUNCATION_CELLS,
                 start,
-                TSDF_RESOLUTION_MM,
+                config::TSDF_RESOLUTION_M,
                 &[],
             );
 
-            // Score all grasps
-            let collision_tol = COLLISION_TOL_MM / 1000.0;
+            let collision_tol = config::COLLISION_TOL_M;
             for sp in &samples {
                 let base_transform = sp.pose.to_se3();
                 let _r1 = score_cylindrical(&lut, &tsdf, &base_transform, collision_tol);
@@ -179,27 +182,25 @@ fn bench_full_pipeline(c: &mut Criterion) {
     });
 }
 
-/// Benchmark individual scoring functions
 fn bench_scoring_functions(c: &mut Criterion) {
     let lut = match load_lut_or_skip() {
         Some(l) => l,
         None => return,
     };
 
-    // Create a small TSDF for scoring
-    let pc = PointCloud::demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 1000);
-    let (morton_arr, offsets, start) = morton(&pc, TSDF_RESOLUTION_MM);
+    let pc = demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 1000);
+    let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
     let tsdf = get_tsdf(
         &morton_arr,
         &offsets,
-        TRUNCATION_CELLS,
+        config::TRUNCATION_CELLS,
         start,
-        TSDF_RESOLUTION_MM,
+        config::TSDF_RESOLUTION_M,
         &[],
     );
 
     let base_transform = black_box(Matrix4::identity());
-    let collision_tol = black_box(COLLISION_TOL_MM / 1000.0);
+    let collision_tol = black_box(config::COLLISION_TOL_M);
 
     c.bench_function("score_cylindrical", |b| {
         b.iter(|| score_cylindrical(&lut, &tsdf, &base_transform, collision_tol))

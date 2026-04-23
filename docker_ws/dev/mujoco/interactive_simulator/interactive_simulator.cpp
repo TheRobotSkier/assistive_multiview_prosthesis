@@ -591,6 +591,7 @@ void InteractiveSimulator::add_custom_section(mujoco::Simulate* sim)
   const mjuiDef planner_def[] = {
     {mjITEM_SECTION,   "Grasp Planner", mjPRESERVE, nullptr,                        "", 0},
     {mjITEM_BUTTON,    "Run Planner",   1,          nullptr,                        "", 0},
+    {mjITEM_BUTTON,    "Reset Planner",  1,          nullptr,                        "", 0},
     {mjITEM_STATIC,    "Status",        1,          nullptr,                        "Idle", 0},
     {mjITEM_END,       "",              0,          nullptr,                        "", 0}
   };
@@ -610,6 +611,8 @@ void InteractiveSimulator::handle_custom_event(
 
   if (itemid == kPlannerItemRunPlanner) {
     launch_planner();
+  } else if (itemid == kPlannerItemResetPlanner) {
+    reset_planner();
   }
 }
 
@@ -647,7 +650,23 @@ void InteractiveSimulator::launch_planner()
   set_status("Calling preshaping service");
 }
 
-// --- Scene Control ---
+void InteractiveSimulator::reset_planner()
+{
+  planner_request_pending_.store(false);
+  planner_running_.store(false);
+
+  if (hand_body_id_ >= 0 && sim_ != nullptr && mj_model_ != nullptr)
+  {
+    request_hand_move(scene_hand_pos_, scene_hand_rpy_, static_cast<double>(motion_duration_));
+    set_status("Planner reset: returning hand to start pose");
+  }
+  else
+  {
+    set_status("Planner reset");
+  }
+}
+
+
 
 void InteractiveSimulator::rpy_to_quat(const mjtNum rpy[3], mjtNum q[4])
 {

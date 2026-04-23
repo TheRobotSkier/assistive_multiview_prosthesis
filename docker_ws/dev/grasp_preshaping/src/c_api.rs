@@ -7,24 +7,10 @@ use crate::predictor::{
     predict_roi_with_samples, PredictionConfig, SampledPose, Twist6, TwistCovariance,
     TwistWithCovariance,
 };
+use crate::config;
 use nalgebra::{Matrix4, Vector3};
 use std::ffi::c_char;
 use std::sync::OnceLock;
-
-const LUT_PATH: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/data/finger_contact_lut.npz"
-);
-
-const TSDF_RESOLUTION_M: f32 = 0.005;
-const TRUNCATION_CELLS: usize = 4;
-const COLLISION_TOL_M: f32 = 0.005;
-const HORIZON: f64 = 5.0;
-const SAMPLES: usize = 1000;
-
-const PREDICTION_HAND_RADIUS_M: f64 = 0.05;
-const MIN_TSDF_DIM_M: f32 = 0.1;
-const MAX_TSDF_DIM_M: f32 = 0.3;
 
 pub const GRASP_TYPE_UNKNOWN: i32 = 0;
 pub const GRASP_TYPE_CYLINDRICAL: i32 = 1;
@@ -56,7 +42,6 @@ pub struct GraspTwistFFI {
     pub ax: f64,
     pub ay: f64,
     pub az: f64,
-    pub covariance: [f64; 36],
 }
 
 #[repr(C)]
@@ -131,8 +116,6 @@ impl GraspType {
 
 struct ScoredGrasp {
     grasp_type: GraspType,
-    sample_pose: DualQuaternion,
-    sample_probability: f64,
     result: GraspScoreResult,
     combined: f64,
 }
@@ -147,14 +130,12 @@ type ScorerFn = fn(
 struct GraspScorer {
     grasp_type: GraspType,
     scorer: ScorerFn,
-    weights: GraspWeights,
 }
 
 struct ComputeOutput {
     grasp_type: GraspType,
     closure_amount: f64,
     combined_score: f64,
-    found_collision: bool,
     thumb_closure: f64,
     index_closure: f64,
     mrl_closure: f64,
@@ -172,25 +153,20 @@ static LUT: OnceLock<FingerLUT> = OnceLock::new();
 static PRED_CONFIG: OnceLock<PredictionConfig> = OnceLock::new();
 static INDEX_TIP_LOCAL: OnceLock<Vector3<f64>> = OnceLock::new();
 
-fn grasp_scorers() -> Vec<GraspScorer> {
-    vec![
-        GraspScorer {
-            grasp_type: GraspType::Cylindrical,
-            scorer: score_cylindrical,
-            weights: GraspWeights::cylindrical(),
-        },
-        GraspScorer {
-            grasp_type: GraspType::Pinch,
-            scorer: score_pinch,
-            weights: GraspWeights::pinch(),
-        },
-        GraspScorer {
-            grasp_type: GraspType::Lateral,
-            scorer: score_lateral,
-            weights: GraspWeights::lateral(),
-        },
-    ]
-}
+const SCORERS: &[GraspScorer] = &[
+    GraspScorer {
+        grasp_type: GraspType::Cylindrical,
+        scorer: score_cylindrical,
+    },
+    GraspScorer {
+        grasp_type: GraspType::Pinch,
+        scorer: score_pinch,
+    },
+    GraspScorer {
+        grasp_type: GraspType::Lateral,
+        scorer: score_lateral,
+    },
+];
 
 fn score_all_samples(
     lut: &FingerLUT,
@@ -198,22 +174,20 @@ fn score_all_samples(
     samples: &[SampledPose],
     collision_tol: f32,
 ) -> Vec<ScoredGrasp> {
-    let scorers = grasp_scorers();
+    let weights = GraspWeights::default();
     let mut results = Vec::new();
 
     for sp in samples {
         let base_transform = sp.pose.to_se3();
-        for gs in &scorers {
+        for gs in SCORERS {
             let result = (gs.scorer)(lut, tsdf, &base_transform, collision_tol);
             let combined = if result.found_collision {
-                result.combined_score(&gs.weights, sp.sample_probability)
+                result.combined_score(&weights, sp.sample_probability)
             } else {
                 f64::NEG_INFINITY
             };
             results.push(ScoredGrasp {
                 grasp_type: gs.grasp_type,
-                sample_pose: sp.pose,
-                sample_probability: sp.sample_probability,
                 result,
                 combined,
             });
@@ -250,14 +224,7 @@ fn twist_to_runtime(twist: &GraspTwistFFI) -> TwistWithCovariance {
             omega: Vector3::new(twist.ax, twist.ay, twist.az),
             v: Vector3::new(twist.lx, twist.ly, twist.lz),
         },
-        covariance: TwistCovariance {
-            diagonal: Vector3::new(twist.covariance[0], twist.covariance[7], twist.covariance[14]),
-            diagonal_v: Vector3::new(
-                twist.covariance[21],
-                twist.covariance[28],
-                twist.covariance[35],
-            ),
-        },
+        covariance: TwistCovariance::fixed(),
     }
 }
 
@@ -317,23 +284,23 @@ fn pointcloud_view_to_pointcloud(view: &PointCloudViewFFI) -> Result<PointCloud,
 }
 
 fn get_lut() -> &'static FingerLUT {
-    LUT.get_or_init(|| FingerLUT::load(LUT_PATH))
+    LUT.get_or_init(|| FingerLUT::load(concat!(env!("CARGO_MANIFEST_DIR"), "/data/finger_contact_lut.npz")))
 }
 
 fn get_prediction_config() -> &'static PredictionConfig {
     PRED_CONFIG.get_or_init(|| PredictionConfig {
-        t_max: HORIZON,
-        n_samples: SAMPLES,
-        hand_radius: PREDICTION_HAND_RADIUS_M,
+        t_max: config::PREDICTION_HORIZON_S,
+        n_samples: config::PREDICTION_SAMPLES,
+        hand_radius: config::HAND_RADIUS_M,
         min_tsdf_dims: Vector3::new(
-            MIN_TSDF_DIM_M as f64,
-            MIN_TSDF_DIM_M as f64,
-            MIN_TSDF_DIM_M as f64,
+            config::MIN_TSDF_DIM_M as f64,
+            config::MIN_TSDF_DIM_M as f64,
+            config::MIN_TSDF_DIM_M as f64,
         ),
         max_tsdf_dims: Vector3::new(
-            MAX_TSDF_DIM_M as f64,
-            MAX_TSDF_DIM_M as f64,
-            MAX_TSDF_DIM_M as f64,
+            config::MAX_TSDF_DIM_M as f64,
+            config::MAX_TSDF_DIM_M as f64,
+            config::MAX_TSDF_DIM_M as f64,
         ),
     })
 }
@@ -373,22 +340,27 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         })
         .collect();
 
-    let (morton_arr, offsets, start) = morton(&pruned, TSDF_RESOLUTION_M);
+    let (morton_arr, offsets, start) = morton(&pruned, config::TSDF_RESOLUTION_M);
     let tsdf = get_tsdf(
         &morton_arr,
         &offsets,
-        TRUNCATION_CELLS,
+        config::TRUNCATION_CELLS,
         start,
-        TSDF_RESOLUTION_M,
+        config::TSDF_RESOLUTION_M,
         &cameras,
     );
 
-    let collision_tol = COLLISION_TOL_M;
+    let collision_tol = config::COLLISION_TOL_M;
     let scored = score_all_samples(lut, &tsdf, &samples, collision_tol);
 
     let best = select_best_grasp(&scored).ok_or("No valid grasps found")?;
-    let _best_loc = best.sample_pose.location();
-    let _sample_prob = best.sample_probability;
+
+    if !best.result.found_collision {
+        return Err(format!(
+            "No collision found for any grasp type ({} samples evaluated)",
+            scored.len()
+        ));
+    }
 
     let (thumb_closure, index_closure, mrl_closure) =
         compute_per_finger_output(best.grasp_type, best.result.closure_amount);
@@ -397,7 +369,6 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         grasp_type: best.grasp_type,
         closure_amount: best.result.closure_amount,
         combined_score: best.combined,
-        found_collision: best.result.found_collision,
         thumb_closure,
         index_closure,
         mrl_closure,

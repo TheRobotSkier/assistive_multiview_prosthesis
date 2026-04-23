@@ -181,8 +181,8 @@ hardware_interface::CallbackReturn InteractiveSystemInterface::on_activate(
 
   // Read twist covariance parameters
   node->declare_parameter("twist_covariance_mode", std::string("velocity_scaled"));
-  node->declare_parameter("twist_covariance_linear_base", 0.01);
-  node->declare_parameter("twist_covariance_angular_base", 0.005);
+  node->declare_parameter("twist_covariance_linear_base", 0.0005);
+  node->declare_parameter("twist_covariance_angular_base", 0.001);
   node->declare_parameter("twist_covariance_velocity_scale", 2.0);
 
   const std::string cov_mode_str =

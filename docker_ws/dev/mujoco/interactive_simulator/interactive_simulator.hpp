@@ -76,7 +76,8 @@ public:
 private:
   // item indices within the "Grasp Planner" section (SECTION header not counted)
   static constexpr int kPlannerItemRunPlanner = 0;
-  static constexpr int kPlannerItemStatus = 1;
+  static constexpr int kPlannerItemResetPlanner = 1;
+  static constexpr int kPlannerItemStatus = 2;
 
   // item indices within the "Scene Control" section (SECTION header not counted)
   // Hand: separator(0), X(1), Y(2), Z(3), Roll(4), Pitch(5), Yaw(6)
@@ -119,6 +120,7 @@ private:
   void sync_custom_status(mujoco::Simulate* sim);
   void set_status(const std::string& status);
   void launch_planner();
+  void reset_planner();
 
   // Scene Control UI
   void add_scene_section(mujoco::Simulate* sim);

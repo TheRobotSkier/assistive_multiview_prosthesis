@@ -184,6 +184,8 @@ pub enum Contact {
     PalmDistRadi,
 }
 
+// Thumb has two opposing modes: Adduction (lateral key-grip) and Abduction
+// (opposition, cylindrical/pinch).  The LUT stores separate tables for each.
 #[derive(Debug, Clone, Copy)]
 enum ContactTable {
     Index,

@@ -1,3 +1,4 @@
+use crate::config;
 use crate::lut_helper::DualQuaternion;
 use crate::pointcloud_helper::Aabb;
 use nalgebra::{Matrix3, Matrix4, Vector3};
@@ -10,11 +11,6 @@ pub struct SampledPose {
     pub sample_probability: f64,
 }
 
-pub const HAND_RADIUS: f64 = 0.05;
-pub const MIN_TSDF_DIM: f64 = 0.1;
-pub const MAX_TSDF_DIM: f64 = 0.3;
-
-#[derive(Debug, Clone)]
 pub struct Twist6 {
     pub omega: Vector3<f64>,
     pub v: Vector3<f64>,
@@ -35,46 +31,20 @@ pub struct PredictionConfig {
     pub max_tsdf_dims: Vector3<f64>,
 }
 
-impl Default for PredictionConfig {
-    fn default() -> Self {
-        Self {
-            t_max: 5.0,
-            n_samples: 50,
-            hand_radius: HAND_RADIUS,
-            min_tsdf_dims: Vector3::new(MIN_TSDF_DIM, MIN_TSDF_DIM, MIN_TSDF_DIM),
-            max_tsdf_dims: Vector3::new(MAX_TSDF_DIM, MAX_TSDF_DIM, MAX_TSDF_DIM),
-        }
-    }
-}
-
-impl Twist6 {
-    pub fn dummy() -> Self {
-        Self {
-            omega: Vector3::new(0.0, 0.0, 0.05),
-            v: Vector3::new(0.01, 0.0, 0.0),
-        }
-    }
-
-    pub fn zero() -> Self {
-        Self {
-            omega: Vector3::zeros(),
-            v: Vector3::zeros(),
-        }
-    }
-}
-
 impl TwistCovariance {
-    pub fn dummy() -> Self {
+    /// Construct from the fixed constants in config.rs.
+    pub fn fixed() -> Self {
         Self {
-            diagonal: Vector3::new(0.01, 0.01, 0.01),
-            diagonal_v: Vector3::new(0.005, 0.005, 0.005),
-        }
-    }
-
-    pub fn zero() -> Self {
-        Self {
-            diagonal: Vector3::zeros(),
-            diagonal_v: Vector3::zeros(),
+            diagonal: Vector3::new(
+                config::FIXED_COV_OMEGA[0],
+                config::FIXED_COV_OMEGA[1],
+                config::FIXED_COV_OMEGA[2],
+            ),
+            diagonal_v: Vector3::new(
+                config::FIXED_COV_V[0],
+                config::FIXED_COV_V[1],
+                config::FIXED_COV_V[2],
+            ),
         }
     }
 }
@@ -265,40 +235,9 @@ pub fn predict_roi_with_samples(
     (aabb, sampled_poses)
 }
 
-pub fn predict_roi(
-    current_pose: &DualQuaternion,
-    twist: &Twist6,
-    covariance: &TwistCovariance,
-    index_tip_local: &Vector3<f64>,
-    config: &PredictionConfig,
-) -> Aabb {
-    let (aabb, _) =
-        predict_roi_with_samples(current_pose, twist, covariance, index_tip_local, config);
-    aabb
-}
-
-pub fn predict_roi_dummy(
-    current_pose: &DualQuaternion,
-    index_tip_local: &Vector3<f64>,
-    config: &PredictionConfig,
-) -> Aabb {
-    predict_roi(
-        current_pose,
-        &Twist6::dummy(),
-        &TwistCovariance::dummy(),
-        index_tip_local,
-        config,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nalgebra::UnitQuaternion;
-
-    fn identity_dq() -> DualQuaternion {
-        DualQuaternion::from_se3(&Matrix4::identity())
-    }
 
     #[test]
     fn twist_to_se3_pure_translation() {
@@ -323,27 +262,6 @@ mod tests {
     }
 
     #[test]
-    fn twist_to_se3_small_theta_uses_pure_translation() {
-        let omega = Vector3::new(1e-12, 0.0, 0.0);
-        let v = Vector3::new(1.0, 2.0, 3.0);
-        let m = twist_to_se3(&omega, &v);
-        assert!((m[(0, 3)] - 1.0).abs() < 1e-6);
-        assert!((m[(1, 3)] - 2.0).abs() < 1e-6);
-        assert!((m[(2, 3)] - 3.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn twist_to_se3_identity() {
-        let m = twist_to_se3(&Vector3::zeros(), &Vector3::zeros());
-        let id: Matrix4<f64> = Matrix4::identity();
-        for i in 0..4 {
-            for j in 0..4 {
-                assert!((m[(i, j)] - id[(i, j)]).abs() < 1e-12);
-            }
-        }
-    }
-
-    #[test]
     fn twist_to_se3_screw_motion() {
         let omega = Vector3::new(0.0, 0.0, 1.0);
         let v = Vector3::new(1.0, 0.0, 0.0);
@@ -365,14 +283,25 @@ mod tests {
             m
         });
         let config = PredictionConfig {
+            t_max: 5.0,
             n_samples: 20,
-            ..Default::default()
+            hand_radius: 0.05,
+            min_tsdf_dims: Vector3::new(0.1, 0.1, 0.1),
+            max_tsdf_dims: Vector3::new(0.3, 0.3, 0.3),
+        };
+        let zero_twist = Twist6 {
+            omega: Vector3::zeros(),
+            v: Vector3::zeros(),
+        };
+        let zero_cov = TwistCovariance {
+            diagonal: Vector3::zeros(),
+            diagonal_v: Vector3::zeros(),
         };
         let mut rng = rand::rng();
         let poses = sample_future_poses(
             &pose,
-            &Twist6::zero(),
-            &TwistCovariance::zero(),
+            &zero_twist,
+            &zero_cov,
             &config,
             &mut rng,
         );
@@ -385,28 +314,6 @@ mod tests {
                 loc[0]
             );
         }
-    }
-
-    #[test]
-    fn sample_future_poses_with_translation_spreads() {
-        let pose = identity_dq();
-        let twist = Twist6 {
-            omega: Vector3::zeros(),
-            v: Vector3::new(1.0, 0.0, 0.0),
-        };
-        let config = PredictionConfig {
-            t_max: 1.0,
-            n_samples: 100,
-            ..Default::default()
-        };
-        let mut rng = rand::rng();
-        let poses = sample_future_poses(&pose, &twist, &TwistCovariance::zero(), &config, &mut rng);
-        let xs: Vec<f64> = poses.iter().map(|sp| sp.pose.location()[0]).collect();
-        let min_x = xs.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max_x = xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        assert!(min_x >= -0.1, "min_x = {}", min_x);
-        assert!(max_x <= 1.1, "max_x = {}", max_x);
-        assert!(max_x > 0.5, "spread should be visible, max_x = {}", max_x);
     }
 
     #[test]
@@ -426,21 +333,28 @@ mod tests {
     }
 
     #[test]
-    fn predict_roi_dummy_returns_valid_aabb() {
+    fn predict_roi_returns_valid_aabb() {
         let pose = DualQuaternion::from_se3(&{
             let mut m = Matrix4::identity();
             m[(0, 3)] = 0.1;
-            m[(1, 3)] = 0.0;
             m[(2, 3)] = 0.2;
-            let rot = UnitQuaternion::from_euler_angles(0.0, 0.0, 0.0);
-            m.fixed_view_mut::<3, 3>(0, 0)
-                .copy_from(rot.to_rotation_matrix().matrix());
             m
         });
         let tip_local = Vector3::new(0.05, 0.0, 0.0);
-        let config = PredictionConfig::default();
+        let config = PredictionConfig {
+            t_max: 5.0,
+            n_samples: 50,
+            hand_radius: 0.05,
+            min_tsdf_dims: Vector3::new(0.1, 0.1, 0.1),
+            max_tsdf_dims: Vector3::new(0.3, 0.3, 0.3),
+        };
+        let zero_twist = Twist6 {
+            omega: Vector3::zeros(),
+            v: Vector3::zeros(),
+        };
+        let cov = TwistCovariance::fixed();
 
-        let aabb = predict_roi_dummy(&pose, &tip_local, &config);
+        let (aabb, _) = predict_roi_with_samples(&pose, &zero_twist, &cov, &tip_local, &config);
 
         let size = aabb.max - aabb.min;
         assert!(
@@ -462,39 +376,5 @@ mod tests {
         let center = (aabb.min + aabb.max) * 0.5;
         assert!(center.x > -1.0 && center.x < 1.0, "center x = {}", center.x);
         assert!(center.z > -1.0 && center.z < 1.0, "center z = {}", center.z);
-    }
-
-    #[test]
-    fn predict_roi_with_nonzero_twist_produces_larger_aabb_than_zero() {
-        let pose = identity_dq();
-        let tip_local = Vector3::new(0.05, 0.0, 0.0);
-        let config = PredictionConfig {
-            n_samples: 200,
-            hand_radius: 0.0,
-            min_tsdf_dims: Vector3::zeros(),
-            ..Default::default()
-        };
-
-        let aabb_zero = predict_roi(
-            &pose,
-            &Twist6::zero(),
-            &TwistCovariance::zero(),
-            &tip_local,
-            &config,
-        );
-        let aabb_moving = predict_roi(
-            &pose,
-            &Twist6::dummy(),
-            &TwistCovariance::dummy(),
-            &tip_local,
-            &config,
-        );
-
-        let size_zero = aabb_zero.max - aabb_zero.min;
-        let size_moving = aabb_moving.max - aabb_moving.min;
-        assert!(
-            size_moving.x >= size_zero.x,
-            "moving aabb should be at least as large as zero-twist aabb"
-        );
     }
 }

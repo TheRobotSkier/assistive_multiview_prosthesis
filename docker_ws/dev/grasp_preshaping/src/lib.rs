@@ -1,4 +1,5 @@
 pub mod c_api;
+pub mod config;
 pub mod lut_helper;
 pub mod planner;
 pub mod pointcloud_helper;

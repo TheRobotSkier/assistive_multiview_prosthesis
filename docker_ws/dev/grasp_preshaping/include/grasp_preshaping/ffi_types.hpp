@@ -36,7 +36,6 @@ struct GraspTwistFFI
   double ax;
   double ay;
   double az;
-  std::array<double, 36> covariance;
 };
 
 struct PointCloudViewFFI

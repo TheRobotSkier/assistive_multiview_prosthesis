@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
@@ -40,7 +42,8 @@ public:
     has_cloud_(false),
     rust_lib_handle_(nullptr),
     rust_compute_fn_(nullptr),
-    rust_api_version_fn_(nullptr)
+    rust_api_version_fn_(nullptr),
+    min_closure_amount_(declare_parameter<double>("min_closure_amount", 0.1))
   {
     // TF2 buffer and listener for camera pose lookups
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
@@ -119,7 +122,6 @@ private:
 
     candidates.emplace_back("/miahand_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so");
     candidates.emplace_back("/miahand_ws/install/lib/libgrasp_preshaping.so");
-
     candidates.emplace_back("/miahand_ws/src/dev/grasp_preshaping/target/release/libgrasp_preshaping.so");
     candidates.emplace_back("/miahand_ws/src/dev/grasp_preshaping/target/debug/libgrasp_preshaping.so");
 
@@ -166,11 +168,11 @@ private:
   void publish_joint_commands(double thumb, double index, double mrl)
   {
     std_msgs::msg::Float64MultiArray command;
-    command.data = {thumb};
+    command.data = {std::max(thumb, min_closure_amount_)};
     thumb_cmd_pub_->publish(command);
-    command.data = {index};
+    command.data = {std::max(index, min_closure_amount_)};
     index_cmd_pub_->publish(command);
-    command.data = {mrl};
+    command.data = {std::max(mrl, min_closure_amount_)};
     mrl_cmd_pub_->publish(command);
   }
 
@@ -217,9 +219,7 @@ private:
     request.twist.ax = twist.twist.twist.angular.x;
     request.twist.ay = twist.twist.twist.angular.y;
     request.twist.az = twist.twist.twist.angular.z;
-    for (size_t i = 0; i < request.twist.covariance.size(); ++i) {
-      request.twist.covariance[i] = twist.twist.covariance[i];
-    }
+    // Covariance is intentionally ignored — fixed values are used on the Rust side.
 
     request.cloud.width = cloud.width;
     request.cloud.height = cloud.height;
@@ -315,23 +315,21 @@ private:
       return true;
     }
 
-    publish_joint_commands(
-      ffi_response.thumb_closure,
-      ffi_response.index_closure,
-      ffi_response.mrl_closure);
+    const double thumb = std::max(ffi_response.thumb_closure, min_closure_amount_);
+    const double index = std::max(ffi_response.index_closure, min_closure_amount_);
+    const double mrl = std::max(ffi_response.mrl_closure, min_closure_amount_);
+    publish_joint_commands(thumb, index, mrl);
+
     response->success = true;
     response->message = message.empty() ? "Preshaping completed" : message;
+    response->message +=
+      " (grasp_type=" + std::to_string(ffi_response.grasp_type) +
+      ", closure_floor=" + std::to_string(min_closure_amount_) +
+      ", thumb=" + std::to_string(thumb) +
+      ", index=" + std::to_string(index) +
+      ", mrl=" + std::to_string(mrl) + ")";
     return true;
   }
-
-  rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr hand_pose_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr hand_twist_sub_;
-  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
-
-  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr thumb_cmd_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr index_cmd_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr mrl_cmd_pub_;
-  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_;
 
   std::mutex input_mutex_;
   geometry_msgs::msg::Pose latest_pose_;
@@ -344,10 +342,20 @@ private:
   void * rust_lib_handle_;
   GraspComputeFn rust_compute_fn_;
   GraspApiVersionFn rust_api_version_fn_;
+  const double min_closure_amount_;
 
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::vector<std::string> camera_frames_;
+
+  rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr hand_pose_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr hand_twist_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
+
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr thumb_cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr index_cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr mrl_cmd_pub_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_;
 };
 
 int main(int argc, char ** argv)

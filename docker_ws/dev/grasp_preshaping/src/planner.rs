@@ -1,8 +1,7 @@
+use crate::config;
 use crate::lut_helper::{Contact, FingerLUT};
 use crate::pointcloud_helper::Tsdf;
 use nalgebra::{Matrix4, Vector3};
-
-const BINARY_SEARCH_TOL: f64 = 0.01;
 
 #[derive(Debug, Clone)]
 pub struct GraspScoreResult {
@@ -32,24 +31,8 @@ pub struct GraspWeights {
     pub w_force_closure: f64,
 }
 
-impl GraspWeights {
-    pub fn cylindrical() -> Self {
-        Self {
-            w_probability: 1.0,
-            w_alignment: 1.0,
-            w_force_closure: 1.0,
-        }
-    }
-
-    pub fn pinch() -> Self {
-        Self {
-            w_probability: 1.0,
-            w_alignment: 1.0,
-            w_force_closure: 1.0,
-        }
-    }
-
-    pub fn lateral() -> Self {
+impl Default for GraspWeights {
+    fn default() -> Self {
         Self {
             w_probability: 1.0,
             w_alignment: 1.0,
@@ -358,7 +341,7 @@ fn refine_binary(
     mut lo: f64,
     mut hi: f64,
 ) -> (f64, f64) {
-    while hi - lo > BINARY_SEARCH_TOL {
+    while hi - lo > config::BINARY_SEARCH_TOL {
         let mid = (lo + hi) * 0.5;
         if collides_at_control(lut, tsdf, base, sweep_points, mid, collision_tol) {
             hi = mid;

@@ -106,12 +106,14 @@ RUN echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/$USERNAME/.bash
 
 RUN sudo python3 -m pip install --no-cache-dir --break-system-packages mujoco==${MUJOCO_VERSION}
 
-
-
 ### OPEN3D
 # Install Open3D from the PyPI repositories
 RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
 ###
+
+# Misc pip packages
+RUN sudo python3 -m pip install --no-cache-dir --break-system-packages \
+    dynamixel-sdk
 
 WORKDIR /miahand_ws
 

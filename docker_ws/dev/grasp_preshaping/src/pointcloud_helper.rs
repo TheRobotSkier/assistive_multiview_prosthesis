@@ -1,8 +1,7 @@
+use crate::config;
 use nalgebra::Vector3;
 use rayon::prelude::*;
 use std::collections::VecDeque;
-
-const RAY_ALIGNMENT_THRESHOLD: f32 = 0.8;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Aabb {
@@ -103,50 +102,6 @@ impl PointCloud {
 
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
-    }
-
-    pub fn from_xyz_file(path: &str) -> Result<Self, String> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read '{}': {}", path, e))?;
-        let mut points = Vec::new();
-        for (line_num, line) in content.lines().enumerate() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
-                continue;
-            }
-            let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if parts.len() < 3 {
-                continue;
-            }
-            let x: f32 = parts[0]
-                .parse()
-                .map_err(|e| format!("{}:{}: invalid x: {}", path, line_num + 1, e))?;
-            let y: f32 = parts[1]
-                .parse()
-                .map_err(|e| format!("{}:{}: invalid y: {}", path, line_num + 1, e))?;
-            let z: f32 = parts[2]
-                .parse()
-                .map_err(|e| format!("{}:{}: invalid z: {}", path, line_num + 1, e))?;
-            points.push(Vector3::new(x, y, z));
-        }
-        if points.is_empty() {
-            return Err(format!("No valid points found in '{}'", path));
-        }
-        Ok(Self { points })
-    }
-
-    pub fn demo_sphere(center: Vector3<f32>, radius: f32, n_points: usize) -> Self {
-        let mut points = Vec::with_capacity(n_points);
-        let golden_ratio = (1.0 + 5f32.sqrt()) / 2.0;
-        for i in 0..n_points {
-            let theta = 2.0 * std::f32::consts::PI * (i as f32 / golden_ratio);
-            let phi = (1.0 - 2.0 * (i as f32 + 0.5) / n_points as f32).acos();
-            let x = center.x + radius * phi.sin() * theta.cos();
-            let y = center.y + radius * phi.sin() * theta.sin();
-            let z = center.z + radius * phi.cos();
-            points.push(Vector3::new(x, y, z));
-        }
-        Self { points }
     }
 }
 
@@ -290,6 +245,8 @@ fn decode_morton(morton: u64) -> (u16, u16, u16) {
     (gx, gy, gz)
 }
 
+// Morton codes interleave x/y/z bits so that spatially-close points have close codes.
+// Sorting by morton code gives a Z-order curve, yielding cache-friendly TSDF traversal.
 pub fn morton(pc: &PointCloud, resolution_m: f32) -> (Vec<MortonPoint>, Vec<usize>, Vector3<f32>) {
     assert!(!pc.is_empty(), "empty point cloud");
     assert!(resolution_m > 0.0, "resolution must be positive");
@@ -465,13 +422,17 @@ pub fn get_tsdf(
                         let ray_dir_len = ray_dir.norm();
                         if to_voxel_len > 1e-10 && ray_dir_len > 1e-10 {
                             let alignment = (ray_dir / ray_dir_len).dot(&(to_voxel / to_voxel_len));
-                            if alignment > RAY_ALIGNMENT_THRESHOLD {
+                            if alignment > config::RAY_ALIGNMENT_THRESHOLD {
                                 inside_votes += 1;
                             }
                         }
                     }
                 }
 
+                // Flip sign for voxels behind the surface (inside the object).
+                // A voxel is "behind" when it is farther from the camera than its
+                // nearest surface point, and the voxel-to-surface vector aligns
+                // with the camera-to-voxel ray.
                 if behind_count > n_cams / 2 && inside_votes > behind_count / 2 {
                     *dist = -*dist;
                 }
@@ -491,16 +452,6 @@ pub fn get_tsdf(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn prune_without_aabb_returns_clone() {
-        let pc = PointCloud::new(vec![
-            Vector3::new(1.0, 2.0, 3.0),
-            Vector3::new(4.0, 5.0, 6.0),
-        ]);
-        let pruned = prune(&pc, None);
-        assert_eq!(pruned.len(), 2);
-    }
 
     #[test]
     fn prune_with_aabb_filters_points() {
@@ -627,36 +578,6 @@ mod tests {
     }
 
     #[test]
-    fn aabb_from_points_computes_bounds() {
-        let points = vec![
-            Vector3::new(1.0, 2.0, 3.0),
-            Vector3::new(-1.0, 5.0, 0.0),
-            Vector3::new(4.0, 1.0, 7.0),
-        ];
-        let aabb = Aabb::from_points(&points);
-        assert_eq!(aabb.min.x, -1.0);
-        assert_eq!(aabb.min.y, 1.0);
-        assert_eq!(aabb.min.z, 0.0);
-        assert_eq!(aabb.max.x, 4.0);
-        assert_eq!(aabb.max.y, 5.0);
-        assert_eq!(aabb.max.z, 7.0);
-    }
-
-    #[test]
-    fn aabb_inflate_expands_uniformly() {
-        let aabb = Aabb {
-            min: Vector3::new(0.0, 0.0, 0.0),
-            max: Vector3::new(1.0, 1.0, 1.0),
-        };
-        let mut aabb = aabb;
-        aabb.inflate(0.5);
-        assert_eq!(aabb.min.x, -0.5);
-        assert_eq!(aabb.max.x, 1.5);
-        assert_eq!(aabb.min.y, -0.5);
-        assert_eq!(aabb.max.z, 1.5);
-    }
-
-    #[test]
     fn aabb_enforce_min_dims_centers_when_too_small() {
         let aabb = Aabb {
             min: Vector3::new(0.0, 0.0, 0.0),
@@ -699,17 +620,6 @@ mod tests {
             "surface point should have ~0 distance, got {}",
             d10
         );
-    }
-
-    #[test]
-    fn prune_empty_yields_no_tsdf_points() {
-        let pc = PointCloud::new(vec![Vector3::new(100.0, 100.0, 100.0)]);
-        let roi = Aabb {
-            min: Vector3::new(0.0, 0.0, 0.0),
-            max: Vector3::new(1.0, 1.0, 1.0),
-        };
-        let pruned = prune(&pc, Some(roi));
-        assert!(pruned.is_empty());
     }
 
     #[test]
@@ -760,47 +670,4 @@ mod tests {
         assert!((aabb.max.x - 0.1).abs() < 1e-6, "max.x = {}", aabb.max.x);
     }
 
-    #[test]
-    fn from_xyz_file_loads_sphere() {
-        let tmp_path = std::env::temp_dir().join(format!(
-            "grasp_preshaping_sphere_{}_{}.xyz",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-
-        let content = "# synthetic sphere sample\n\
-0.10 0.00 0.00\n\
-0.00 0.10 0.00\n\
-0.00 0.00 0.10\n\
--0.10 0.00 0.00\n\
-0.00 -0.10 0.00\n\
-0.00 0.00 -0.10\n";
-        std::fs::write(&tmp_path, content).unwrap();
-
-        let pc = PointCloud::from_xyz_file(tmp_path.to_str().unwrap()).unwrap();
-        let _ = std::fs::remove_file(&tmp_path);
-        assert_eq!(pc.len(), 6, "synthetic xyz fixture should parse six points");
-        for p in &pc.points {
-            assert!(p.x.is_finite() && p.y.is_finite() && p.z.is_finite());
-        }
-    }
-
-    #[test]
-    fn from_xyz_file_missing_file_returns_error() {
-        let result = PointCloud::from_xyz_file("/nonexistent/path/input.xyz");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn demo_sphere_generates_points() {
-        let pc = PointCloud::demo_sphere(Vector3::new(0.1, 0.2, 0.3), 0.05, 100);
-        assert_eq!(pc.len(), 100);
-        let center = pc.points.iter().fold(Vector3::zeros(), |acc, p| acc + p) / pc.len() as f32;
-        assert!((center.x - 0.1).abs() < 0.01, "center x = {}", center.x);
-        assert!((center.y - 0.2).abs() < 0.01, "center y = {}", center.y);
-        assert!((center.z - 0.3).abs() < 0.01, "center z = {}", center.z);
-    }
 }

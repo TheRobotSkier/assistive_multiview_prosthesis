@@ -175,8 +175,8 @@ private:
     kVelocityScaled = 1
   };
   TwistCovarianceMode twist_cov_mode_{TwistCovarianceMode::kVelocityScaled};
-  double twist_cov_linear_base_{0.01};     // base linear velocity variance (m/s)^2
-  double twist_cov_angular_base_{0.005};   // base angular velocity variance (rad/s)^2
+  double twist_cov_linear_base_{0.0005};     // base linear velocity variance (m/s)^2
+  double twist_cov_angular_base_{0.001};   // base angular velocity variance (rad/s)^2
   double twist_cov_velocity_scale_{2.0};   // scale factor for velocity-dependent covariance
 
   int pose_pub_counter_;
