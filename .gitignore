@@ -37,3 +37,6 @@ __pycache__/
 plans/
 .forge/
 .mcp.json
+
+# Debug data
+docker_ws/dev/grasp_preshaping/data/debug/

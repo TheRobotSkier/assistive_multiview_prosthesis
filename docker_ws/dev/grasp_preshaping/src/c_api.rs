@@ -353,6 +353,70 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     let collision_tol = config::COLLISION_TOL_M;
     let scored = score_all_samples(lut, &tsdf, &samples, collision_tol);
 
+    // --- Debug visualization export ---
+    if config::DEBUG_VISUALIZATION {
+        let grasp_exports: Vec<crate::debug_export::ScoredGraspExport> = scored
+            .iter()
+            .enumerate()
+            .map(|(i, sg)| {
+                let sample_index = i / SCORERS.len();
+                let se3 = samples[sample_index].pose.to_se3();
+                let mut pose_se3 = [0.0f64; 16];
+                for row in 0..4 {
+                    for col in 0..4 {
+                        pose_se3[row * 4 + col] = se3[(row, col)];
+                    }
+                }
+                crate::debug_export::ScoredGraspExport {
+                    sample_index,
+                    grasp_type_i32: sg.grasp_type.to_ffi(),
+                    closure_amount: sg.result.closure_amount,
+                    alignment_score: sg.result.alignment_score,
+                    force_closure_score: sg.result.force_closure_score,
+                    found_collision: sg.result.found_collision,
+                    combined_score: sg.combined,
+                    sample_probability: if sample_index < samples.len() {
+                        samples[sample_index].sample_probability
+                    } else {
+                        0.0
+                    },
+                    pose_se3,
+                }
+            })
+            .collect();
+
+        let dump = crate::debug_export::DebugDump {
+            tsdf: &tsdf,
+            point_cloud: &pruned,
+            roi: &roi,
+            cameras: &cameras,
+            scored_grasps: &grasp_exports,
+            input_pose: [
+                request.pose.px,
+                request.pose.py,
+                request.pose.pz,
+                request.pose.qx,
+                request.pose.qy,
+                request.pose.qz,
+                request.pose.qw,
+            ],
+            input_twist: [
+                request.twist.lx,
+                request.twist.ly,
+                request.twist.lz,
+                request.twist.ax,
+                request.twist.ay,
+                request.twist.az,
+            ],
+        };
+
+        let path = crate::debug_export::debug_output_path();
+        match crate::debug_export::export_npz(&dump, &path) {
+            Ok(()) => eprintln!("[debug_viz] wrote {}", path.display()),
+            Err(e) => eprintln!("[debug_viz] FAILED to write {}: {}", path.display(), e),
+        }
+    }
+
     let best = select_best_grasp(&scored).ok_or("No valid grasps found")?;
 
     if !best.result.found_collision {

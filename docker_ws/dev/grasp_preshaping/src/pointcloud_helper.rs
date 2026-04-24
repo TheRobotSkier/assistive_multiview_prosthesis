@@ -208,6 +208,27 @@ impl Tsdf {
             grad / norm
         }
     }
+
+    /// Returns the raw signed-distance data as a flat slice.
+    /// Layout: x-major, then y, then z (row-major with strides width, width*height).
+    pub fn data(&self) -> &[f32] {
+        &self.data
+    }
+
+    /// Returns the (width, height, depth) grid dimensions.
+    pub fn dimensions(&self) -> (usize, usize, usize) {
+        (self.width, self.height, self.depth)
+    }
+
+    /// Returns the grid resolution in metres.
+    pub fn resolution(&self) -> f32 {
+        self.resolution_m
+    }
+
+    /// Returns the world-space origin (corner of voxel [0,0,0]).
+    pub fn origin(&self) -> Vector3<f32> {
+        self.origin
+    }
 }
 
 pub fn prune(pc: &PointCloud, aabb: Option<Aabb>) -> PointCloud {
