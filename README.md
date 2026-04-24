@@ -88,9 +88,6 @@ For the motion topics the **duration in seconds** is encoded in `header.stamp` (
 **Simulation time** (`std_msgs/Float64`, ~10 Hz):
 - `/mujoco/sim_time` — MuJoCo simulation time in seconds. Use this with the pose topics to compute velocities (`Δpos / Δt`).
 
-**Grasp start signal** (`std_msgs/Bool`):
-- `/mujoco/grasp_start` — reserved topic for triggering the autonomous grasping algorithm. Published when the simulation starts; no messages are sent yet.
-
 **IMU — front camera** (`depth_cam_body`, clean/noiseless):
 - `/mujoco/front_cam/imu` (`sensor_msgs/Imu`, ~100 Hz) — angular velocity, linear acceleration, and orientation in front camera frame. Linear acceleration includes gravity correction (at rest reads ≈ +9.81 m/s² upward in camera frame).
 - `/mujoco/front_cam/imu/magnetic_field` (`sensor_msgs/MagneticField`, ~100 Hz) — simulated magnetometer. World X+ projected into front camera frame (arbitrary "north").
@@ -104,7 +101,7 @@ For the motion topics the **duration in seconds** is encoded in `header.stamp` (
 - `/mujoco/depth/camera_info` — camera intrinsics
 - `/segmented_object_cloud` — segmented object point cloud (`sensor_msgs/PointCloud2`)
 
-All topics use `frame_id = "mujoco_front_depth_cam"` for front camera data and `frame_id = "mujoco_wrist_cam"` for wrist camera data.
+All topics use `frame_id = "mujoco_front_depth_cam"` for front camera data and `frame_id = "mujoco_camera_wrist_cam"` for wrist camera data.
 
 **Terminal example** — read the current front camera IMU data once:
 
@@ -204,45 +201,8 @@ This will launch the dynamic simulation, and you should have a GUI for selecting
 
 ### For the old simulation:
 
-THEN to build the simulation:
+The legacy standalone CLI (`cargo run -- --mode ros`) has been removed. The grasp preshaping pipeline is now integrated as a ROS 2 service node that is launched automatically with the interactive or dynamic simulation. Use the interactive simulation (recommended) or the dynamic simulation described above.
 
-```bash
-scene=custom docker compose run --build --rm miahand_mujoco
-```
-
-It will show a wrong simulation for some reason. So, use ctrl+c to stop the sim, type "exit" to leave the container shell, and then run the container again (without "--build"):
-
-```bash
-scene=custom docker compose run --rm miahand_mujoco
-```
-
-Now it should show the simulation with the hand and a red ball in front of it.
-
-THEN in a different terminal (also in docker-deployment folder), to start grasp script run:
-
-```bash
-docker compose run --build --rm miahand_ros2
-```
-
-and in the shell run:
-
-```bash
-cd src/dev/grasp_preshaping && cargo run -r -- --mode ros --pointcloud-topic /segmented_object_cloud --pointcloud-scale 1.0 --iterations 1 --publish-commands --command-backend pos_ff
-```
-
-```bash
-cd src/dev/grasp_preshaping && cargo run -r -- --mode ros --publish-commands --command-backend pos_ff
-```
-
-If there are any issues, try exiting the docker container, then stop all containers with
-
-```bash
-docker stop -a
-```
-
-and start your container again.
-
-
-Multiview:
+**Multiview**:
 The multiview system presumes launch on the Nvidia Jetson, and is not containerized-- This will be harder to set up to run on your own systems.
 For using the launch script in the multiview folder, change the directory path in the .sh file as: RVIZ_CONFIG.

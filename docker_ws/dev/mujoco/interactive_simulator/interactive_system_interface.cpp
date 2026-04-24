@@ -540,7 +540,7 @@ hardware_interface::return_type InteractiveSystemInterface::read(
 
     if (imu2_pub_) {
       sensor_msgs::msg::Imu imu2_msg;
-      imu2_msg.header.frame_id = "mujoco_wrist_cam";
+      imu2_msg.header.frame_id = "mujoco_camera_wrist_cam";
       imu2_msg.header.stamp    = rclcpp::Clock().now();
       imu2_msg.angular_velocity.x = ang_vel2[0];
       imu2_msg.angular_velocity.y = ang_vel2[1];
@@ -560,7 +560,7 @@ hardware_interface::return_type InteractiveSystemInterface::read(
 
     if (mag2_pub_) {
       sensor_msgs::msg::MagneticField mag2_msg;
-      mag2_msg.header.frame_id = "mujoco_wrist_cam";
+      mag2_msg.header.frame_id = "mujoco_camera_wrist_cam";
       mag2_msg.header.stamp    = rclcpp::Clock().now();
       mag2_msg.magnetic_field.x = mag_field2[0];
       mag2_msg.magnetic_field.y = mag_field2[1];
