@@ -69,3 +69,30 @@ By this way, the command will run automatically whenever a new terminal session 
 ```bash
 echo "xhost +si:localuser:$(whoami) > /dev/null 2>&1" >> ~/.bashrc
 ```
+
+---
+
+## Classical EMG Gesture Classifier
+
+Three services for the MindRove armband EMG pipeline. Connect to the armband's WiFi before running any of them. Data and trained models are persisted in `../dev/mindrove/data/` and `../dev/mindrove/models/` via bind mounts.
+
+| Service | Purpose |
+|---|---|
+| `mindrove_emg_collect` | Interactive gesture recording (saves `.npz` to `data/`) |
+| `mindrove_emg_train` | Offline training — loads all `.npz` files, trains LDA classifier, saves `.pkl` models |
+| `mindrove_emg_run` | Real-time inference — streams from board, prints gesture + confidence + proportional control |
+
+**Typical workflow:**
+
+```bash
+# 1. Record gestures (guided, interactive)
+docker compose run --rm mindrove_emg_collect
+
+# 2. Train the classifier
+docker compose run --rm mindrove_emg_train
+
+# 3. Run live
+docker compose run --rm mindrove_emg_run
+```
+
+See `../dev/mindrove/README.md` for the full pipeline description and tuning options.

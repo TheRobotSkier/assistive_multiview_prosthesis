@@ -8,9 +8,23 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir mindrove
+RUN pip install --no-cache-dir \
+    mindrove \
+    numpy \
+    scipy \
+    scikit-learn \
+    joblib
 
 WORKDIR /app
+
+# Legacy reader — kept for reference
 COPY read_emg.py /app/read_emg.py
 
-CMD ["python", "read_emg.py"]
+# Classical EMG classifier package and scripts
+COPY emg_classifier/ /app/emg_classifier/
+COPY scripts/ /app/scripts/
+
+# data/ and models/ are bind-mounted at runtime; create empty placeholders
+RUN mkdir -p /app/data /app/models
+
+CMD ["python", "scripts/run_classifier.py"]

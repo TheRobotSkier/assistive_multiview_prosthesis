@@ -123,6 +123,49 @@ services:
     tty: true
     stdin_open: true
 
+  # ── Classical EMG classifier services ────────────────────────────────────
+  # Shared build context: same image as mindrove_emg (re-used via cache).
+  # data/ and models/ are bind-mounted so files persist between runs.
+
+  mindrove_emg_collect:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile
+    container_name: mindrove_emg_collect
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove/data:/app/data
+      - ../dev/mindrove/models:/app/models
+    command: ["python", "scripts/collect_data.py"]
+
+  mindrove_emg_train:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile
+    container_name: mindrove_emg_train
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove/data:/app/data
+      - ../dev/mindrove/models:/app/models
+    command: ["python", "scripts/train.py"]
+
+  mindrove_emg_run:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile
+    container_name: mindrove_emg_run
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove/data:/app/data
+      - ../dev/mindrove/models:/app/models
+    command: ["python", "scripts/run_classifier.py"]
+
   mindrove_cpp:
     build:
       context: ../dev/mindrove_cpp
