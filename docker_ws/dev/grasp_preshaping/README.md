@@ -2,58 +2,38 @@
 
 This package provides the grasp preshaping solver core (Rust), the FFI type definitions shared between Rust and C++, and the ROS 2 service bridge node.
 
-## Runtime architecture
+## Architecture Overview
 
-- **Public ROS API**: `/grasp_preshaping/compute_grasp` (`std_srvs/srv/Trigger`), implemented by the C++ bridge node in this package.
-- **Rust role**: compute library only — no ROS runtime node.
-- **Entry points exported by the Rust cdylib**:
-  - `grasp_preshaping_api_version`
-  - `grasp_preshaping_compute`
+### Data Loading
 
-On each service call, the C++ bridge node:
+The pipeline starts by loading the point cloud and transform frames from ROS topics, which serve as inputs to the preshaping solver.
 
-1. Uses the latest cached simulator messages from:
-   - `/hand_pose`
-   - `/hand_twist`
-   - `/segmented_object_cloud`
-2. Calls `grasp_preshaping_compute` through FFI.
-3. Publishes controller commands to:
-   - `/thumb_pos_ff_controller/commands`
-   - `/index_pos_ff_controller/commands`
-   - `/mrl_pos_ff_controller/commands`
+### Data Structure Construction
 
-## Package layout
+Internal data structures are pre-built to accelerate search and calculations:
 
-```
-grasp_preshaping/
-├── Cargo.toml                  Rust build manifest
-├── CMakeLists.txt              ament_cmake: builds Rust cdylib + C++ bridge node
-├── package.xml                 ROS 2 package manifest
-├── include/grasp_preshaping/
-│   └── ffi_types.hpp           Single source of truth for FFI structs
-├── nodes/
-│   └── preshaping_service_bridge_node.cpp   C++ ROS 2 service bridge
-├── src/                        Rust sources
-└── data/                       Lookup table data
-```
+1. **Lookup table** – Pre-generated for fast lookups
+2. **Point cloud pruning** – Filter points to the region of interest
+3. **TSDF construction** – Built from the pruned point cloud and camera positions:
+   - Points are sorted using Morton codes for spatial locality
+   - Signed distances are computed and then marked based on camera visibility to distinguish inside/outside surfaces
 
-The FFI structs in `include/grasp_preshaping/ffi_types.hpp` must be kept in sync with the `#[repr(C)]` definitions in `src/c_api.rs`.
+### Optimization Loop
 
-## Build
+The TSDF enables extremely fast distance and gradient queries. The optimization loop:
 
-Build the full package (Rust library + C++ bridge node):
+1. Searches across multiple perturbations of the hand state, propagated forward up to 5 seconds
+2. Evaluates each perturbation by querying the TSDF at predicted fingertip positions
+3. Scores grasps using type-specific cost functions (cylindrical, pinch, lateral)
+4. Selects the best-scoring grasp as the output
 
-```bash
-colcon build --packages-select grasp_preshaping
-```
+## Future Work
 
-Build Rust library only (for development):
+**Wrist orientation handling** – Currently, the solver only searches across perturbations in hand position, time, and grasp type. Extending this to include wrist orientation would improve grasps. The approach could sample randomly across all dimensions or search each dimension separately.
 
-```bash
-cargo build --release --lib
-```
+**Trajectory simulation** – Adding trajectory simulation would help validate the overall workflow.
 
-## Notes
+## Known Issues
 
-- If required inputs are missing, the service returns `success=false` with a descriptive message.
-- The service callers (trigger clients) live in `mia_hand_mujoco` (interactive and planner-gui system interfaces) and are pure ROS service clients with no dependency on this package's implementation.
+- Rust clipping may be asymmetric
+- Covariance is large for static objects
