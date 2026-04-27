@@ -225,3 +225,40 @@ services:
       RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
       ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
 
+  # ── Haptic armband BT-ROS2 bridge ────────────────────────────────────────
+  # Connects to two Vibro8 Bluetooth Classic devices (8 motors each = 16 total).
+  # Subscribes to /haptic_band/motors (std_msgs/Float32MultiArray, 16 values 0-100).
+  # Configure BT addresses via env vars if they differ from the defaults.
+  haptic_band:
+    build:
+      context: ../dev/haptic_band
+      dockerfile: Dockerfile
+    container_name: haptic_band
+    network_mode: "host"
+    privileged: true
+    tty: true
+    stdin_open: true
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      HAPTIC_BT_ADDR1: ${HAPTIC_BT_ADDR1:-842E1409E14E}
+      HAPTIC_BT_ADDR2: ${HAPTIC_BT_ADDR2:-8CF681F32E12}
+
+  # ── Haptic motor sweep test ───────────────────────────────────────────────
+  # Publishes a sequential ramp-up test to /haptic_band/motors.
+  # Run alongside haptic_band to exercise all 16 motors one by one.
+  haptic_band_test:
+    build:
+      context: ../dev/haptic_band
+      dockerfile: Dockerfile
+    container_name: haptic_band_test
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/haptic_band/scripts:/scripts:ro
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+    command: ["python3", "/scripts/motor_test.py"]
+

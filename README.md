@@ -272,3 +272,33 @@ docker compose run --rm mindrove_emg_run
 Streams from the armband at ~10 Hz and prints the recognised gesture, confidence, and proportional control value to the terminal.
 
 See `docker_ws/dev/mindrove/README.md` for the full pipeline overview, file layout, and tuning options.
+
+---
+
+## Haptic Band (Vibro8 BT bridge)
+
+A ROS 2 Jazzy Bluetooth bridge for a **Vibro8** 8-motor haptic armband, running in its own Docker container.
+
+### Start the bridge
+
+```bash
+docker compose run --build --rm haptic_band
+```
+
+Connects to the Vibro8 over Bluetooth Classic (RFCOMM), sends a brief buzz-buzz on first connect, then listens on:
+
+```
+/haptic_band/motors   std_msgs/Float32MultiArray   [8 values, 0.0–100.0]
+```
+
+Publish a message to that topic from any other ROS 2 node or container to drive the 8 motors.
+
+### Run the motor sweep test
+
+```bash
+docker compose run --rm haptic_band_test
+```
+
+Activates each of the 8 motors one at a time, ramping 0 → 100 % in 10 % steps (~1 s), then turns off before moving to the next motor.
+
+See `docker_ws/dev/haptic_band/README.md` for the full protocol details, address configuration, and file layout.
