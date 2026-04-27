@@ -28,3 +28,5 @@ docker_ws/dev/pc_segmentation/weights/weights_exp14_14.pth
 
 *.ply
 *.bag
+# kilo code related
+.kilo/kilo.json

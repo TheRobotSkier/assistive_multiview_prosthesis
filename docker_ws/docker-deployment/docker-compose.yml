@@ -135,3 +135,33 @@ services:
       - ../dev/mindrove_cpp:/src:ro
       - ../dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64:/sdk:ro
 
+  naviflame:
+    build:
+      context: ../dev/mindrove_naviflame
+      dockerfile: Dockerfile
+    container_name: naviflame
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    depends_on:
+      - naviflame_ros_bridge
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${XAUTHORITY}:/tmp/.Xauthority:ro,z
+    environment:
+      DISPLAY: $DISPLAY
+      XAUTHORITY: /tmp/.Xauthority
+      QT_X11_NO_MITSHM: 1
+
+  naviflame_ros_bridge:
+    build:
+      context: ../dev/mindrove_naviflame
+      dockerfile: Dockerfile.bridge
+    container_name: naviflame_ros_bridge
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+
