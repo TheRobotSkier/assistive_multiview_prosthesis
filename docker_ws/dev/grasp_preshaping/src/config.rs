@@ -19,8 +19,8 @@ pub const MIN_TSDF_DIM_M: f32 = 0.1;
 pub const MAX_TSDF_DIM_M: f32 = 0.3;
 
 // Fixed twist covariance
-pub const FIXED_COV_OMEGA: [f64; 3] = [0.01, 0.01, 0.01];
-pub const FIXED_COV_V: [f64; 3] = [0.005, 0.005, 0.005];
+pub const FIXED_COV_OMEGA: [f64; 3] = [0.001, 0.001, 0.001];
+pub const FIXED_COV_V: [f64; 3] = [0.0005, 0.0005, 0.0005];
 
 // Debug visualization
 // When true, each pipeline invocation writes a single .npz file containing the

@@ -11,19 +11,25 @@ The Mia Hand and Wrist Dynamixel motor are now integrated into the ROS2 control 
 
 ### 1. USB Device Configuration
 ```bash
+# IMPORTANT: Run all commands in this section on the HOST OS (WSL2/Ubuntu/Jetson),
+# not inside a Docker/Podman container. Containers usually do not run udevd,
+# so `udevadm control --reload-rules` will fail there.
+
 # Identify devices (run when both are connected)
 lsusb
 
-# Example output:
-# Bus 001 Device 005: ID 0403:6001 FTFT (Mia Hand adapter)
-# Bus 001 Device 006: ID 10c4:ea60 CP210x (Dynamixel adapter)
+# Output Expected:
+# Bus 001 Device 003: ID 0403:6014 Future Technology Devices International, Ltd FT232H Single HS USB-UART/FIFO IC (Dynamixel)
+# Bus 001 Device 003: ID 0403:6001 Future Technology Devices International, Ltd FT232 Serial (UART) IC (Mia Hand adapter)
 
 # Create udev rules (replace IDs with your actual devices)
 echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", SYMLINK+="mia_hand"' | sudo tee /etc/udev/rules.d/99-mia-hand.rules
-echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="wrist_motor"' | sudo tee /etc/udev/rules.d/99-wrist-motor.rules
+echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6014", SYMLINK+="wrist_motor"' | sudo tee /etc/udev/rules.d/99-wrist-motor.rules
 
 # Reload rules
 sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# If symlinks do not appear immediately, unplug/replug USB devices once.
 ```
 
 ### 2. WSL2 USB Passthrough (if applicable)
@@ -39,9 +45,13 @@ usbipd attach --wsl --busid <BUSID_2>
 
 ### 3. Verify Device Access
 ```bash
-# Inside container/WSL2:
+# On host (after udev reload + replug):
 ls -la /dev/mia_hand /dev/wrist_motor
 # Should show symlinks to actual ttyUSB/ttyACM devices
+
+# Inside container (after mapping devices in compose):
+ls -la /dev/ttyUSB0 /dev/ttyUSB1 /dev/mia_hand /dev/wrist_motor
+# Depending on runtime/device mapping, /dev/mia_hand may be absent while ttyUSB* exists.
 ```
 
 ### 4. Test Hardware Connection

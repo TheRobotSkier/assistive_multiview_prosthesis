@@ -10,12 +10,16 @@ services:
     network_mode: "host"
     tty: true
     stdin_open: true
+    device_cgroup_rules:
+      - "c 188:* rmw"                  # ttyUSB* devices
     volumes:
       - ../:/miahand_ws/src
       - /tmp/.X11-unix:/tmp/.X11-unix
       #- ${XAUTHORITY}:/tmp/.Xauthority:ro,z # added LINUX
       #- ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/run/user/1000/${WAYLAND_DISPLAY} # added LINUX
     entrypoint: /ros_entrypoint.sh
+    group_add:
+      - dialout
     environment:
       tty: true
       PYTHONPATH: "/opt/ros/jazzy/lib/python3.12/site-packages"
@@ -50,13 +54,15 @@ services:
   miahand_moveit:
     extends: miahand_ros2
     container_name: miahand_ros2_moveit
+    privileged: true
+    #userns_mode: "host"                # required for rootful hardware access with device cgroup rules
     environment:
       - USE_MUJOCO_SIM=${USE_MUJOCO_SIM:-true}
       - USE_MOCK_HARDWARE=${USE_MOCK_HARDWARE:-true}
     command:  >
       bash -c "
         source install/setup.bash &&
-        ros2 launch mia_hand_moveit_config mia_hand_moveit.launch.py use_mujoco_sim:=${USE_MUJOCO_SIM:-true} use_mock_hardware:=${USE_MOCK_HARDWARE:-true};
+        ros2 launch mia_hand_moveit_config mia_hand_moveit.launch.py use_mujoco_sim:=${USE_MUJOCO_SIM:-true} use_mock_hardware:=${USE_MOCK_HARDWARE:-true} serial_port:=${SERIAL_PORT:-/dev/ttyUSB1};
         /bin/bash
       "
   miahand_mujoco:
@@ -134,14 +140,16 @@ services:
     container_name: miahand_ros2_hardware
     privileged: true
     userns_mode: "host"                # required for rootful hardware access with device cgroup rules
-    device_cgroup_rules:
-      - "c 188:* rmw"                  # ttyUSB* devices
-      - "c 166:* rmw"                  # ttyACM* devices
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyUSB1:/dev/ttyUSB1
     environment:
       - USE_MOCK_HARDWARE=false
+      - MIA_SERIAL_PORT=${MIA_SERIAL_PORT:-/dev/ttyUSB1}
+      - WRIST_PORT=${WRIST_PORT:-/dev/ttyUSB0}
     command:  >
       bash -c "
         source install/setup.bash &&
-        ros2 launch mia_hand_ros2_control mia_hand_with_wrist_system_interface_launch.py serial_port:=/dev/mia_hand wrist_port:=/dev/wrist_motor use_mock_hardware:=false;
+        ros2 launch mia_hand_ros2_control mia_hand_with_wrist_system_interface_launch.py serial_port:=${MIA_SERIAL_PORT:-/dev/ttyUSB1} wrist_port:=${WRIST_PORT:-/dev/ttyUSB0} use_mock_hardware:=false;
         /bin/bash
       "

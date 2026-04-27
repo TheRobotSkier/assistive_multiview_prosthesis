@@ -50,11 +50,23 @@ def test_motor_connection(port_name, baudrate, motor_id):
         portHandler.closePort()
         return False
     
-    # Try to ping the motor
-    dxl_comm_result, dxl_error = packetHandler.ping(portHandler, motor_id)
+    # Try to ping the motor. Different SDK versions return either:
+    #   (comm_result, error) or (model_number, comm_result, error)
+    ping_result = packetHandler.ping(portHandler, motor_id)
+    if len(ping_result) == 3:
+        dxl_model_number, dxl_comm_result, dxl_error = ping_result
+    elif len(ping_result) == 2:
+        dxl_comm_result, dxl_error = ping_result
+        dxl_model_number = None
+    else:
+        print(f"ERROR: Unexpected ping response format: {ping_result}")
+        portHandler.closePort()
+        return False
+
     if dxl_comm_result == COMM_SUCCESS:
         print(f"SUCCESS: Motor ID {motor_id} responded to ping")
-        print(f"  Model number: {packetHandler.getModelNumber(portHandler, motor_id)}")
+        if dxl_model_number is not None:
+            print(f"  Model number: {dxl_model_number}")
     else:
         print(f"ERROR: Motor ID {motor_id} did not respond to ping")
         print(f"  Communication result: {packetHandler.getTxRxResult(dxl_comm_result)}")
@@ -95,7 +107,7 @@ def test_motor_connection(port_name, baudrate, motor_id):
     # Test position control (move to middle position)
     print("Testing position control: moving to position 2048 (middle)...")
     dxl_comm_result, dxl_error = packetHandler.write4ByteTxRx(
-        portHandler, motor_id, ADDR_GOAL_POSITION, 2048)
+        portHandler, motor_id, ADDR_GOAL_POSITION, 2048) # Maybe not working
     if dxl_comm_result == COMM_SUCCESS:
         print("SUCCESS: Goal position set to 2048")
         time.sleep(2)  # Wait for movement
@@ -115,7 +127,7 @@ def test_motor_connection(port_name, baudrate, motor_id):
     # Test velocity control
     print("Testing velocity control: setting velocity to 100...")
     dxl_comm_result, dxl_error = packetHandler.write4ByteTxRx(
-        portHandler, motor_id, ADDR_GOAL_VELOCITY, 100)
+        portHandler, motor_id, ADDR_GOAL_VELOCITY, -20) # Tried -100, 0, and 100 with success
     if dxl_comm_result == COMM_SUCCESS:
         print("SUCCESS: Goal velocity set to 100")
         time.sleep(2)  # Wait for movement

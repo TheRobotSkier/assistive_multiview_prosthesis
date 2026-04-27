@@ -79,7 +79,7 @@ RUN groupadd --gid $USER_GID $USERNAME \
     && echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> /home/$USERNAME/.bashrc \
     && echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$MUJOCO_DIR/lib"  >> /home/$USERNAME/.bashrc \
     && echo "export PS1='\u@\h:\[\e[32m\]\w\[\e[0m\]\$ '" >> /home/$USERNAME/.bashrc 
-
+    
 USER $USERNAME
 
 RUN sudo apt-get update \
@@ -109,7 +109,7 @@ RUN sudo python3 -m pip install --no-cache-dir --break-system-packages mujoco==$
 
 ### OPEN3D
 # Install Open3D from the PyPI repositories
-RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
+#RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
 ###
 
 # Misc pip packages
