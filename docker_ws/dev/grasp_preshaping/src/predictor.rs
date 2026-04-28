@@ -1,14 +1,22 @@
 use crate::config;
 use crate::lut_helper::DualQuaternion;
 use crate::pointcloud_helper::Aabb;
-use nalgebra::{Matrix3, Matrix4, Vector3};
+use nalgebra::{Matrix3, Matrix4, UnitQuaternion, Vector3};
 use rand::Rng;
 use rand_distr::Normal;
+
+/// Maximum wrist rotation angle in radians (±90° = 180° total range).
+/// The wrist rotates around the local Y axis (supination/pronation).
+pub const WRIST_ROTATION_RANGE_RAD: f64 = std::f64::consts::FRAC_PI_2;
 
 #[derive(Debug, Clone)]
 pub struct SampledPose {
     pub pose: DualQuaternion,
     pub sample_probability: f64,
+    /// Randomly assigned grasp type: 0 = cylindrical, 1 = pinch, 2 = lateral.
+    pub grasp_type: usize,
+    /// Wrist rotation angle around local Y axis in radians, in [-WRIST_ROTATION_RANGE_RAD, WRIST_ROTATION_RANGE_RAD].
+    pub wrist_rotation: f64,
 }
 
 pub struct Twist6 {
@@ -147,7 +155,7 @@ fn compute_sample_probability(
     (-0.5 * (d_omega_sq + d_v_sq)).exp().clamp(0.0, 1.0)
 }
 
-fn sample_future_poses(
+pub fn sample_future_poses(
     current_pose: &DualQuaternion,
     twist: &Twist6,
     covariance: &TwistCovariance,
@@ -161,6 +169,27 @@ fn sample_future_poses(
         let displacement_se3 = twist_to_se3(&sampled.twist.omega, &sampled.twist.v);
         let displacement_dq = DualQuaternion::from_se3(&displacement_se3);
         let future_pose = current_pose.multiply(&displacement_dq);
+
+        // Random grasp type: uniform over 0, 1, 2.
+        let grasp_type: usize = rng.random_range(0..3);
+
+        // Random wrist rotation around local Y axis.
+        let wrist_rotation: f64 = rng.random_range(-WRIST_ROTATION_RANGE_RAD..WRIST_ROTATION_RANGE_RAD);
+
+        // Apply wrist rotation to the sampled pose.
+        let wrist_se3 = {
+            let rot = UnitQuaternion::from_axis_angle(
+                &nalgebra::Vector3::y_axis(),
+                wrist_rotation,
+            );
+            let mut m = Matrix4::identity();
+            m.fixed_view_mut::<3, 3>(0, 0)
+                .copy_from(rot.to_rotation_matrix().matrix());
+            m
+        };
+        let wrist_dq = DualQuaternion::from_se3(&wrist_se3);
+        let final_pose = future_pose.multiply(&wrist_dq);
+
         let prob = compute_sample_probability(
             &sampled.noise_omega,
             &sampled.noise_v,
@@ -168,14 +197,16 @@ fn sample_future_poses(
             sampled.t,
         );
         poses.push(SampledPose {
-            pose: future_pose,
+            pose: final_pose,
             sample_probability: prob,
+            grasp_type,
+            wrist_rotation,
         });
     }
     poses
 }
 
-fn project_index_tips(
+pub fn project_index_tips(
     sampled_poses: &[SampledPose],
     current_pose: &DualQuaternion,
     index_tip_local: &Vector3<f64>,
@@ -196,7 +227,7 @@ fn project_index_tips(
     points
 }
 
-fn compute_prediction_aabb(
+pub fn compute_prediction_aabb(
     points: &[Vector3<f32>],
     config: &PredictionConfig,
     anchor: &Vector3<f32>,

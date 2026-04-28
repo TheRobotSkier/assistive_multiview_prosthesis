@@ -75,6 +75,11 @@ struct GraspComputeResponseFFI
   double thumb_closure;
   double index_closure;
   double mrl_closure;
+  // Wrist orientation quaternion [qx, qy, qz, qw].
+  double wrist_qx;
+  double wrist_qy;
+  double wrist_qz;
+  double wrist_qw;
 };
 
 // Function-pointer types for the two exported Rust entry points.

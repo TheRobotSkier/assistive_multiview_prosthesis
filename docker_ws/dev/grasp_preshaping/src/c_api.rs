@@ -9,6 +9,7 @@ use crate::predictor::{
 };
 use crate::config;
 use nalgebra::{Matrix4, Vector3};
+use rayon::prelude::*;
 use std::ffi::c_char;
 use std::sync::OnceLock;
 
@@ -85,6 +86,11 @@ pub struct GraspComputeResponseFFI {
     pub thumb_closure: f64,
     pub index_closure: f64,
     pub mrl_closure: f64,
+    /// Wrist orientation quaternion [qx, qy, qz, qw].
+    pub wrist_qx: f64,
+    pub wrist_qy: f64,
+    pub wrist_qz: f64,
+    pub wrist_qw: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,12 +131,7 @@ type ScorerFn = fn(
     &crate::pointcloud_helper::Tsdf,
     &Matrix4<f64>,
     f32,
-) -> GraspScoreResult;
-
-struct GraspScorer {
-    grasp_type: GraspType,
-    scorer: ScorerFn,
-}
+) -> Option<GraspScoreResult>;
 
 struct ComputeOutput {
     grasp_type: GraspType,
@@ -139,6 +140,8 @@ struct ComputeOutput {
     thumb_closure: f64,
     index_closure: f64,
     mrl_closure: f64,
+    /// Wrist orientation quaternion [qx, qy, qz, qw].
+    wrist_quaternion: [f64; 4],
 }
 
 fn compute_per_finger_output(grasp_type: GraspType, closure_amount: f64) -> (f64, f64, f64) {
@@ -153,21 +156,6 @@ static LUT: OnceLock<FingerLUT> = OnceLock::new();
 static PRED_CONFIG: OnceLock<PredictionConfig> = OnceLock::new();
 static INDEX_TIP_LOCAL: OnceLock<Vector3<f64>> = OnceLock::new();
 
-const SCORERS: &[GraspScorer] = &[
-    GraspScorer {
-        grasp_type: GraspType::Cylindrical,
-        scorer: score_cylindrical,
-    },
-    GraspScorer {
-        grasp_type: GraspType::Pinch,
-        scorer: score_pinch,
-    },
-    GraspScorer {
-        grasp_type: GraspType::Lateral,
-        scorer: score_lateral,
-    },
-];
-
 fn score_all_samples(
     lut: &FingerLUT,
     tsdf: &crate::pointcloud_helper::Tsdf,
@@ -175,26 +163,52 @@ fn score_all_samples(
     collision_tol: f32,
 ) -> Vec<ScoredGrasp> {
     let weights = GraspWeights::default();
-    let mut results = Vec::new();
 
-    for sp in samples {
-        let base_transform = sp.pose.to_se3();
-        for gs in SCORERS {
-            let result = (gs.scorer)(lut, tsdf, &base_transform, collision_tol);
-            let combined = if result.found_collision {
-                result.combined_score(&weights, sp.sample_probability)
-            } else {
-                f64::NEG_INFINITY
+    samples
+        .par_iter()
+        .map(|sp| {
+            let base_transform = sp.pose.to_se3();
+            let scorer: ScorerFn = match sp.grasp_type {
+                0 => score_cylindrical,
+                1 => score_pinch,
+                _ => score_lateral,
             };
-            results.push(ScoredGrasp {
-                grasp_type: gs.grasp_type,
-                result,
-                combined,
-            });
-        }
-    }
+            let grasp_type = match sp.grasp_type {
+                0 => GraspType::Cylindrical,
+                1 => GraspType::Pinch,
+                _ => GraspType::Lateral,
+            };
 
-    results
+            match scorer(lut, tsdf, &base_transform, collision_tol) {
+                Some(result) => {
+                    let combined = if result.found_collision {
+                        result.combined_score(&weights, sp.sample_probability)
+                    } else {
+                        f64::NEG_INFINITY
+                    };
+                    ScoredGrasp {
+                        grasp_type,
+                        result,
+                        combined,
+                    }
+                }
+                None => {
+                    // Start-position collision — pose is invalid.
+                    ScoredGrasp {
+                        grasp_type,
+                        result: GraspScoreResult {
+                            closure_amount: 0.0,
+                            alignment_score: 0.0,
+                            force_closure_score: 0.0,
+                            contact_count_score: 0.0,
+                            found_collision: false,
+                        },
+                        combined: f64::NEG_INFINITY,
+                    }
+                }
+            }
+        })
+        .collect()
 }
 
 fn select_best_grasp(scored: &[ScoredGrasp]) -> Option<&ScoredGrasp> {
@@ -359,8 +373,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
             .iter()
             .enumerate()
             .map(|(i, sg)| {
-                let sample_index = i / SCORERS.len();
-                let se3 = samples[sample_index].pose.to_se3();
+                let se3 = samples[i].pose.to_se3();
                 let mut pose_se3 = [0.0f64; 16];
                 for row in 0..4 {
                     for col in 0..4 {
@@ -368,19 +381,17 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
                     }
                 }
                 crate::debug_export::ScoredGraspExport {
-                    sample_index,
+                    sample_index: i,
                     grasp_type_i32: sg.grasp_type.to_ffi(),
                     closure_amount: sg.result.closure_amount,
                     alignment_score: sg.result.alignment_score,
                     force_closure_score: sg.result.force_closure_score,
+                    contact_count_score: sg.result.contact_count_score,
                     found_collision: sg.result.found_collision,
                     combined_score: sg.combined,
-                    sample_probability: if sample_index < samples.len() {
-                        samples[sample_index].sample_probability
-                    } else {
-                        0.0
-                    },
+                    sample_probability: samples[i].sample_probability,
                     pose_se3,
+                    wrist_rotation: samples[i].wrist_rotation,
                 }
             })
             .collect();
@@ -429,6 +440,19 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     let (thumb_closure, index_closure, mrl_closure) =
         compute_per_finger_output(best.grasp_type, best.result.closure_amount);
 
+    // Extract wrist orientation quaternion from the best sample's pose.
+    let best_sample_idx = scored.iter().enumerate()
+        .filter(|(_, sg)| sg.combined == best.combined)
+        .map(|(i, _)| i)
+        .next()
+        .unwrap_or(0);
+    let best_se3 = samples[best_sample_idx].pose.to_se3();
+    let rot = best_se3.fixed_view::<3, 3>(0, 0);
+    let rot3 = nalgebra::Rotation3::from_matrix_unchecked(rot.clone_owned());
+    let uq = nalgebra::UnitQuaternion::from_rotation_matrix(&rot3);
+    let q = uq.quaternion();
+    let wrist_quaternion = [q.i, q.j, q.k, q.w];
+
     Ok(ComputeOutput {
         grasp_type: best.grasp_type,
         closure_amount: best.result.closure_amount,
@@ -436,6 +460,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         thumb_closure,
         index_closure,
         mrl_closure,
+        wrist_quaternion,
     })
 }
 
@@ -456,7 +481,7 @@ fn write_message(buf: *mut c_char, buf_len: usize, msg: &str) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn grasp_preshaping_api_version() -> u32 {
-    1
+    2
 }
 
 #[unsafe(no_mangle)]
@@ -481,6 +506,10 @@ pub extern "C" fn grasp_preshaping_compute(
         thumb_closure: 0.0,
         index_closure: 0.0,
         mrl_closure: 0.0,
+        wrist_qx: 0.0,
+        wrist_qy: 0.0,
+        wrist_qz: 0.0,
+        wrist_qw: 1.0,
     };
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -496,14 +525,22 @@ pub extern "C" fn grasp_preshaping_compute(
             response_ref.thumb_closure = output.thumb_closure;
             response_ref.index_closure = output.index_closure;
             response_ref.mrl_closure = output.mrl_closure;
+            response_ref.wrist_qx = output.wrist_quaternion[0];
+            response_ref.wrist_qy = output.wrist_quaternion[1];
+            response_ref.wrist_qz = output.wrist_quaternion[2];
+            response_ref.wrist_qw = output.wrist_quaternion[3];
             let message = format!(
-                "{} grasp, closure={:.4}, combined={:.4}, thumb={:.4}, index={:.4}, mrl={:.4}",
+                "{} grasp, closure={:.4}, combined={:.4}, thumb={:.4}, index={:.4}, mrl={:.4}, wrist_q=({:.3},{:.3},{:.3},{:.3})",
                 output.grasp_type,
                 output.closure_amount,
                 output.combined_score,
                 output.thumb_closure,
                 output.index_closure,
-                output.mrl_closure
+                output.mrl_closure,
+                output.wrist_quaternion[0],
+                output.wrist_quaternion[1],
+                output.wrist_quaternion[2],
+                output.wrist_quaternion[3],
             );
             write_message(message_out, message_out_len, &message);
             GRASP_COMPUTE_OK

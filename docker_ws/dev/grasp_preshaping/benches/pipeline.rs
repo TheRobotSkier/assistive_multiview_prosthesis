@@ -97,18 +97,14 @@ fn bench_roi_prediction(c: &mut Criterion) {
 fn bench_pointcloud_pruning(c: &mut Criterion) {
     let pc = demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 5000);
 
-    let lut = match load_lut_or_skip() {
-        Some(l) => l,
-        None => return,
+    // Use a fixed deterministic ROI for the prune benchmark.
+    // The prune benchmark measures the prune function itself, not the ROI size.
+    // Previously predict_roi_with_samples was used, but it now includes random wrist rotation
+    // which inflates the AABB non-deterministically.
+    let roi = grasp_preshaping::pointcloud_helper::Aabb {
+        min: Vector3::new(-0.05, 0.05, -0.02),
+        max: Vector3::new(0.05, 0.15, 0.08),
     };
-
-    let pred_config = create_pred_config();
-    let pose = identity_pose();
-    let twist = dummy_twist();
-    let twist_cov = TwistCovariance::fixed();
-    let index_tip = lut.get_location(Contact::IndexTip, 0.0);
-
-    let (roi, _) = predict_roi_with_samples(&pose, &twist, &twist_cov, &index_tip, &pred_config);
 
     c.bench_function("pointcloud_prune_to_roi_5000pts", |b| {
         b.iter(|| prune(&pc, Some(roi)))
@@ -174,9 +170,12 @@ fn bench_full_pipeline(c: &mut Criterion) {
             let collision_tol = config::COLLISION_TOL_M;
             for sp in &samples {
                 let base_transform = sp.pose.to_se3();
-                let _r1 = score_cylindrical(&lut, &tsdf, &base_transform, collision_tol);
-                let _r2 = score_pinch(&lut, &tsdf, &base_transform, collision_tol);
-                let _r3 = score_lateral(&lut, &tsdf, &base_transform, collision_tol);
+                let scorer: fn(&FingerLUT, &grasp_preshaping::pointcloud_helper::Tsdf, &Matrix4<f64>, f32) -> Option<grasp_preshaping::planner::GraspScoreResult> = match sp.grasp_type {
+                    0 => score_cylindrical,
+                    1 => score_pinch,
+                    _ => score_lateral,
+                };
+                let _ = scorer(&lut, &tsdf, &base_transform, collision_tol);
             }
         })
     });

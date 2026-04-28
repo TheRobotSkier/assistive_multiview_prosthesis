@@ -8,18 +8,23 @@ pub struct GraspScoreResult {
     pub closure_amount: f64,
     pub alignment_score: f64,
     pub force_closure_score: f64,
+    pub contact_count_score: f64,
     pub found_collision: bool,
 }
 
 impl GraspScoreResult {
     pub fn combined_score(&self, weights: &GraspWeights, sample_probability: f64) -> f64 {
-        let denom = weights.w_probability + weights.w_alignment + weights.w_force_closure;
+        let denom = weights.w_probability
+            + weights.w_alignment
+            + weights.w_force_closure
+            + weights.w_contact_count;
         if denom.abs() < 1e-12 {
             return 0.0;
         }
         (weights.w_probability * sample_probability
             + weights.w_alignment * self.alignment_score
-            + weights.w_force_closure * self.force_closure_score)
+            + weights.w_force_closure * self.force_closure_score
+            + weights.w_contact_count * self.contact_count_score)
             / denom
     }
 }
@@ -29,6 +34,7 @@ pub struct GraspWeights {
     pub w_probability: f64,
     pub w_alignment: f64,
     pub w_force_closure: f64,
+    pub w_contact_count: f64,
 }
 
 impl Default for GraspWeights {
@@ -37,6 +43,7 @@ impl Default for GraspWeights {
             w_probability: 1.0,
             w_alignment: 1.0,
             w_force_closure: 1.0,
+            w_contact_count: 1.5,
         }
     }
 }
@@ -60,6 +67,10 @@ struct SweepPoint {
 struct GraspSpec {
     sweep_points: Vec<SweepPoint>,
     score_contacts: Vec<Contact>,
+    min_contacts: usize,
+    /// Index into the LUT's max_closure_per_grasp_type array.
+    /// 0 = cylindrical, 1 = pinch, 2 = lateral.
+    max_closure_index: usize,
 }
 
 pub fn score_cylindrical(
@@ -67,13 +78,16 @@ pub fn score_cylindrical(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
-) -> GraspScoreResult {
+) -> Option<GraspScoreResult> {
+    let spec = cylindrical_spec();
+    let max_closure = lut.get_max_closure(spec.max_closure_index);
     score_grasp(
         lut,
         tsdf,
         base_transform,
         collision_tol,
-        &cylindrical_spec(),
+        &spec,
+        max_closure,
     )
 }
 
@@ -82,8 +96,10 @@ pub fn score_pinch(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
-) -> GraspScoreResult {
-    score_grasp(lut, tsdf, base_transform, collision_tol, &pinch_spec())
+) -> Option<GraspScoreResult> {
+    let spec = pinch_spec();
+    let max_closure = lut.get_max_closure(spec.max_closure_index);
+    score_grasp(lut, tsdf, base_transform, collision_tol, &spec, max_closure)
 }
 
 pub fn score_lateral(
@@ -91,8 +107,10 @@ pub fn score_lateral(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
-) -> GraspScoreResult {
-    score_grasp(lut, tsdf, base_transform, collision_tol, &lateral_spec())
+) -> Option<GraspScoreResult> {
+    let spec = lateral_spec();
+    let max_closure = lut.get_max_closure(spec.max_closure_index);
+    score_grasp(lut, tsdf, base_transform, collision_tol, &spec, max_closure)
 }
 
 fn cylindrical_spec() -> GraspSpec {
@@ -156,6 +174,8 @@ fn cylindrical_spec() -> GraspSpec {
             Contact::PalmDistUlna,
             Contact::PalmDistRadi,
         ],
+        min_contacts: 3,
+        max_closure_index: 0,
     }
 }
 
@@ -198,6 +218,8 @@ fn pinch_spec() -> GraspSpec {
             l(Contact::PalmDistRadi),
         ],
         score_contacts: vec![Contact::ThumbAbdTip, Contact::IndexTip],
+        min_contacts: 2,
+        max_closure_index: 1,
     }
 }
 
@@ -246,6 +268,8 @@ fn lateral_spec() -> GraspSpec {
             Contact::IndexPipSide,
             Contact::IndexTipSide,
         ],
+        min_contacts: 2,
+        max_closure_index: 2,
     }
 }
 
@@ -255,23 +279,24 @@ fn score_grasp(
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
     spec: &GraspSpec,
-) -> GraspScoreResult {
-    match sweep_for_collision(lut, tsdf, base_transform, &spec.sweep_points, collision_tol) {
-        None => GraspScoreResult {
+    max_closure: f64,
+) -> Option<GraspScoreResult> {
+    match sweep_for_collision(lut, tsdf, base_transform, &spec.sweep_points, collision_tol, max_closure) {
+        None => Some(GraspScoreResult {
             closure_amount: 0.0,
             alignment_score: 0.0,
             force_closure_score: 0.0,
+            contact_count_score: 0.0,
             found_collision: false,
-        },
-        Some(0) => GraspScoreResult {
-            closure_amount: 0.0,
-            alignment_score: 0.0,
-            force_closure_score: 0.0,
-            found_collision: true,
-        },
+        }),
+        // Start-position collision: palm or open-hand fingers already inside
+        // the object. This pose is physically impossible — no valid grasp here.
+        Some(0) => None,
         Some(coll_sample) => {
             let lo_ctrl = lut.get_control(coll_sample - 1);
             let hi_ctrl = lut.get_control(coll_sample);
+            // Clamp hi_ctrl to max_closure to avoid self-collision.
+            let hi_ctrl = hi_ctrl.min(max_closure);
             let (lo, hi) = refine_binary(
                 lut,
                 tsdf,
@@ -290,12 +315,18 @@ fn score_grasp(
                 hi,
                 collision_tol,
             );
-            GraspScoreResult {
+            let contact_count_score = if active.is_empty() {
+                0.0
+            } else {
+                (active.len() as f64 / spec.min_contacts as f64).min(1.0)
+            };
+            Some(GraspScoreResult {
                 closure_amount: lo,
                 alignment_score: compute_alignment(&active),
                 force_closure_score: compute_force_closure(&active),
+                contact_count_score,
                 found_collision: true,
-            }
+            })
         }
     }
 }
@@ -306,9 +337,12 @@ fn sweep_for_collision(
     base: &Matrix4<f64>,
     sweep_points: &[SweepPoint],
     collision_tol: f32,
+    max_closure: f64,
 ) -> Option<usize> {
     let resolution = lut.get_resolution();
 
+    // Check locked points first (palm, etc.) — if any collides at sample 0,
+    // the start position is invalid.
     for sp in sweep_points {
         if let Flex::Locked(locked_s) = sp.flex {
             let p = pos_at_sample(lut, sp.contact, locked_s, base);
@@ -318,7 +352,14 @@ fn sweep_for_collision(
         }
     }
 
-    for sample in 0..resolution {
+    // Compute the max sample index based on max_closure to avoid self-collision.
+    let max_sample = if max_closure >= 1.0 {
+        resolution
+    } else {
+        lut.get_sample(max_closure) + 1
+    };
+
+    for sample in 0..max_sample {
         for sp in sweep_points {
             if let Flex::Coupled = sp.flex {
                 let p = pos_at_sample(lut, sp.contact, sample, base);

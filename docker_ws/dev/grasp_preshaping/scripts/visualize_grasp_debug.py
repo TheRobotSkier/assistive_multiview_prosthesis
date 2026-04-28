@@ -115,19 +115,63 @@ def load_dump(path: str) -> dict:
     pose = data["input_pose"]
     twist = data["input_twist"]
 
-    grasps_raw = data["scored_grasps"].reshape(-1, 24) if len(data["scored_grasps"]) > 0 else np.zeros((0, 24))
+    # Backward-compatible: handle 24-col, 25-col, and 26-col formats
+    raw_len = len(data["scored_grasps"])
+    if raw_len > 0:
+        if raw_len % 26 == 0:
+            row_len = 26
+        elif raw_len % 25 == 0:
+            row_len = 25
+        else:
+            row_len = 24
+        grasps_raw = data["scored_grasps"].reshape(-1, row_len)
+    else:
+        row_len = 26
+        grasps_raw = np.zeros((0, row_len))
 
-    grasps = {
-        "sample_index": grasps_raw[:, 0].astype(int),
-        "grasp_type": grasps_raw[:, 1].astype(int),
-        "closure": grasps_raw[:, 2],
-        "alignment": grasps_raw[:, 3],
-        "force_closure": grasps_raw[:, 4],
-        "found_collision": grasps_raw[:, 5] > 0.5,
-        "combined": grasps_raw[:, 6],
-        "probability": grasps_raw[:, 7],
-        "pose_4x4": grasps_raw[:, 8:24].reshape(-1, 4, 4),
-    }
+    if row_len == 26:
+        grasps = {
+            "sample_index": grasps_raw[:, 0].astype(int),
+            "grasp_type": grasps_raw[:, 1].astype(int),
+            "closure": grasps_raw[:, 2],
+            "alignment": grasps_raw[:, 3],
+            "force_closure": grasps_raw[:, 4],
+            "contact_count_score": grasps_raw[:, 5],
+            "found_collision": grasps_raw[:, 6] > 0.5,
+            "combined": grasps_raw[:, 7],
+            "probability": grasps_raw[:, 8],
+            "wrist_rotation": grasps_raw[:, 9],
+            "pose_4x4": grasps_raw[:, 10:26].reshape(-1, 4, 4),
+        }
+    elif row_len == 25:
+        grasps = {
+            "sample_index": grasps_raw[:, 0].astype(int),
+            "grasp_type": grasps_raw[:, 1].astype(int),
+            "closure": grasps_raw[:, 2],
+            "alignment": grasps_raw[:, 3],
+            "force_closure": grasps_raw[:, 4],
+            "contact_count_score": grasps_raw[:, 5],
+            "found_collision": grasps_raw[:, 6] > 0.5,
+            "combined": grasps_raw[:, 7],
+            "probability": grasps_raw[:, 8],
+            "wrist_rotation": np.zeros(len(grasps_raw)),
+            "pose_4x4": grasps_raw[:, 9:25].reshape(-1, 4, 4),
+        }
+    else:
+        # Legacy 24-column format
+        grasps = {
+            "sample_index": grasps_raw[:, 0].astype(int),
+            "grasp_type": grasps_raw[:, 1].astype(int),
+            "closure": grasps_raw[:, 2],
+            "alignment": grasps_raw[:, 3],
+            "force_closure": grasps_raw[:, 4],
+            "contact_count_score": np.zeros(len(grasps_raw)),
+            "found_collision": grasps_raw[:, 5] > 0.5,
+            "combined": grasps_raw[:, 6],
+            "probability": grasps_raw[:, 7],
+            "wrist_rotation": np.zeros(len(grasps_raw)),
+            "pose_4x4": grasps_raw[:, 8:24].reshape(-1, 4, 4),
+        }
 
     return {
         "tsdf": tsdf,

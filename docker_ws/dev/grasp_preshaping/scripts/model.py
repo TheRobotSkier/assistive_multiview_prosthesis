@@ -549,9 +549,12 @@ def generate_contact_lut(resolution=11):
     contact_groups = np.array([c["group"] for c in CONTACT_DEFINITIONS], dtype="<U16")
     contact_offsets = np.vstack([c["local_offset"] for c in CONTACT_DEFINITIONS]).astype(np.float32)
 
+    # Compute self-collision limits per grasp type.
+    max_closure = compute_max_closure_per_grasp_type()
+
     np.savez(
         LUT_PATH,
-        meta_version=np.array(["3.0"], dtype="<U8"),
+        meta_version=np.array(["4.0"], dtype="<U8"),
         representation=np.array(["dual_quaternion_wxyz"], dtype="<U32"),
         resolution=np.array([resolution], dtype=np.int32),
         joint_names=np.array(JOINT_ORDER, dtype="<U32"),
@@ -572,14 +575,16 @@ def generate_contact_lut(resolution=11):
         thumb_opp_mode0_table=thumb_opp_mode0_table,
         thumb_opp_mode1_table=thumb_opp_mode1_table,
         palm_table=palm_table,
+        max_closure_per_grasp_type=max_closure,
     )
 
     print(f"LUT saved to {LUT_PATH}")
     print(f"Resolution: {resolution}")
-    print(f"Contacts per finger: index=8 (2×4 geoms), middle=4, ring=3, little=3, thumb=3")
-    print("Palm contacts: 4 (2×2 geoms)")
+    print(f"Contacts per finger: index=8 (2x4 geoms), middle=4, ring=3, little=3, thumb=3")
+    print("Palm contacts: 4 (2x2 geoms)")
     print("Total contacts: 25")
     print("Stored as dual quaternions with component order [qr_w, qr_x, qr_y, qr_z, qd_w, qd_x, qd_y, qd_z]")
+    print(f"Max closure per grasp type: cylindrical={max_closure[0]:.4f}, pinch={max_closure[1]:.4f}, lateral={max_closure[2]:.4f}")
 
     return {
         "index_table": index_table,
@@ -587,7 +592,72 @@ def generate_contact_lut(resolution=11):
         "thumb_opp_mode0_table": thumb_opp_mode0_table,
         "thumb_opp_mode1_table": thumb_opp_mode1_table,
         "palm_table": palm_table,
+        "max_closure_per_grasp_type": max_closure,
     }
+
+def compute_max_closure_per_grasp_type(n_steps=50):
+    """Find the maximum closure amount before self-collision for each grasp type.
+
+    Uses Pinocchio's collision checking to binary-search for the closure threshold
+    where the thumb collides with any other finger geometry. Palm-finger pairs are
+    excluded since the URDF collision volumes overlap at rest.
+
+    Returns:
+        np.array of shape (3,) with dtype float32:
+        [cylindrical_max, pinch_max, lateral_max] in [0, 1] normalized closure.
+    """
+    # Build collision model with only thumb-vs-finger pairs.
+    # Thumb geoms: indices 16-18 (mia_thumb_fle_0/1/2)
+    # Finger geoms: indices 2-15 (index, little, middle, ring)
+    # Palm geoms: indices 0-1 are excluded (always overlap at rest).
+    collision_model = pin.buildGeomFromUrdf(model, URDF_PATH, pin.GeometryType.COLLISION)
+    thumb_geoms = {16, 17, 18}
+    finger_geoms = set(range(2, 16))
+    for t in thumb_geoms:
+        for f in finger_geoms:
+            a, b = min(t, f), max(t, f)
+            collision_model.addCollisionPair(pin.CollisionPair(a, b))
+    collision_data = collision_model.createData()
+
+    # Grasp types: each maps to a function that builds q_full from a closure amount.
+    # cylindrical: thumb (abduction mode=1), index, MRL all close together
+    # pinch: thumb (abduction mode=1), index close, MRL locked open
+    # lateral: thumb (adduction mode=0), index close, MRL locked open
+    grasp_builders = [
+        # Cylindrical: all fingers close, thumb in abduction (opposition)
+        lambda c: _q_full_with_thumb_mode(
+            np.array([c, c, c], dtype=float), THUMB_OPPOSITION_STATES[1]
+        ),
+        # Pinch: thumb + index close, MRL open, thumb in abduction
+        lambda c: _q_full_with_thumb_mode(
+            np.array([c, c, 0.0], dtype=float), THUMB_OPPOSITION_STATES[1]
+        ),
+        # Lateral: thumb + index close, MRL open, thumb in adduction
+        lambda c: _q_full_with_thumb_mode(
+            np.array([c, c, 0.0], dtype=float), THUMB_OPPOSITION_STATES[0]
+        ),
+    ]
+
+    max_closures = np.zeros(3, dtype=np.float32)
+
+    for gi, builder in enumerate(grasp_builders):
+        # Binary search for the max closure before self-collision.
+        lo, hi = 0.0, 1.0
+        for _ in range(20):  # ~1e-6 precision
+            mid = (lo + hi) * 0.5
+            q = builder(mid)
+            pin.computeCollisions(model, data, collision_model, collision_data, q)
+            has_collision = any(
+                collision_data.collisionResults[k].isCollision()
+                for k in range(len(collision_model.collisionPairs))
+            )
+            if has_collision:
+                hi = mid
+            else:
+                lo = mid
+        max_closures[gi] = np.float32(lo)
+
+    return max_closures
 
 
 def generate_lut(resolution=11):

@@ -208,6 +208,10 @@ pub struct FingerLUT {
     thumb_add_table: Vec<DualQuaternion>,
     thumb_abd_table: Vec<DualQuaternion>,
     palm_table: Vec<DualQuaternion>,
+    /// Maximum closure amount before self-collision, per grasp type.
+    /// Index 0 = cylindrical, 1 = pinch, 2 = lateral.
+    /// Values in [0, 1] normalized closure.
+    max_closure_per_grasp_type: [f64; 3],
 }
 
 impl FingerLUT {
@@ -243,6 +247,9 @@ impl FingerLUT {
         );
         let palm_table = Self::decode_palm_table(&palm_raw, Self::PALM_CONTACTS, "palm_table");
 
+        // Load max closure per grasp type (optional for backward compatibility).
+        let max_closure_per_grasp_type = Self::read_max_closure(&mut npz);
+
         Self {
             resolution,
             index_table,
@@ -250,6 +257,7 @@ impl FingerLUT {
             thumb_add_table,
             thumb_abd_table,
             palm_table,
+            max_closure_per_grasp_type,
         }
     }
 
@@ -351,6 +359,16 @@ impl FingerLUT {
         idx.min(self.resolution - 1)
     }
 
+    /// Returns the maximum closure amount before self-collision for the given grasp type.
+    /// `grasp_type_index`: 0 = cylindrical, 1 = pinch, 2 = lateral.
+    /// Returns 1.0 if the data is not available in the LUT (backward compat).
+    pub fn get_max_closure(&self, grasp_type_index: usize) -> f64 {
+        self.max_closure_per_grasp_type
+            .get(grasp_type_index)
+            .copied()
+            .unwrap_or(1.0)
+    }
+
     fn read_resolution<R: Read + Seek>(npz: &mut NpzArchive<R>) -> usize {
         let as_i32 = npz
             .by_name("resolution")
@@ -426,6 +444,38 @@ impl FingerLUT {
         data.chunks_exact(8)
             .map(DualQuaternion::from_slice)
             .collect()
+    }
+
+    /// Read max_closure_per_grasp_type from the npz. Returns [1.0, 1.0, 1.0]
+    /// if the field is missing (backward compatibility with older LUT files).
+    fn read_max_closure<R: Read + Seek>(npz: &mut NpzArchive<R>) -> [f64; 3] {
+        let default = [1.0, 1.0, 1.0];
+
+        let arr = match npz.by_name("max_closure_per_grasp_type") {
+            Ok(Some(reader)) => reader,
+            _ => return default,
+        };
+
+        // Try f32 first (as stored by Python).
+        if let Ok(vec) = arr.into_vec::<f32>() {
+            if vec.len() >= 3 {
+                return [vec[0] as f64, vec[1] as f64, vec[2] as f64];
+            }
+            return default;
+        }
+
+        // Try f64.
+        let arr2 = match npz.by_name("max_closure_per_grasp_type") {
+            Ok(Some(reader)) => reader,
+            _ => return default,
+        };
+        if let Ok(vec) = arr2.into_vec::<f64>() {
+            if vec.len() >= 3 {
+                return [vec[0], vec[1], vec[2]];
+            }
+        }
+
+        default
     }
 
     fn contact_spec(contact: Contact) -> ContactSpec {
@@ -607,6 +657,7 @@ mod tests {
             thumb_add_table,
             thumb_abd_table,
             palm_table,
+            max_closure_per_grasp_type: [1.0, 1.0, 1.0],
         }
     }
 

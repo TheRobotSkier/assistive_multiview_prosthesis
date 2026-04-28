@@ -16,18 +16,21 @@ use std::path::Path;
 /// Constructed by the caller from the private `ScoredGrasp` in `c_api.rs`.
 #[derive(Debug, Clone)]
 pub struct ScoredGraspExport {
-    /// Index into the samples array (sample_index = total_index / 3).
+    /// Index into the samples array (1:1 mapping since unified sampling).
     pub sample_index: usize,
     /// 1 = cylindrical, 2 = pinch, 3 = lateral.
     pub grasp_type_i32: i32,
     pub closure_amount: f64,
     pub alignment_score: f64,
     pub force_closure_score: f64,
+    pub contact_count_score: f64,
     pub found_collision: bool,
     pub combined_score: f64,
     pub sample_probability: f64,
     /// Row-major 4x4 SE(3) matrix for the sample's hand base pose.
     pub pose_se3: [f64; 16],
+    /// Wrist rotation angle around local Y axis in radians.
+    pub wrist_rotation: f64,
 }
 
 /// Collected artifacts from one pipeline invocation.
@@ -56,11 +59,12 @@ pub struct DebugDump<'a> {
 /// | `cameras`         | f32   | (C*3,)      | Camera positions |
 /// | `input_pose`      | f64   | (7,)        | [px,py,pz,qx,qy,qz,qw] |
 /// | `input_twist`     | f64   | (6,)        | [lx,ly,lz,ax,ay,az] |
-/// | `scored_grasps`   | f64   | (M*24,)     | Flat rows (see below) |
+/// | `scored_grasps`   | f64   | (M*26,)     | Flat rows (see below) |
 ///
-/// Each scored_grasps row has 24 columns:
+/// Each scored_grasps row has 26 columns:
 ///   [sample_idx, grasp_type, closure, alignment, force_closure,
-///    found_collision(0|1), combined, probability, pose_4x4(16)]
+///    contact_count, found_collision(0|1), combined, probability, wrist_rotation,
+///    pose_4x4(16)]
 pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -186,20 +190,22 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
         writer.finish()?;
     }
 
-    // --- scored_grasps (f64, M*22 flat) ---
-    // Columns per row (22 total):
+    // --- scored_grasps (f64, M*26 flat) ---
+    // Columns per row (26 total):
     //   [0]  sample_index
     //   [1]  grasp_type (1=cyl, 2=pinch, 3=lat)
     //   [2]  closure_amount
     //   [3]  alignment_score
     //   [4]  force_closure_score
-    //   [5]  found_collision (0.0 or 1.0)
-    //   [6]  combined_score
-    //   [7]  sample_probability
-    //   [8..24]  pose_se3 row-major 4x4
+    //   [5]  contact_count_score
+    //   [6]  found_collision (0.0 or 1.0)
+    //   [7]  combined_score
+    //   [8]  sample_probability
+    //   [9]  wrist_rotation (radians)
+    //   [10..26]  pose_se3 row-major 4x4
     {
         let m = dump.scored_grasps.len();
-        let total = m * 24;
+        let total = m * 26;
         let mut writer = npz
             .array::<f64>("scored_grasps", Default::default())?
             .default_dtype()
@@ -211,9 +217,11 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
             writer.push(&g.closure_amount)?;
             writer.push(&g.alignment_score)?;
             writer.push(&g.force_closure_score)?;
+            writer.push(&g.contact_count_score)?;
             writer.push(&if g.found_collision { 1.0f64 } else { 0.0f64 })?;
             writer.push(&g.combined_score)?;
             writer.push(&g.sample_probability)?;
+            writer.push(&g.wrist_rotation)?;
             for &v in &g.pose_se3 {
                 writer.push(&v)?;
             }

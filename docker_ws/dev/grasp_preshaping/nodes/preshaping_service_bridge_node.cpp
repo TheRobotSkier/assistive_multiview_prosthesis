@@ -87,6 +87,10 @@ public:
     mrl_cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
       "/mrl_pos_ff_controller/commands", 10);
 
+    // Publish wrist orientation as a Pose topic for downstream consumers.
+    wrist_pose_pub_ = create_publisher<geometry_msgs::msg::Pose>(
+      "/grasp_preshaping/wrist_pose", 10);
+
     initialize_rust_backend();
 
     service_ = create_service<std_srvs::srv::Trigger>(
@@ -320,6 +324,16 @@ private:
     const double mrl = std::max(ffi_response.mrl_closure, min_closure_amount_);
     publish_joint_commands(thumb, index, mrl);
 
+    // Publish wrist orientation.
+    {
+      geometry_msgs::msg::Pose wrist_pose;
+      wrist_pose.orientation.x = ffi_response.wrist_qx;
+      wrist_pose.orientation.y = ffi_response.wrist_qy;
+      wrist_pose.orientation.z = ffi_response.wrist_qz;
+      wrist_pose.orientation.w = ffi_response.wrist_qw;
+      wrist_pose_pub_->publish(wrist_pose);
+    }
+
     response->success = true;
     response->message = message.empty() ? "Preshaping completed" : message;
     response->message +=
@@ -355,6 +369,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr thumb_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr index_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr mrl_cmd_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr wrist_pose_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_;
 };
 
