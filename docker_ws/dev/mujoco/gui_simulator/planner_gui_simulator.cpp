@@ -174,7 +174,25 @@ void PlannerGuiSimulator::set_jnt_vel(uint_fast8_t jnt, double vel)
 void PlannerGuiSimulator::stop_jnt(uint_fast8_t jnt)
 {
   std::lock_guard<std::mutex> lock(sim_mtx_);
-  jnt_pos_cmd_[jnt] = mj_data_->qpos[jnt];
+  jnt_pos_cmd_[jnt] = jnt_pos_state_[jnt];
+}
+
+void PlannerGuiSimulator::set_wrist_pos(double pos)
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  wrist_pos_cmd_ = pos;
+}
+
+double PlannerGuiSimulator::get_wrist_pos()
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  return wrist_pos_state_;
+}
+
+double PlannerGuiSimulator::get_wrist_vel()
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  return wrist_vel_state_;
 }
 
 PlannerGuiSimulator::PlannerGuiSimulator()
@@ -407,6 +425,9 @@ void PlannerGuiSimulator::control_cb_impl(const mjModel* /* model */, mjData* da
   data->ctrl[0] = jnt_pos_cmd_[0];
   data->ctrl[1] = jnt_pos_cmd_[1];
   data->ctrl[2] = jnt_pos_cmd_[2];
+  if (has_wrist_ && ctrl_wrist_id_ >= 0) {
+    data->ctrl[ctrl_wrist_id_] = wrist_pos_cmd_;
+  }
 }
 
 bool PlannerGuiSimulator::simulate_impl(
@@ -438,6 +459,25 @@ bool PlannerGuiSimulator::simulate_impl(
     if (!success)
     {
       std::strcpy(err_msg_, "Index-thumb actuator plugin not found.");
+    }
+  }
+
+  if (success)
+  {
+    // Dynamic qpos address lookup — safe regardless of scene XML joint ordering.
+    auto find_addr = [&](const char* name) -> int {
+      int id = mj_name2id(mj_model_, mjOBJ_JOINT, name);
+      return (id >= 0) ? mj_model_->jnt_qposadr[id] : 1;
+    };
+    qpos_thumb_addr_ = find_addr("j_thumb_fle_r");
+    qpos_index_addr_ = find_addr("j_index_fle_r");
+    qpos_mrl_addr_   = find_addr("j_mrl_fle_r");
+
+    int wrist_id = mj_name2id(mj_model_, mjOBJ_JOINT, "j_wrist_rotation");
+    has_wrist_ = (wrist_id >= 0);
+    if (has_wrist_) {
+      qpos_wrist_addr_ = mj_model_->jnt_qposadr[wrist_id];
+      ctrl_wrist_id_   = mj_name2id(mj_model_, mjOBJ_ACTUATOR, "wrist_pos_r");
     }
   }
 
@@ -506,13 +546,17 @@ bool PlannerGuiSimulator::simulate_impl(
       glfwPollEvents();
 
       std::lock_guard<std::mutex> lock(sim_mtx_);
-      jnt_vel_state_[0] = mj_data_->qvel[1];
-      jnt_vel_state_[1] = mj_data_->qvel[2];
-      jnt_vel_state_[2] = mj_data_->qvel[3];
+      jnt_vel_state_[0] = mj_data_->qvel[qpos_thumb_addr_];
+      jnt_vel_state_[1] = mj_data_->qvel[qpos_index_addr_];
+      jnt_vel_state_[2] = mj_data_->qvel[qpos_mrl_addr_];
 
-      jnt_pos_state_[0] = mj_data_->qpos[1];
-      jnt_pos_state_[1] = mj_data_->qpos[2];
-      jnt_pos_state_[2] = mj_data_->qpos[3];
+      jnt_pos_state_[0] = mj_data_->qpos[qpos_thumb_addr_];
+      jnt_pos_state_[1] = mj_data_->qpos[qpos_index_addr_];
+      jnt_pos_state_[2] = mj_data_->qpos[qpos_mrl_addr_];
+      if (has_wrist_) {
+        wrist_pos_state_ = mj_data_->qpos[qpos_wrist_addr_];
+        wrist_vel_state_ = mj_data_->qvel[qpos_wrist_addr_];
+      }
     }
 
     mjcb_control = nullptr;

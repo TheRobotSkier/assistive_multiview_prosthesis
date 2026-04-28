@@ -216,6 +216,13 @@ InteractiveSystemInterface::export_state_interfaces()
     }
   }
 
+  if (has_wrist_) {
+    jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
+      wrist_name_, hardware_interface::HW_IF_POSITION, &wrist_pos_state_));
+    jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
+      wrist_name_, hardware_interface::HW_IF_VELOCITY, &wrist_vel_state_));
+  }
+
   return jnt_state_interfaces;
 }
 
@@ -236,6 +243,11 @@ InteractiveSystemInterface::export_command_interfaces()
         jnt_names_[i], hardware_interface::HW_IF_VELOCITY,
         &jnt_vel_cmd_[i]));
     }
+  }
+
+  if (has_wrist_) {
+    jnt_cmd_interfaces.emplace_back(hardware_interface::CommandInterface(
+      wrist_name_, hardware_interface::HW_IF_POSITION, &wrist_pos_cmd_));
   }
 
   return jnt_cmd_interfaces;
@@ -303,6 +315,11 @@ hardware_interface::return_type InteractiveSystemInterface::read(
     if (std::abs(jnt_pos_state_[i]) < 0.01) {
       jnt_pos_state_[i] = 0.0;
     }
+  }
+
+  if (has_wrist_) {
+    wrist_pos_state_ = InteractiveSimulator::get_instance().get_wrist_pos();
+    wrist_vel_state_ = InteractiveSimulator::get_instance().get_wrist_vel();
   }
 
   // Publish current scene poses at ~10 Hz (throttled from 1 kHz read loop)
@@ -426,9 +443,21 @@ hardware_interface::return_type InteractiveSystemInterface::write(
 {
   for (std::size_t jnt_it = 0; jnt_it < 3; ++jnt_it) {
     if (CommandMode::kPosition == jnt_cmd_modes_[jnt_it]) {
-      InteractiveSimulator::get_instance().set_jnt_pos(jnt_it, jnt_pos_cmd_[jnt_it]);
+      // Only forward when command actually changes — prevents 50Hz constant re-send
+      // which would fight against GUI slider input in control_cb
+      if (jnt_pos_cmd_[jnt_it] != prev_ros_pos_cmd_[jnt_it]) {
+        InteractiveSimulator::get_instance().set_jnt_pos(jnt_it, jnt_pos_cmd_[jnt_it]);
+        prev_ros_pos_cmd_[jnt_it] = jnt_pos_cmd_[jnt_it];
+      }
     } else if (CommandMode::kVelocity == jnt_cmd_modes_[jnt_it]) {
       InteractiveSimulator::get_instance().set_jnt_vel(jnt_it, jnt_vel_cmd_[jnt_it]);
+    }
+  }
+
+  if (has_wrist_) {
+    if (wrist_pos_cmd_ != prev_ros_wrist_cmd_) {
+      InteractiveSimulator::get_instance().set_wrist_pos(wrist_pos_cmd_);
+      prev_ros_wrist_cmd_ = wrist_pos_cmd_;
     }
   }
 
@@ -440,7 +469,7 @@ bool InteractiveSystemInterface::read_joints_info(
 {
   bool success = true;
 
-  if (4 == jnt_info.size()) {
+  if (jnt_info.size() >= 4) {
     std::array<std::string, 3> jnt_roles = {
       "j_thumb_fle", "j_index_fle", "j_mrl_fle"};
 
@@ -472,8 +501,18 @@ bool InteractiveSystemInterface::read_joints_info(
         success = false;
       }
     }
+
+    // Optionally detect wrist rotation joint
+    const auto wrist_it = std::find_if(
+      jnt_info.begin(), jnt_info.end(),
+      [](const hardware_interface::ComponentInfo& jnt)
+      { return std::string::npos != jnt.name.find("wrist_rotation"); });
+    if (wrist_it != jnt_info.end()) {
+      has_wrist_ = true;
+      wrist_name_ = wrist_it->name;
+    }
   } else {
-    RCLCPP_FATAL(*logger_, "4 joints expected, but %ld provided.", jnt_info.size());
+    RCLCPP_FATAL(*logger_, "At least 4 joints expected, but %ld provided.", jnt_info.size());
     success = false;
   }
 

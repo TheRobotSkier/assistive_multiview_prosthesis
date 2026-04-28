@@ -2,6 +2,7 @@
 #define MIA_HAND_MUJOCO_INTERACTIVE_SYSTEM_INTERFACE_HPP
 
 #include <array>
+#include <limits>
 #include <memory>
 #include <string>
 #include <thread>
@@ -123,6 +124,20 @@ private:
 
   double jnt_vel_state_[3];
   double jnt_vel_cmd_[3];
+
+  // Wrist rotation joint (optional — present only when scene has j_wrist_rotation)
+  bool has_wrist_{false};
+  std::string wrist_name_;
+  double wrist_pos_state_{0.0};
+  double wrist_vel_state_{0.0};
+  double wrist_pos_cmd_{0.0};
+
+  // Previous ROS command values — only forward to simulator when they change
+  double prev_ros_pos_cmd_[3]{
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::quiet_NaN(),
+    std::numeric_limits<double>::quiet_NaN()};
+  double prev_ros_wrist_cmd_{std::numeric_limits<double>::quiet_NaN()};
 
   std::array<CommandMode, 3> jnt_cmd_modes_;
 

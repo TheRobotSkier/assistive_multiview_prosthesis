@@ -47,8 +47,12 @@
   </asset>
 
   <worldbody>
+    <!-- Wrist rotation body: invisible (no geometry), provides j_wrist_rotation hinge.
+         Carries the world-space pose previously on palm_r; palm_r inherits it as a child. -->
+    <body name="wrist_body" pos="-0.1 0 0.2" quat="0.707388 0.706825 0 0">
+      <joint name="j_wrist_rotation" type="hinge" axis="0 1 0" range="-3.14159 3.14159" damping="0.5"/>
     <!-- Pose matches the hardcoded default MuJoCo hand transform used by grasp_preshaping. -->
-    <body name="palm_r" pos="-0.1 0 0.2" quat="0.707388 0.706825 0 0">
+    <body name="palm_r" pos="0 0 0">
       <inertial pos="0.00268 0.0671 -0.016" quat="0.5 0.5 -0.5 0.5" mass="0.274" diaginertia="0.000343 0.000301 0.00013"/>
       <geom class="visual_r" pos="0.00303524 0.075372 -0.0252042" quat="0.991445 -0.130526 0 0" rgba="0.0150198 0.0150198 0.0150198 1" mesh="dorsum_simple"/>
       <geom class="visual_r" pos="0.00380022 0.0659745 -0.0120549" quat="0.991445 -0.130526 0 0" rgba="0.0150198 0.0150198 0.0150198 1" mesh="palm_simple"/>
@@ -130,7 +134,8 @@
           pos="0 0 0" euler="-1.5708 0 3.14159"
           contype="0" conaffinity="0" group="0" rgba="0.2 0.2 0.2 1"/>
       </body>
-    </body>
+    </body>   <!-- palm_r -->
+    </body>   <!-- wrist_body -->
   </worldbody>
 
   <equality>
@@ -151,5 +156,6 @@
     <position name="thumb_fle_pos_r" joint="j_thumb_fle_r" inheritrange="1"/>
     <plugin name="index_fle_pos_r" joint="j_index_fle_r" plugin="mujoco.mia_hand.index_thumb_actuator" instance="index_thumb_actuator_r"/>
     <position name="mrl_fle_pos_r" joint="j_mrl_fle_r" inheritrange="1"/>
+    <position name="wrist_pos_r" joint="j_wrist_rotation" kp="10"/>
   </actuator>
 </mujoco>

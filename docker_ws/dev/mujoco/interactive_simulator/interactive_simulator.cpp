@@ -147,6 +147,8 @@ void InteractiveSimulator::set_jnt_pos(uint_fast8_t jnt, double pos)
 {
   std::lock_guard<std::mutex> lock(sim_mtx_);
   jnt_pos_cmd_[jnt] = pos;
+  ctrl_last_set_[jnt] = pos;  // our command — control_cb will apply it
+  new_cmd_[jnt] = true;
 }
 
 void InteractiveSimulator::set_jnt_vel(uint_fast8_t jnt, double vel)
@@ -160,6 +162,41 @@ void InteractiveSimulator::stop_jnt(uint_fast8_t jnt)
   std::lock_guard<std::mutex> lock(sim_mtx_);
   // hold current position as the new command
   jnt_pos_cmd_[jnt] = jnt_pos_state_[jnt];
+}
+
+void InteractiveSimulator::set_wrist_pos(double pos)
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  wrist_pos_cmd_ = pos;
+  ctrl_wrist_last_set_ = pos;
+  new_wrist_cmd_ = true;
+}
+
+double InteractiveSimulator::get_wrist_pos()
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  return wrist_pos_state_;
+}
+
+double InteractiveSimulator::get_wrist_vel()
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  return wrist_vel_state_;
+}
+
+bool InteractiveSimulator::consume_planner_request()
+{
+  return planner_request_pending_.exchange(false);
+}
+
+void InteractiveSimulator::report_planner_result(bool success, const std::string& message)
+{
+  if (success) {
+    set_status(std::string("OK: ") + message);
+  } else {
+    set_status(std::string("FAIL: ") + message);
+  }
+  planner_running_.store(false);
 }
 
 InteractiveSimulator::InteractiveSimulator()
@@ -251,9 +288,29 @@ void InteractiveSimulator::control_cb(const mjModel* model, mjData* data)
 void InteractiveSimulator::control_cb_impl(const mjModel* /* model */, mjData* data)
 {
   std::lock_guard<std::mutex> lock(sim_mtx_);
-  data->ctrl[0] = jnt_pos_cmd_[0];
-  data->ctrl[1] = jnt_pos_cmd_[1];
-  data->ctrl[2] = jnt_pos_cmd_[2];
+  for (int i = 0; i < 3; ++i) {
+    if (new_cmd_[i]) {
+      // Fresh ROS command — apply it and mark as written
+      data->ctrl[i] = jnt_pos_cmd_[i];
+      ctrl_last_set_[i] = jnt_pos_cmd_[i];
+      new_cmd_[i] = false;
+    } else if (std::abs(data->ctrl[i] - ctrl_last_set_[i]) > 1e-6) {
+      // GUI slider changed ctrl — track it instead of fighting it
+      jnt_pos_cmd_[i] = data->ctrl[i];
+      ctrl_last_set_[i] = data->ctrl[i];
+    }
+    // else: no change — leave ctrl as-is; MuJoCo retains the value
+  }
+  if (has_wrist_ && ctrl_wrist_id_ >= 0) {
+    if (new_wrist_cmd_) {
+      data->ctrl[ctrl_wrist_id_] = wrist_pos_cmd_;
+      ctrl_wrist_last_set_ = wrist_pos_cmd_;
+      new_wrist_cmd_ = false;
+    } else if (std::abs(data->ctrl[ctrl_wrist_id_] - ctrl_wrist_last_set_) > 1e-6) {
+      wrist_pos_cmd_ = data->ctrl[ctrl_wrist_id_];
+      ctrl_wrist_last_set_ = data->ctrl[ctrl_wrist_id_];
+    }
+  }
 }
 
 bool InteractiveSimulator::get_plugin_instance(const mjModel* p_mjm)
@@ -385,12 +442,16 @@ void InteractiveSimulator::physics_thread_fn(
         // Copy joint state to shared arrays under our own mutex
         {
           std::lock_guard<std::mutex> state_lock(sim_mtx_);
-          jnt_pos_state_[0] = mj_data_->qpos[1];
-          jnt_pos_state_[1] = mj_data_->qpos[2];
-          jnt_pos_state_[2] = mj_data_->qpos[3];
-          jnt_vel_state_[0] = mj_data_->qvel[1];
-          jnt_vel_state_[1] = mj_data_->qvel[2];
-          jnt_vel_state_[2] = mj_data_->qvel[3];
+          jnt_pos_state_[0] = mj_data_->qpos[qpos_thumb_addr_];
+          jnt_pos_state_[1] = mj_data_->qpos[qpos_index_addr_];
+          jnt_pos_state_[2] = mj_data_->qpos[qpos_mrl_addr_];
+          jnt_vel_state_[0] = mj_data_->qvel[qpos_thumb_addr_];
+          jnt_vel_state_[1] = mj_data_->qvel[qpos_index_addr_];
+          jnt_vel_state_[2] = mj_data_->qvel[qpos_mrl_addr_];
+          if (has_wrist_) {
+            wrist_pos_state_ = mj_data_->qpos[qpos_wrist_addr_];
+            wrist_vel_state_ = mj_data_->qvel[qpos_wrist_addr_];
+          }
 
           // Update IMU data from camera body state
           if (cam_body_id_ >= 0) {
@@ -561,6 +622,24 @@ bool InteractiveSimulator::simulate_impl(
   if (success && !get_plugin_instance(mj_model_)) {
     success = false;
     std::strcpy(err_msg_, "Index-thumb actuator plugin not found.");
+  }
+
+  // Dynamic qpos address lookup — safe regardless of scene XML joint ordering.
+  if (success) {
+    auto find_addr = [&](const char* name) -> int {
+      int id = mj_name2id(mj_model_, mjOBJ_JOINT, name);
+      return (id >= 0) ? mj_model_->jnt_qposadr[id] : 1;
+    };
+    qpos_thumb_addr_ = find_addr("j_thumb_fle_r");
+    qpos_index_addr_ = find_addr("j_index_fle_r");
+    qpos_mrl_addr_   = find_addr("j_mrl_fle_r");
+
+    int wrist_id = mj_name2id(mj_model_, mjOBJ_JOINT, "j_wrist_rotation");
+    has_wrist_ = (wrist_id >= 0);
+    if (has_wrist_) {
+      qpos_wrist_addr_ = mj_model_->jnt_qposadr[wrist_id];
+      ctrl_wrist_id_   = mj_name2id(mj_model_, mjOBJ_ACTUATOR, "wrist_pos_r");
+    }
   }
 
   if (!success) {
