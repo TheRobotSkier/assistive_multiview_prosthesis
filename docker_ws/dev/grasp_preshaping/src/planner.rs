@@ -1,6 +1,8 @@
 use crate::config;
 use crate::lut_helper::{Contact, FingerLUT};
 use crate::pointcloud_helper::Tsdf;
+use std::collections::HashSet;
+
 use nalgebra::{Matrix4, Vector3};
 
 #[derive(Debug, Clone)]
@@ -9,6 +11,7 @@ pub struct GraspScoreResult {
     pub alignment_score: f64,
     pub force_closure_score: f64,
     pub contact_count_score: f64,
+    pub active_contact_count: usize,
     pub found_collision: bool,
 }
 
@@ -40,10 +43,10 @@ pub struct GraspWeights {
 impl Default for GraspWeights {
     fn default() -> Self {
         Self {
-            w_probability: 1.0,
-            w_alignment: 1.0,
-            w_force_closure: 1.0,
-            w_contact_count: 1.5,
+            w_probability: config::GRASP_WEIGHT_PROBABILITY,
+            w_alignment: config::GRASP_WEIGHT_ALIGNMENT,
+            w_force_closure: config::GRASP_WEIGHT_FORCE_CLOSURE,
+            w_contact_count: config::GRASP_WEIGHT_CONTACT_COUNT,
         }
     }
 }
@@ -71,6 +74,8 @@ struct GraspSpec {
     /// Index into the LUT's max_closure_per_grasp_type array.
     /// 0 = cylindrical, 1 = pinch, 2 = lateral.
     max_closure_index: usize,
+    /// Minimum number of distinct finger groups that must have active contacts.
+    min_fingers: usize,
 }
 
 pub fn score_cylindrical(
@@ -176,6 +181,7 @@ fn cylindrical_spec() -> GraspSpec {
         ],
         min_contacts: 3,
         max_closure_index: 0,
+        min_fingers: 2,
     }
 }
 
@@ -220,6 +226,7 @@ fn pinch_spec() -> GraspSpec {
         score_contacts: vec![Contact::ThumbAbdTip, Contact::IndexTip],
         min_contacts: 2,
         max_closure_index: 1,
+        min_fingers: 2,
     }
 }
 
@@ -270,6 +277,7 @@ fn lateral_spec() -> GraspSpec {
         ],
         min_contacts: 2,
         max_closure_index: 2,
+        min_fingers: 2,
     }
 }
 
@@ -287,6 +295,7 @@ fn score_grasp(
             alignment_score: 0.0,
             force_closure_score: 0.0,
             contact_count_score: 0.0,
+            active_contact_count: 0,
             found_collision: false,
         }),
         // Start-position collision: palm or open-hand fingers already inside
@@ -306,7 +315,7 @@ fn score_grasp(
                 lo_ctrl,
                 hi_ctrl,
             );
-            let active = find_active_contacts(
+            let active_with_contacts = find_active_contacts(
                 lut,
                 tsdf,
                 base_transform,
@@ -315,6 +324,18 @@ fn score_grasp(
                 hi,
                 collision_tol,
             );
+
+            // Check finger diversity — reject grasps where contacts are
+            // concentrated on too few fingers.
+            let mut finger_set = HashSet::new();
+            for &(contact, _) in &active_with_contacts {
+                finger_set.insert(contact.finger_group());
+            }
+            if finger_set.len() < spec.min_fingers {
+                return None;
+            }
+
+            let active: Vec<_> = active_with_contacts.into_iter().map(|(_, ac)| ac).collect();
             let contact_count_score = if active.is_empty() {
                 0.0
             } else {
@@ -325,6 +346,7 @@ fn score_grasp(
                 alignment_score: compute_alignment(&active),
                 force_closure_score: compute_force_closure(&active),
                 contact_count_score,
+                active_contact_count: active.len(),
                 found_collision: true,
             })
         }
@@ -421,7 +443,7 @@ fn find_active_contacts(
     lo_ctrl: f64,
     hi_ctrl: f64,
     collision_tol: f32,
-) -> Vec<ActiveContact> {
+) -> Vec<(Contact, ActiveContact)> {
     let mut active = Vec::new();
     let threshold = collision_tol * 2.0;
 
@@ -447,10 +469,10 @@ fn find_active_contacts(
             Vector3::zeros()
         };
 
-        active.push(ActiveContact {
+        active.push((contact, ActiveContact {
             surface_normal: normal,
             force_direction: force_dir,
-        });
+        }));
     }
 
     active

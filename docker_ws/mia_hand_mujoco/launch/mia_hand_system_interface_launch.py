@@ -38,6 +38,7 @@ def launch_fun(context, *args, **kwargs):
     depth_output_dir = LaunchConfiguration('depth_output_dir')
     depth_publish_tf = LaunchConfiguration('depth_publish_tf').perform(context)
     depth_camera_frame_convention = LaunchConfiguration('depth_camera_frame_convention').perform(context)
+    depth_match_tolerance = LaunchConfiguration('depth_match_tolerance')
     tf_publish_hz = LaunchConfiguration('tf_publish_hz')
     enable_preshaping_service = LaunchConfiguration('enable_preshaping_service')
 
@@ -214,6 +215,7 @@ def launch_fun(context, *args, **kwargs):
             'laterality': laterality,
             'prefix': prefix,
             'camera_frame_convention': camera_frame_convention,
+            'depth_match_tolerance': depth_match_tolerance,
         }],
         condition = IfCondition(TextSubstitution(text = str(start_scene_state_publisher).lower())),
     )
@@ -412,6 +414,15 @@ def generate_launch_description():
                     'scene:=dynamic forces ros_optical so the camera frame is TF-consistent.'
     )
 
+    depth_match_tolerance_arg = DeclareLaunchArgument(
+        'depth_match_tolerance',
+        default_value='0.01',
+        description='Maximum allowed difference (meters) between a point\'s depth and the '
+                    'ray-cast distance to the target geom. Points exceeding this tolerance '
+                    'are assumed to originate from a closer geometry (e.g. the hand) and are '
+                    'filtered out. Set to 0.0 to disable the depth check.'
+    )
+
     tf_publish_hz_arg = DeclareLaunchArgument(
         'tf_publish_hz',
         default_value='30.0',
@@ -451,6 +462,7 @@ def generate_launch_description():
         depth_output_dir_arg,
         depth_publish_tf_arg,
         depth_camera_frame_convention_arg,
+        depth_match_tolerance_arg,
         tf_publish_hz_arg,
         enable_preshaping_service_arg,
         OpaqueFunction(function = launch_fun)

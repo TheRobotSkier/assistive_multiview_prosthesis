@@ -115,10 +115,12 @@ def load_dump(path: str) -> dict:
     pose = data["input_pose"]
     twist = data["input_twist"]
 
-    # Backward-compatible: handle 24-col, 25-col, and 26-col formats
+    # Backward-compatible: handle 24-col, 25-col, 26-col, and 27-col formats
     raw_len = len(data["scored_grasps"])
     if raw_len > 0:
-        if raw_len % 26 == 0:
+        if raw_len % 27 == 0:
+            row_len = 27
+        elif raw_len % 26 == 0:
             row_len = 26
         elif raw_len % 25 == 0:
             row_len = 25
@@ -126,10 +128,10 @@ def load_dump(path: str) -> dict:
             row_len = 24
         grasps_raw = data["scored_grasps"].reshape(-1, row_len)
     else:
-        row_len = 26
+        row_len = 27
         grasps_raw = np.zeros((0, row_len))
 
-    if row_len == 26:
+    if row_len == 27:
         grasps = {
             "sample_index": grasps_raw[:, 0].astype(int),
             "grasp_type": grasps_raw[:, 1].astype(int),
@@ -137,6 +139,22 @@ def load_dump(path: str) -> dict:
             "alignment": grasps_raw[:, 3],
             "force_closure": grasps_raw[:, 4],
             "contact_count_score": grasps_raw[:, 5],
+            "active_contact_count": grasps_raw[:, 6].astype(int),
+            "found_collision": grasps_raw[:, 7] > 0.5,
+            "combined": grasps_raw[:, 8],
+            "probability": grasps_raw[:, 9],
+            "wrist_rotation": grasps_raw[:, 10],
+            "pose_4x4": grasps_raw[:, 11:27].reshape(-1, 4, 4),
+        }
+    elif row_len == 26:
+        grasps = {
+            "sample_index": grasps_raw[:, 0].astype(int),
+            "grasp_type": grasps_raw[:, 1].astype(int),
+            "closure": grasps_raw[:, 2],
+            "alignment": grasps_raw[:, 3],
+            "force_closure": grasps_raw[:, 4],
+            "contact_count_score": grasps_raw[:, 5],
+            "active_contact_count": np.zeros(len(grasps_raw), dtype=int),
             "found_collision": grasps_raw[:, 6] > 0.5,
             "combined": grasps_raw[:, 7],
             "probability": grasps_raw[:, 8],
@@ -151,6 +169,7 @@ def load_dump(path: str) -> dict:
             "alignment": grasps_raw[:, 3],
             "force_closure": grasps_raw[:, 4],
             "contact_count_score": grasps_raw[:, 5],
+            "active_contact_count": np.zeros(len(grasps_raw), dtype=int),
             "found_collision": grasps_raw[:, 6] > 0.5,
             "combined": grasps_raw[:, 7],
             "probability": grasps_raw[:, 8],
@@ -166,6 +185,7 @@ def load_dump(path: str) -> dict:
             "alignment": grasps_raw[:, 3],
             "force_closure": grasps_raw[:, 4],
             "contact_count_score": np.zeros(len(grasps_raw)),
+            "active_contact_count": np.zeros(len(grasps_raw), dtype=int),
             "found_collision": grasps_raw[:, 5] > 0.5,
             "combined": grasps_raw[:, 6],
             "probability": grasps_raw[:, 7],
@@ -299,7 +319,8 @@ def print_summary(dump: dict, path: str):
     if best_idx >= 0:
         gt = grasps["grasp_type"][best_idx]
         print(f"  Best grasp:      {GRASP_TYPE_NAMES.get(gt, '?')} (type {gt})")
-        print(f"    closure={grasps['closure'][best_idx]:.4f}"
+        print(f"    contacts={grasps['active_contact_count'][best_idx]}"
+              f"  closure={grasps['closure'][best_idx]:.4f}"
               f"  alignment={grasps['alignment'][best_idx]:.4f}"
               f"  force_closure={grasps['force_closure'][best_idx]:.4f}"
               f"  combined={grasps['combined'][best_idx]:.4f}"

@@ -184,6 +184,34 @@ pub enum Contact {
     PalmDistRadi,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FingerGroup {
+    Thumb,
+    Index,
+    Middle,
+    Ring,
+    Little,
+    Palm,
+}
+
+impl Contact {
+    pub fn finger_group(self) -> FingerGroup {
+        match self {
+            Contact::ThumbAddPip | Contact::ThumbAddDip | Contact::ThumbAddTip
+            | Contact::ThumbAbdPip | Contact::ThumbAbdDip | Contact::ThumbAbdTip => FingerGroup::Thumb,
+            Contact::IndexPip | Contact::IndexPipSide | Contact::IndexMcp
+            | Contact::IndexMcpSide | Contact::IndexDip | Contact::IndexDipSide
+            | Contact::IndexTip | Contact::IndexTipSide => FingerGroup::Index,
+            Contact::MiddleMcp | Contact::MiddlePip | Contact::MiddleDip
+            | Contact::MiddleTip => FingerGroup::Middle,
+            Contact::RingDip | Contact::RingPip | Contact::RingTip => FingerGroup::Ring,
+            Contact::LittleDip | Contact::LittlePip | Contact::LittleTip => FingerGroup::Little,
+            Contact::PalmProxUlna | Contact::PalmProxRadi
+            | Contact::PalmDistUlna | Contact::PalmDistRadi => FingerGroup::Palm,
+        }
+    }
+}
+
 // Thumb has two opposing modes: Adduction (lateral key-grip) and Abduction
 // (opposition, cylindrical/pinch).  The LUT stores separate tables for each.
 #[derive(Debug, Clone, Copy)]
