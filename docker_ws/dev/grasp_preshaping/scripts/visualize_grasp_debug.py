@@ -16,7 +16,7 @@ Keyboard shortcuts (PyVista viewer):
     p  - toggle point cloud
     r  - toggle ROI box
     c  - toggle camera markers
-    h  - toggle hand skeleton (best grasp, requires pinocchio + URDF)
+    h  - toggle hand skeleton (unified)
     i  - toggle info text
     1  - filter grasps: cylindrical only
     2  - filter grasps: pinch only
@@ -45,36 +45,17 @@ F32_MAX = np.float32(np.finfo(np.float32).max)
 # Truncation constant (must match config.rs TRUNCATION_CELLS).
 TRUNCATION_CELLS = 4
 
-# Hand skeleton frame connectivity: (parent, child, finger) triples.
-# Each triple draws a line between two link frames and colors by finger group.
-#
-# Simple model: thumb, index, middle — 1 joint + tip each.
-# Used when grasp_mode == "all" (many grasps, lower visual clutter).
-_FRAME_EDGES_SIMPLE = [
-    ("mia_palm", "mia_thumb_opp", "thumb"),
-    ("mia_thumb_opp", "mia_thumb_fle", "thumb"),
-    ("mia_thumb_fle", "mia_thumb_sensor", "thumb"),
-    ("mia_palm", "mia_index_fle", "index"),
-    ("mia_index_fle", "mia_index_sensor", "index"),
-    ("mia_palm", "mia_middle_fle", "middle"),
-    ("mia_middle_fle", "mia_middle_sensor", "middle"),
+# Unified hand skeleton: one compact topology for both best and all modes.
+# Each entry is (finger name, base frame name, tip contact name).
+_HAND_SKELETON_SPECS = [
+    ("thumb", "mia_thumb_opp", "ThumbAddTip"),
+    ("index", "mia_index_fle", "IndexTip"),
+    ("middle", "mia_middle_fle", "MiddleTip"),
+    ("ring", "mia_ring_fle", "RingTip"),
+    ("little", "mia_little_fle", "LittleTip"),
 ]
 
-# Full model: all 5 fingers — 2 joints + tip where available.
-# Used when grasp_mode == "best" (single grasp, highest detail).
-_FRAME_EDGES_FULL = [
-    ("mia_palm", "mia_thumb_opp", "thumb"),
-    ("mia_thumb_opp", "mia_thumb_fle", "thumb"),
-    ("mia_thumb_fle", "mia_thumb_sensor", "thumb"),
-    ("mia_palm", "mia_index_fle", "index"),
-    ("mia_index_fle", "mia_index_sensor", "index"),
-    ("mia_palm", "mia_middle_fle", "middle"),
-    ("mia_middle_fle", "mia_middle_sensor", "middle"),
-    ("mia_palm", "mia_ring_fle", "ring"),
-    ("mia_palm", "mia_little_fle", "little"),
-]
-
-# Finger group coloring for hand skeleton lines (all 5 fingers).
+# Finger group coloring for hand skeleton lines/markers.
 FINGER_COLORS = {
     "thumb": "#f4a261",
     "index": "#e76f51",
@@ -83,25 +64,11 @@ FINGER_COLORS = {
     "little": "#8d99ae",
 }
 
-# Simplified color set for the 3-finger simple model.
-FINGER_COLORS_SIMPLE = {
-    "thumb": "#f4a261",
-    "index": "#e76f51",
-    "middle": "#2a9d8f",
-}
+# Map finger name -> base frame for FK lookup.
+_HAND_BASE_FRAMES = {finger: base for finger, base, _ in _HAND_SKELETON_SPECS}
 
-# Map child frame name -> finger group for coloring.
-_FRAME_TO_FINGER = {
-    "mia_thumb_opp": "thumb",
-    "mia_thumb_fle": "thumb",
-    "mia_thumb_sensor": "thumb",
-    "mia_index_fle": "index",
-    "mia_index_sensor": "index",
-    "mia_middle_fle": "middle",
-    "mia_middle_sensor": "middle",
-    "mia_ring_fle": "ring",
-    "mia_little_fle": "little",
-}
+# Map finger name -> contact tip name.
+_HAND_TIP_CONTACTS = {finger: tip for finger, _, tip in _HAND_SKELETON_SPECS}
 
 # Try to import pinocchio + model for hand skeleton support.
 _pin_hand_available = False
@@ -115,6 +82,7 @@ try:
         data as pin_data,
         get_q_full,
         _q_full_with_thumb_mode,
+        CONTACT_DEFINITIONS,
         COLLISION_GEOMETRIES,
     )
     import pinocchio as pin
@@ -696,44 +664,40 @@ def visualize_pyvista(dump: dict, args):
     add_grasp_actors()
 
     # ==================================================================
-    # Hand skeleton (URDF-based, requires pinocchio)
-    # Two models: simple (3 fingers, all mode) and full (5 fingers, best mode).
-    # Pre-resolve frame IDs and finger groups for both edge lists.
+    # Hand skeleton (compact unified model, requires pinocchio)
+    # One topology for both best/all modes: finger base marker + fingertip marker.
     # ==================================================================
     if _pin_hand_available:
-        # Resolve simple model edges: (pid, cid, finger_name)
-        _frame_edges_simple_resolved = []
-        for parent_name, child_name, finger in _FRAME_EDGES_SIMPLE:
-            pid = pin_model.getFrameId(parent_name)
-            cid = pin_model.getFrameId(child_name)
-            if pid < pin_model.nframes and cid < pin_model.nframes:
-                _frame_edges_simple_resolved.append((pid, cid, finger))
+        _hand_specs_resolved = []
+        for finger, base_name, tip_name in _HAND_SKELETON_SPECS:
+            base_id = pin_model.getFrameId(base_name)
+            if base_id < pin_model.nframes:
+                _hand_specs_resolved.append((finger, base_id, tip_name))
             else:
-                print(f"  WARNING: frame not found: parent={parent_name} (id={pid}), child={child_name} (id={cid})")
-        
-        # Resolve full model edges: (pid, cid, finger_name)
-        _frame_edges_full_resolved = []
-        for parent_name, child_name, finger in _FRAME_EDGES_FULL:
-            pid = pin_model.getFrameId(parent_name)
-            cid = pin_model.getFrameId(child_name)
-            if pid < pin_model.nframes and cid < pin_model.nframes:
-                _frame_edges_full_resolved.append((pid, cid, finger))
-            else:
-                print(f"  WARNING: frame not found: parent={parent_name} (id={pid}), child={child_name} (id={cid})")
-        
-        print(f"  Hand skeleton: pinocchio + URDF loaded ({len(_frame_edges_full_resolved)} frame edges)")
+                print(f"  WARNING: frame not found: base={base_name} (id={base_id}), tip={tip_name}")
+
+        print(f"  Hand skeleton: pinocchio + unified contact model loaded ({len(_hand_specs_resolved)} fingers)")
     else:
-        _frame_edges_simple_resolved = []
-        _frame_edges_full_resolved = []
+        _hand_specs_resolved = []
         print("  Hand skeleton: unavailable (pinocchio or URDF not found)")
 
-    def _compute_hand_positions(grasp_idx, edges_with_finger):
-        """Run FK and return dict[fid] -> world-space np.array of frame positions.
+    _contact_definitions_by_name = {contact["name"]: contact for contact in CONTACT_DEFINITIONS}
 
-        Args:
-            grasp_idx: index into the grasps dict
-            edges_with_finger: list of (pid, cid, finger_name) resolved frame ID pairs
-        """
+    def _contact_position_in_hand_frame(contact_name):
+        """Return the contact position in the hand base frame for the current q."""
+        contact = _contact_definitions_by_name.get(contact_name)
+        if contact is None:
+            return None
+
+        geom_info = COLLISION_GEOMETRIES[contact["geom"]]
+        m_joint = pin_data.oMi[geom_info["joint_id"]]
+        m_geom_world = m_joint * geom_info["placement"]
+        return (
+            m_geom_world.translation + m_geom_world.rotation @ contact["local_offset"]
+        ).astype(np.float64)
+
+    def _compute_hand_positions(grasp_idx):
+        """Run FK and return the compact hand markers in world coordinates."""
         gt = grasps["grasp_type"][grasp_idx]
         T = grasps["pose_4x4"][grasp_idx]
         closure = grasps["closure"][grasp_idx]
@@ -744,11 +708,11 @@ def visualize_pyvista(dump: dict, args):
         pin.updateFramePlacements(pin_model, pin_data)
 
         positions = {}
-        for pid, cid, _ in edges_with_finger:
-            if pid not in positions:
-                positions[pid] = pin_data.oMf[pid].translation.copy().astype(np.float64)
-            if cid not in positions:
-                positions[cid] = pin_data.oMf[cid].translation.copy().astype(np.float64)
+        for finger, base_id, tip_name in _hand_specs_resolved:
+            positions[f"{finger}_base"] = pin_data.oMf[base_id].translation.copy().astype(np.float64)
+            tip_pos = _contact_position_in_hand_frame(tip_name)
+            if tip_pos is not None:
+                positions[f"{finger}_tip"] = tip_pos
 
         # Transform to world frame via grasp pose.
         R, t = T[:3, :3], T[:3, 3]
@@ -757,52 +721,108 @@ def visualize_pyvista(dump: dict, args):
 
         return positions
 
-    def _add_single_hand(frame_positions, edges_with_finger, finger_colors, opacity, line_width, sphere_radius):
-        """Render one hand skeleton given precomputed frame positions.
+    def _hex_to_rgb01(hex_color):
+        hex_color = hex_color.lstrip("#")
+        return np.array(
+            [
+                int(hex_color[0:2], 16) / 255.0,
+                int(hex_color[2:4], 16) / 255.0,
+                int(hex_color[4:6], 16) / 255.0,
+            ],
+            dtype=np.float32,
+        )
 
-        Args:
-            frame_positions: dict[fid] -> world-space np.array
-            edges_with_finger: list of (pid, cid, finger_name) resolved frame ID pairs
-            finger_colors: dict mapping finger name -> hex color string
-            opacity: float, actor opacity
-            line_width: int, PyVista line width
-            sphere_radius: float, sphere radius in scene units
-        """
-        drawn_frames = set()
-        for pid, cid, finger in edges_with_finger:
-            p_pos = frame_positions.get(pid)
-            c_pos = frame_positions.get(cid)
+    def _add_single_hand(frame_positions, opacity, line_width, point_size, render_points_as_spheres):
+        """Render one compact hand skeleton with a single line/point actor pair."""
+        points = []
+        point_colors = []
+        line_cells = []
+
+        for finger, _, _ in _hand_specs_resolved:
+            base_key = f"{finger}_base"
+            tip_key = f"{finger}_tip"
+            p_pos = frame_positions.get(base_key)
+            c_pos = frame_positions.get(tip_key)
             if p_pos is None or c_pos is None:
                 continue
 
-            line_color = finger_colors.get(finger, "#f4a261")
+            color = FINGER_COLORS.get(finger, "#f4a261")
+            rgb = _hex_to_rgb01(color)
 
-            # Line between parent and child.
-            line = pv.Line(p_pos, c_pos)
+            start_idx = len(points)
+            points.extend([p_pos, c_pos])
+            point_colors.extend([rgb, rgb])
+            line_cells.append([2, start_idx, start_idx + 1])
+
+        if not points:
+            return
+
+        pts = pv.PolyData(np.asarray(points, dtype=np.float64))
+        pts["colors"] = np.asarray(point_colors, dtype=np.float32)
+        actor = plotter.add_mesh(
+            pts,
+            scalars="colors",
+            rgb=True,
+            style="points",
+            point_size=point_size,
+            render_points_as_spheres=render_points_as_spheres,
+            opacity=opacity,
+        )
+        actor_groups["hand_skeleton"].append(actor)
+
+        lines = pv.PolyData(np.asarray(points, dtype=np.float64))
+        lines.lines = np.hstack(line_cells)
+        actor = plotter.add_mesh(
+            lines,
+            color="#c9d1d9",
+            line_width=line_width,
+            opacity=min(0.7, opacity),
+            label="Hand skeleton",
+        )
+        actor_groups["hand_skeleton"].append(actor)
+
+        thumb_base = frame_positions.get("thumb_base")
+        palm_connectors = []
+        if thumb_base is not None:
+            thumb_pos = np.asarray(thumb_base, dtype=np.float64)
+            connector_order = ["index", "middle", "ring", "little"]
+            prev_pos = thumb_pos
+            for finger in connector_order:
+                base_pos = frame_positions.get(f"{finger}_base")
+                if base_pos is None:
+                    continue
+                palm_connectors.extend([
+                    prev_pos,
+                    np.asarray(base_pos, dtype=np.float64),
+                ])
+                prev_pos = np.asarray(base_pos, dtype=np.float64)
+
+            if thumb_pos is not None:
+                for finger in connector_order:
+                    base_pos = frame_positions.get(f"{finger}_base")
+                    if base_pos is None:
+                        continue
+                    palm_connectors.extend([thumb_pos, np.asarray(base_pos, dtype=np.float64)])
+
+        if palm_connectors:
+            connector_points = np.asarray(palm_connectors, dtype=np.float64)
+            connector_cells = np.hstack(
+                [[2, i, i + 1] for i in range(0, len(connector_points), 2)]
+            )
+            connectors = pv.PolyData(connector_points)
+            connectors.lines = connector_cells
             actor = plotter.add_mesh(
-                line, color=line_color, line_width=line_width, opacity=opacity,
+                connectors,
+                color="#d8dee9",
+                line_width=max(1, line_width - 1),
+                opacity=min(0.28, opacity),
             )
             actor_groups["hand_skeleton"].append(actor)
-
-            # Sphere at child frame.
-            if cid not in drawn_frames:
-                sphere = pv.Sphere(radius=sphere_radius, center=c_pos)
-                actor = plotter.add_mesh(sphere, color=line_color, opacity=opacity)
-                actor_groups["hand_skeleton"].append(actor)
-                drawn_frames.add(cid)
-
-            # Sphere at parent frame.
-            if pid not in drawn_frames:
-                sphere = pv.Sphere(radius=sphere_radius, center=p_pos)
-                actor = plotter.add_mesh(sphere, color=line_color, opacity=opacity)
-                actor_groups["hand_skeleton"].append(actor)
-                drawn_frames.add(pid)
 
     def add_hand_skeletons():
         """Render hand skeletons based on current grasp mode.
 
-        - best mode: single full hand for the best grasp
-        - all mode: simple hands for all visible grasps
+        Both modes use the same compact topology; only styling changes.
         """
         actor_groups["hand_skeleton"].clear()
         if not _pin_hand_available:
@@ -813,26 +833,30 @@ def visualize_pyvista(dump: dict, args):
             return
 
         mode = state["grasp_mode"]
-
         if mode == "best":
-            # Single full model for the best grasp.
-            i = indices[0] if indices else None
-            if i is None or not grasps["found_collision"][i]:
+            i = indices[0]
+            if not grasps["found_collision"][i]:
                 return
-            positions = _compute_hand_positions(i, _frame_edges_full_resolved)
-            _add_single_hand(positions, _frame_edges_full_resolved, FINGER_COLORS,
-                            opacity=0.9, line_width=4,
-                            sphere_radius=scene_extent * 0.015)
-
+            positions = _compute_hand_positions(i)
+            _add_single_hand(
+                positions,
+                opacity=0.72,
+                line_width=4,
+                point_size=12,
+                render_points_as_spheres=True,
+            )
         elif mode == "all":
-            # Simple model for each visible grasp.
             for i in indices:
                 if not grasps["found_collision"][i]:
                     continue
-                positions = _compute_hand_positions(i, _frame_edges_simple_resolved)
-                _add_single_hand(positions, _frame_edges_simple_resolved, FINGER_COLORS_SIMPLE,
-                                opacity=0.6, line_width=2,
-                                sphere_radius=scene_extent * 0.010)
+                positions = _compute_hand_positions(i)
+                _add_single_hand(
+                    positions,
+                    opacity=0.35,
+                    line_width=2,
+                    point_size=8,
+                    render_points_as_spheres=False,
+                )
 
     add_hand_skeletons()
 
@@ -850,7 +874,7 @@ def visualize_pyvista(dump: dict, args):
         n_shown = len(indices)
 
         tsdf_str = state["tsdf_mode"]
-        hand_str = "full" if state["grasp_mode"] == "best" else "simple"
+        hand_str = "unified"
 
         lines = [
             f"Grasps: {n_shown} shown (mode={mode_str}, threshold>={threshold:.2f})",
@@ -889,7 +913,7 @@ def visualize_pyvista(dump: dict, args):
         ("Cylindrical", GRASP_TYPE_COLORS[1]),
         ("Pinch", GRASP_TYPE_COLORS[2]),
         ("Lateral", GRASP_TYPE_COLORS[3]),
-        ("Hand: full (best)", "#f4a261"),
+        ("Hand: unified", "#f4a261"),
     ]
     plotter.add_legend(legend_entries, size=(0.18, 0.22), loc="upper left",
                        face="rectangle")
@@ -923,7 +947,7 @@ def visualize_pyvista(dump: dict, args):
             plotter.remove_actor(actor)
         actor_groups["grasps"].clear()
         add_grasp_actors()
-        # Hand model may change between best/all, so rebuild it too.
+        # Hand model stays unified across modes; rebuild it to refresh positions.
         for actor in actor_groups["hand_skeleton"]:
             plotter.remove_actor(actor)
         actor_groups["hand_skeleton"].clear()
@@ -1003,7 +1027,7 @@ def visualize_pyvista(dump: dict, args):
         print("  p  - toggle point cloud")
         print("  r  - toggle ROI box")
         print("  c  - toggle camera markers")
-        print("  h  - toggle hand skeleton (best=full, all=simple)")
+        print("  h  - toggle hand skeleton (unified)")
         print("  i  - toggle info text")
         print("  1  - filter: cylindrical only")
         print("  2  - filter: pinch only")
@@ -1119,7 +1143,7 @@ def main():
               t  cycle TSDF: surface/points/off
               g  toggle grasp mode (best/all)
               p  toggle point cloud      r  toggle ROI box
-              c  toggle cameras          h  toggle hand skeleton
+              c  toggle cameras          h  toggle hand skeleton (unified)
               i  toggle info text        0-3  filter grasp types
               ?  print help
         """),
