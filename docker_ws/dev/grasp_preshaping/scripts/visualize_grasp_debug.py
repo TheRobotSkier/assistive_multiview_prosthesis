@@ -233,7 +233,7 @@ def print_summary(dump: dict, path: str):
           f" {roi[1,2]-roi[0,2]:.3f}) m")
     print(f"  Cameras:         {len(dump['cameras'])}")
     pose = dump["input_pose"]
-    print(f"  Input pose:      pos=({pose[0]:.3f}, {pose[1]:.3f}, {pose[2]:.3f})"
+    print(f"  Input pose (TF): pos=({pose[0]:.3f}, {pose[1]:.3f}, {pose[2]:.3f})"
           f"  quat=({pose[3]:.3f}, {pose[4]:.3f}, {pose[5]:.3f}, {pose[6]:.3f})")
     twist = dump["input_twist"]
     print(f"  Input twist:     lin=({twist[0]:.3f}, {twist[1]:.3f}, {twist[2]:.3f})"
@@ -278,6 +278,8 @@ TSDF_MODES = ["surface", "points", "off"]
 def visualize_pyvista(dump: dict, args):
     """Full interactive 3D visualization using PyVista."""
     import pyvista as pv
+
+    pv.global_theme.font.color = 'white'
 
     tsdf = dump["tsdf"]
     origin = dump["tsdf_origin"]
@@ -385,8 +387,9 @@ def visualize_pyvista(dump: dict, args):
                 show_scalar_bar=True,
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
-                    "position_x": 0.05,
-                    "position_y": 0.05,
+                    # position the scalar bar centered at the bottom of the view
+                    "position_x": 0.35,
+                    "position_y": 0.02,
                     "width": 0.3,
                     "height": 0.05,
                 },
@@ -419,8 +422,9 @@ def visualize_pyvista(dump: dict, args):
                 show_scalar_bar=True,
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
-                    "position_x": 0.05,
-                    "position_y": 0.05,
+                    # position the scalar bar centered at the bottom of the view
+                    "position_x": 0.35,
+                    "position_y": 0.02,
                     "width": 0.3,
                     "height": 0.05,
                 },
@@ -556,7 +560,9 @@ def visualize_pyvista(dump: dict, args):
     best_idx, best_combined = _find_best_grasp(grasps, threshold)
 
     def get_grasp_indices():
-        """Compute which grasp indices to show based on current state."""
+        """Compute which grasp indices to show based on current state.
+        Returns a tuple: (all_valid_indices, top_displayed_indices)
+        """
         candidates = []
         for i in range(n_grasps):
             if not grasps["found_collision"][i]:
@@ -569,69 +575,48 @@ def visualize_pyvista(dump: dict, args):
                     continue
             candidates.append(i)
 
+        # Sort descending by score for top 10 extraction
+        candidates.sort(key=lambda i: grasps["combined"][i], reverse=True)
+
         if state["grasp_mode"] == "best":
             if best_idx >= 0 and best_idx in candidates:
-                return [best_idx]
+                return [best_idx], [best_idx]
             elif candidates:
-                return [candidates[0]]  # best available
-            return []
+                return [candidates[0]], [candidates[0]]  # best available
+            return [], []
 
         # "all"
-        return candidates
+        return candidates, candidates[:10]
 
     def add_grasp_actors():
         actor_groups["grasps"].clear()
 
-        indices = get_grasp_indices()
-        if not indices:
+        all_indices, top_indices = get_grasp_indices()
+        if not all_indices:
             return
 
-        # Compute score range for size scaling
-        scores = [grasps["combined"][i] for i in indices]
-        score_min = min(scores) if scores else 0
-        score_max = max(scores) if scores else 1
-        score_range = score_max - score_min if score_max > score_min else 1.0
-
-        # Collect positions, colors, sizes, and Z-axis directions for batch rendering.
+        # Render the current grasp set as a single point cloud for context.
         positions = []
-        z_dirs = []
-        z_lens = []
         point_colors = []
-        point_sizes = []
 
-        for rank, i in enumerate(indices):
+        for i in all_indices:
             gt = grasps["grasp_type"][i]
             is_best = (i == best_idx)
             T = grasps["pose_4x4"][i]
-            pos = T[:3, 3]
-            R = T[:3, :3]
-            score = grasps["combined"][i]
+            positions.append(T[:3, 3])
 
-            score_norm = (score - score_min) / score_range if score_range > 0 else 1.0
-
-            positions.append(pos)
-
-            # Z-axis direction (approach direction)
-            z_dir = R[:, 2]
-            z_dirs.append(z_dir)
-            z_lens.append(marker_size * (1.2 if is_best else 0.2 + 0.4 * score_norm))
-
-            # Color by grasp type, gold for best
             if is_best:
                 point_colors.append([1.0, 0.84, 0.0])  # gold
-                point_sizes.append(20)
             else:
                 hex_color = GRASP_TYPE_COLORS.get(gt, "#ffffff")
                 r_c = int(hex_color[1:3], 16) / 255.0
                 g_c = int(hex_color[3:5], 16) / 255.0
                 b_c = int(hex_color[5:7], 16) / 255.0
                 point_colors.append([r_c, g_c, b_c])
-                point_sizes.append(4 + 14 * score_norm)
 
         positions = np.array(positions)
         point_colors = np.array(point_colors)
 
-        # Render all grasp positions as a single point cloud.
         grasp_cloud = pv.PolyData(positions)
         grasp_cloud["colors"] = point_colors
         actor = plotter.add_mesh(
@@ -639,25 +624,55 @@ def visualize_pyvista(dump: dict, args):
             scalars="colors",
             rgb=True,
             style="points",
-            point_size=12,
+            point_size=4 if state["grasp_mode"] == "all" else 10,
             render_points_as_spheres=True,
-            label=f"Grasps ({len(indices)})",
+            label=f"Grasps ({len(all_indices)})",
         )
         actor_groups["grasps"].append(actor)
 
-        # Render Z-axis arrows as lines.
-        for idx in range(len(positions)):
-            start = positions[idx]
-            end = start + z_dirs[idx] * z_lens[idx]
-            line = pv.Line(start, end)
-            is_best = (indices[idx] == best_idx)
-            line_color = "gold" if is_best else GRASP_TYPE_COLORS.get(
-                grasps["grasp_type"][indices[idx]], "white"
-            )
+        if not top_indices:
+            return
+
+        # Compute score range for size scaling based on top displayed.
+        scores = [grasps["combined"][i] for i in top_indices]
+        score_min = min(scores) if scores else 0
+        score_max = max(scores) if scores else 1
+        score_range = score_max - score_min if score_max > score_min else 1.0
+
+        # Render top grasps as separate actors, similar to the camera markers.
+        for idx in top_indices:
+            gt = grasps["grasp_type"][idx]
+            is_best = (idx == best_idx)
+            T = grasps["pose_4x4"][idx]
+            pos = T[:3, 3]
+            R = T[:3, :3]
+            score = grasps["combined"][idx]
+
+            score_norm = (score - score_min) / score_range if score_range > 0 else 1.0
+
+            marker_radius = marker_size * (0.11 if is_best else (0.05 + 0.07 * score_norm))
+            grasp_marker = pv.Sphere(radius=marker_radius, center=pos)
+            marker_color = "gold" if is_best else GRASP_TYPE_COLORS.get(gt, "white")
             actor = plotter.add_mesh(
-                line, color=line_color,
-                line_width=3 if is_best else 1.5,
-                opacity=0.9 if is_best else 0.6,
+                grasp_marker,
+                color=marker_color,
+                opacity=0.95 if is_best else 0.75,
+            )
+            actor_groups["grasps"].append(actor)
+            
+            # Z-axis direction (approach direction)
+            z_dir = R[:, 2]
+            z_len = marker_size * (1.2 if is_best else 0.2 + 0.4 * score_norm)
+
+            start = pos
+            end = pos + z_dir * z_len
+            line = pv.Line(start, end)
+            line_color = "gold" if is_best else GRASP_TYPE_COLORS.get(gt, "white")
+            actor = plotter.add_mesh(
+                line,
+                color=line_color,
+                line_width=4 if is_best else 2,
+                opacity=0.95 if is_best else 0.7,
             )
             actor_groups["grasps"].append(actor)
 
@@ -828,28 +843,24 @@ def visualize_pyvista(dump: dict, args):
         if not _pin_hand_available:
             return
 
-        indices = get_grasp_indices()
-        if not indices:
+        all_indices, top_indices = get_grasp_indices()
+        if not top_indices:
             return
 
-        mode = state["grasp_mode"]
-        if mode == "best":
-            i = indices[0]
+        for i in top_indices:
             if not grasps["found_collision"][i]:
-                return
+                continue
+            is_best = (i == best_idx)
             positions = _compute_hand_positions(i)
-            _add_single_hand(
-                positions,
-                opacity=0.72,
-                line_width=4,
-                point_size=12,
-                render_points_as_spheres=True,
-            )
-        elif mode == "all":
-            for i in indices:
-                if not grasps["found_collision"][i]:
-                    continue
-                positions = _compute_hand_positions(i)
+            if is_best:
+                _add_single_hand(
+                    positions,
+                    opacity=0.72,
+                    line_width=4,
+                    point_size=12,
+                    render_points_as_spheres=True,
+                )
+            else:
                 _add_single_hand(
                     positions,
                     opacity=0.35,
@@ -858,7 +869,8 @@ def visualize_pyvista(dump: dict, args):
                     render_points_as_spheres=False,
                 )
 
-    add_hand_skeletons()
+    if state["show_hand"]:
+        add_hand_skeletons()
 
     # ==================================================================
     # Info text
@@ -870,14 +882,15 @@ def visualize_pyvista(dump: dict, args):
         if state["grasp_type_filter"] != 0:
             mode_str += f" ({GRASP_TYPE_SHORT.get(state['grasp_type_filter'], '?')})"
 
-        indices = get_grasp_indices()
-        n_shown = len(indices)
+        all_indices, top_indices = get_grasp_indices()
+        n_shown = len(all_indices)
+        n_top = len(top_indices)
 
         tsdf_str = state["tsdf_mode"]
         hand_str = "unified"
 
         lines = [
-            f"Grasps: {n_shown} shown (mode={mode_str}, threshold>={threshold:.2f})",
+            f"Grasps: {n_shown} points, top {n_top} rendered (mode={mode_str}, threshold>={threshold:.2f})",
         ]
         if best_idx >= 0:
             gt = grasps["grasp_type"][best_idx]
@@ -951,7 +964,8 @@ def visualize_pyvista(dump: dict, args):
         for actor in actor_groups["hand_skeleton"]:
             plotter.remove_actor(actor)
         actor_groups["hand_skeleton"].clear()
-        add_hand_skeletons()
+        if state["show_hand"]:
+            add_hand_skeletons()
         update_info_text()
         plotter.render()
 
@@ -975,8 +989,8 @@ def visualize_pyvista(dump: dict, args):
 
     def on_key_g():
         """Toggle grasp display mode between best and all."""
-        current = state["grasp_mode"]
-        state["grasp_mode"] = "all" if current == "best" else "best"
+        state["grasp_mode"] = "all" if state["grasp_mode"] == "best" else "best"
+        state["show_hand"] = False  # Reset hand visibility to hidden on mode switch
         print(f"  Grasp mode: {state['grasp_mode']}")
         rebuild_grasps()
 
@@ -991,11 +1005,18 @@ def visualize_pyvista(dump: dict, args):
 
     def on_key_h():
         """Toggle hand skeleton(s)."""
-        if actor_groups["hand_skeleton"]:
-            toggle_actors("hand_skeleton")
+        state["show_hand"] = not state["show_hand"]
+        if state["show_hand"]:
+            if not actor_groups["hand_skeleton"]:
+                add_hand_skeletons()
+            else:
+                for actor in actor_groups["hand_skeleton"]:
+                    actor.SetVisibility(True)
         else:
-            add_hand_skeletons()
-            plotter.render()
+            for actor in actor_groups["hand_skeleton"]:
+                actor.SetVisibility(False)
+        update_info_text()
+        plotter.render()
 
     def on_key_i():
         toggle_actors("info")
@@ -1097,7 +1118,7 @@ def visualize_matplotlib(dump: dict, args):
 
     # Draw input pose
     pose = dump["input_pose"]
-    ax.scatter(*pose[0:3], c="black", s=80, marker="^", label="Hand pose")
+    ax.scatter(*pose[0:3], c="black", s=80, marker="^", label="Hand pose (TF)")
 
     ax.set_xlabel("X [m]")
     ax.set_ylabel("Y [m]")

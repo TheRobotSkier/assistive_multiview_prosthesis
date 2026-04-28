@@ -69,10 +69,6 @@ The TSDF enables extremely fast distance and gradient queries. The optimization 
 
 - **Wrist orientation handling** – Currently, the solver only searches across perturbations in hand position, time, and grasp type. Extending this to include wrist orientation would align better with the realworld hardware. The approach should sample randomly across all dimensions and not do per dimensions sampling, to get better spread and parrelalism. The program should return wrist orientation as part of the output, and the ROS node should publish it as well.
 
-- **Rayon** - Take a look at anything that could be parallelized with rayon, such as the perturbation search and evaluation.
-
-- **Trajectory simulation** - There is a compose service that should simulate more realistic approch behavior, usually the grasp preshaping planenr service would be run when the hand is in motion, and then imediatly rotate the wrist, and close the hand in the selected grasp type by some percentage configured in config.rs. Then when the hand is starting to approch the calcualted grasp position, it starts closing fully. My imidiate way to solve this would be to make some sort of cluster with a threshold also defined in config.rs where aa soon as we approch grasp positions that are deemed succesful even in other wrist and grasp types, then we begin closing. You have to imagine a user moving the arm, and essentially being able to see the grasp starting to close, and being able to finetune the position where they close around the object. Tell me what you think of an approch like this, or if i am missing some obvious way to do it simpler. Another idea i had was to just have a distance threshold from selected grasp position defined in config.rs, and then as soon as we are within that distance, we start closing. Try also examine how to integrate theis into the sim. I imagine starting with the hand_trajectory_node would make sense.
-
 - **Asymetric clipping** - The Rust can currently do assymetric clipping, of the tsdf. This may be a good thing, but is want to understand if there are any issues with the current implementation. My original plan was to scale it to the roi, but then again if there is not data then why takup the whole roi? Examine the two options, and see if there are any implications of either.
 
 - **Collisions in start position** - I have observed some issues where there are collisions in the start position, and it seems to me like the expected behavior would be to invalidate this starting position, and instead use ones that are not in collision.
@@ -81,5 +77,17 @@ The TSDF enables extremely fast distance and gradient queries. The optimization 
 
 - **TSDF sign calculation** - I observed an issue where if 2 cameras are looking at the object from opposite sides, then the sign calculation can get messed up, and it seems to me like the expected behavior would be that we need to check if there are any occlusions from any of the cameras inrealtion to seeing the point. Since i belive we first make the TDF, i have a suspicions we can do some smarter calculations to get the sign, liek checking if any of the voxels along the ray from the camera to the point are occupied, and if they are then we can mark it as outside, and if they are not then we can mark it as inside. Then we would also need to deal with multiple cameras, but i think we already do that well. Tell me what you think about this approch.
 
+- **Rayon** - (Not as important as other tasks.) Take a look at anything that could be parallelized with rayon, such as the perturbation search and evaluation.
+
+## TODO Sim
+
+- **Trajectory simulation** - There is a compose service that should simulate more realistic approch behavior, usually the grasp preshaping planner service would be run when the hand is in motion, and then imediatly rotate the wrist, and close the hand in the selected grasp type by some percentage configured in config.rs. Then when the hand is starting to approch the calcualted grasp position, it starts closing fully. My imidiate way to solve this would be to make some sort of cluster with a threshold also defined in config.rs where a soon as we approch grasp positions that are deemed succesful even in other wrist and grasp types, then we begin closing. You have to imagine a user moving the arm, and essentially being able to see the grasp starting to close, and being able to finetune the position where they close around the object. Tell me what you think of an approch like this, or if i am missing some obvious way to do it simpler. Another idea i had was to just have a distance threshold from selected grasp position defined in config.rs, and then as soon as we are within that distance, we start closing. Try also examine how to integrate theis into the sim. I imagine starting with the hand_trajectory_node would make sense.
+
 ## Maybe TODO
 - **Large covariance** - The covariance can feel quite large if the hand is currently static, i am thinking we may need to somehow deal better with this. The thing is that it is not expected behavior to have the hand be static, but 
+
+- **Grasps seems to get a score even when not touching** - In my debug vizualizer i see candidate grasps that are not touching the object, but still get a score, and it seems to me like the expected behavior would be that if a grasp is not touching the object, then it should get a very low score, since it is not a good grasp. This may be related to the issue with the grasp types, but it seems to me like we should also have some sort of penalty for grasps that are not touching the object, to prevent this from happening.
+
+## Notes
+
+Viz needs wrist integration
