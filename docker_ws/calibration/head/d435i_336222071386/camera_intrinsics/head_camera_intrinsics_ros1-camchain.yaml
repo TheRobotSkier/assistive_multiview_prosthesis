@@ -1,0 +1,8 @@
+cam0:
+  cam_overlaps: []
+  camera_model: pinhole
+  distortion_coeffs: [0.10145785800383872, -0.1804649364024266, -0.00554649207971166, 0.006273612661840293]
+  distortion_model: radtan
+  intrinsics: [602.6444778596135, 603.1924090384315, 333.864330057231, 243.29999878810983]
+  resolution: [640, 480]
+  rostopic: /head/d435i_head/color/image_raw

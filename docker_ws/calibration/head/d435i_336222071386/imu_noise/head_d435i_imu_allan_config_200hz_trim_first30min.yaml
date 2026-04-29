@@ -1,0 +1,4 @@
+imu_topic: "/head/d435i_head/imu"
+imu_rate: 200
+measure_rate: 200
+sequence_time: 51388
