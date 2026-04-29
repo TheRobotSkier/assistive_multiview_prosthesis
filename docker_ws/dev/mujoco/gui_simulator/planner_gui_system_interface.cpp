@@ -175,6 +175,14 @@ PlannerGuiSystemInterface::export_state_interfaces()
     }
   }
 
+  if (has_wrist_)
+  {
+    jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
+      wrist_name_, hardware_interface::HW_IF_POSITION, &wrist_pos_state_));
+    jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
+      wrist_name_, hardware_interface::HW_IF_VELOCITY, &wrist_vel_state_));
+  }
+
   return jnt_state_interfaces;
 }
 
@@ -198,6 +206,12 @@ PlannerGuiSystemInterface::export_command_interfaces()
         jnt_names_[data_it], hardware_interface::HW_IF_VELOCITY,
         &jnt_vel_cmd_[data_it]));
     }
+  }
+
+  if (has_wrist_)
+  {
+    jnt_cmd_interfaces.emplace_back(hardware_interface::CommandInterface(
+      wrist_name_, hardware_interface::HW_IF_POSITION, &wrist_pos_cmd_));
   }
 
   return jnt_cmd_interfaces;
@@ -352,6 +366,12 @@ hardware_interface::return_type PlannerGuiSystemInterface::read(
     jnt_pos_state_[2] = 0.0;
   }
 
+  if (has_wrist_)
+  {
+    wrist_pos_state_ = PlannerGuiSimulator::get_instance().get_wrist_pos();
+    wrist_vel_state_ = PlannerGuiSimulator::get_instance().get_wrist_vel();
+  }
+
   return hardware_interface::return_type::OK;
 }
 
@@ -370,6 +390,11 @@ hardware_interface::return_type PlannerGuiSystemInterface::write(
     }
   }
 
+  if (has_wrist_)
+  {
+    PlannerGuiSimulator::get_instance().set_wrist_pos(wrist_pos_cmd_);
+  }
+
   return hardware_interface::return_type::OK;
 }
 
@@ -378,7 +403,7 @@ bool PlannerGuiSystemInterface::read_joints_info(
 {
   bool success = true;
 
-  if (4 == jnt_info.size())
+  if (jnt_info.size() >= 4)
   {
     std::array<std::string, 3> jnt_roles = {
       "j_thumb_fle", "j_index_fle", "j_mrl_fle"};
@@ -419,10 +444,21 @@ bool PlannerGuiSystemInterface::read_joints_info(
         success = false;
       }
     }
+
+    // Optionally detect wrist rotation joint
+    const auto wrist_it = std::find_if(
+      jnt_info.begin(), jnt_info.end(),
+      [](const hardware_interface::ComponentInfo& jnt)
+      { return std::string::npos != jnt.name.find("wrist_rotation"); });
+    if (wrist_it != jnt_info.end())
+    {
+      has_wrist_ = true;
+      wrist_name_ = wrist_it->name;
+    }
   }
   else
   {
-    RCLCPP_FATAL(*logger_, "4 joints expected, but %ld provided.", jnt_info.size());
+    RCLCPP_FATAL(*logger_, "At least 4 joints expected, but %ld provided.", jnt_info.size());
     success = false;
   }
 

@@ -4,7 +4,7 @@
 
   <xacro:macro 
     name="mia_hand_mujoco_ros2_control" 
-    params="name prefix xml_model_path hardware_plugin">
+    params="name prefix xml_model_path hardware_plugin include_wrist:=true">
 
     <ros2_control name="${name}" type="system">
       <hardware>
@@ -32,6 +32,14 @@
 
       <!-- Extra joints used only for Rviz2 visualization -->
       <joint name="${prefix}j_thumb_opp"/>
+
+      <xacro:if value="${include_wrist}">
+        <joint name="${prefix}wrist_rotation">
+          <command_interface name="position"/>
+          <state_interface name="position"/>
+          <state_interface name="velocity"/>
+        </joint>
+      </xacro:if>
 
     </ros2_control>
 

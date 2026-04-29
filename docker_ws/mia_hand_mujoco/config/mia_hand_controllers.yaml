@@ -42,6 +42,12 @@ controller_manager:
     group_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    #
+    # Wrist rotation controller
+    #
+    wrist_pos_ff_controller:
+      type: position_controllers/JointGroupPositionController
+
 # ------------------------------------- #
 # --- Single controllers parameters --- #
 # ------------------------------------- #
@@ -56,6 +62,7 @@ joint_state_broadcaster:
       - $(var prefix)j_index_fle
       - $(var prefix)j_mrl_fle
       - $(var prefix)j_thumb_opp
+      - $(var prefix)wrist_rotation
     interfaces:
       - position
       - velocity
@@ -160,3 +167,11 @@ group_trajectory_controller:
       $(var prefix)j_mrl_fle:
         trajectory: 1.0
         goal: 0.5
+
+#
+# Wrist controller
+#
+wrist_pos_ff_controller:
+  ros__parameters:
+    joints:
+      - $(var prefix)wrist_rotation

@@ -95,6 +95,8 @@ void InteractiveSimulator::set_jnt_pos(uint_fast8_t jnt, double pos)
 {
   std::lock_guard<std::mutex> lock(sim_mtx_);
   jnt_pos_cmd_[jnt] = pos;
+  ctrl_last_set_[jnt] = pos;  // our command — control_cb will apply it
+  new_cmd_[jnt] = true;
 }
 
 void InteractiveSimulator::set_jnt_vel(uint_fast8_t jnt, double vel)
@@ -108,6 +110,26 @@ void InteractiveSimulator::stop_jnt(uint_fast8_t jnt)
   std::lock_guard<std::mutex> lock(sim_mtx_);
   // hold current position as the new command
   jnt_pos_cmd_[jnt] = jnt_pos_state_[jnt];
+}
+
+void InteractiveSimulator::set_wrist_pos(double pos)
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  wrist_pos_cmd_ = pos;
+  ctrl_wrist_last_set_ = pos;
+  new_wrist_cmd_ = true;
+}
+
+double InteractiveSimulator::get_wrist_pos()
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  return wrist_pos_state_;
+}
+
+double InteractiveSimulator::get_wrist_vel()
+{
+  std::lock_guard<std::mutex> lock(sim_mtx_);
+  return wrist_vel_state_;
 }
 
 bool InteractiveSimulator::consume_planner_request()
@@ -213,9 +235,29 @@ void InteractiveSimulator::control_cb(const mjModel* model, mjData* data)
 void InteractiveSimulator::control_cb_impl(const mjModel* /* model */, mjData* data)
 {
   std::lock_guard<std::mutex> lock(sim_mtx_);
-  data->ctrl[0] = jnt_pos_cmd_[0];
-  data->ctrl[1] = jnt_pos_cmd_[1];
-  data->ctrl[2] = jnt_pos_cmd_[2];
+  for (int i = 0; i < 3; ++i) {
+    if (new_cmd_[i]) {
+      // Fresh ROS command — apply it and mark as written
+      data->ctrl[i] = jnt_pos_cmd_[i];
+      ctrl_last_set_[i] = jnt_pos_cmd_[i];
+      new_cmd_[i] = false;
+    } else if (std::abs(data->ctrl[i] - ctrl_last_set_[i]) > 1e-6) {
+      // GUI slider changed ctrl — track it instead of fighting it
+      jnt_pos_cmd_[i] = data->ctrl[i];
+      ctrl_last_set_[i] = data->ctrl[i];
+    }
+    // else: no change — leave ctrl as-is; MuJoCo retains the value
+  }
+  if (has_wrist_ && ctrl_wrist_id_ >= 0) {
+    if (new_wrist_cmd_) {
+      data->ctrl[ctrl_wrist_id_] = wrist_pos_cmd_;
+      ctrl_wrist_last_set_ = wrist_pos_cmd_;
+      new_wrist_cmd_ = false;
+    } else if (std::abs(data->ctrl[ctrl_wrist_id_] - ctrl_wrist_last_set_) > 1e-6) {
+      wrist_pos_cmd_ = data->ctrl[ctrl_wrist_id_];
+      ctrl_wrist_last_set_ = data->ctrl[ctrl_wrist_id_];
+    }
+  }
 }
 
 bool InteractiveSimulator::get_plugin_instance(const mjModel* p_mjm)
@@ -347,12 +389,16 @@ void InteractiveSimulator::physics_thread_fn(
         // Copy joint state to shared arrays under our own mutex
         {
           std::lock_guard<std::mutex> state_lock(sim_mtx_);
-          jnt_pos_state_[0] = mj_data_->qpos[1];
-          jnt_pos_state_[1] = mj_data_->qpos[2];
-          jnt_pos_state_[2] = mj_data_->qpos[3];
-          jnt_vel_state_[0] = mj_data_->qvel[1];
-          jnt_vel_state_[1] = mj_data_->qvel[2];
-          jnt_vel_state_[2] = mj_data_->qvel[3];
+          jnt_pos_state_[0] = mj_data_->qpos[qpos_thumb_addr_];
+          jnt_pos_state_[1] = mj_data_->qpos[qpos_index_addr_];
+          jnt_pos_state_[2] = mj_data_->qpos[qpos_mrl_addr_];
+          jnt_vel_state_[0] = mj_data_->qvel[qpos_thumb_addr_];
+          jnt_vel_state_[1] = mj_data_->qvel[qpos_index_addr_];
+          jnt_vel_state_[2] = mj_data_->qvel[qpos_mrl_addr_];
+          if (has_wrist_) {
+            wrist_pos_state_ = mj_data_->qpos[qpos_wrist_addr_];
+            wrist_vel_state_ = mj_data_->qvel[qpos_wrist_addr_];
+          }
 
           // Update IMU data from camera body state
           if (cam_body_id_ >= 0) {
@@ -523,6 +569,24 @@ bool InteractiveSimulator::simulate_impl(
   if (success && !get_plugin_instance(mj_model_)) {
     success = false;
     std::strcpy(err_msg_, "Index-thumb actuator plugin not found.");
+  }
+
+  // Dynamic qpos address lookup — safe regardless of scene XML joint ordering.
+  if (success) {
+    auto find_addr = [&](const char* name) -> int {
+      int id = mj_name2id(mj_model_, mjOBJ_JOINT, name);
+      return (id >= 0) ? mj_model_->jnt_qposadr[id] : 1;
+    };
+    qpos_thumb_addr_ = find_addr("j_thumb_fle_r");
+    qpos_index_addr_ = find_addr("j_index_fle_r");
+    qpos_mrl_addr_   = find_addr("j_mrl_fle_r");
+
+    int wrist_id = mj_name2id(mj_model_, mjOBJ_JOINT, "j_wrist_rotation");
+    has_wrist_ = (wrist_id >= 0);
+    if (has_wrist_) {
+      qpos_wrist_addr_ = mj_model_->jnt_qposadr[wrist_id];
+      ctrl_wrist_id_   = mj_name2id(mj_model_, mjOBJ_ACTUATOR, "wrist_pos_r");
+    }
   }
 
   if (!success) {
@@ -734,6 +798,47 @@ void InteractiveSimulator::slerp_quat(
   mju_normalize4(res);
 }
 
+void InteractiveSimulator::local_to_world_inplace(
+  const mjModel* m, int body_id, mjtNum pos[3], mjtNum quat_wxyz[4])
+{
+  const int parent_id = m->body_parentid[body_id];
+  if (parent_id == 0) return;  // parent is worldbody, already world frame
+  // Parent is a joint-free intermediate body; body_pos[parent] = its world pos.
+  const mjtNum* p_pos  = &m->body_pos [parent_id * 3];
+  const mjtNum* p_quat = &m->body_quat[parent_id * 4];
+  // world_pos = R_parent × local_pos + p_pos
+  mjtNum rotated[3];
+  mju_rotVecQuat(rotated, pos, p_quat);
+  pos[0] = rotated[0] + p_pos[0];
+  pos[1] = rotated[1] + p_pos[1];
+  pos[2] = rotated[2] + p_pos[2];
+  // world_quat = p_quat × local_quat
+  const mjtNum lq[4] = {quat_wxyz[0], quat_wxyz[1], quat_wxyz[2], quat_wxyz[3]};
+  mju_mulQuat(quat_wxyz, p_quat, lq);
+  mju_normalize4(quat_wxyz);
+}
+
+void InteractiveSimulator::apply_body_pose_world(
+  mjModel* m, int body_id, const mjtNum pos_world[3], const mjtNum quat_world[4])
+{
+  mjtNum pos[3]  = {pos_world[0], pos_world[1], pos_world[2]};
+  mjtNum quat[4] = {quat_world[0], quat_world[1], quat_world[2], quat_world[3]};
+  const int parent_id = m->body_parentid[body_id];
+  if (parent_id != 0) {
+    const mjtNum* p_pos  = &m->body_pos [parent_id * 3];
+    const mjtNum* p_quat = &m->body_quat[parent_id * 4];
+    // local_pos = R_parent_inv × (world_pos - p_pos)
+    const mjtNum dp[3] = {pos[0]-p_pos[0], pos[1]-p_pos[1], pos[2]-p_pos[2]};
+    const mjtNum p_inv[4] = {p_quat[0], -p_quat[1], -p_quat[2], -p_quat[3]};
+    mju_rotVecQuat(pos, dp, p_inv);
+    // local_quat = R_parent_inv × world_quat
+    const mjtNum wq[4] = {quat[0], quat[1], quat[2], quat[3]};
+    mju_mulQuat(quat, p_inv, wq);
+    mju_normalize4(quat);
+  }
+  apply_body_pose(m, body_id, pos, quat);
+}
+
 void InteractiveSimulator::add_scene_section(mujoco::Simulate* sim)
 {
   if (!mj_model_) return;
@@ -744,13 +849,17 @@ void InteractiveSimulator::add_scene_section(mujoco::Simulate* sim)
   cam_body_id_        = mj_name2id(mj_model_, mjOBJ_BODY, "depth_cam_body");
   wrist_cam_body_id_  = mj_name2id(mj_model_, mjOBJ_BODY, "wrist_cam_body");
 
-  // Read initial poses from the model
+  // Read initial poses from the model in world frame
   auto read_body_pose = [&](int id, mjtNum pos[3], mjtNum rpy[3]) {
     if (id < 0) return;
     pos[0] = mj_model_->body_pos[id*3 + 0];
     pos[1] = mj_model_->body_pos[id*3 + 1];
     pos[2] = mj_model_->body_pos[id*3 + 2];
-    const mjtNum* q = &mj_model_->body_quat[id*4];
+    mjtNum q[4] = {
+      mj_model_->body_quat[id*4 + 0], mj_model_->body_quat[id*4 + 1],
+      mj_model_->body_quat[id*4 + 2], mj_model_->body_quat[id*4 + 3]
+    };
+    local_to_world_inplace(mj_model_, id, pos, q);
     quat_to_rpy(q, rpy);
   };
 
@@ -847,7 +956,7 @@ void InteractiveSimulator::apply_scene_poses(mjModel* m, mjData* /*d*/)
     scene_hand_dirty_.store(false);
     mjtNum q[4];
     rpy_to_quat(scene_hand_rpy_, q);
-    apply_body_pose(m, hand_body_id_, scene_hand_pos_, q);
+    apply_body_pose_world(m, hand_body_id_, scene_hand_pos_, q);
   }
   if (scene_obj_dirty_.load() && obj_body_id_ >= 0 && !motion_obj_state_.active) {
     scene_obj_dirty_.store(false);
@@ -1091,6 +1200,8 @@ void InteractiveSimulator::advance_motions(mjModel* m)
         for (int i = 0; i < 3; ++i) ms.src_pos[i]  = m->body_pos[body_id*3 + i];
         for (int i = 0; i < 4; ++i) ms.src_quat[i] = m->body_quat[body_id*4 + i];
         mju_normalize4(ms.src_quat);
+        // Convert src from parent-local to world frame for world-frame interpolation.
+        local_to_world_inplace(m, body_id, ms.src_pos, ms.src_quat);
         for (int i = 0; i < 3; ++i) ms.tgt_pos[i]  = cmd.tgt_pos[i];
         for (int i = 0; i < 4; ++i) ms.tgt_quat[i] = cmd.tgt_quat[i];
         mju_normalize4(ms.tgt_quat);
@@ -1128,7 +1239,7 @@ void InteractiveSimulator::advance_motions(mjModel* m)
     mjtNum cur_quat[4];
     slerp_quat(cur_quat, ms.src_quat, ms.tgt_quat, ts);
 
-    apply_body_pose(m, body_id, cur_pos, cur_quat);
+    apply_body_pose_world(m, body_id, cur_pos, cur_quat);
 
     // Mirror interpolated pose into scene arrays so Scene Control stays in sync.
     for (int i = 0; i < 3; ++i) pos[i] = cur_pos[i];

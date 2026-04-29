@@ -272,6 +272,7 @@ class MujocoSceneStatePublisher(Node):
         mapping = {}
         for base_name in ["j_thumb_fle", "j_index_fle", "j_mrl_fle", "j_thumb_opp"]:
             mapping[self.prefix + base_name] = base_name + suffix
+        mapping[self.prefix + "wrist_rotation"] = "j_wrist_rotation"
         return mapping
 
     def _build_named_body_frame_map(self) -> dict[int, str]:

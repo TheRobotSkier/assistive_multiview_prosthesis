@@ -40,3 +40,7 @@ plans/
 
 # Debug data
 docker_ws/dev/grasp_preshaping/data/debug/
+*.ply
+*.bag
+# kilo code related
+.kilo/kilo.json

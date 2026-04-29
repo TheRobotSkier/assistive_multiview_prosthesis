@@ -108,6 +108,13 @@ private:
   double jnt_vel_state_[3];
   double jnt_vel_cmd_[3];
 
+  // Wrist rotation joint (optional — present only when scene has j_wrist_rotation)
+  bool has_wrist_{false};
+  std::string wrist_name_;
+  double wrist_pos_state_{0.0};
+  double wrist_vel_state_{0.0};
+  double wrist_pos_cmd_{0.0};
+
   std::array<CommandMode, 3> jnt_cmd_modes_;
 
   std::array<Rviz2JointInfo, 3> rviz2_joints_;

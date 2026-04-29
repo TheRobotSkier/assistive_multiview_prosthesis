@@ -84,9 +84,9 @@ services:
       - MUJOCO_HARDWARE_PLUGIN=${MUJOCO_HARDWARE_PLUGIN:-mia_hand_mujoco/PlannerGuiSystemInterface}
     command:  >
       bash -c "
-        source /opt/ros/jazzy/setup.bash &&
         cd /miahand_ws &&
-        colcon build --packages-select grasp_preshaping mia_hand_mujoco &&
+        source /opt/ros/jazzy/setup.bash &&
+        colcon build --packages-select mia_hand_mujoco &&
         source install/setup.bash &&
         ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=dynamic enable_depth_publisher:=true hardware_plugin:=${MUJOCO_HARDWARE_PLUGIN:-mia_hand_mujoco/PlannerGuiSystemInterface};
         /bin/bash
@@ -99,9 +99,9 @@ services:
       - MUJOCO_PC_MODE=${MUJOCO_PC_MODE:-object}
     command:  >
       bash -c "
-        source /opt/ros/jazzy/setup.bash &&
         cd /miahand_ws &&
-        colcon build --packages-select grasp_preshaping mia_hand_mujoco &&
+        source /opt/ros/jazzy/setup.bash &&
+        colcon build --packages-select mia_hand_mujoco &&
         source install/setup.bash &&
         ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=${MUJOCO_OBJECT:-sphere} depth_target_geom_name:=target_${MUJOCO_OBJECT:-sphere} depth_pc_mode:=${MUJOCO_PC_MODE:-object} enable_depth_publisher:=true hardware_plugin:=mia_hand_mujoco/InteractiveSystemInterface;
         /bin/bash
@@ -114,6 +114,9 @@ services:
       - MUJOCO_PC_MODE=${MUJOCO_PC_MODE:-object}
     command:  >
       bash -c "
+        cd /miahand_ws &&
+        source /opt/ros/jazzy/setup.bash &&
+        colcon build --packages-select mia_hand_mujoco &&
         source install/setup.bash &&
         ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=${MUJOCO_OBJECT:-sphere} depth_target_geom_name:=target_${MUJOCO_OBJECT:-sphere} depth_pc_mode:=${MUJOCO_PC_MODE:-object} enable_depth_publisher:=true hardware_plugin:=mia_hand_mujoco/InteractiveSystemInterface &
         sleep 5 &&
@@ -153,3 +156,134 @@ services:
         ros2 launch mia_hand_ros2_control mia_hand_with_wrist_system_interface_launch.py serial_port:=${MIA_SERIAL_PORT:-/dev/ttyUSB1} wrist_port:=${WRIST_PORT:-/dev/ttyUSB0} use_mock_hardware:=false;
         /bin/bash
       "
+  mindrove_emg:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile
+    container_name: mindrove_emg
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+
+  # ── Classical EMG classifier services ────────────────────────────────────
+  # Shared build context: same image as mindrove_emg (re-used via cache).
+  # data/ and models/ are bind-mounted so files persist between runs.
+
+  mindrove_emg_collect:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile
+    container_name: mindrove_emg_collect
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove/data:/app/data
+      - ../dev/mindrove/models:/app/models
+    command: ["python", "scripts/collect_data.py"]
+
+  mindrove_emg_train:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile
+    container_name: mindrove_emg_train
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove/data:/app/data
+      - ../dev/mindrove/models:/app/models
+    command: ["python", "scripts/train.py"]
+
+  mindrove_emg_run:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile
+    container_name: mindrove_emg_run
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove/data:/app/data
+      - ../dev/mindrove/models:/app/models
+    command: ["python", "scripts/run_classifier.py"]
+
+  mindrove_cpp:
+    build:
+      context: ../dev/mindrove_cpp
+      dockerfile: Dockerfile
+    container_name: mindrove_cpp
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove_cpp:/src:ro
+      - ../dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64:/sdk:ro
+
+  naviflame:
+    build:
+      context: ../dev/mindrove_naviflame
+      dockerfile: Dockerfile
+    container_name: naviflame
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    depends_on:
+      - naviflame_ros_bridge
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${XAUTHORITY}:/tmp/.Xauthority:ro,z
+    environment:
+      DISPLAY: $DISPLAY
+      XAUTHORITY: /tmp/.Xauthority
+      QT_X11_NO_MITSHM: 1
+
+  naviflame_ros_bridge:
+    build:
+      context: ../dev/mindrove_naviflame
+      dockerfile: Dockerfile.bridge
+    container_name: naviflame_ros_bridge
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+
+  # ── Haptic armband BT-ROS2 bridge ────────────────────────────────────────
+  # Connects to two Vibro8 Bluetooth Classic devices (8 motors each = 16 total).
+  # Subscribes to /haptic_band/motors (std_msgs/Float32MultiArray, 16 values 0-100).
+  # Configure BT addresses via env vars if they differ from the defaults.
+  haptic_band:
+    build:
+      context: ../dev/haptic_band
+      dockerfile: Dockerfile
+    container_name: haptic_band
+    network_mode: "host"
+    privileged: true
+    tty: true
+    stdin_open: true
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      HAPTIC_BT_ADDR1: ${HAPTIC_BT_ADDR1:-842E1409E14E}
+      HAPTIC_BT_ADDR2: ${HAPTIC_BT_ADDR2:-8CF681F32E12}
+
+  # ── Haptic motor sweep test ───────────────────────────────────────────────
+  # Publishes a sequential ramp-up test to /haptic_band/motors.
+  # Run alongside haptic_band to exercise all 16 motors one by one.
+  haptic_band_test:
+    build:
+      context: ../dev/haptic_band
+      dockerfile: Dockerfile
+    container_name: haptic_band_test
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/haptic_band/scripts:/scripts:ro
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+    command: ["python3", "/scripts/motor_test.py"]
+

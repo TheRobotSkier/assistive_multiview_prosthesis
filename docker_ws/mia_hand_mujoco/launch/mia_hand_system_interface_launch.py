@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, OpaqueFunction,
-                            RegisterEventHandler)
+                            RegisterEventHandler, TimerAction)
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import (Command, FindExecutable, LaunchConfiguration, 
@@ -41,6 +41,7 @@ def launch_fun(context, *args, **kwargs):
     depth_match_tolerance = LaunchConfiguration('depth_match_tolerance')
     tf_publish_hz = LaunchConfiguration('tf_publish_hz')
     enable_preshaping_service = LaunchConfiguration('enable_preshaping_service')
+    include_wrist = LaunchConfiguration('include_wrist').perform(context)
 
     internal_depth_image_topic = '/mujoco/internal/depth/image'
     internal_depth_camera_info_topic = '/mujoco/internal/depth/camera_info'
@@ -111,7 +112,9 @@ def launch_fun(context, *args, **kwargs):
             ' prefix:=',
             TextSubstitution(text = prefix),
             ' joint_limits_config_file:=',
-            TextSubstitution(text = joint_limits_config_file)
+            TextSubstitution(text = joint_limits_config_file),
+            ' include_wrist:=',
+            TextSubstitution(text = include_wrist),
         ]),
         value_type = str
     )
@@ -164,6 +167,23 @@ def launch_fun(context, *args, **kwargs):
         ]
     )
 
+    wrist_pos_ff_controller_spawner = Node(
+        name = 'wrist_pos_ff_controller_spawner',
+        package = 'controller_manager',
+        executable = 'spawner',
+        arguments = ['wrist_pos_ff_controller', '-c', '/controller_manager'],
+        condition = IfCondition(TextSubstitution(text = include_wrist)),
+    )
+
+    wrist_controller_node = Node(
+        package = 'mia_hand_mujoco',
+        executable = 'wrist_controller_node.py',
+        name = 'wrist_controller',
+        output = 'screen',
+        parameters = [{'simulate': True, 'prefix': prefix}],
+        condition = IfCondition(TextSubstitution(text = include_wrist)),
+    )
+
     trajectory_controllers_spawner = Node(
         name = 'trajectory_controllers_spawner',
         package = 'controller_manager',
@@ -183,6 +203,7 @@ def launch_fun(context, *args, **kwargs):
             on_exit = [
                 position_controllers_spawner,
                 trajectory_controllers_spawner,
+                wrist_pos_ff_controller_spawner,
             ]
         )
     )
@@ -260,12 +281,13 @@ def launch_fun(context, *args, **kwargs):
     return [
         ros2_control_node,
         robot_state_publisher,
-        joint_state_broadcaster_spawner,
+        TimerAction(period=5.0, actions=[joint_state_broadcaster_spawner]),
         position_controllers_spawner_after_joint_state_broadcaster_spawner,
         scene_state_publisher_node,
         depth_publisher_node,
         tf_publisher_node,
         preshaping_service_bridge_node,
+        wrist_controller_node,
     ]
 
 def generate_launch_description():
@@ -431,10 +453,15 @@ def generate_launch_description():
 
     enable_preshaping_service_arg = DeclareLaunchArgument(
         'enable_preshaping_service',
-        default_value='true',
+        default_value='false',
         description='Start the standalone grasp preshaping ROS service node with the simulation launch.'
     )
 
+    include_wrist_arg = DeclareLaunchArgument(
+        'include_wrist',
+        default_value='true',
+        description='Add wrist rotation joint to the simulation and spawn wrist_pos_ff_controller + wrist_controller_node.'
+    )
 
     return LaunchDescription([
         scene_arg,
@@ -465,5 +492,6 @@ def generate_launch_description():
         depth_match_tolerance_arg,
         tf_publish_hz_arg,
         enable_preshaping_service_arg,
+        include_wrist_arg,
         OpaqueFunction(function = launch_fun)
     ])

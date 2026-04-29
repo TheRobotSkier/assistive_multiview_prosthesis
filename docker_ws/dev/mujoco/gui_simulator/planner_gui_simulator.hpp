@@ -34,6 +34,10 @@ public:
   void set_jnt_vel(uint_fast8_t jnt, double vel);
   void stop_jnt(uint_fast8_t jnt);
 
+  void set_wrist_pos(double pos);
+  double get_wrist_pos();
+  double get_wrist_vel();
+
   bool consume_planner_request();
   void report_planner_result(bool success, const std::string& message);
 
@@ -120,6 +124,17 @@ private:
 
   double jnt_pos_state_[3];
   double jnt_pos_cmd_[3];
+
+  // qpos address cache — set at model load via mj_name2id + jnt_qposadr
+  int qpos_thumb_addr_{1};
+  int qpos_index_addr_{2};
+  int qpos_mrl_addr_{3};
+  bool has_wrist_{false};
+  int qpos_wrist_addr_{0};
+  int ctrl_wrist_id_{-1};
+  double wrist_pos_state_{0.0};
+  double wrist_vel_state_{0.0};
+  double wrist_pos_cmd_{0.0};
 
   mutable std::mutex sim_mtx_;
 

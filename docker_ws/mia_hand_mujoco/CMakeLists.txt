@@ -240,6 +240,7 @@ install(PROGRAMS
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/mujoco_depth_publisher_node.py
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/mujoco_tf_publisher_node.py
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/mujoco_hand_trajectory_node.py
+  ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/nodes/wrist_controller_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

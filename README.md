@@ -206,3 +206,65 @@ The legacy standalone CLI (`cargo run -- --mode ros`) has been removed. The gras
 **Multiview**:
 The multiview system presumes launch on the Nvidia Jetson, and is not containerized-- This will be harder to set up to run on your own systems.
 For using the launch script in the multiview folder, change the directory path in the .sh file as: RVIZ_CONFIG.
+
+---
+
+## Classical EMG Gesture Classifier (MindRove armband)
+
+A three-step pipeline in `docker_ws/dev/mindrove/` that recognises 4 hand gestures + REST from the MindRove WiFi armband and outputs a proportional control value. All steps run inside Docker (connect to the armband's WiFi first, then run from `docker_ws/docker-deployment/`).
+
+### Step 1 — Record training data
+
+```bash
+docker compose run --rm mindrove_emg_collect
+```
+
+Guides you through recording each gesture interactively (default: 3 reps × 5 s each). Saves raw EMG to `docker_ws/dev/mindrove/data/`.
+
+### Step 2 — Train the classifier
+
+```bash
+docker compose run --rm mindrove_emg_train
+```
+
+Filters + windows the recordings, extracts features (MAV, RMS, WL, ZC, SSC, VAR × 8 channels), trains an LDA classifier with 5-fold cross-validation, and saves models to `docker_ws/dev/mindrove/models/`.
+
+### Step 3 — Run live inference
+
+```bash
+docker compose run --rm mindrove_emg_run
+```
+
+Streams from the armband at ~10 Hz and prints the recognised gesture, confidence, and proportional control value to the terminal.
+
+See `docker_ws/dev/mindrove/README.md` for the full pipeline overview, file layout, and tuning options.
+
+---
+
+## Haptic Band (Vibro8 BT bridge)
+
+A ROS 2 Jazzy Bluetooth bridge for a **Vibro8** 8-motor haptic armband, running in its own Docker container.
+
+### Start the bridge
+
+```bash
+docker compose run --build --rm haptic_band
+```
+
+Connects to the Vibro8 over Bluetooth Classic (RFCOMM), sends a brief buzz-buzz on first connect, then listens on:
+
+```
+/haptic_band/motors   std_msgs/Float32MultiArray   [8 values, 0.0–100.0]
+```
+
+Publish a message to that topic from any other ROS 2 node or container to drive the 8 motors.
+
+### Run the motor sweep test
+
+```bash
+docker compose run --rm haptic_band_test
+```
+
+Activates each of the 8 motors one at a time, ramping 0 → 100 % in 10 % steps (~1 s), then turns off before moving to the next motor.
+
+See `docker_ws/dev/haptic_band/README.md` for the full protocol details, address configuration, and file layout.
