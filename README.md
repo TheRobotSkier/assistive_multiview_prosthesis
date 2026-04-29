@@ -28,6 +28,12 @@ Linux note: if not using bash shell, use
 bash -c 'COMMAND'
 ```
 
+# Select your compose file (system specific) like this in the .env file:
+
+```bash
+COMPOSE_FILE=docker-compose.yml:docker-compose.linux-podman.yml
+```
+
 and replace COMMAND with the command to run (keep the quotes in). This will run the command as a bash command regardless of your shell.
 
 THEN cd to the docker-deployment directory:
