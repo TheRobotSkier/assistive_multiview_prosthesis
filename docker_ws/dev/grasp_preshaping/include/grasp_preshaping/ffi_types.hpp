@@ -75,11 +75,17 @@ struct GraspComputeResponseFFI
   double thumb_closure;
   double index_closure;
   double mrl_closure;
+  // Target hand position from the best scored grasp sample (world frame).
+  double target_px;
+  double target_py;
+  double target_pz;
   // Wrist orientation quaternion [qx, qy, qz, qw].
   double wrist_qx;
   double wrist_qy;
   double wrist_qz;
   double wrist_qw;
+  // Wrist rotation angle in degrees [0, 360).
+  double wrist_rotation_deg;
 };
 
 // Function-pointer types for the two exported Rust entry points.

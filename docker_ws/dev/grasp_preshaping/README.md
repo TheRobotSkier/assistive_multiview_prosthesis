@@ -92,57 +92,60 @@ The TSDF enables extremely fast distance and gradient queries. The optimization 
 
 Viz needs wrist integration
 
+This revised version incorporates the architectural shift in the code (removing the `Option` wrapper) and clarifies the importance of the **0.1** score for collisions to maintain a strong gradient signal.
 
-### Current state vs Proposed state
+---
 
-**1. Alignment Score**
-- *Current:* Averages the dot product of surface normal and force direction for contacts that surpass a basic force threshold.
-- *Proposed:* Keep as is. It measures if the local surface is pushing back against the closing finger. If `0.0`, the fingers are slipping sideways.
+## Grasp Scoring Improvements: Dense Reward Strategy
 
-**2. Force Closure Score**
-- *Current:* Measures whether the normal forces acting on the object span a wide enough set of directions to resist forces (centroid of normals close to origin).
-- *Proposed:* Keep as is. If `0.0`, all contacts are pushing the object in the same direction (it will pop out). 
+The goal of this refactor is to move from a **sparse** to a **dense reward landscape**. Currently, many failed grasps return no data, leaving the optimizer "blind" in large portions of the search space. By ensuring every state—even failures—returns a meaningful score, we provide a continuous gradient that guides the optimizer toward success rather than treating all non-successful grasps as equally discarded.
 
-**3. Contact Score (The Unified Quality/Penalty Metric)**
-- *Current:* `min(active.len() as f64 / spec.min_contacts as f64, 1.0)`.
-- *Proposed (Actionable Plan):* Expand this into a comprehensive measure of whether the physical contact structure makes sense. 
-  - Start at a baseline based on active contacts vs. required contacts (like today).
-  - *Multiply* by a penalty if `finger_set.len() < spec.min_fingers` (e.g., `0.5`). It's not a hard fail anymore—maybe a two-finger cylindrical grasp just needs to shift slightly to catch the third finger.
-  - *If a start collision occurs (palm in object)*: Score is `0.0` (or `1e-6`). This requires *major* tweaks, not minor ones. 
-  - *If no collision at all occurs*: Score is `0.0`. Again, the hand closed on nothing.
+### 1. Implementation Architecture: Removing the `Option` Wrapper
+To support a truly dense landscape, we must change how `score_grasp` is handled in `planner.rs`:
+* **Remove the `Option<GraspScoreResult>` return type.** The function should now return a `GraspScoreResult` everywhere.
+* **Avoid "Hard Fails":** Instead of returning `None` when a collision is detected or no contact is made, we instantiate a `GraspScoreResult` with low-tier scores (e.g., 0.1 or 0.0). This ensures the optimizer always has a struct to read from, preventing breaks in the gradient flow.
 
-### How to implement this in planner.rs:
+### 2. Tiered Scoring Model (The Contact Score)
+The **Contact Score** will be our primary "unified quality/penalty metric." It captures whether the physical structure of the grasp makes sense. We will map failure modes to distinct score tiers to provide the optimizer with a "warmer/colder" signal:
 
-Instead of modifying `GraspScoreResult`, you just change *how* you instantiate it inside `score_grasp`:
+* **Tier 1: Valid Grasp (Score: 0.8 to 1.0)**
+    * *Criteria:* Hand swept closed, hit surface, good normals, and satisfies `min_fingers`.
+    * *Meaning:* A successful grasp. Optimization here is about "polishing" (moving from good to great).
 
-1. **Remove `Option` wrapper:** If you want smooth gradients, return `GraspScoreResult` everywhere.
-2. **Start collision:** Return a `GraspScoreResult` with all scores `0.0`.
-3. **No collision:** Same, all scores `0.0`.
-4. **Calculated valid closure:** 
-   - Calculate basic contact fraction: `base_contact = min(active_count / min_contacts, 1.0)`
-   - Calculate diversity multiplier: `if finger_count < min_fingers { 0.5 } else { 1.0 }`
-   - Set `contact_score = base_contact * diversity_multiplier`.
+* **Tier 2: Soft Rejection (Score: 0.3 to 0.7)**
+    * *Example:* Found collisions and good normals, but missing a finger constraint (`finger_set.len() < spec.min_fingers`).
+    * *Actionable Fix:* Minor translation or rotation to catch the final finger.
+    * *Calculation:* `base_contact_fraction * 0.5 (penalty multiplier)`.
 
-### How to distinguish them using scores
+* **Tier 3: Start Collision (Score: 0.1)**
+    * *Example:* `sample == 0` collision (palm or fingers inside the object).
+    * *Meaning:* The hand is "in" the object. 
+    * *Actionable Fix:* Moderate translation (pulling back). 
+    * **Crucial Detail:** We use **0.1** rather than a tiny epsilon (like `1e-6`) to provide a strong, non-negligible signal that tells the optimizer: *"You've found the object, but you're too deep. Back up!"*
 
-If your goal is a continuous gradient where higher scores mean "closer to a perfect grasp," you can map these failure modes to distinct score tiers within the `contact_count_score` (or an overall `quality_multiplier`):
+* **Tier 4: No Collision (Score: 0.0)**
+    * *Example:* Hand sweeps completely closed and hits nothing.
+    * *Meaning:* Empty space; no physical data available.
+    * *Actionable Fix:* Major translation needed to locate the object.
 
-1. **Valid Grasp (Score: ~0.8 to 1.0)**
-   - Swept closed, hit surface, good normals, enough fingers. 
+---
 
-2. **Soft Rejection (Score: ~0.3 to 0.7)**
-   - *Example:* Found collisions and good normals, but missing a finger constraint (`finger_set.len() < spec.min_fingers`).
-   - *Fix:* Minor translation or rotation to catch that last finger.
+### 3. Metric Roles & Optimization Weights
+While we have three core scores, they serve different purposes in the optimization loop:
 
-3. **Start Collision (Score: ~0.1)**
-   - *Example:* `sample == 0` collision. 
-   - *Meaning:* Palm or open fingers are inside the object. Closure is `0.0`.
-   - *Fix:* Moderate translation (pull back). The non-zero score tells an optimizer "you are close to the object, keep exploring near here!"
+1.  **Contact Score (Directional/Actionable):**
+    * **Weight:** **High**.
+    * **Role:** This provides the "gradient" that tells the hand how to move to reach a valid state. Because it transitions from 0.0 to 1.0 based on proximity and finger participation, it is the primary driver of convergence.
 
-4. **No Collision (Score: 0.0)**
-   - *Example:* Hand sweeps completely closed, hits nothing.
-   - *Meaning:* Empty space.
-   - *Fix:* Major translation needed. Score is zero because there's no useful physical contact data.
+2.  **Alignment & Force Closure (Evaluative/Diagnostic):**
+    * **Weight:** **Moderate**.
+    * **Role:** These act as diagnostic signals. They tell us *why* a valid contact might still be a poor grasp (e.g., "the fingers are slipping sideways" or "the object will pop out"). These are crucial for differentiating a "good" grasp from a "great" one once Tier 1 is reached.
+
+By weighting the **Contact Score** more heavily during the initial search, we ensure the planner prioritizes "finding and touching the object properly" before it begins obsessing over the perfect force-closure physics.
+
+---
+
+Your job is to map out the changes required and files that needs modification, verify your findings, and construct a detailed plan on how to do the refactor.
 
 
 ## Doing sampling
@@ -166,6 +169,26 @@ I am not entirely sure what changes would need to happen for this to be implemnt
 
 You should also examine how rayon or other optimisations can speed this search up, since we are doing alot of samples and they should be highly parallelizable. I am not sure if the current implementation is already doing this, but it is worth looking into.
 
-## Topic mapping
+## Integrations with trajecotry flow
 
-Do some smarter in out topics for the presahping, so i know what is going on
+I want to refine my publishing flow slightly in the preshping node. 
+
+So straight away I want to publish the wrist rotations and some percentage of the calculated closure, where the percentage amount is defined in config.rs. The smaller closure amount shoud be sent straight to the controllers.
+
+Then on some planner topics I want to publish the target hand pose from the planner, the full closure amount for each finger controller, and the grasp type. 
+
+This way a trajectory node can subscribe to these topics, and then as we approch the target hand pose, we can start closing the hand fully. While this node already rotates the wrist and does a simple lighter closue to signify what the hand will do later on.
+
+Take a look a this, and propose a detailed plan on how to implement this, what topics to publish, and how to integrate this with current bridge node. You do not need to worry about implementing this with the sim yet, just the ROS 2 side of things.
+
+### 2nd iteration
+
+I have a few things I want to change, namely:
+
+/grasp_preshaping/target_finger_closures | Float64MultiArray │ Full [thumb, index, mrl] 0.0-1.0 closure amount 
+/grasp_preshaping/target_hand_pose | geometry_msgs::msg::Pose | Full pose where the best grasp is predicted
+/grasp_preshaping/wrist_pose | std_msgs/Float64 | Wrist rotations in degreed (0-360)
+
+This means there is somthing with the postion where we need to get that from rust. keep the other definitions and topics, I did not mention.
+
+Make a plan on how to implment this change, find the correct files and sections, and verify your findings.

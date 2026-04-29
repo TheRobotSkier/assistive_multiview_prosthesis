@@ -33,6 +33,14 @@ pub const GRASP_WEIGHT_ALIGNMENT: f64 = 1.0;
 pub const GRASP_WEIGHT_FORCE_CLOSURE: f64 = 1.0;
 pub const GRASP_WEIGHT_CONTACT_COUNT: f64 = 1.5;
 
+// Preshaping closure: fraction of the planner's full closure that is sent
+// immediately to the finger controllers as a "pre-grasp" signal.  The
+// remaining closure is published on a planner topic for a downstream
+// trajectory node to apply progressively as the arm approaches the target.
+// Range: [0.0, 1.0].  A value of 0.3 means 30 % of the computed closure is
+// applied immediately, leaving 70 % for the trajectory node.
+pub const PRESHAPING_CLOSURE_FRACTION: f64 = 0.3;
+
 // Debug visualization
 // When true, each pipeline invocation writes a single .npz file containing the
 // scored grasp candidates.  When false the entire export path is eliminated by

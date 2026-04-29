@@ -14,7 +14,9 @@
 #include "grasp_preshaping/ffi_types.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/int32.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
@@ -43,7 +45,8 @@ public:
     rust_lib_handle_(nullptr),
     rust_compute_fn_(nullptr),
     rust_api_version_fn_(nullptr),
-    min_closure_amount_(declare_parameter<double>("min_closure_amount", 0.1))
+    min_closure_amount_(declare_parameter<double>("min_closure_amount", 0.1)),
+    preshaping_closure_fraction_(declare_parameter<double>("preshaping_closure_fraction", 0.3))
   {
     // TF2 buffer and listener for camera pose lookups
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
@@ -87,9 +90,23 @@ public:
     mrl_cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
       "/mrl_pos_ff_controller/commands", 10);
 
-    // Publish wrist orientation as a Pose topic for downstream consumers.
-    wrist_pose_pub_ = create_publisher<geometry_msgs::msg::Pose>(
+    // Publish wrist rotation in degrees [0, 360).
+    wrist_pose_pub_ = create_publisher<std_msgs::msg::Float64>(
       "/grasp_preshaping/wrist_pose", 10);
+
+    // ── Planner topics (consumed by downstream trajectory node) ──────────
+    // Target hand pose: input position + planned wrist orientation.
+    target_hand_pose_pub_ = create_publisher<geometry_msgs::msg::Pose>(
+      "/grasp_preshaping/target_hand_pose", rclcpp::QoS(10).transient_local());
+
+    // Full finger closures [thumb, index, mrl] for the trajectory node to
+    // apply progressively as the arm approaches the target.
+    target_finger_closures_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
+      "/grasp_preshaping/target_finger_closures", rclcpp::QoS(10).transient_local());
+
+    // Grasp type: 1=cylindrical, 2=pinch, 3=lateral.
+    grasp_type_pub_ = create_publisher<std_msgs::msg::Int32>(
+      "/grasp_preshaping/grasp_type", rclcpp::QoS(10).transient_local());
 
     initialize_rust_backend();
 
@@ -319,29 +336,64 @@ private:
       return true;
     }
 
-    const double thumb = std::max(ffi_response.thumb_closure, min_closure_amount_);
-    const double index = std::max(ffi_response.index_closure, min_closure_amount_);
-    const double mrl = std::max(ffi_response.mrl_closure, min_closure_amount_);
-    publish_joint_commands(thumb, index, mrl);
+    // ── Full closure values from the planner ────────────────────────────
+    const double full_thumb = ffi_response.thumb_closure;
+    const double full_index = ffi_response.index_closure;
+    const double full_mrl   = ffi_response.mrl_closure;
 
-    // Publish wrist orientation.
+    // ── Reduced (preshape) closure sent immediately to controllers ───────
+    const double preshape_thumb = std::max(full_thumb * preshaping_closure_fraction_, min_closure_amount_);
+    const double preshape_index = std::max(full_index * preshaping_closure_fraction_, min_closure_amount_);
+    const double preshape_mrl   = std::max(full_mrl   * preshaping_closure_fraction_, min_closure_amount_);
+    publish_joint_commands(preshape_thumb, preshape_index, preshape_mrl);
+
+    // ── Publish wrist rotation in degrees (immediate) ───────────────────
     {
-      geometry_msgs::msg::Pose wrist_pose;
-      wrist_pose.orientation.x = ffi_response.wrist_qx;
-      wrist_pose.orientation.y = ffi_response.wrist_qy;
-      wrist_pose.orientation.z = ffi_response.wrist_qz;
-      wrist_pose.orientation.w = ffi_response.wrist_qw;
-      wrist_pose_pub_->publish(wrist_pose);
+      std_msgs::msg::Float64 wrist_msg;
+      wrist_msg.data = ffi_response.wrist_rotation_deg;
+      wrist_pose_pub_->publish(wrist_msg);
+    }
+
+    // ── Publish planner topics for downstream trajectory node ────────────
+    // Target hand pose: best grasp position + planned wrist orientation.
+    {
+      geometry_msgs::msg::Pose target_pose;
+      target_pose.position.x = ffi_response.target_px;
+      target_pose.position.y = ffi_response.target_py;
+      target_pose.position.z = ffi_response.target_pz;
+      target_pose.orientation.x = ffi_response.wrist_qx;
+      target_pose.orientation.y = ffi_response.wrist_qy;
+      target_pose.orientation.z = ffi_response.wrist_qz;
+      target_pose.orientation.w = ffi_response.wrist_qw;
+      target_hand_pose_pub_->publish(target_pose);
+    }
+
+    // Full finger closures [thumb, index, mrl].
+    {
+      std_msgs::msg::Float64MultiArray closures;
+      closures.data = {full_thumb, full_index, full_mrl};
+      target_finger_closures_pub_->publish(closures);
+    }
+
+    // Grasp type.
+    {
+      std_msgs::msg::Int32 grasp_type_msg;
+      grasp_type_msg.data = ffi_response.grasp_type;
+      grasp_type_pub_->publish(grasp_type_msg);
     }
 
     response->success = true;
     response->message = message.empty() ? "Preshaping completed" : message;
     response->message +=
       " (grasp_type=" + std::to_string(ffi_response.grasp_type) +
-      ", closure_floor=" + std::to_string(min_closure_amount_) +
-      ", thumb=" + std::to_string(thumb) +
-      ", index=" + std::to_string(index) +
-      ", mrl=" + std::to_string(mrl) + ")";
+      ", preshape_fraction=" + std::to_string(preshaping_closure_fraction_) +
+      ", preshape=[" + std::to_string(preshape_thumb) + ","
+                        + std::to_string(preshape_index) + ","
+                        + std::to_string(preshape_mrl) + "]"
+      ", full=[" + std::to_string(full_thumb) + ","
+                  + std::to_string(full_index) + ","
+                  + std::to_string(full_mrl) + "]"
+      ")";
     return true;
   }
 
@@ -357,6 +409,7 @@ private:
   GraspComputeFn rust_compute_fn_;
   GraspApiVersionFn rust_api_version_fn_;
   const double min_closure_amount_;
+  const double preshaping_closure_fraction_;
 
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -369,7 +422,10 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr thumb_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr index_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr mrl_cmd_pub_;
-  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr wrist_pose_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr wrist_pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr target_hand_pose_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr target_finger_closures_pub_;
+  rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr grasp_type_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_;
 };
 

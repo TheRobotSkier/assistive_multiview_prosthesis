@@ -86,11 +86,17 @@ pub struct GraspComputeResponseFFI {
     pub thumb_closure: f64,
     pub index_closure: f64,
     pub mrl_closure: f64,
+    /// Target hand position from the best scored grasp sample (world frame).
+    pub target_px: f64,
+    pub target_py: f64,
+    pub target_pz: f64,
     /// Wrist orientation quaternion [qx, qy, qz, qw].
     pub wrist_qx: f64,
     pub wrist_qy: f64,
     pub wrist_qz: f64,
     pub wrist_qw: f64,
+    /// Wrist rotation angle in degrees [0, 360).
+    pub wrist_rotation_deg: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,8 +146,12 @@ struct ComputeOutput {
     thumb_closure: f64,
     index_closure: f64,
     mrl_closure: f64,
+    /// Target hand position from the best scored grasp sample [px, py, pz].
+    target_position: [f64; 3],
     /// Wrist orientation quaternion [qx, qy, qz, qw].
     wrist_quaternion: [f64; 4],
+    /// Wrist rotation angle in degrees [0, 360).
+    wrist_rotation_deg: f64,
 }
 
 fn compute_per_finger_output(grasp_type: GraspType, closure_amount: f64) -> (f64, f64, f64) {
@@ -449,11 +459,13 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         .next()
         .unwrap_or(0);
     let best_se3 = samples[best_sample_idx].pose.to_se3();
+    let target_position = [best_se3[(0, 3)], best_se3[(1, 3)], best_se3[(2, 3)]];
     let rot = best_se3.fixed_view::<3, 3>(0, 0);
     let rot3 = nalgebra::Rotation3::from_matrix_unchecked(rot.clone_owned());
     let uq = nalgebra::UnitQuaternion::from_rotation_matrix(&rot3);
     let q = uq.quaternion();
     let wrist_quaternion = [q.i, q.j, q.k, q.w];
+    let wrist_rotation_deg = samples[best_sample_idx].wrist_rotation.to_degrees().rem_euclid(360.0);
 
     Ok(ComputeOutput {
         grasp_type: best.grasp_type,
@@ -462,7 +474,9 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         thumb_closure,
         index_closure,
         mrl_closure,
+        target_position,
         wrist_quaternion,
+        wrist_rotation_deg,
     })
 }
 
@@ -483,7 +497,7 @@ fn write_message(buf: *mut c_char, buf_len: usize, msg: &str) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn grasp_preshaping_api_version() -> u32 {
-    2
+    3
 }
 
 #[unsafe(no_mangle)]
@@ -508,10 +522,14 @@ pub extern "C" fn grasp_preshaping_compute(
         thumb_closure: 0.0,
         index_closure: 0.0,
         mrl_closure: 0.0,
+        target_px: 0.0,
+        target_py: 0.0,
+        target_pz: 0.0,
         wrist_qx: 0.0,
         wrist_qy: 0.0,
         wrist_qz: 0.0,
         wrist_qw: 1.0,
+        wrist_rotation_deg: 0.0,
     };
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -531,18 +549,22 @@ pub extern "C" fn grasp_preshaping_compute(
             response_ref.wrist_qy = output.wrist_quaternion[1];
             response_ref.wrist_qz = output.wrist_quaternion[2];
             response_ref.wrist_qw = output.wrist_quaternion[3];
+            response_ref.target_px = output.target_position[0];
+            response_ref.target_py = output.target_position[1];
+            response_ref.target_pz = output.target_position[2];
+            response_ref.wrist_rotation_deg = output.wrist_rotation_deg;
             let message = format!(
-                "{} grasp, closure={:.4}, combined={:.4}, thumb={:.4}, index={:.4}, mrl={:.4}, wrist_q=({:.3},{:.3},{:.3},{:.3})",
+                "{} grasp, closure={:.4}, combined={:.4}, thumb={:.4}, index={:.4}, mrl={:.4}, target=({:.4},{:.4},{:.4}), wrist_rot={:.1} deg",
                 output.grasp_type,
                 output.closure_amount,
                 output.combined_score,
                 output.thumb_closure,
                 output.index_closure,
                 output.mrl_closure,
-                output.wrist_quaternion[0],
-                output.wrist_quaternion[1],
-                output.wrist_quaternion[2],
-                output.wrist_quaternion[3],
+                output.target_position[0],
+                output.target_position[1],
+                output.target_position[2],
+                output.wrist_rotation_deg,
             );
             write_message(message_out, message_out_len, &message);
             GRASP_COMPUTE_OK
