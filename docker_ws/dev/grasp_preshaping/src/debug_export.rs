@@ -24,6 +24,8 @@ pub struct ScoredGraspExport {
     pub alignment_score: f64,
     pub force_closure_score: f64,
     pub contact_count_score: f64,
+    /// Dense tiered metric [0.0–1.0]. See planner.rs tier definitions.
+    pub contact_score: f64,
     pub active_contact_count: usize,
     pub found_collision: bool,
     pub combined_score: f64,
@@ -60,11 +62,11 @@ pub struct DebugDump<'a> {
 /// | `cameras`         | f32   | (C*3,)      | Camera positions |
 /// | `input_pose`      | f64   | (7,)        | [px,py,pz,qx,qy,qz,qw] |
 /// | `input_twist`     | f64   | (6,)        | [lx,ly,lz,ax,ay,az] |
-/// | `scored_grasps`   | f64   | (M*27,)     | Flat rows (see below) |
+/// | `scored_grasps`   | f64   | (M*28,)     | Flat rows (see below) |
 ///
-/// Each scored_grasps row has 27 columns:
+/// Each scored_grasps row has 28 columns:
 ///   [sample_idx, grasp_type, closure, alignment, force_closure,
-///    contact_count, active_contact_count, found_collision(0|1), combined, probability, wrist_rotation,
+///    contact_count, contact_score, active_contact_count, found_collision(0|1), combined, probability, wrist_rotation,
 ///    pose_4x4(16)]
 pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
@@ -191,23 +193,24 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
         writer.finish()?;
     }
 
-    // --- scored_grasps (f64, M*27 flat) ---
-    // Columns per row (27 total):
+    // --- scored_grasps (f64, M*28 flat) ---
+    // Columns per row (28 total):
     //   [0]  sample_index
     //   [1]  grasp_type (1=cyl, 2=pinch, 3=lat)
     //   [2]  closure_amount
     //   [3]  alignment_score
     //   [4]  force_closure_score
     //   [5]  contact_count_score
-    //   [6]  active_contact_count
-    //   [7]  found_collision (0.0 or 1.0)
-    //   [8]  combined_score
-    //   [9]  sample_probability
-    //   [10]  wrist_rotation (radians)
-    //   [11..27]  pose_se3 row-major 4x4
+    //   [6]  contact_score (dense tiered metric)
+    //   [7]  active_contact_count
+    //   [8]  found_collision (0.0 or 1.0)
+    //   [9]  combined_score
+    //   [10] sample_probability
+    //   [11] wrist_rotation (radians)
+    //   [12..28]  pose_se3 row-major 4x4
     {
         let m = dump.scored_grasps.len();
-        let total = m * 27;
+        let total = m * 28;
         let mut writer = npz
             .array::<f64>("scored_grasps", Default::default())?
             .default_dtype()
@@ -220,6 +223,7 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
             writer.push(&g.alignment_score)?;
             writer.push(&g.force_closure_score)?;
             writer.push(&g.contact_count_score)?;
+            writer.push(&g.contact_score)?;
             writer.push(&(g.active_contact_count as f64))?;
             writer.push(&if g.found_collision { 1.0f64 } else { 0.0f64 })?;
             writer.push(&g.combined_score)?;

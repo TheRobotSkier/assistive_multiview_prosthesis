@@ -453,7 +453,7 @@ def generate_launch_description():
 
     enable_preshaping_service_arg = DeclareLaunchArgument(
         'enable_preshaping_service',
-        default_value='false',
+        default_value='true',
         description='Start the standalone grasp preshaping ROS service node with the simulation launch.'
     )
 

@@ -10,7 +10,12 @@ pub struct GraspScoreResult {
     pub closure_amount: f64,
     pub alignment_score: f64,
     pub force_closure_score: f64,
+    /// Diagnostic only: raw contact fraction. Not used in `combined_score`.
     pub contact_count_score: f64,
+    /// Dense tiered metric [0.0–1.0] used as the primary directional signal.
+    /// Tier 4 (no collision) = 0.0, Tier 3 (start collision) = 0.1,
+    /// Tier 2 (soft rejection) = fraction * 0.5, Tier 1 (valid) = 0.8 + 0.2 * fraction.
+    pub contact_score: f64,
     pub active_contact_count: usize,
     pub found_collision: bool,
 }
@@ -20,14 +25,14 @@ impl GraspScoreResult {
         let denom = weights.w_probability
             + weights.w_alignment
             + weights.w_force_closure
-            + weights.w_contact_count;
+            + weights.w_contact_score;
         if denom.abs() < 1e-12 {
             return 0.0;
         }
         (weights.w_probability * sample_probability
             + weights.w_alignment * self.alignment_score
             + weights.w_force_closure * self.force_closure_score
-            + weights.w_contact_count * self.contact_count_score)
+            + weights.w_contact_score * self.contact_score)
             / denom
     }
 }
@@ -37,7 +42,7 @@ pub struct GraspWeights {
     pub w_probability: f64,
     pub w_alignment: f64,
     pub w_force_closure: f64,
-    pub w_contact_count: f64,
+    pub w_contact_score: f64,
 }
 
 impl Default for GraspWeights {
@@ -46,7 +51,7 @@ impl Default for GraspWeights {
             w_probability: config::GRASP_WEIGHT_PROBABILITY,
             w_alignment: config::GRASP_WEIGHT_ALIGNMENT,
             w_force_closure: config::GRASP_WEIGHT_FORCE_CLOSURE,
-            w_contact_count: config::GRASP_WEIGHT_CONTACT_COUNT,
+            w_contact_score: config::GRASP_WEIGHT_CONTACT_SCORE,
         }
     }
 }
@@ -83,7 +88,7 @@ pub fn score_cylindrical(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
-) -> Option<GraspScoreResult> {
+) -> GraspScoreResult {
     let spec = cylindrical_spec();
     let max_closure = lut.get_max_closure(spec.max_closure_index);
     score_grasp(
@@ -101,7 +106,7 @@ pub fn score_pinch(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
-) -> Option<GraspScoreResult> {
+) -> GraspScoreResult {
     let spec = pinch_spec();
     let max_closure = lut.get_max_closure(spec.max_closure_index);
     score_grasp(lut, tsdf, base_transform, collision_tol, &spec, max_closure)
@@ -112,7 +117,7 @@ pub fn score_lateral(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
-) -> Option<GraspScoreResult> {
+) -> GraspScoreResult {
     let spec = lateral_spec();
     let max_closure = lut.get_max_closure(spec.max_closure_index);
     score_grasp(lut, tsdf, base_transform, collision_tol, &spec, max_closure)
@@ -288,19 +293,30 @@ fn score_grasp(
     collision_tol: f32,
     spec: &GraspSpec,
     max_closure: f64,
-) -> Option<GraspScoreResult> {
+) -> GraspScoreResult {
     match sweep_for_collision(lut, tsdf, base_transform, &spec.sweep_points, collision_tol, max_closure) {
-        None => Some(GraspScoreResult {
+        // Tier 4: No collision — hand swept fully closed and hit nothing.
+        // Empty space; the optimizer must translate toward the object.
+        None => GraspScoreResult {
             closure_amount: 0.0,
             alignment_score: 0.0,
             force_closure_score: 0.0,
             contact_count_score: 0.0,
+            contact_score: 0.0,
             active_contact_count: 0,
             found_collision: false,
-        }),
-        // Start-position collision: palm or open-hand fingers already inside
-        // the object. This pose is physically impossible — no valid grasp here.
-        Some(0) => None,
+        },
+        // Tier 3: Start-position collision — palm or open-hand fingers already
+        // inside the object. The hand is "in" the object. Back up!
+        Some(0) => GraspScoreResult {
+            closure_amount: 0.0,
+            alignment_score: 0.0,
+            force_closure_score: 0.0,
+            contact_count_score: 0.0,
+            contact_score: 0.1,
+            active_contact_count: 0,
+            found_collision: false,
+        },
         Some(coll_sample) => {
             let lo_ctrl = lut.get_control(coll_sample - 1);
             let hi_ctrl = lut.get_control(coll_sample);
@@ -325,14 +341,10 @@ fn score_grasp(
                 collision_tol,
             );
 
-            // Check finger diversity — reject grasps where contacts are
-            // concentrated on too few fingers.
+            // Check finger diversity — contacts concentrated on too few fingers.
             let mut finger_set = HashSet::new();
             for &(contact, _) in &active_with_contacts {
                 finger_set.insert(contact.finger_group());
-            }
-            if finger_set.len() < spec.min_fingers {
-                return None;
             }
 
             let active: Vec<_> = active_with_contacts.into_iter().map(|(_, ac)| ac).collect();
@@ -341,14 +353,32 @@ fn score_grasp(
             } else {
                 (active.len() as f64 / spec.min_contacts as f64).min(1.0)
             };
-            Some(GraspScoreResult {
+
+            if finger_set.len() < spec.min_fingers {
+                // Tier 2: Soft rejection — collision found, but too few distinct
+                // finger groups engaged. Minor adjustment could fix this.
+                return GraspScoreResult {
+                    closure_amount: lo,
+                    alignment_score: compute_alignment(&active),
+                    force_closure_score: compute_force_closure(&active),
+                    contact_count_score,
+                    contact_score: contact_count_score * 0.5,
+                    active_contact_count: active.len(),
+                    found_collision: true,
+                };
+            }
+
+            // Tier 1: Valid grasp — hand swept closed, hit surface, good normals,
+            // and satisfies min_fingers. Optimization here is "polishing".
+            GraspScoreResult {
                 closure_amount: lo,
                 alignment_score: compute_alignment(&active),
                 force_closure_score: compute_force_closure(&active),
                 contact_count_score,
+                contact_score: 0.8 + 0.2 * contact_count_score,
                 active_contact_count: active.len(),
                 found_collision: true,
-            })
+            }
         }
     }
 }

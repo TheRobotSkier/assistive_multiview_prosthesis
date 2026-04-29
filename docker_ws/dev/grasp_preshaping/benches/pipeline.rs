@@ -170,7 +170,7 @@ fn bench_full_pipeline(c: &mut Criterion) {
             let collision_tol = config::COLLISION_TOL_M;
             for sp in &samples {
                 let base_transform = sp.pose.to_se3();
-                let scorer: fn(&FingerLUT, &grasp_preshaping::pointcloud_helper::Tsdf, &Matrix4<f64>, f32) -> Option<grasp_preshaping::planner::GraspScoreResult> = match sp.grasp_type {
+                let scorer: fn(&FingerLUT, &grasp_preshaping::pointcloud_helper::Tsdf, &Matrix4<f64>, f32) -> grasp_preshaping::planner::GraspScoreResult = match sp.grasp_type {
                     0 => score_cylindrical,
                     1 => score_pinch,
                     _ => score_lateral,

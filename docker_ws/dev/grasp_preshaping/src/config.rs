@@ -28,10 +28,10 @@ pub const FIXED_COV_OMEGA: [f64; 3] = [0.001, 0.001, 0.001];
 pub const FIXED_COV_V: [f64; 3] = [0.0005, 0.0005, 0.0005];
 
 // Grasp scoring weights
-pub const GRASP_WEIGHT_PROBABILITY: f64 = 1.0;
+pub const GRASP_WEIGHT_PROBABILITY: f64 = 0.5;
 pub const GRASP_WEIGHT_ALIGNMENT: f64 = 1.0;
 pub const GRASP_WEIGHT_FORCE_CLOSURE: f64 = 1.0;
-pub const GRASP_WEIGHT_CONTACT_COUNT: f64 = 1.5;
+pub const GRASP_WEIGHT_CONTACT_SCORE: f64 = 3.0;
 
 // Preshaping closure: fraction of the planner's full closure that is sent
 // immediately to the finger controllers as a "pre-grasp" signal.  The

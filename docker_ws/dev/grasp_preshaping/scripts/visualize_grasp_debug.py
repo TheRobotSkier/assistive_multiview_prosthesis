@@ -115,10 +115,12 @@ def load_dump(path: str) -> dict:
     pose = data["input_pose"]
     twist = data["input_twist"]
 
-    # Backward-compatible: handle 24-col, 25-col, 26-col, and 27-col formats
+    # Backward-compatible: handle 24-col, 25-col, 26-col, 27-col, and 28-col formats
     raw_len = len(data["scored_grasps"])
     if raw_len > 0:
-        if raw_len % 27 == 0:
+        if raw_len % 28 == 0:
+            row_len = 28
+        elif raw_len % 27 == 0:
             row_len = 27
         elif raw_len % 26 == 0:
             row_len = 26
@@ -128,10 +130,10 @@ def load_dump(path: str) -> dict:
             row_len = 24
         grasps_raw = data["scored_grasps"].reshape(-1, row_len)
     else:
-        row_len = 27
+        row_len = 28
         grasps_raw = np.zeros((0, row_len))
 
-    if row_len == 27:
+    if row_len == 28:
         grasps = {
             "sample_index": grasps_raw[:, 0].astype(int),
             "grasp_type": grasps_raw[:, 1].astype(int),
@@ -139,6 +141,23 @@ def load_dump(path: str) -> dict:
             "alignment": grasps_raw[:, 3],
             "force_closure": grasps_raw[:, 4],
             "contact_count_score": grasps_raw[:, 5],
+            "contact_score": grasps_raw[:, 6],
+            "active_contact_count": grasps_raw[:, 7].astype(int),
+            "found_collision": grasps_raw[:, 8] > 0.5,
+            "combined": grasps_raw[:, 9],
+            "probability": grasps_raw[:, 10],
+            "wrist_rotation": grasps_raw[:, 11],
+            "pose_4x4": grasps_raw[:, 12:28].reshape(-1, 4, 4),
+        }
+    elif row_len == 27:
+        grasps = {
+            "sample_index": grasps_raw[:, 0].astype(int),
+            "grasp_type": grasps_raw[:, 1].astype(int),
+            "closure": grasps_raw[:, 2],
+            "alignment": grasps_raw[:, 3],
+            "force_closure": grasps_raw[:, 4],
+            "contact_count_score": grasps_raw[:, 5],
+            "contact_score": np.zeros(len(grasps_raw)),
             "active_contact_count": grasps_raw[:, 6].astype(int),
             "found_collision": grasps_raw[:, 7] > 0.5,
             "combined": grasps_raw[:, 8],
@@ -154,6 +173,7 @@ def load_dump(path: str) -> dict:
             "alignment": grasps_raw[:, 3],
             "force_closure": grasps_raw[:, 4],
             "contact_count_score": grasps_raw[:, 5],
+            "contact_score": np.zeros(len(grasps_raw)),
             "active_contact_count": np.zeros(len(grasps_raw), dtype=int),
             "found_collision": grasps_raw[:, 6] > 0.5,
             "combined": grasps_raw[:, 7],
@@ -169,6 +189,7 @@ def load_dump(path: str) -> dict:
             "alignment": grasps_raw[:, 3],
             "force_closure": grasps_raw[:, 4],
             "contact_count_score": grasps_raw[:, 5],
+            "contact_score": np.zeros(len(grasps_raw)),
             "active_contact_count": np.zeros(len(grasps_raw), dtype=int),
             "found_collision": grasps_raw[:, 6] > 0.5,
             "combined": grasps_raw[:, 7],
@@ -185,6 +206,7 @@ def load_dump(path: str) -> dict:
             "alignment": grasps_raw[:, 3],
             "force_closure": grasps_raw[:, 4],
             "contact_count_score": np.zeros(len(grasps_raw)),
+            "contact_score": np.zeros(len(grasps_raw)),
             "active_contact_count": np.zeros(len(grasps_raw), dtype=int),
             "found_collision": grasps_raw[:, 5] > 0.5,
             "combined": grasps_raw[:, 6],
@@ -214,12 +236,17 @@ def _quat_rotate(qw, qx, qy, qz, v):
 
 
 def _find_best_grasp(grasps, threshold=-np.inf):
-    """Find the index and score of the best grasp above threshold."""
+    """Find the index and score of the best grasp above threshold.
+
+    With dense scoring, all grasps have real combined scores (no NEG_INFINITY).
+    The found_collision flag is kept as a diagnostic but no longer used as a
+    hard filter — Tier 2/3 results can be the "best" when no Tier 1 exists.
+    """
     n = len(grasps["combined"])
     best_idx = -1
     best_combined = -np.inf
     for i in range(n):
-        if grasps["found_collision"][i] and grasps["combined"][i] >= threshold:
+        if grasps["combined"][i] >= threshold:
             if grasps["combined"][i] > best_combined:
                 best_combined = grasps["combined"][i]
                 best_idx = i
@@ -304,6 +331,15 @@ def print_summary(dump: dict, path: str):
           f"  ang=({twist[3]:.3f}, {twist[4]:.3f}, {twist[5]:.3f})")
     print(f"  Grasp candidates: {n_total} total, {n_collision} with collision")
 
+    # Contact-score tier distribution (dense reward landscape)
+    cs = grasps["contact_score"]
+    n_tier1 = int((cs >= 0.8).sum())
+    n_tier2 = int(((cs >= 0.3) & (cs < 0.8)).sum())
+    n_tier3 = int(((cs > 0.0) & (cs < 0.3)).sum())
+    n_tier4 = int((cs == 0.0).sum())
+    print(f"  Contact tiers:   T1(valid)={n_tier1}  T2(soft)={n_tier2}"
+          f"  T3(start-col)={n_tier3}  T4(no-col)={n_tier4}")
+
     # Score distribution
     if n_collision > 0:
         collision_scores = grasps["combined"][grasps["found_collision"]]
@@ -323,6 +359,7 @@ def print_summary(dump: dict, path: str):
               f"  closure={grasps['closure'][best_idx]:.4f}"
               f"  alignment={grasps['alignment'][best_idx]:.4f}"
               f"  force_closure={grasps['force_closure'][best_idx]:.4f}"
+              f"  contact_score={grasps['contact_score'][best_idx]:.4f}"
               f"  combined={grasps['combined'][best_idx]:.4f}"
               f"  prob={grasps['probability'][best_idx]:.4f}")
     print("=" * 60)
@@ -627,10 +664,15 @@ def visualize_pyvista(dump: dict, args):
     def get_grasp_indices():
         """Compute which grasp indices to show based on current state.
         Returns a tuple: (all_valid_indices, top_displayed_indices)
+
+        With dense scoring, all grasps have real combined scores. We filter
+        by threshold and contact_score > 0 (i.e., at least Tier 3) to avoid
+        rendering Tier 4 (no object in reach) as clutter.
         """
         candidates = []
         for i in range(n_grasps):
-            if not grasps["found_collision"][i]:
+            if grasps["contact_score"][i] <= 0.0:
+                # Tier 4: no collision at all — skip rendering.
                 continue
             if grasps["combined"][i] < threshold:
                 continue
@@ -913,7 +955,7 @@ def visualize_pyvista(dump: dict, args):
             return
 
         for i in top_indices:
-            if not grasps["found_collision"][i]:
+            if grasps["contact_score"][i] <= 0.0:
                 continue
             is_best = (i == best_idx)
             positions = _compute_hand_positions(i)
@@ -1163,7 +1205,7 @@ def visualize_matplotlib(dump: dict, args):
     best_idx, best_combined = _find_best_grasp(grasps)
 
     for i in range(len(grasps["combined"])):
-        if not grasps["found_collision"][i] or grasps["combined"][i] < threshold:
+        if grasps["contact_score"][i] <= 0.0 or grasps["combined"][i] < threshold:
             continue
         T = grasps["pose_4x4"][i]
         pos = T[:3, 3]

@@ -125,7 +125,7 @@ fn main() {
     let collision_tol = config::COLLISION_TOL_M;
     let weights = grasp_preshaping::planner::GraspWeights::default();
 
-    let grasp_scorers: [(i32, fn(&FingerLUT, &grasp_preshaping::pointcloud_helper::Tsdf, &Matrix4<f64>, f32) -> Option<grasp_preshaping::planner::GraspScoreResult>); 3] = [
+    let grasp_scorers: [(i32, fn(&FingerLUT, &grasp_preshaping::pointcloud_helper::Tsdf, &Matrix4<f64>, f32) -> grasp_preshaping::planner::GraspScoreResult); 3] = [
         (1i32, score_cylindrical),
         (2i32, score_pinch),
         (3i32, score_lateral),
@@ -144,46 +144,23 @@ fn main() {
 
         let (gt_int, scorer) = grasp_scorers[sp.grasp_type];
 
-        match scorer(&lut, &tsdf, &base_transform, collision_tol) {
-            Some(result) => {
-                let combined = if result.found_collision {
-                    result.combined_score(&weights, sp.sample_probability)
-                } else {
-                    f64::NEG_INFINITY
-                };
-                grasp_exports.push(ScoredGraspExport {
-                    sample_index: si,
-                    grasp_type_i32: gt_int,
-                    closure_amount: result.closure_amount,
-                    alignment_score: result.alignment_score,
-                    force_closure_score: result.force_closure_score,
-                    contact_count_score: result.contact_count_score,
-                    active_contact_count: result.active_contact_count,
-                    found_collision: result.found_collision,
-                    combined_score: combined,
-                    sample_probability: sp.sample_probability,
-                    pose_se3,
-                    wrist_rotation: sp.wrist_rotation,
-                });
-            }
-            None => {
-                // Start-position collision — invalid pose.
-                grasp_exports.push(ScoredGraspExport {
-                    sample_index: si,
-                    grasp_type_i32: gt_int,
-                    closure_amount: 0.0,
-                    alignment_score: 0.0,
-                    force_closure_score: 0.0,
-                    contact_count_score: 0.0,
-                    active_contact_count: 0,
-                    found_collision: false,
-                    combined_score: f64::NEG_INFINITY,
-                    sample_probability: sp.sample_probability,
-                    pose_se3,
-                    wrist_rotation: sp.wrist_rotation,
-                });
-            }
-        }
+        let result = scorer(&lut, &tsdf, &base_transform, collision_tol);
+        let combined = result.combined_score(&weights, sp.sample_probability);
+        grasp_exports.push(ScoredGraspExport {
+            sample_index: si,
+            grasp_type_i32: gt_int,
+            closure_amount: result.closure_amount,
+            alignment_score: result.alignment_score,
+            force_closure_score: result.force_closure_score,
+            contact_count_score: result.contact_count_score,
+            contact_score: result.contact_score,
+            active_contact_count: result.active_contact_count,
+            found_collision: result.found_collision,
+            combined_score: combined,
+            sample_probability: sp.sample_probability,
+            pose_se3,
+            wrist_rotation: sp.wrist_rotation,
+        });
     }
 
     // Build debug dump

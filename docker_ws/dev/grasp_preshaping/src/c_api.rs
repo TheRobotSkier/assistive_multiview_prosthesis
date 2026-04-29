@@ -137,7 +137,7 @@ type ScorerFn = fn(
     &crate::pointcloud_helper::Tsdf,
     &Matrix4<f64>,
     f32,
-) -> Option<GraspScoreResult>;
+) -> GraspScoreResult;
 
 struct ComputeOutput {
     grasp_type: GraspType,
@@ -189,34 +189,12 @@ fn score_all_samples(
                 _ => GraspType::Lateral,
             };
 
-            match scorer(lut, tsdf, &base_transform, collision_tol) {
-                Some(result) => {
-                    let combined = if result.found_collision {
-                        result.combined_score(&weights, sp.sample_probability)
-                    } else {
-                        f64::NEG_INFINITY
-                    };
-                    ScoredGrasp {
-                        grasp_type,
-                        result,
-                        combined,
-                    }
-                }
-                None => {
-                    // Start-position collision — pose is invalid.
-                    ScoredGrasp {
-                        grasp_type,
-                        result: GraspScoreResult {
-                            closure_amount: 0.0,
-                            alignment_score: 0.0,
-                            force_closure_score: 0.0,
-                            contact_count_score: 0.0,
-                            active_contact_count: 0,
-                            found_collision: false,
-                        },
-                        combined: f64::NEG_INFINITY,
-                    }
-                }
+            let result = scorer(lut, tsdf, &base_transform, collision_tol);
+            let combined = result.combined_score(&weights, sp.sample_probability);
+            ScoredGrasp {
+                grasp_type,
+                result,
+                combined,
             }
         })
         .collect()
@@ -398,6 +376,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
                     alignment_score: sg.result.alignment_score,
                     force_closure_score: sg.result.force_closure_score,
                     contact_count_score: sg.result.contact_count_score,
+                    contact_score: sg.result.contact_score,
                     active_contact_count: sg.result.active_contact_count,
                     found_collision: sg.result.found_collision,
                     combined_score: sg.combined,
@@ -442,9 +421,9 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
 
     let best = select_best_grasp(&scored).ok_or("No valid grasps found")?;
 
-    if !best.result.found_collision {
+    if best.result.contact_score == 0.0 {
         return Err(format!(
-            "No collision found for any grasp type ({} samples evaluated)",
+            "No object in reach for any grasp type ({} samples evaluated, best contact_score=0.0)",
             scored.len()
         ));
     }
