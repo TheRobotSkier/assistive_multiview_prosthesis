@@ -91,3 +91,81 @@ The TSDF enables extremely fast distance and gradient queries. The optimization 
 ## Notes
 
 Viz needs wrist integration
+
+
+### Current state vs Proposed state
+
+**1. Alignment Score**
+- *Current:* Averages the dot product of surface normal and force direction for contacts that surpass a basic force threshold.
+- *Proposed:* Keep as is. It measures if the local surface is pushing back against the closing finger. If `0.0`, the fingers are slipping sideways.
+
+**2. Force Closure Score**
+- *Current:* Measures whether the normal forces acting on the object span a wide enough set of directions to resist forces (centroid of normals close to origin).
+- *Proposed:* Keep as is. If `0.0`, all contacts are pushing the object in the same direction (it will pop out). 
+
+**3. Contact Score (The Unified Quality/Penalty Metric)**
+- *Current:* `min(active.len() as f64 / spec.min_contacts as f64, 1.0)`.
+- *Proposed (Actionable Plan):* Expand this into a comprehensive measure of whether the physical contact structure makes sense. 
+  - Start at a baseline based on active contacts vs. required contacts (like today).
+  - *Multiply* by a penalty if `finger_set.len() < spec.min_fingers` (e.g., `0.5`). It's not a hard fail anymore—maybe a two-finger cylindrical grasp just needs to shift slightly to catch the third finger.
+  - *If a start collision occurs (palm in object)*: Score is `0.0` (or `1e-6`). This requires *major* tweaks, not minor ones. 
+  - *If no collision at all occurs*: Score is `0.0`. Again, the hand closed on nothing.
+
+### How to implement this in planner.rs:
+
+Instead of modifying `GraspScoreResult`, you just change *how* you instantiate it inside `score_grasp`:
+
+1. **Remove `Option` wrapper:** If you want smooth gradients, return `GraspScoreResult` everywhere.
+2. **Start collision:** Return a `GraspScoreResult` with all scores `0.0`.
+3. **No collision:** Same, all scores `0.0`.
+4. **Calculated valid closure:** 
+   - Calculate basic contact fraction: `base_contact = min(active_count / min_contacts, 1.0)`
+   - Calculate diversity multiplier: `if finger_count < min_fingers { 0.5 } else { 1.0 }`
+   - Set `contact_score = base_contact * diversity_multiplier`.
+
+### How to distinguish them using scores
+
+If your goal is a continuous gradient where higher scores mean "closer to a perfect grasp," you can map these failure modes to distinct score tiers within the `contact_count_score` (or an overall `quality_multiplier`):
+
+1. **Valid Grasp (Score: ~0.8 to 1.0)**
+   - Swept closed, hit surface, good normals, enough fingers. 
+
+2. **Soft Rejection (Score: ~0.3 to 0.7)**
+   - *Example:* Found collisions and good normals, but missing a finger constraint (`finger_set.len() < spec.min_fingers`).
+   - *Fix:* Minor translation or rotation to catch that last finger.
+
+3. **Start Collision (Score: ~0.1)**
+   - *Example:* `sample == 0` collision. 
+   - *Meaning:* Palm or open fingers are inside the object. Closure is `0.0`.
+   - *Fix:* Moderate translation (pull back). The non-zero score tells an optimizer "you are close to the object, keep exploring near here!"
+
+4. **No Collision (Score: 0.0)**
+   - *Example:* Hand sweeps completely closed, hits nothing.
+   - *Meaning:* Empty space.
+   - *Fix:* Major translation needed. Score is zero because there's no useful physical contact data.
+
+
+## Doing sampling
+
+To do more efficient sampling, we should implement Sequential Monte Carlo (SMC) with decaying proposal variance. For this we need jitter_omega, jitter_v, elite_ratio, decay, and iterations. The current PREDICTION_SAMPLES should be used for each iteration. I propose starting values:
+
+```rust
+// Should be added to config.rs
+
+// SMC Optimization Constants
+pub const ITERATIONS: usize = 8; 
+pub const DECAY_RATE: f64 = 0.75; // Geometric decay
+pub const ELITE_RATIO: f64 = 0.1;
+
+// Starting Proposal Variance (The "Wide Net")
+pub const INITIAL_PROPOSAL_STD_V: f64 = 0.002;
+pub const INITIAL_PROPOSAL_STD_OMEGA: f64 = 0.005;
+```
+
+I am not entirely sure what changes would need to happen for this to be implemnted succesfully, please investigate the files, and figure out exactly how to implment this, what files to modify, and verficaty your findings.
+
+You should also examine how rayon or other optimisations can speed this search up, since we are doing alot of samples and they should be highly parallelizable. I am not sure if the current implementation is already doing this, but it is worth looking into.
+
+## Topic mapping
+
+Do some smarter in out topics for the presahping, so i know what is going on

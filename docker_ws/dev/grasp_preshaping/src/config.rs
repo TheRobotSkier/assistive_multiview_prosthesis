@@ -13,10 +13,15 @@ pub const BINARY_SEARCH_TOL: f64 = 0.01;
 
 // ROI prediction
 pub const PREDICTION_HORIZON_S: f64 = 5.0;
-pub const PREDICTION_SAMPLES: usize = 1000000;
+pub const PREDICTION_SAMPLES: usize = 10000;
 pub const HAND_RADIUS_M: f64 = 0.05;
 pub const MIN_TSDF_DIM_M: f32 = 0.1;
 pub const MAX_TSDF_DIM_M: f32 = 0.3;
+
+// Wrist rotation allowed range (radians). The wrist rotates around the local
+// Y axis (supination/pronation). Value is the half-range; actual rotation is
+// sampled uniformly from [-WRIST_ROTATION_RANGE_RAD, WRIST_ROTATION_RANGE_RAD].
+pub const WRIST_ROTATION_RANGE_RAD: f64 = std::f64::consts::FRAC_PI_2;
 
 // Fixed twist covariance
 pub const FIXED_COV_OMEGA: [f64; 3] = [0.001, 0.001, 0.001];

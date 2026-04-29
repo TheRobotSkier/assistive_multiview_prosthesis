@@ -5,9 +5,6 @@ use nalgebra::{Matrix3, Matrix4, UnitQuaternion, Vector3};
 use rand::Rng;
 use rand_distr::Normal;
 
-/// Maximum wrist rotation angle in radians (±90° = 180° total range).
-/// The wrist rotates around the local Y axis (supination/pronation).
-pub const WRIST_ROTATION_RANGE_RAD: f64 = std::f64::consts::FRAC_PI_2;
 
 #[derive(Debug, Clone)]
 pub struct SampledPose {
@@ -174,7 +171,7 @@ pub fn sample_future_poses(
         let grasp_type: usize = rng.random_range(0..3);
 
         // Random wrist rotation around local Y axis.
-        let wrist_rotation: f64 = rng.random_range(-WRIST_ROTATION_RANGE_RAD..WRIST_ROTATION_RANGE_RAD);
+        let wrist_rotation: f64 = rng.random_range(-config::WRIST_ROTATION_RANGE_RAD..config::WRIST_ROTATION_RANGE_RAD);
 
         // Apply wrist rotation to the sampled pose.
         let wrist_se3 = {
