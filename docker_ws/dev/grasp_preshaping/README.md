@@ -2,6 +2,27 @@
 
 This package provides the grasp preshaping solver core (Rust), the FFI type definitions shared between Rust and C++, and the ROS 2 service bridge node.
 
+## Building
+
+The Rust shared library (`libgrasp_preshaping.so`) is built separately from the ROS 2 workspace
+using the `rust_build` Docker Compose service. This keeps Rust toolchain out of the main ROS
+image and avoids recompiling unrelated packages when only Rust code changes.
+
+```bash
+# From docker_ws/docker-deployment/ — first time, or after changing src/
+docker compose run --rm rust_build
+```
+
+The `.so` is written to `docker_ws/dev/grasp_preshaping/target/release/` on the host and loaded
+at runtime by the bridge node via `dlopen` through the workspace bind mount. The bridge node
+will exit with a fatal error if the `.so` is not found — run `rust_build` first.
+
+`colcon build` (inside the main ROS container) only compiles the C++ bridge node executable; it
+does not require Rust. If a pre-built `.so` is already present in `target/release/`, colcon will
+also install it into the workspace.
+
+---
+
 ## Architecture Overview
 
 ### Data Loading

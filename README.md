@@ -28,19 +28,33 @@ Linux note: if not using bash shell, use
 bash -c 'COMMAND'
 ```
 
-# Select your compose file (system specific) like this in the .env file:
+# Select your compose file (system specific)
+
+`compose.yaml` auto-discovers the correct platform compose file via the
+`PLATFORM_COMPOSE` variable in `.env`. The default is `docker-compose.linux-podman.yml`.
+For Windows/WSL, set:
 
 ```bash
-COMPOSE_FILE=docker-compose.yml:docker-compose.linux-podman.yml
+echo "PLATFORM_COMPOSE=docker-compose.windows.yml" >> docker_ws/docker-deployment/.env
 ```
-
-and replace COMMAND with the command to run (keep the quotes in). This will run the command as a bash command regardless of your shell.
 
 THEN cd to the docker-deployment directory:
 
 ```bash
 cd docker_ws/docker-deployment
 ```
+
+### Build the Rust grasp-preshaping library (once, or on Rust source change)
+
+Before starting the simulation for the first time, build the Rust `.so`:
+
+```bash
+docker compose run --rm rust_build
+```
+
+This compiles `libgrasp_preshaping.so` and places it in
+`docker_ws/dev/grasp_preshaping/target/release/` on the host. Re-run this step
+whenever you change files under `docker_ws/dev/grasp_preshaping/src/`.
 
 ### For the interactive simulation (recommended):
 

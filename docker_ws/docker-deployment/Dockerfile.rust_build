@@ -1,0 +1,10 @@
+FROM rust:slim-bookworm
+
+# Build-time dependencies for the preshaping crate (none beyond the Rust
+# toolchain itself — all crate deps are fetched by cargo at run time).
+# The source tree is bind-mounted at /build by docker compose, so there
+# is nothing to COPY here.
+
+WORKDIR /build
+
+CMD ["cargo", "build", "--release", "--lib"]

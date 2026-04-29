@@ -36,8 +36,7 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-### OPEN3D
-# Install Open3D system dependencies and pip
+### OpenGL / MuJoCo rendering dependencies
 RUN apt-get update && apt-get install --no-install-recommends -y \
     libegl1 \
     libgl1 \
@@ -57,15 +56,6 @@ RUN wget https://github.com/google-deepmind/mujoco/releases/download/${MUJOCO_VE
 RUN mkdir -p /home/mujoco
 RUN tar -xzf "mujoco-${MUJOCO_VERSION}-linux-${CPU_ARCH}.tar.gz" -C $(dirname "${MUJOCO_DIR}")
 
-
-### ADDED: Rust Installation
-ENV RUSTUP_HOME=/usr/local/rustup \
-    CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path \
-    && chmod -R a+w $RUSTUP_HOME $CARGO_HOME
-###
 
 
 # Setup user configuration
@@ -107,8 +97,9 @@ RUN echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/$USERNAME/.bash
 
 RUN sudo python3 -m pip install --no-cache-dir --break-system-packages mujoco==${MUJOCO_VERSION}
 
-### OPEN3D
-# Install Open3D from the PyPI repositories
+### Open3D
+# Open3D is only needed by the pc_segmentation service (which has its own
+# Dockerfile). Uncomment only if you need it in this base image as well.
 #RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
 ###
 

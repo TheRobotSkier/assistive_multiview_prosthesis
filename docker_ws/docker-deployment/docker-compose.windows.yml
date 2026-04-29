@@ -287,3 +287,23 @@ services:
       ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
     command: ["python3", "/scripts/motor_test.py"]
 
+  # ── Rust grasp-preshaping build ───────────────────────────────────────────
+  # One-shot service: compiles libgrasp_preshaping.so and writes the output to
+  # docker_ws/dev/grasp_preshaping/target/release/ on the host (via bind mount).
+  # Run this once before starting any simulation service that uses the grasp
+  # planner, and re-run whenever the Rust source changes.
+  #
+  #   docker compose run --rm rust_build
+  #
+  rust_build:
+    build:
+      context: ..
+      dockerfile: docker-deployment/Dockerfile.rust_build
+    container_name: rust_build
+    network_mode: "host"
+    volumes:
+      - ../dev/grasp_preshaping:/build
+      - rust_cargo_cache:/usr/local/cargo/registry
+
+volumes:
+  rust_cargo_cache:

@@ -3,7 +3,7 @@ The **mia_hand_ros2_pkgs** packages use `Docker Compose` to simplify the use of 
 Each component is containerized, to ensure environment consistency and easy setup.
 
 ## Docker Compose services
-All the services defined in the `docker-compose.yml` file can be retrieved by running the following command:
+All the services defined in the compose files can be retrieved by running:
 ```bash
 cd docker-deployment
 docker compose config --services
@@ -16,6 +16,7 @@ An overview of the services is reported below:
 * `miahand_moveit`: planning and execution of motions with `Moveit2` by using a simulated, mock, or real hardware interface.
 * `miahand_mujoco`: simulate Mia Hand in `MuJoCo` and control the simulated hand through the `ROS2 Control` framework.
 * `miahand_ros2_control`: control Mia Hand through the `ROS2 Control` framework.
+* `rust_build`: **one-shot** — compiles `libgrasp_preshaping.so` from the Rust grasp-preshaping crate. Run before any simulation service that uses the grasp planner.
 
 ### Using Docker Compose
 
@@ -57,6 +58,21 @@ Launch the `miahand_ros2_control` service:
 ```bash
 USE_MOCK_HARDWARE=false docker compose run --rm miahand_ros2_control
 ```
+
+#### Rust grasp-preshaping build (one-time / on Rust source change)
+
+The grasp-preshaping Rust library (`libgrasp_preshaping.so`) is built in its own container and
+**must be built before** starting any simulation service that uses the planner
+(`mujoco_dynamic`, `mujoco_interactive`, `mujoco_trajectory`).
+
+```bash
+# First time, or after changing docker_ws/dev/grasp_preshaping/src/**
+docker compose run --rm rust_build
+```
+
+The compiled `.so` is written to `docker_ws/dev/grasp_preshaping/target/release/` on the host and
+loaded at runtime by the bridge node via `dlopen`. The main ROS 2 image does not need Rust
+installed.
 
 ### Graphic User Interface (GUI) Support
 For the services that require a GUI (`RViz2` or `MuJoCo`), the Docker access to the X server should be granted.
