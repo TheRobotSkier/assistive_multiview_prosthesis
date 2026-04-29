@@ -84,6 +84,11 @@ install(TARGETS preshaping_service_bridge_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  nodes/grasp_proximity_controller_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY include/
   DESTINATION include
 )
