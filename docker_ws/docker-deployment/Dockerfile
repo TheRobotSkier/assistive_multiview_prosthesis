@@ -32,6 +32,9 @@ RUN apt-get update && \
         libegl1 \
         libgl1 \
         libgomp1 \
+        libeigen3-dev \
+        libboost-all-dev \
+        libceres-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -112,7 +115,7 @@ RUN sudo chown -R $USERNAME:$USERNAME /miahand_ws \
     && sudo apt-get clean \
     && sudo rm -rf /var/lib/apt/lists/* \
     && . "/opt/ros/${ROS_DISTRO}/setup.sh" \
-    && colcon build \
+    && MAKEFLAGS="-j1" CMAKE_BUILD_PARALLEL_LEVEL=1 colcon build --executor sequential \
     && echo "source install/setup.bash" >> /home/$USERNAME/.bashrc
 
 COPY ./docker-deployment/ros_entrypoint.sh /ros_entrypoint.sh
