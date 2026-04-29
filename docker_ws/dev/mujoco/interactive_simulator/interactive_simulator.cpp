@@ -981,6 +981,47 @@ void InteractiveSimulator::slerp_quat(
   mju_normalize4(res);
 }
 
+void InteractiveSimulator::local_to_world_inplace(
+  const mjModel* m, int body_id, mjtNum pos[3], mjtNum quat_wxyz[4])
+{
+  const int parent_id = m->body_parentid[body_id];
+  if (parent_id == 0) return;  // parent is worldbody, already world frame
+  // Parent is a joint-free intermediate body; body_pos[parent] = its world pos.
+  const mjtNum* p_pos  = &m->body_pos [parent_id * 3];
+  const mjtNum* p_quat = &m->body_quat[parent_id * 4];
+  // world_pos = R_parent × local_pos + p_pos
+  mjtNum rotated[3];
+  mju_rotVecQuat(rotated, pos, p_quat);
+  pos[0] = rotated[0] + p_pos[0];
+  pos[1] = rotated[1] + p_pos[1];
+  pos[2] = rotated[2] + p_pos[2];
+  // world_quat = p_quat × local_quat
+  const mjtNum lq[4] = {quat_wxyz[0], quat_wxyz[1], quat_wxyz[2], quat_wxyz[3]};
+  mju_mulQuat(quat_wxyz, p_quat, lq);
+  mju_normalize4(quat_wxyz);
+}
+
+void InteractiveSimulator::apply_body_pose_world(
+  mjModel* m, int body_id, const mjtNum pos_world[3], const mjtNum quat_world[4])
+{
+  mjtNum pos[3]  = {pos_world[0], pos_world[1], pos_world[2]};
+  mjtNum quat[4] = {quat_world[0], quat_world[1], quat_world[2], quat_world[3]};
+  const int parent_id = m->body_parentid[body_id];
+  if (parent_id != 0) {
+    const mjtNum* p_pos  = &m->body_pos [parent_id * 3];
+    const mjtNum* p_quat = &m->body_quat[parent_id * 4];
+    // local_pos = R_parent_inv × (world_pos - p_pos)
+    const mjtNum dp[3] = {pos[0]-p_pos[0], pos[1]-p_pos[1], pos[2]-p_pos[2]};
+    const mjtNum p_inv[4] = {p_quat[0], -p_quat[1], -p_quat[2], -p_quat[3]};
+    mju_rotVecQuat(pos, dp, p_inv);
+    // local_quat = R_parent_inv × world_quat
+    const mjtNum wq[4] = {quat[0], quat[1], quat[2], quat[3]};
+    mju_mulQuat(quat, p_inv, wq);
+    mju_normalize4(quat);
+  }
+  apply_body_pose(m, body_id, pos, quat);
+}
+
 void InteractiveSimulator::add_scene_section(mujoco::Simulate* sim)
 {
   if (!mj_model_) return;
@@ -991,13 +1032,17 @@ void InteractiveSimulator::add_scene_section(mujoco::Simulate* sim)
   cam_body_id_        = mj_name2id(mj_model_, mjOBJ_BODY, "depth_cam_body");
   wrist_cam_body_id_  = mj_name2id(mj_model_, mjOBJ_BODY, "wrist_cam_body");
 
-  // Read initial poses from the model
+  // Read initial poses from the model in world frame
   auto read_body_pose = [&](int id, mjtNum pos[3], mjtNum rpy[3]) {
     if (id < 0) return;
     pos[0] = mj_model_->body_pos[id*3 + 0];
     pos[1] = mj_model_->body_pos[id*3 + 1];
     pos[2] = mj_model_->body_pos[id*3 + 2];
-    const mjtNum* q = &mj_model_->body_quat[id*4];
+    mjtNum q[4] = {
+      mj_model_->body_quat[id*4 + 0], mj_model_->body_quat[id*4 + 1],
+      mj_model_->body_quat[id*4 + 2], mj_model_->body_quat[id*4 + 3]
+    };
+    local_to_world_inplace(mj_model_, id, pos, q);
     quat_to_rpy(q, rpy);
   };
 
@@ -1094,7 +1139,7 @@ void InteractiveSimulator::apply_scene_poses(mjModel* m, mjData* /*d*/)
     scene_hand_dirty_.store(false);
     mjtNum q[4];
     rpy_to_quat(scene_hand_rpy_, q);
-    apply_body_pose(m, hand_body_id_, scene_hand_pos_, q);
+    apply_body_pose_world(m, hand_body_id_, scene_hand_pos_, q);
   }
   if (scene_obj_dirty_.load() && obj_body_id_ >= 0 && !motion_obj_state_.active) {
     scene_obj_dirty_.store(false);
@@ -1338,6 +1383,8 @@ void InteractiveSimulator::advance_motions(mjModel* m)
         for (int i = 0; i < 3; ++i) ms.src_pos[i]  = m->body_pos[body_id*3 + i];
         for (int i = 0; i < 4; ++i) ms.src_quat[i] = m->body_quat[body_id*4 + i];
         mju_normalize4(ms.src_quat);
+        // Convert src from parent-local to world frame for world-frame interpolation.
+        local_to_world_inplace(m, body_id, ms.src_pos, ms.src_quat);
         for (int i = 0; i < 3; ++i) ms.tgt_pos[i]  = cmd.tgt_pos[i];
         for (int i = 0; i < 4; ++i) ms.tgt_quat[i] = cmd.tgt_quat[i];
         mju_normalize4(ms.tgt_quat);
@@ -1375,7 +1422,7 @@ void InteractiveSimulator::advance_motions(mjModel* m)
     mjtNum cur_quat[4];
     slerp_quat(cur_quat, ms.src_quat, ms.tgt_quat, ts);
 
-    apply_body_pose(m, body_id, cur_pos, cur_quat);
+    apply_body_pose_world(m, body_id, cur_pos, cur_quat);
 
     // Mirror interpolated pose into scene arrays so Scene Control stays in sync.
     for (int i = 0; i < 3; ++i) pos[i] = cur_pos[i];

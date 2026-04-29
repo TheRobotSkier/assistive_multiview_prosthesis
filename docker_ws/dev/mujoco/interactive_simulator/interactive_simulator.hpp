@@ -156,6 +156,13 @@ private:
   static void quat_to_rpy(const mjtNum q_wxyz[4], mjtNum rpy[3]);
   static void apply_body_pose(mjModel* m, int body_id,
                               const mjtNum pos[3], const mjtNum quat_wxyz[4]);
+  // Convert pos/quat in-place from parent-local frame to world frame.
+  // No-op when parent is worldbody. Assumes parent has no joints (static body).
+  static void local_to_world_inplace(const mjModel* m, int body_id,
+                                     mjtNum pos[3], mjtNum quat_wxyz[4]);
+  // Apply pos/quat expressed in world frame to a body (handles parent-local conversion).
+  static void apply_body_pose_world(mjModel* m, int body_id,
+                                    const mjtNum pos_world[3], const mjtNum quat_world[4]);
   static void slerp_quat(mjtNum res[4], const mjtNum q0[4],
                          const mjtNum q1[4], mjtNum t);
 

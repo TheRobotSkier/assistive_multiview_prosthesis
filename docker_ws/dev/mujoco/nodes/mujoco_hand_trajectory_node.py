@@ -35,6 +35,8 @@ from rclpy.node import Node
 # ---------------------------------------------------------------------------
 HAND_START = dict(x=-0.3,   y=0.5,  z=0.41,  roll=2,  pitch=0.0,  yaw=-0.4)
 HAND_END   = dict(x=-0.12, y=0.1,  z=0.31,  roll=3.14, pitch=-1.0, yaw=0.0)
+#HAND_START = dict(x=0.25,   y=0.18,  z=0.3,  roll=1,  pitch=-2.7,  yaw=-1)
+#HAND_END   = dict(x=-0.1, y=0.18,  z=0.12,  roll=2.4, pitch=-3.14, yaw=-0.8)
 
 TRAJECTORY_DURATION_S = 4.0   # seconds
 SETTLE_DELAY_S        = 1.5   # pause between teleport and trajectory
