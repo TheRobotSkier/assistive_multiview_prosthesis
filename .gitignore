@@ -7,7 +7,7 @@ docker_ws/dev/mujoco/log/*
 .vscode
 .github/
 agent.md
-
+.agents/
 # ignore rust files
 target/
 Cargo.lock
