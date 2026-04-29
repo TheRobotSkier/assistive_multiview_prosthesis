@@ -9,21 +9,45 @@ Calibration artifacts and reproduction notes for the head/forehead-mounted Intel
 - Intended visual input: RGB monocular + IMU
 - Not used for this workflow: IR stereo, depth, RGB-D
 
+## Current Recommendation
+
+Use the **dynamic-bag camera intrinsics** and the **10x inflated camera-IMU calibration** as the current best calibration for OpenVINS integration/testing.
+
+Recommended final files:
+
+```text
+docker_ws/calibration/head/d435i_336222071386/camera_imu_extrinsics_inflated10x/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-camchain-imucam.yaml
+docker_ws/calibration/head/d435i_336222071386/camera_imu_extrinsics_inflated10x/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml
+```
+
+The original camera-only intrinsics and nominal IMU-noise results are kept for traceability and comparison.
+
 ## Folder Layout
 
-Recommended tracked location in the repository:
+Tracked location in the repository:
 
 ```text
 docker_ws/calibration/head/d435i_336222071386/
 ├── README.md
 ├── aprilgrid_6x6_80mm_0p3.yaml
+├── camera_imu_extrinsics_inflated10x
+│   ├── head_d435i_imu_200hz_trim_first30min_inflated10x.yaml
+│   ├── head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-camchain-imucam.yaml
+│   ├── head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-imu.yaml
+│   ├── head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-report-imucam.pdf
+│   └── head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-results-imucam.txt
 ├── camera_intrinsics
 │   ├── head_camera_intrinsics_ros1-camchain.yaml
 │   ├── head_camera_intrinsics_ros1-report-cam.pdf
 │   └── head_camera_intrinsics_ros1-results-cam.txt
+├── camera_intrinsics_from_dynamic
+│   ├── head_rgb_imu_dynamic_20260429_131443_ros1-camchain.yaml
+│   ├── head_rgb_imu_dynamic_20260429_131443_ros1-report-cam.pdf
+│   └── head_rgb_imu_dynamic_20260429_131443_ros1-results-cam.txt
 └── imu_noise
     ├── acceleration.png
     ├── gyro.png
+    ├── head_d435i_imu_200hz_trim_first30min_inflated10x.yaml
     ├── head_d435i_imu_200hz_trim_first30min.yaml
     └── head_d435i_imu_allan_config_200hz_trim_first30min.yaml
 ```
@@ -70,15 +94,16 @@ Kalibr reports the tag spacing as `0.024 m`, because:
 
 ## Machine and Docker Setup
 
-Calibration was run on an x86 Ubuntu machine using Docker. This was done because building/running Kalibr on Jetson ARM64 was too heavy and failed due to architecture and memory constraints.
+Calibration was run on an x86 Ubuntu machine using Docker because building/running Kalibr on Jetson ARM64 was too heavy and failed due to architecture and memory constraints.
 
-The robot/recording setup was:
+Recording setup:
 
-- Jetson Orin Nano host OS: Ubuntu 22.04
+- Source robot: Jetson Orin Nano
+- Jetson host OS: Ubuntu 22.04
 - Jetson host ROS version: ROS 2 Humble
 - Project runtime container: Ubuntu 24.04 + ROS 2 Jazzy
 - Original camera/IMU data: recorded inside the ROS 2 Jazzy project container
-- Kalibr input: converted ROS 1 bags
+- Kalibr input: ROS 1 bags converted from ROS 2 Jazzy MCAP bags
 
 Kalibr requires ROS 1 bags for this workflow. Do not run Kalibr directly on the ROS 2 MCAP bags unless using a separate workflow that explicitly supports conversion.
 
@@ -165,19 +190,20 @@ Camera intrinsics ROS 1 bag:
 docker_ws/bags/calibration/head/camera_intrinsics/head_camera_intrinsics_ros1.bag
 ```
 
-Original stationary IMU ROS 1 bag:
+Stationary IMU ROS 1 bags:
 
 ```text
 docker_ws/bags/calibration/head/imu_noise/head_imu_stationary_15h_unified_ros1.bag
-```
-
-Trimmed stationary IMU ROS 1 bag, first 30 minutes removed:
-
-```text
 docker_ws/bags/calibration/head/imu_noise/head_imu_stationary_15h_trim_first30min_ros1.bag
 ```
 
-The original stationary IMU bag had:
+Dynamic camera-IMU ROS 1 bag:
+
+```text
+docker_ws/bags/calibration/head/cam_imu_dynamic/head_rgb_imu_dynamic_20260429_131443_ros1.bag
+```
+
+### Original Stationary IMU Bag
 
 ```text
 duration:    14hr 46:28s (53188s)
@@ -188,7 +214,7 @@ type:        sensor_msgs/Imu
 
 The first 30 minutes were removed because the device was powered on immediately before recording and was still warming up.
 
-The trimmed IMU bag had:
+### Trimmed Stationary IMU Bag
 
 ```text
 duration:    14hr 16:28s (51388s)
@@ -197,12 +223,39 @@ topic:       /head/d435i_head/imu
 type:        sensor_msgs/Imu
 ```
 
-## Verify Camera Intrinsics Bag
+### Dynamic Camera-IMU Bag
+
+The dynamic bag contained both:
+
+```text
+/head/d435i_head/color/image_raw    sensor_msgs/Image
+/head/d435i_head/imu                sensor_msgs/Imu
+```
+
+Kalibr read:
+
+```text
+Images:       8571
+IMU readings: 57795
+Duration:     about 289.9 s
+```
+
+## Verify Bags
+
+Set paths:
 
 ```bash
 export AMP_WS="$HOME/Documents/GitHub/assistive_multiview_prosthesis/docker_ws"
+export TRACKED_CALIB="$AMP_WS/calibration/head/d435i_336222071386"
 export CAM_CALIB="$AMP_WS/bags/calibration/head/camera_intrinsics"
+export IMU_CALIB="$AMP_WS/bags/calibration/head/imu_noise"
+export DYN_CALIB="$AMP_WS/bags/calibration/head/cam_imu_dynamic"
+export DYN_BAG="head_rgb_imu_dynamic_20260429_131443_ros1.bag"
+```
 
+Verify camera intrinsics bag:
+
+```bash
 sudo docker run --rm -it \
   --platform linux/amd64 \
   --entrypoint /bin/bash \
@@ -215,19 +268,28 @@ sudo docker run --rm -it \
   '
 ```
 
-Expected camera topic:
+Verify dynamic camera-IMU bag:
 
-```text
-/head/d435i_head/color/image_raw
+```bash
+sudo docker run --rm -it \
+  --platform linux/amd64 \
+  --entrypoint /bin/bash \
+  -v "$DYN_CALIB:/data:ro" \
+  kalibr:ros1_20_04 \
+  -lc "
+    source /catkin_ws/devel/setup.bash
+    rosbag info /data/$DYN_BAG | grep -E 'duration:|messages:|/head/d435i_head/color/image_raw|/head/d435i_head/imu|sensor_msgs'
+  "
 ```
 
-Expected ROS 1 message type:
+Expected ROS 1 message types:
 
 ```text
 sensor_msgs/Image
+sensor_msgs/Imu
 ```
 
-## Camera Intrinsics Calibration
+## Camera Intrinsics Calibration: Original Camera-Only Bag
 
 Command used:
 
@@ -263,43 +325,14 @@ head_camera_intrinsics_ros1-results-cam.txt
 head_camera_intrinsics_ros1-report-cam.pdf
 ```
 
-The PDF generation may print an X display warning in some Docker/headless setups. The calibration itself is still valid if the camchain and text result files were written.
-
-### Camera Intrinsics Result
-
-Model:
+Result:
 
 ```text
-pinhole-radtan
-```
-
-Camera topic:
-
-```text
-/head/d435i_head/color/image_raw
-```
-
-Estimated projection parameters:
-
-```text
-[602.64447786, 603.19240904, 333.86433006, 243.29999879]
-```
-
-Estimated distortion parameters:
-
-```text
-[0.10145786, -0.18046494, -0.00554649, 0.00627361]
-```
-
-Reprojection error:
-
-```text
-[0.000001, -0.000000] +- [0.400945, 0.366891] px
-```
-
-Other notes:
-
-```text
+Model: pinhole-radtan
+Topic: /head/d435i_head/color/image_raw
+Projection: [602.64447786, 603.19240904, 333.86433006, 243.29999879]
+Distortion: [0.10145786, -0.18046494, -0.00554649, 0.00627361]
+Reprojection error: [0.000001, -0.000000] +- [0.400945, 0.366891] px
 Processed images: 903
 Images used: 32
 Removed outlier corners: 181
@@ -308,11 +341,70 @@ Removed outlier corners: 181
 Assessment:
 
 ```text
-Usable for OpenVINS initial testing.
-The result is acceptable but not perfect. It could be improved later with a flatter Aprilgrid and more accepted views.
+Usable, but not the preferred final intrinsics.
+The board had small wrinkles during this recording, which may have contributed to outliers and residual error.
 ```
 
-Important caveat: the calibration board had small wrinkles during recording. This may have contributed to outlier corners and residual error, especially near the image edges. If final VIO quality is poor, redo the camera intrinsics calibration with the Aprilgrid mounted on a rigid, flat backing.
+## Camera Intrinsics Calibration: Dynamic Camera-IMU Bag
+
+The dynamic camera-IMU bag was also used to compute a second camera intrinsics calibration. This one is preferred because it produced lower reprojection error and fewer removed outliers.
+
+Command used:
+
+```bash
+export AMP_WS="$HOME/Documents/GitHub/assistive_multiview_prosthesis/docker_ws"
+export DYN_CALIB="$AMP_WS/bags/calibration/head/cam_imu_dynamic"
+export DYN_BAG="head_rgb_imu_dynamic_20260429_131443_ros1.bag"
+export TARGET="$AMP_WS/calibration/head/d435i_336222071386/aprilgrid_6x6_80mm_0p3.yaml"
+
+sudo docker run --rm -it \
+  --platform linux/amd64 \
+  --entrypoint /bin/bash \
+  -e MPLBACKEND=Agg \
+  -v "$DYN_CALIB:/data:rw" \
+  -v "$TARGET:/target.yaml:ro" \
+  -w /data \
+  kalibr:ros1_20_04 \
+  -lc "
+    set -e
+    source /catkin_ws/devel/setup.bash
+
+    rosrun kalibr kalibr_calibrate_cameras \
+      --models pinhole-radtan \
+      --topics /head/d435i_head/color/image_raw \
+      --target /target.yaml \
+      --bag /data/$DYN_BAG \
+      --bag-freq 10.0
+  "
+```
+
+Kalibr output files:
+
+```text
+head_rgb_imu_dynamic_20260429_131443_ros1-camchain.yaml
+head_rgb_imu_dynamic_20260429_131443_ros1-results-cam.txt
+head_rgb_imu_dynamic_20260429_131443_ros1-report-cam.pdf
+```
+
+Result:
+
+```text
+Model: pinhole-radtan
+Topic: /head/d435i_head/color/image_raw
+Projection: [599.17399284, 599.268246, 324.97194633, 250.51904788]
+Distortion: [0.11030607, -0.20736098, -0.00227622, 0.00184355]
+Reprojection error: [0.000001, -0.000002] +- [0.304388, 0.309307] px
+Processed images: 2859
+Images used: 34
+Removed outlier corners: 162
+```
+
+Assessment:
+
+```text
+Preferred camera intrinsics for the camera-IMU calibration.
+Compared with the original camera-only bag, this had lower reprojection error and fewer outlier corners.
+```
 
 ## IMU Noise Calibration
 
@@ -352,26 +444,6 @@ sudo docker run --rm -it \
       /data/head_imu_stationary_15h_trim_first30min_ros1.bag \
       "t.to_sec() > 1777392391.40"
   '
-```
-
-Verify trimmed bag:
-
-```bash
-sudo docker run --rm -it \
-  --platform linux/amd64 \
-  --entrypoint /bin/bash \
-  -v "$IMU_CALIB:/data:ro" \
-  kalibr:ros1_20_04 \
-  -lc '
-    source /catkin_ws/devel/setup.bash
-    rosbag info /data/head_imu_stationary_15h_trim_first30min_ros1.bag
-  '
-```
-
-Expected trimmed duration:
-
-```text
-14hr 16:28s (51388s)
 ```
 
 ### Allan Config
@@ -474,7 +546,7 @@ sudo chown -R "$USER:$USER" \
   "$IMU_CALIB/head_imu_stationary_15h_trim_first30min_ros1.bag"
 ```
 
-### IMU Noise Result
+### IMU Noise Result: Allan Estimate
 
 Final trimmed 200 Hz result:
 
@@ -506,123 +578,255 @@ rostopic: '/head/d435i_head/imu'
 update_rate: 200
 ```
 
-The trimmed and untrimmed values are very similar. This is a good sign. The trimmed 200 Hz result is the recommended one to use because it excludes the camera/IMU warm-up period.
+The trimmed and untrimmed values are very similar. This is a good sign. The trimmed 200 Hz result was used as the base IMU noise estimate.
 
-## Files to Use for OpenVINS / Future Kalibr Calibration
+### IMU Noise Result: 10x Inflated Runtime/Calibration Version
 
-Camera intrinsics:
+The Allan-estimated IMU values were inflated by 10x to account for unmodeled errors. This produced better normalized residuals during camera-IMU calibration.
 
-```text
-camera_intrinsics/head_camera_intrinsics_ros1-camchain.yaml
-```
-
-IMU noise:
+Final 10x inflated IMU noise file:
 
 ```text
-imu_noise/head_d435i_imu_200hz_trim_first30min.yaml
+imu_noise/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml
 ```
 
-Aprilgrid target:
+Contents:
+
+```yaml
+#Accelerometer
+accelerometer_noise_density: 0.009278837334054291
+accelerometer_random_walk: 0.0002804825905759594
+
+#Gyroscope
+gyroscope_noise_density: 0.0019841370058405537
+gyroscope_random_walk: 1.7544399415266354e-05
+
+rostopic: '/head/d435i_head/imu'
+update_rate: 200
+```
+
+## Camera-IMU Extrinsics and Time Offset Calibration
+
+Camera-IMU calibration used:
 
 ```text
-aprilgrid_6x6_80mm_0p3.yaml
+Camera intrinsics: camera_intrinsics_from_dynamic/head_rgb_imu_dynamic_20260429_131443_ros1-camchain.yaml
+IMU noise:         imu_noise/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml
+Target:            aprilgrid_6x6_80mm_0p3.yaml
+Dynamic bag:       bags/calibration/head/cam_imu_dynamic/head_rgb_imu_dynamic_20260429_131443_ros1.bag
 ```
 
-Reports for inspection/documentation:
+A symlinked bag name was used for the 10x run so Kalibr would not overwrite the nominal output:
 
-```text
-camera_intrinsics/head_camera_intrinsics_ros1-report-cam.pdf
-camera_intrinsics/head_camera_intrinsics_ros1-results-cam.txt
-imu_noise/acceleration.png
-imu_noise/gyro.png
+```bash
+cd "$DYN_CALIB"
+ln -sf head_rgb_imu_dynamic_20260429_131443_ros1.bag \
+       head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x.bag
 ```
 
-## Remaining Calibration Step: Camera-IMU Extrinsics and Time Offset
-
-For OpenVINS, camera intrinsics and IMU noise are not enough. A camera-IMU extrinsics and time-offset calibration is still required.
-
-Record a new dynamic ROS 2 bag on the Jetson, then convert it to a ROS 1 bag. The bag must contain both:
-
-```text
-/head/d435i_head/color/image_raw
-/head/d435i_head/imu
-```
-
-During recording:
-
-- Keep the Aprilgrid stationary.
-- Move the head-mounted RealSense D435i in front of the Aprilgrid.
-- Excite all six degrees of freedom: roll, pitch, yaw, x, y, z.
-- Move slowly enough to avoid image blur.
-- Keep the Aprilgrid visible as much as possible.
-- Use many different distances and angles.
-- Include motion that creates meaningful IMU excitation, not just slow translation.
-- Do not use the 15-hour stationary IMU bag for camera-IMU extrinsics; it is only for IMU noise.
-
-The eventual Kalibr command will have this form:
+Command used for the 10x inflated calibration:
 
 ```bash
 export AMP_WS="$HOME/Documents/GitHub/assistive_multiview_prosthesis/docker_ws"
+export DYN_CALIB="$AMP_WS/bags/calibration/head/cam_imu_dynamic"
+export DYN_BAG_10X="head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x.bag"
+export TRACKED_CALIB="$AMP_WS/calibration/head/d435i_336222071386"
+export TARGET="$TRACKED_CALIB/aprilgrid_6x6_80mm_0p3.yaml"
+export CAM_FOR_IMUCAM="$TRACKED_CALIB/camera_intrinsics_from_dynamic/head_rgb_imu_dynamic_20260429_131443_ros1-camchain.yaml"
+export IMU_YAML_10X="$TRACKED_CALIB/imu_noise/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml"
 
 sudo docker run --rm -it \
   --platform linux/amd64 \
   --entrypoint /bin/bash \
   -e MPLBACKEND=Agg \
-  -v "$AMP_WS/bags/calibration/head:/data:rw" \
+  -v "$DYN_CALIB:/data:rw" \
+  -v "$TARGET:/target.yaml:ro" \
+  -v "$CAM_FOR_IMUCAM:/camchain.yaml:ro" \
+  -v "$IMU_YAML_10X:/imu.yaml:ro" \
   -w /data \
   kalibr:ros1_20_04 \
-  -lc '
+  -lc "
     set -e
     source /catkin_ws/devel/setup.bash
 
     rosrun kalibr kalibr_calibrate_imu_camera \
-      --target /data/camera_intrinsics/aprilgrid_6x6_80mm_0p3.yaml \
-      --cam /data/camera_intrinsics/head_camera_intrinsics_ros1-camchain.yaml \
-      --imu /data/imu_noise/allan_output_200hz_trim_first30min/head_d435i_imu_200hz_trim_first30min.yaml \
-      --bag /data/camera_imu_dynamic/head_camera_imu_dynamic_ros1.bag \
+      --target /target.yaml \
+      --cam /camchain.yaml \
+      --imu /imu.yaml \
+      --bag /data/$DYN_BAG_10X \
       --imu-models calibrated
-  '
+  "
 ```
 
-Adjust paths once the dynamic camera-IMU bag exists.
+Kalibr output files:
+
+```text
+head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-camchain-imucam.yaml
+head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-imu.yaml
+head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-results-imucam.txt
+head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-report-imucam.pdf
+```
+
+### Camera-IMU Calibration Result: 10x Inflated
+
+Final residuals:
+
+```text
+Reprojection error (cam0) [px]:     mean 0.6085045236342096, median 0.464548510997314, std 0.5160939857871177
+Gyroscope error (imu0) [rad/s]:     mean 0.017541621509591522, median 0.015475129742388965, std 0.010153973501470995
+Accelerometer error (imu0) [m/s^2]: mean 0.09125694440044545, median 0.0832767268788441, std 0.052133769492380445
+```
+
+Normalized residuals:
+
+```text
+Reprojection error (cam0): mean 0.6085045236342096, median 0.464548510997314, std 0.5160939857871177
+Gyroscope error (imu0):    mean 0.6251483383419513, median 0.5515027010924173, std 0.3618673255800177
+Accelerometer error (imu0): mean 0.6954363126842715, median 0.6346219485380425, std 0.3972926845218351
+```
+
+Estimated transform:
+
+```text
+T_ci: imu0 to cam0
+[[ 0.99987512  0.01520848  0.00429518  0.0225262 ]
+ [-0.01520471  0.99988399 -0.00090895 -0.00213086]
+ [-0.0043085   0.00084353  0.99999036 -0.00386642]
+ [ 0.          0.          0.          1.        ]]
+```
+
+Inverse transform:
+
+```text
+T_ic: cam0 to imu0
+[[ 0.99987512 -0.01520471 -0.0043085  -0.02257245]
+ [ 0.01520848  0.99988399  0.00084353  0.00179128]
+ [ 0.00429518 -0.00090895  0.99999036  0.00376769]
+ [ 0.          0.          0.          1.        ]]
+```
+
+Time shift:
+
+```text
+t_imu = t_cam + 0.01334857234167497 s
+```
+
+Interpretation:
+
+```text
+The 10x inflated calibration is the recommended one to use for OpenVINS testing.
+The residuals are more balanced than the nominal Allan-noise calibration, and the transform/time shift remain physically plausible.
+```
+
+### Comparison: Nominal vs 10x Inflated Camera-IMU Result
+
+Nominal result:
+
+```text
+Reprojection mean:       0.7555389538514138 px
+Gyro normalized mean:    2.165666677975137
+Accel normalized mean:   3.2107940608899974
+Time shift:              0.013723439570657896 s
+T_ci translation:        [0.02353388, -0.00842372, -0.0045148] m
+```
+
+10x inflated result:
+
+```text
+Reprojection mean:       0.6085045236342096 px
+Gyro normalized mean:    0.6251483383419513
+Accel normalized mean:   0.6954363126842715
+Time shift:              0.01334857234167497 s
+T_ci translation:        [0.0225262, -0.00213086, -0.00386642] m
+```
+
+Assessment:
+
+```text
+The 10x inflated result is preferred. The time shift changed by less than 0.4 ms compared with nominal, and rotation changed only slightly. Translation changed by a few millimeters, but both transforms are physically plausible.
+```
+
+## Notes on Report Quality
+
+The camera-IMU report's reprojection-error plot still has some points outside the dashed ellipse. This is not an automatic failure. The dataset contains thousands of detections, and residual tails are expected with a real D435i, dynamic motion, target corner noise, possible motion blur, rolling-shutter effects, and non-ideal target flatness.
+
+Do not keep increasing IMU noise inflation only to make this plot look prettier. Inflating IMU noise changes the weighting between the IMU and camera residuals; it does not directly fix camera reprojection outliers.
+
+Current practical recommendation:
+
+```text
+Use the 10x inflated result for OpenVINS integration/testing.
+Redo the recording only if OpenVINS diverges, has unstable scale/orientation, or online calibration makes large corrections.
+```
+
+## Files to Use
+
+For OpenVINS integration/testing, use:
+
+```text
+camera_imu_extrinsics_inflated10x/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-camchain-imucam.yaml
+camera_imu_extrinsics_inflated10x/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml
+```
+
+For future calibration/reproduction, keep:
+
+```text
+aprilgrid_6x6_80mm_0p3.yaml
+camera_intrinsics/head_camera_intrinsics_ros1-*.{yaml,txt,pdf}
+camera_intrinsics_from_dynamic/head_rgb_imu_dynamic_20260429_131443_ros1-*.{yaml,txt,pdf}
+imu_noise/head_d435i_imu_200hz_trim_first30min.yaml
+imu_noise/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml
+imu_noise/acceleration.png
+imu_noise/gyro.png
+camera_imu_extrinsics_inflated10x/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-*.{yaml,txt,pdf}
+```
 
 ## Copy Outputs Into This Tracked Folder
 
-Example commands used to create the tracked calibration folder:
+Example commands used to create/update this tracked calibration folder:
 
 ```bash
 export AMP_WS="$HOME/Documents/GitHub/assistive_multiview_prosthesis/docker_ws"
+export TRACKED_CALIB="$AMP_WS/calibration/head/d435i_336222071386"
 export CAM_CALIB="$AMP_WS/bags/calibration/head/camera_intrinsics"
+export DYN_CALIB="$AMP_WS/bags/calibration/head/cam_imu_dynamic"
 export IMU_CALIB="$AMP_WS/bags/calibration/head/imu_noise"
-export CALIB_TRACKED="$AMP_WS/calibration/head/d435i_336222071386"
 
-mkdir -p "$CALIB_TRACKED/camera_intrinsics"
-mkdir -p "$CALIB_TRACKED/imu_noise"
+mkdir -p "$TRACKED_CALIB/camera_intrinsics"
+mkdir -p "$TRACKED_CALIB/camera_intrinsics_from_dynamic"
+mkdir -p "$TRACKED_CALIB/imu_noise"
+mkdir -p "$TRACKED_CALIB/camera_imu_extrinsics_inflated10x"
 
 cp "$CAM_CALIB/aprilgrid_6x6_80mm_0p3.yaml" \
-   "$CALIB_TRACKED/aprilgrid_6x6_80mm_0p3.yaml"
+   "$TRACKED_CALIB/aprilgrid_6x6_80mm_0p3.yaml"
 
 cp "$CAM_CALIB/head_camera_intrinsics_ros1-camchain.yaml" \
-   "$CALIB_TRACKED/camera_intrinsics/"
+   "$CAM_CALIB/head_camera_intrinsics_ros1-results-cam.txt" \
+   "$CAM_CALIB/head_camera_intrinsics_ros1-report-cam.pdf" \
+   "$TRACKED_CALIB/camera_intrinsics/"
 
-cp "$CAM_CALIB/head_camera_intrinsics_ros1-results-cam.txt" \
-   "$CALIB_TRACKED/camera_intrinsics/"
-
-cp "$CAM_CALIB/head_camera_intrinsics_ros1-report-cam.pdf" \
-   "$CALIB_TRACKED/camera_intrinsics/"
+cp "$DYN_CALIB/head_rgb_imu_dynamic_20260429_131443_ros1-camchain.yaml" \
+   "$DYN_CALIB/head_rgb_imu_dynamic_20260429_131443_ros1-results-cam.txt" \
+   "$DYN_CALIB/head_rgb_imu_dynamic_20260429_131443_ros1-report-cam.pdf" \
+   "$TRACKED_CALIB/camera_intrinsics_from_dynamic/"
 
 cp "$IMU_CALIB/head_d435i_imu_allan_config_200hz_trim_first30min.yaml" \
-   "$CALIB_TRACKED/imu_noise/"
+   "$IMU_CALIB/allan_output_200hz_trim_first30min/head_d435i_imu_200hz_trim_first30min.yaml" \
+   "$IMU_CALIB/allan_output_200hz_trim_first30min/acceleration.png" \
+   "$IMU_CALIB/allan_output_200hz_trim_first30min/gyro.png" \
+   "$TRACKED_CALIB/imu_noise/"
 
-cp "$IMU_CALIB/allan_output_200hz_trim_first30min/head_d435i_imu_200hz_trim_first30min.yaml" \
-   "$CALIB_TRACKED/imu_noise/"
+cp "$TRACKED_CALIB/imu_noise/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml" \
+   "$TRACKED_CALIB/camera_imu_extrinsics_inflated10x/"
 
-cp "$IMU_CALIB/allan_output_200hz_trim_first30min/acceleration.png" \
-   "$CALIB_TRACKED/imu_noise/"
-
-cp "$IMU_CALIB/allan_output_200hz_trim_first30min/gyro.png" \
-   "$CALIB_TRACKED/imu_noise/"
+cp "$DYN_CALIB/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-camchain-imucam.yaml" \
+   "$DYN_CALIB/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-imu.yaml" \
+   "$DYN_CALIB/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-results-imucam.txt" \
+   "$DYN_CALIB/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-report-imucam.pdf" \
+   "$TRACKED_CALIB/camera_imu_extrinsics_inflated10x/"
 ```
+
+## Git Commit
 
 Check Git ignore status:
 
@@ -650,3 +854,15 @@ rsync -av \
   jetson:/path/to/assistive_multiview_prosthesis/docker_ws/calibration/head/d435i_336222071386/
 ```
 
+## Future Redo Criteria
+
+Redo the calibration only if OpenVINS testing shows clear problems, such as:
+
+- VIO diverges quickly.
+- Scale or orientation drift is severe.
+- Camera-IMU online calibration changes the transform/time offset substantially.
+- Feature tracks are poor because the dynamic calibration images were too blurred.
+- The D435i mounting changed mechanically.
+- The RGB stream resolution, cropping, or image pipeline changes.
+
+If re-recording, warm up the D435i for 20-30 minutes, keep the Aprilgrid rigid and flat, move the camera/IMU rig slowly enough to avoid blur, and excite roll, pitch, yaw, and translation while keeping the Aprilgrid visible across the full image.
