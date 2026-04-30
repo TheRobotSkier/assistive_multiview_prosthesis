@@ -90,7 +90,7 @@ fn bench_roi_prediction(c: &mut Criterion) {
     let twist_cov = black_box(TwistCovariance::fixed());
     let index_tip = black_box(lut.get_location(Contact::IndexTip, 0.0));
 
-    c.bench_function("roi_prediction_1000_samples", |b| {
+    c.bench_function("roi_prediction", |b| {
         b.iter(|| predict_roi_with_samples(&pose, &twist, &twist_cov, &index_tip, &pred_config))
     });
 }
@@ -231,7 +231,7 @@ fn bench_smc_pipeline(c: &mut Criterion) {
     let index_tip = black_box(lut.get_location(Contact::IndexTip, 0.0));
     let pc = black_box(demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 5000));
 
-    c.bench_function("smc_pipeline_8iter_1000samples", |b| {
+    c.bench_function("smc_pipeline", |b| {
         b.iter(|| {
             // Build ROI and TSDF once.
             let (roi, _) =
@@ -280,11 +280,14 @@ fn bench_smc_pipeline(c: &mut Criterion) {
                 let elite_indices = select_elite_indices(&particles, config::ELITE_RATIO);
                 let elites: Vec<SmcParticle> = elite_indices.iter().map(|&idx| particles[idx].clone()).collect();
                 let decay = config::DECAY_RATE.powi(iteration as i32);
+                let grasp_type_weights = grasp_preshaping::predictor::compute_grasp_type_weights(&particles);
                 particles = resample_around_elites(
                     &elites,
                     n_samples,
                     config::INITIAL_PROPOSAL_STD_V * decay,
                     config::INITIAL_PROPOSAL_STD_OMEGA * decay,
+                    config::INITIAL_PROPOSAL_STD_WRIST * decay,
+                    &grasp_type_weights,
                     &mut rng,
                 );
             }
@@ -305,11 +308,14 @@ fn bench_resample_around_elites(c: &mut Criterion) {
     c.bench_function("resample_around_elites_1000_from_100", |b| {
         b.iter(|| {
             let mut rng = rand::rng();
+            let grasp_type_weights = [0.33, 0.33, 0.34];
             resample_around_elites(
                 &particles,
                 1000,
                 config::INITIAL_PROPOSAL_STD_V,
                 config::INITIAL_PROPOSAL_STD_OMEGA,
+                config::INITIAL_PROPOSAL_STD_WRIST,
+                &grasp_type_weights,
                 &mut rng,
             )
         })

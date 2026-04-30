@@ -17,7 +17,11 @@ Keyboard shortcuts (PyVista viewer):
     r  - toggle ROI box
     c  - toggle camera markers
     h  - toggle hand skeleton (unified)
+    k  - toggle LUT contact points
     i  - toggle info text
+    +  - next SMC iteration filter
+    -  - previous SMC iteration filter
+    *  - show all iterations (reset filter)
     1  - filter grasps: cylindrical only
     2  - filter grasps: pinch only
     3  - filter grasps: lateral only
@@ -69,6 +73,36 @@ _HAND_BASE_FRAMES = {finger: base for finger, base, _ in _HAND_SKELETON_SPECS}
 
 # Map finger name -> contact tip name.
 _HAND_TIP_CONTACTS = {finger: tip for finger, _, tip in _HAND_SKELETON_SPECS}
+
+# Grasp-type-specific score contact names (from planner.rs grasp specs).
+# These are the contacts used for scoring; all others are sweep-only.
+_GRASP_SCORE_CONTACTS = {
+    1: {  # cylindrical
+        "ThumbAbdPip", "ThumbAbdDip", "ThumbAbdTip",
+        "IndexMcp", "IndexDip", "IndexPip", "IndexTip",
+        "MiddleMcp", "MiddlePip", "MiddleDip", "MiddleTip",
+        "RingDip", "RingPip", "RingTip",
+        "LittleDip", "LittlePip", "LittleTip",
+        "PalmProxUlna", "PalmProxRadi", "PalmDistUlna", "PalmDistRadi",
+    },
+    2: {  # pinch
+        "ThumbAbdTip", "IndexTip",
+    },
+    3: {  # lateral
+        "ThumbAddTip",
+        "IndexMcpSide", "IndexDipSide", "IndexPipSide", "IndexTipSide",
+    },
+}
+
+# Finger group colors for contact points (same as hand skeleton).
+_CONTACT_FINGER_COLORS = {
+    "thumb": "#f4a261",
+    "index": "#e76f51",
+    "middle": "#2a9d8f",
+    "ring": "#457b9d",
+    "little": "#8d99ae",
+    "palm": "#6a994e",
+}
 
 # Try to import pinocchio + model for hand skeleton support.
 _pin_hand_available = False
@@ -426,17 +460,28 @@ def visualize_pyvista(dump: dict, args):
     marker_size = min(scene_extent * 0.15, roi_diag * 0.08)
     marker_size = max(marker_size, 0.005)  # at least 5mm
 
+    # ---- Determine available SMC iterations (needed for default state) ----
+    n_grasps = len(dump["grasps"]["combined"])
+    if n_grasps > 0 and "smc_iteration" in dump["grasps"]:
+        max_iteration = int(dump["grasps"]["smc_iteration"].max())
+    else:
+        max_iteration = 0
+
     # ---- Mutable state for interactive toggles ----
     state = {
-        "tsdf_mode": "surface" if not args.no_tsdf else "off",
-        "grasp_mode": "best" if not args.show_all_grasps else "all",
+        "tsdf_mode": "off",
+        "grasp_mode": "all",
         "show_pc": True,
         "show_roi": True,
         "show_cameras": True,
         "show_hand": False,
+        "show_contacts": True,
         "show_info": True,
         "grasp_type_filter": 0,  # 0 = all, 1/2/3 = specific type
+        "iteration_filter": max_iteration if n_grasps > 0 else None,  # default to last iteration
     }
+
+
 
     plotter = pv.Plotter(title="Grasp Preshaping Debug Viewer")
     plotter.set_background("#1e1e2e", top="#2d2d44")
@@ -451,6 +496,7 @@ def visualize_pyvista(dump: dict, args):
         "twist": [],
         "grasps": [],
         "hand_skeleton": [],
+        "contact_points": [],
         "info": [],
     }
 
@@ -513,6 +559,7 @@ def visualize_pyvista(dump: dict, args):
                 show_scalar_bar=True,
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
+                    "color": "white",
                     # position the scalar bar centered at the bottom of the view
                     "position_x": 0.35,
                     "position_y": 0.02,
@@ -548,6 +595,7 @@ def visualize_pyvista(dump: dict, args):
                 show_scalar_bar=True,
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
+                    "color": "white",
                     # position the scalar bar centered at the bottom of the view
                     "position_x": 0.35,
                     "position_y": 0.02,
@@ -680,10 +728,28 @@ def visualize_pyvista(dump: dict, args):
     # ==================================================================
     # Grasp candidates
     # ==================================================================
-    n_grasps = len(grasps["combined"])
+    # n_grasps and max_iteration already computed above (before state dict).
+
     threshold = args.threshold
 
     best_idx, best_combined = _find_best_grasp(grasps, threshold)
+
+    # Iteration-filtered best grasp (for display when iteration filter is active).
+    def _iteration_mask():
+        """Return a boolean mask for the current iteration filter."""
+        if state["iteration_filter"] is None:
+            return np.ones(n_grasps, dtype=bool)
+        return grasps["smc_iteration"] == state["iteration_filter"]
+
+    def _filtered_best():
+        """Find the best grasp within the current iteration filter."""
+        mask = _iteration_mask()
+        if not mask.any():
+            return -1, -np.inf
+        filtered_indices = np.where(mask)[0]
+        scores = grasps["combined"][filtered_indices]
+        best_local = int(np.argmax(scores))
+        return int(filtered_indices[best_local]), float(scores[best_local])
 
     def get_grasp_indices():
         """Compute which grasp indices to show based on current state.
@@ -694,7 +760,10 @@ def visualize_pyvista(dump: dict, args):
         rendering Tier 4 (no object in reach) as clutter.
         """
         candidates = []
+        iter_mask = _iteration_mask()
         for i in range(n_grasps):
+            if not iter_mask[i]:
+                continue
             if grasps["contact_score"][i] <= 0.0:
                 # Tier 4: no collision at all — skip rendering.
                 continue
@@ -709,9 +778,12 @@ def visualize_pyvista(dump: dict, args):
         # Sort descending by score for top 10 extraction
         candidates.sort(key=lambda i: grasps["combined"][i], reverse=True)
 
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
+
         if state["grasp_mode"] == "best":
-            if best_idx >= 0 and best_idx in candidates:
-                return [best_idx], [best_idx]
+            if display_best >= 0 and display_best in candidates:
+                return [display_best], [display_best]
             elif candidates:
                 return [candidates[0]], [candidates[0]]  # best available
             return [], []
@@ -730,9 +802,11 @@ def visualize_pyvista(dump: dict, args):
         positions = []
         point_colors = []
 
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
         for i in all_indices:
             gt = grasps["grasp_type"][i]
-            is_best = (i == best_idx)
+            is_best = (i == display_best)
             T = grasps["pose_4x4"][i]
             positions.append(T[:3, 3])
 
@@ -771,9 +845,11 @@ def visualize_pyvista(dump: dict, args):
         score_range = score_max - score_min if score_max > score_min else 1.0
 
         # Render top grasps as separate actors, similar to the camera markers.
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
         for idx in top_indices:
             gt = grasps["grasp_type"][idx]
-            is_best = (idx == best_idx)
+            is_best = (idx == display_best)
             T = grasps["pose_4x4"][idx]
             pos = T[:3, 3]
             R = T[:3, :3]
@@ -978,10 +1054,12 @@ def visualize_pyvista(dump: dict, args):
         if not top_indices:
             return
 
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
         for i in top_indices:
             if grasps["contact_score"][i] <= 0.0:
                 continue
-            is_best = (i == best_idx)
+            is_best = (i == display_best)
             positions = _compute_hand_positions(i)
             if is_best:
                 _add_single_hand(
@@ -1004,6 +1082,128 @@ def visualize_pyvista(dump: dict, args):
         add_hand_skeletons()
 
     # ==================================================================
+    # LUT contact points (all 25 contacts per top grasp)
+    # ==================================================================
+    def _grasp_to_fk_params(grasp_type, closure):
+        """Map grasp type + closure to (q_active, thumb_opp_mode) for FK.
+
+        Mirrors the grasp specs in planner.rs:
+          cylindrical: all fingers close, thumb in abduction (opposition)
+          pinch: thumb + index close, MRL locked open, thumb in abduction
+          lateral: thumb + index close, MRL locked open, thumb in adduction
+        """
+        if grasp_type == 1:  # cylindrical
+            q_active = np.array([closure, closure, closure], dtype=float)
+            thumb_mode = 1.0
+        elif grasp_type == 2:  # pinch
+            q_active = np.array([closure, closure, 0.0], dtype=float)
+            thumb_mode = 1.0
+        else:  # lateral (type 3)
+            q_active = np.array([closure, closure, 0.0], dtype=float)
+            thumb_mode = 0.0
+        return q_active, thumb_mode
+
+    def add_contact_points():
+        """Render all 25 LUT contact points for the top grasps.
+
+        Uses Pinocchio FK via get_sampled_contact_transforms() to compute
+        contact positions in hand-local frame, then transforms to world frame
+        using the grasp's 4x4 pose matrix. Score contacts are rendered larger
+        than sweep-only contacts.
+        """
+        actor_groups["contact_points"].clear()
+        if not _pin_hand_available:
+            return
+
+        all_indices, top_indices = get_grasp_indices()
+        if not top_indices:
+            return
+
+        # Build a contact-name -> group lookup from model.py CONTACT_DEFINITIONS.
+        contact_group_map = {c["name"]: c["group"] for c in CONTACT_DEFINITIONS}
+
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
+
+        all_positions = []
+        all_colors = []
+        all_sizes = []
+
+        for idx in top_indices:
+            if grasps["contact_score"][idx] <= 0.0:
+                continue
+
+            gt = grasps["grasp_type"][idx]
+            T = grasps["pose_4x4"][idx]
+            closure = grasps["closure"][idx]
+            R, t = T[:3, :3], T[:3, 3]
+            is_best = (idx == display_best)
+
+            q_active, thumb_mode = _grasp_to_fk_params(gt, closure)
+            try:
+                transforms = get_sampled_contact_transforms(q_active, thumb_opp_mode=thumb_mode)
+            except Exception:
+                continue
+
+            score_contacts = _GRASP_SCORE_CONTACTS.get(gt, set())
+
+            for contact_name, contact_T in transforms.items():
+                # Transform from hand-local to world frame.
+                local_pos = contact_T[:3, 3]
+                world_pos = R @ local_pos + t
+                all_positions.append(world_pos)
+
+                # Color by finger group.
+                group = contact_group_map.get(contact_name, "index")
+                hex_color = _CONTACT_FINGER_COLORS.get(group, "#ffffff")
+                r_c = int(hex_color[1:3], 16) / 255.0
+                g_c = int(hex_color[3:5], 16) / 255.0
+                b_c = int(hex_color[5:7], 16) / 255.0
+
+                # Score contacts are brighter; sweep-only are dimmer.
+                is_score = contact_name in score_contacts
+                if is_score:
+                    all_colors.append([r_c, g_c, b_c])
+                else:
+                    all_colors.append([r_c * 0.5, g_c * 0.5, b_c * 0.5])
+
+                # Point size: best grasp score contacts are largest.
+                if is_best and is_score:
+                    all_sizes.append(12)
+                elif is_best:
+                    all_sizes.append(7)
+                elif is_score:
+                    all_sizes.append(8)
+                else:
+                    all_sizes.append(4)
+
+        if not all_positions:
+            return
+
+        positions_arr = np.array(all_positions, dtype=np.float64)
+        colors_arr = np.array(all_colors, dtype=np.float32)
+        sizes_arr = np.array(all_sizes, dtype=np.float32)
+
+        cloud = pv.PolyData(positions_arr)
+        cloud["colors"] = colors_arr
+        cloud["sizes"] = sizes_arr
+
+        actor = plotter.add_mesh(
+            cloud,
+            scalars="colors",
+            rgb=True,
+            style="points",
+            point_size=8,
+            render_points_as_spheres=True,
+            opacity=0.85,
+            label=f"Contacts ({len(all_positions)} pts)",
+        )
+        actor_groups["contact_points"].append(actor)
+
+    if state["show_contacts"]:
+        add_contact_points()
+
+    # ==================================================================
     # Info text
     # ==================================================================
     def update_info_text():
@@ -1019,20 +1219,25 @@ def visualize_pyvista(dump: dict, args):
 
         tsdf_str = state["tsdf_mode"]
         hand_str = "unified"
+        contacts_str = "on" if state["show_contacts"] else "off"
 
+        iter_str = f"iter={state['iteration_filter']}" if state['iteration_filter'] is not None else f"iter=all(0-{max_iteration})"
         lines = [
-            f"Grasps: {n_shown} points, top {n_top} rendered (mode={mode_str}, threshold>={threshold:.2f})",
+            f"Grasps: {n_shown} points, top {n_top} rendered (mode={mode_str}, threshold>={threshold:.2f}, {iter_str})",
         ]
-        if best_idx >= 0:
-            gt = grasps["grasp_type"][best_idx]
+        # Show iteration-filtered best when filter is active.
+        display_best_idx = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
+        display_best_score = best_combined if state["iteration_filter"] is None else _filtered_best()[1]
+        if display_best_idx >= 0:
+            gt = grasps["grasp_type"][display_best_idx]
             lines.append(
-                f"Best: {GRASP_TYPE_NAMES.get(gt, '?')}  combined={best_combined:.4f}"
+                f"Best: {GRASP_TYPE_NAMES.get(gt, '?')}  combined={display_best_score:.4f}"
             )
         else:
             lines.append("Best: none")
 
-        lines.append(f"TSDF: {tsdf_str}  Hand: {hand_str}")
-        lines.append("Keys: t=TSDF  g=grasps  p=cloud  r=ROI  c=cam  h=hand  ?=help")
+        lines.append(f"TSDF: {tsdf_str}  Hand: {hand_str}  Contacts: {contacts_str}")
+        lines.append("Keys: t=TSDF  g=grasps  p=cloud  r=ROI  c=cam  h=hand  k=contacts  +/-/*=iter  ?=help")
 
         text = "\n".join(lines)
         actor = plotter.add_text(
@@ -1058,8 +1263,9 @@ def visualize_pyvista(dump: dict, args):
         ("Pinch", GRASP_TYPE_COLORS[2]),
         ("Lateral", GRASP_TYPE_COLORS[3]),
         ("Hand: unified", "#f4a261"),
+        ("Contact points", "#6a994e"),
     ]
-    plotter.add_legend(legend_entries, size=(0.18, 0.22), loc="upper left",
+    plotter.add_legend(legend_entries, size=(0.18, 0.25), loc="upper left",
                        face="rectangle")
 
     # ==================================================================
@@ -1097,6 +1303,12 @@ def visualize_pyvista(dump: dict, args):
         actor_groups["hand_skeleton"].clear()
         if state["show_hand"]:
             add_hand_skeletons()
+        # Contact points also depend on which grasps are displayed.
+        for actor in actor_groups["contact_points"]:
+            plotter.remove_actor(actor)
+        actor_groups["contact_points"].clear()
+        if state["show_contacts"]:
+            add_contact_points()
         update_info_text()
         plotter.render()
 
@@ -1149,6 +1361,21 @@ def visualize_pyvista(dump: dict, args):
         update_info_text()
         plotter.render()
 
+    def on_key_k():
+        """Toggle LUT contact points."""
+        state["show_contacts"] = not state["show_contacts"]
+        if state["show_contacts"]:
+            if not actor_groups["contact_points"]:
+                add_contact_points()
+            else:
+                for actor in actor_groups["contact_points"]:
+                    actor.SetVisibility(True)
+        else:
+            for actor in actor_groups["contact_points"]:
+                actor.SetVisibility(False)
+        update_info_text()
+        plotter.render()
+
     def on_key_i():
         toggle_actors("info")
 
@@ -1172,6 +1399,40 @@ def visualize_pyvista(dump: dict, args):
         print("  Filter: lateral only")
         rebuild_grasps()
 
+    def on_key_plus():
+        """Advance to the next SMC iteration filter."""
+        if max_iteration == 0:
+            return
+        if state["iteration_filter"] is None:
+            state["iteration_filter"] = 0
+        elif state["iteration_filter"] < max_iteration:
+            state["iteration_filter"] += 1
+        else:
+            state["iteration_filter"] = None  # wrap to all
+        iter_str = f"iter {state['iteration_filter']}" if state['iteration_filter'] is not None else "all"
+        print(f"  Iteration filter: {iter_str}")
+        rebuild_grasps()
+
+    def on_key_minus():
+        """Go back to the previous SMC iteration filter."""
+        if max_iteration == 0:
+            return
+        if state["iteration_filter"] is None:
+            state["iteration_filter"] = max_iteration
+        elif state["iteration_filter"] > 0:
+            state["iteration_filter"] -= 1
+        else:
+            state["iteration_filter"] = None  # wrap to all
+        iter_str = f"iter {state['iteration_filter']}" if state['iteration_filter'] is not None else "all"
+        print(f"  Iteration filter: {iter_str}")
+        rebuild_grasps()
+
+    def on_key_star():
+        """Reset iteration filter to show all iterations."""
+        state["iteration_filter"] = None
+        print("  Iteration filter: all")
+        rebuild_grasps()
+
     def on_key_help():
         print("\n  === Keyboard Shortcuts ===")
         print("  t  - cycle TSDF mode: surface / points / off")
@@ -1180,7 +1441,11 @@ def visualize_pyvista(dump: dict, args):
         print("  r  - toggle ROI box")
         print("  c  - toggle camera markers")
         print("  h  - toggle hand skeleton (unified)")
+        print("  k  - toggle LUT contact points")
         print("  i  - toggle info text")
+        print("  +  - next SMC iteration filter")
+        print("  -  - previous SMC iteration filter")
+        print("  *  - show all iterations (reset filter)")
         print("  1  - filter: cylindrical only")
         print("  2  - filter: pinch only")
         print("  3  - filter: lateral only")
@@ -1193,11 +1458,15 @@ def visualize_pyvista(dump: dict, args):
     plotter.add_key_event("r", on_key_r)
     plotter.add_key_event("c", on_key_c)
     plotter.add_key_event("h", on_key_h)
+    plotter.add_key_event("k", on_key_k)
     plotter.add_key_event("i", on_key_i)
     plotter.add_key_event("0", on_key_0)
     plotter.add_key_event("1", on_key_1)
     plotter.add_key_event("2", on_key_2)
     plotter.add_key_event("3", on_key_3)
+    plotter.add_key_event("plus", on_key_plus)
+    plotter.add_key_event("minus", on_key_minus)
+    plotter.add_key_event("asterisk", on_key_star)
     plotter.add_key_event("question", on_key_help)
 
     plotter.add_axes()
@@ -1296,7 +1565,9 @@ def main():
               g  toggle grasp mode (best/all)
               p  toggle point cloud      r  toggle ROI box
               c  toggle cameras          h  toggle hand skeleton (unified)
+              k  toggle LUT contact points
               i  toggle info text        0-3  filter grasp types
+              +/- cycle SMC iteration    * show all iterations
               ?  print help
         """),
     )

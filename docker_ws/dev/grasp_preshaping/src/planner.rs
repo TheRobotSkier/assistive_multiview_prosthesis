@@ -296,15 +296,32 @@ fn score_grasp(
 ) -> GraspScoreResult {
     match sweep_for_collision(lut, tsdf, base_transform, &spec.sweep_points, collision_tol, max_closure) {
         // Tier 4: No collision — hand swept fully closed and hit nothing.
-        // Empty space; the optimizer must translate toward the object.
-        None => GraspScoreResult {
-            closure_amount: 0.0,
-            alignment_score: 0.0,
-            force_closure_score: 0.0,
-            contact_count_score: 0.0,
-            contact_score: 0.0,
-            active_contact_count: 0,
-            found_collision: false,
+        // With wider truncation band, we can provide a proximity score based on how
+        // close the hand is to the surface, giving the optimizer directional information.
+        None => {
+            // Compute proximity score using minimum TSDF distance at mid-closure.
+            // This gives a small gradient (0.0-0.05) to guide the optimizer toward the object.
+            let mid_closure = 0.5;
+            let min_dist = min_tsdf_distance(lut, tsdf, base_transform, &spec.sweep_points, mid_closure);
+            let proximity_score = if min_dist < f32::MAX {
+                // Convert distance to a score in [0.0, 0.05].
+                // Distance 0 → score 0.05, distance at truncation → score 0.0.
+                let trunc_dist = config::TRUNCATION_CELLS as f32 * config::TSDF_RESOLUTION_M;
+                let normalized = (min_dist / trunc_dist).clamp(0.0, 1.0);
+                0.05 * (1.0 - normalized)
+            } else {
+                0.0
+            };
+
+            GraspScoreResult {
+                closure_amount: 0.0,
+                alignment_score: 0.0,
+                force_closure_score: 0.0,
+                contact_count_score: 0.0,
+                contact_score: proximity_score as f64,
+                active_contact_count: 0,
+                found_collision: false,
+            }
         },
         // Tier 3: Start-position collision — palm or open-hand fingers already
         // inside the object. The hand is "in" the object. Back up!
@@ -463,6 +480,30 @@ fn collides_at_control(
         }
     }
     false
+}
+
+/// Compute the minimum TSDF distance across all sweep points at a given control value.
+/// Returns the minimum non-MAX distance found, or f32::MAX if all points are unobserved.
+/// This is used for proximity-based scoring of Tier 4 (no collision) grasps.
+fn min_tsdf_distance(
+    lut: &FingerLUT,
+    tsdf: &Tsdf,
+    base: &Matrix4<f64>,
+    sweep_points: &[SweepPoint],
+    control: f64,
+) -> f32 {
+    let mut min_dist = f32::MAX;
+    for sp in sweep_points {
+        let p = match sp.flex {
+            Flex::Coupled => pos_at_control(lut, sp.contact, control, base),
+            Flex::Locked(locked_s) => pos_at_sample(lut, sp.contact, locked_s, base),
+        };
+        let dist = tsdf.get_distance(p.x, p.y, p.z);
+        if dist < min_dist {
+            min_dist = dist;
+        }
+    }
+    min_dist
 }
 
 fn find_active_contacts(

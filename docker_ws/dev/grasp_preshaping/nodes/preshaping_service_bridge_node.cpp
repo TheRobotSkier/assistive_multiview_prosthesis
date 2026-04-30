@@ -34,6 +34,20 @@ using CameraPositionFFI       = grasp_preshaping::CameraPositionFFI;
 
 constexpr int kGraspComputeOk = grasp_preshaping::kGraspComputeOk;
 
+static const char * grasp_type_to_string(std::int32_t grasp_type)
+{
+  switch (grasp_type) {
+    case grasp_preshaping::kGraspTypeCylindrical:
+      return "Cylindrical";
+    case grasp_preshaping::kGraspTypePinch:
+      return "Pinch";
+    case grasp_preshaping::kGraspTypeLateral:
+      return "Lateral";
+    default:
+      return "Unknown";
+  }
+}
+
 class PreshapingServiceBridgeNode : public rclcpp::Node
 {
 public:
@@ -46,7 +60,7 @@ public:
     rust_compute_fn_(nullptr),
     rust_api_version_fn_(nullptr),
     min_closure_amount_(declare_parameter<double>("min_closure_amount", 0.1)),
-    preshaping_closure_fraction_(declare_parameter<double>("preshaping_closure_fraction", 0.3))
+    preshaping_closure_fraction_(declare_parameter<double>("preshaping_closure_fraction", 1.0))
   {
     // TF2 buffer and listener for camera pose lookups
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
@@ -335,6 +349,56 @@ private:
       response->message = message.empty() ? "Preshaping failed" : message;
       return true;
     }
+
+    RCLCPP_INFO(get_logger(), "=== Preshaping Result ===");
+    RCLCPP_INFO(
+      get_logger(),
+      "  Pipeline Time: %u ms",
+      ffi_response.pipeline_time_ms);
+    RCLCPP_INFO(
+      get_logger(),
+      "  SMC Iterations: %u",
+      ffi_response.smc_iterations_used);
+    RCLCPP_INFO(
+      get_logger(),
+      "  Grasp Type: %s",
+      grasp_type_to_string(ffi_response.grasp_type));
+    RCLCPP_INFO(
+      get_logger(),
+      "  Combined Score: %.4f",
+      ffi_response.combined_score);
+    RCLCPP_INFO(
+      get_logger(),
+      "  Alignment Score: %.4f",
+      ffi_response.alignment_score);
+    RCLCPP_INFO(
+      get_logger(),
+      "  Force Closure Score: %.4f",
+      ffi_response.force_closure_score);
+    RCLCPP_INFO(
+      get_logger(),
+      "  Contact Count Score: %.4f",
+      ffi_response.contact_count_score);
+    RCLCPP_INFO(
+      get_logger(),
+      "  Contact Score: %.4f",
+      ffi_response.contact_score);
+    RCLCPP_INFO(
+      get_logger(),
+      "  Closure Amount: %.4f",
+      ffi_response.closure_amount);
+    if (ffi_response.second_best_grasp_type != grasp_preshaping::kGraspTypeUnknown) {
+      RCLCPP_INFO(
+        get_logger(),
+        "  2nd Best Grasp: %s",
+        grasp_type_to_string(ffi_response.second_best_grasp_type));
+      RCLCPP_INFO(
+        get_logger(),
+        "  2nd Best Score: %.4f (margin: %.4f)",
+        ffi_response.second_best_combined_score,
+        ffi_response.combined_score - ffi_response.second_best_combined_score);
+    }
+    RCLCPP_INFO(get_logger(), "===========================");
 
     // ── Full closure values from the planner ────────────────────────────
     const double full_thumb = ffi_response.thumb_closure;

@@ -5,7 +5,7 @@ use crate::planner::{
 use crate::pointcloud_helper::{get_tsdf, morton, prune, PointCloud};
 use crate::predictor::{
     predict_roi_with_samples, sample_initial_particles, resample_around_elites,
-    select_elite_indices, SmcParticle, PredictionConfig, Twist6, TwistCovariance,
+    select_elite_indices, compute_grasp_type_weights, SmcParticle, PredictionConfig, Twist6, TwistCovariance,
     TwistWithCovariance,
 };
 use crate::config;
@@ -84,9 +84,17 @@ pub struct GraspComputeResponseFFI {
     pub closure_amount: f64,
     pub combined_score: f64,
     pub grasp_type: i32,
+    pub alignment_score: f64,
+    pub force_closure_score: f64,
+    pub contact_count_score: f64,
+    pub contact_score: f64,
+    pub second_best_combined_score: f64,
+    pub second_best_grasp_type: i32,
     pub thumb_closure: f64,
     pub index_closure: f64,
     pub mrl_closure: f64,
+    pub pipeline_time_ms: u32,
+    pub smc_iterations_used: u32,
     /// Target hand position from the best scored grasp sample (world frame).
     pub target_px: f64,
     pub target_py: f64,
@@ -145,6 +153,14 @@ struct ComputeOutput {
     grasp_type: GraspType,
     closure_amount: f64,
     combined_score: f64,
+    alignment_score: f64,
+    force_closure_score: f64,
+    contact_count_score: f64,
+    contact_score: f64,
+    second_best_combined_score: f64,
+    second_best_grasp_type: i32,
+    pipeline_time_ms: u32,
+    smc_iterations_used: u32,
     thumb_closure: f64,
     index_closure: f64,
     mrl_closure: f64,
@@ -168,12 +184,15 @@ static LUT: OnceLock<FingerLUT> = OnceLock::new();
 static PRED_CONFIG: OnceLock<PredictionConfig> = OnceLock::new();
 static INDEX_TIP_LOCAL: OnceLock<Vector3<f64>> = OnceLock::new();
 
-fn select_best_grasp(scored: &[ScoredGrasp]) -> Option<&ScoredGrasp> {
-    scored.iter().max_by(|a, b| {
-        a.combined
-            .partial_cmp(&b.combined)
+fn select_best_grasps(scored: &[ScoredGrasp]) -> (Option<&ScoredGrasp>, Option<&ScoredGrasp>) {
+    let mut ranked: Vec<&ScoredGrasp> = scored.iter().collect();
+    ranked.sort_by(|a, b| {
+        b.combined
+            .partial_cmp(&a.combined)
             .unwrap_or(std::cmp::Ordering::Equal)
-    })
+    });
+
+    (ranked.first().copied(), ranked.get(1).copied())
 }
 
 /// Score all SMC particles in parallel, returning scored grasps and updating
@@ -328,6 +347,7 @@ fn get_index_tip_local() -> &'static Vector3<f64> {
 }
 
 fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutput, String> {
+    let pipeline_start = std::time::Instant::now();
     let current_pose = pose_to_dual_quaternion(&request.pose);
     let twist_with_cov = twist_to_runtime(&request.twist);
     let cloud = pointcloud_view_to_pointcloud(&request.cloud)?;
@@ -398,8 +418,16 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
 
     let mut scored: Vec<ScoredGrasp> = Vec::new();
 
+    // Track best score for early termination.
+    let mut prev_best_score: Option<f64> = None;
+    let mut iterations_used: u32 = 0;
+
     for iteration in 0..n_iterations {
+        iterations_used = iteration as u32 + 1;
         scored = score_all_particles(lut, &tsdf, &mut particles, collision_tol);
+
+        // Find best score in this iteration for convergence checking.
+        let current_best_score = scored.iter().map(|sg| sg.combined).fold(f64::NEG_INFINITY, f64::max);
 
         // Store debug data for this iteration.
         if let Some(ref mut debug) = all_debug {
@@ -407,6 +435,17 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
                 debug.push((i, sg.clone(), iteration, particles[i].clone()));
             }
         }
+
+        // Check for convergence (early termination) after minimum iterations.
+        if iteration >= config::SMC_MIN_ITERATIONS {
+            if let Some(prev) = prev_best_score {
+                if (current_best_score - prev).abs() < config::SMC_CONVERGENCE_TOL {
+                    // Converged - stop iterating.
+                    break;
+                }
+            }
+        }
+        prev_best_score = Some(current_best_score);
 
         // Last iteration: no resampling needed.
         if iteration == n_iterations - 1 {
@@ -420,15 +459,21 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
             .map(|&idx| particles[idx].clone())
             .collect();
 
+        // Compute weighted grasp type probabilities based on current population performance.
+        let grasp_type_weights = compute_grasp_type_weights(&particles);
+
         let decay = config::DECAY_RATE.powi(iteration as i32);
         let proposal_std_v = config::INITIAL_PROPOSAL_STD_V * decay;
         let proposal_std_omega = config::INITIAL_PROPOSAL_STD_OMEGA * decay;
+        let proposal_std_wrist = config::INITIAL_PROPOSAL_STD_WRIST * decay;
 
         particles = resample_around_elites(
             &elites,
             n_samples,
             proposal_std_v,
             proposal_std_omega,
+            proposal_std_wrist,
+            &grasp_type_weights,
             &mut rng,
         );
     }
@@ -499,7 +544,8 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     }
 
     // --- Select best grasp from final iteration ---
-    let best = select_best_grasp(&scored).ok_or("No valid grasps found")?;
+    let (best, second_best) = select_best_grasps(&scored);
+    let best = best.ok_or("No valid grasps found")?;
 
     if best.result.contact_score == 0.0 {
         return Err(format!(
@@ -527,11 +573,24 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     let q = uq.quaternion();
     let wrist_quaternion = [q.i, q.j, q.k, q.w];
     let wrist_rotation_deg = particles[best_idx].wrist_rotation.to_degrees().rem_euclid(360.0);
+    let pipeline_time_ms = pipeline_start.elapsed().as_millis() as u32;
+    let (second_best_combined_score, second_best_grasp_type) = match second_best {
+        Some(grasp) => (grasp.combined, grasp.grasp_type.to_ffi()),
+        None => (0.0, GRASP_TYPE_UNKNOWN),
+    };
 
     Ok(ComputeOutput {
         grasp_type: best.grasp_type,
         closure_amount: best.result.closure_amount,
         combined_score: best.combined,
+        alignment_score: best.result.alignment_score,
+        force_closure_score: best.result.force_closure_score,
+        contact_count_score: best.result.contact_count_score,
+        contact_score: best.result.contact_score,
+        second_best_combined_score,
+        second_best_grasp_type,
+        pipeline_time_ms,
+        smc_iterations_used: iterations_used,
         thumb_closure,
         index_closure,
         mrl_closure,
@@ -558,7 +617,7 @@ fn write_message(buf: *mut c_char, buf_len: usize, msg: &str) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn grasp_preshaping_api_version() -> u32 {
-    4
+    5
 }
 
 #[unsafe(no_mangle)]
@@ -580,9 +639,17 @@ pub extern "C" fn grasp_preshaping_compute(
         closure_amount: 0.0,
         combined_score: 0.0,
         grasp_type: GRASP_TYPE_UNKNOWN,
+        alignment_score: 0.0,
+        force_closure_score: 0.0,
+        contact_count_score: 0.0,
+        contact_score: 0.0,
+        second_best_combined_score: 0.0,
+        second_best_grasp_type: GRASP_TYPE_UNKNOWN,
         thumb_closure: 0.0,
         index_closure: 0.0,
         mrl_closure: 0.0,
+        pipeline_time_ms: 0,
+        smc_iterations_used: 0,
         target_px: 0.0,
         target_py: 0.0,
         target_pz: 0.0,
@@ -603,9 +670,17 @@ pub extern "C" fn grasp_preshaping_compute(
             response_ref.closure_amount = output.closure_amount;
             response_ref.combined_score = output.combined_score;
             response_ref.grasp_type = output.grasp_type.to_ffi();
+            response_ref.alignment_score = output.alignment_score;
+            response_ref.force_closure_score = output.force_closure_score;
+            response_ref.contact_count_score = output.contact_count_score;
+            response_ref.contact_score = output.contact_score;
+            response_ref.second_best_combined_score = output.second_best_combined_score;
+            response_ref.second_best_grasp_type = output.second_best_grasp_type;
             response_ref.thumb_closure = output.thumb_closure;
             response_ref.index_closure = output.index_closure;
             response_ref.mrl_closure = output.mrl_closure;
+            response_ref.pipeline_time_ms = output.pipeline_time_ms;
+            response_ref.smc_iterations_used = output.smc_iterations_used;
             response_ref.wrist_qx = output.wrist_quaternion[0];
             response_ref.wrist_qy = output.wrist_quaternion[1];
             response_ref.wrist_qz = output.wrist_quaternion[2];
@@ -615,10 +690,15 @@ pub extern "C" fn grasp_preshaping_compute(
             response_ref.target_pz = output.target_position[2];
             response_ref.wrist_rotation_deg = output.wrist_rotation_deg;
             let message = format!(
-                "{} grasp, closure={:.4}, combined={:.4}, thumb={:.4}, index={:.4}, mrl={:.4}, target=({:.4},{:.4},{:.4}), wrist_rot={:.1} deg",
+                "{} grasp, closure={:.4}, combined={:.4}, alignment={:.4}, force_closure={:.4}, contact_count={:.4}, contact={:.4}, second_best={:.4}, thumb={:.4}, index={:.4}, mrl={:.4}, target=({:.4},{:.4},{:.4}), wrist_rot={:.1} deg, pipeline={} ms, iterations={}",
                 output.grasp_type,
                 output.closure_amount,
                 output.combined_score,
+                output.alignment_score,
+                output.force_closure_score,
+                output.contact_count_score,
+                output.contact_score,
+                output.second_best_combined_score,
                 output.thumb_closure,
                 output.index_closure,
                 output.mrl_closure,
@@ -626,6 +706,8 @@ pub extern "C" fn grasp_preshaping_compute(
                 output.target_position[1],
                 output.target_position[2],
                 output.wrist_rotation_deg,
+                output.pipeline_time_ms,
+                output.smc_iterations_used,
             );
             write_message(message_out, message_out_len, &message);
             GRASP_COMPUTE_OK
