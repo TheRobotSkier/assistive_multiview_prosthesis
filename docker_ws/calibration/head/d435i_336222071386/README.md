@@ -854,6 +854,78 @@ rsync -av \
   jetson:/path/to/assistive_multiview_prosthesis/docker_ws/calibration/head/d435i_336222071386/
 ```
 
+## OpenVINS Integration Notes
+
+The workspace already contains OpenVINS example configurations under:
+
+```text
+docker_ws/src/src/open_vins/config/
+```
+
+Examples found in the current workspace include:
+
+```text
+euroc_mav/
+kaist/
+kaist_vio/
+rpng_aruco/
+rpng_ironsides/
+rpng_plane/
+rpng_sim/
+rs_d455/
+rs_t265/
+tum_vi/
+uzhfpv_indoor/
+uzhfpv_indoor_45/
+uzhfpv_outdoor/
+uzhfpv_outdoor_45/
+```
+
+For the head-mounted D435i, create a project-local OpenVINS config folder instead of editing the upstream examples directly, for example:
+
+```text
+multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/
+```
+
+Recommended input files for the first OpenVINS RGB monocular + IMU test:
+
+```text
+docker_ws/calibration/head/d435i_336222071386/camera_imu_extrinsics_inflated10x/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-camchain-imucam.yaml
+docker_ws/calibration/head/d435i_336222071386/camera_imu_extrinsics_inflated10x/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml
+```
+
+Suggested setup commands from the Jetson host:
+
+```bash
+cd ~/Documents/assistive_multiview_prosthesis/docker_ws
+
+mkdir -p multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386
+
+cp calibration/head/d435i_336222071386/camera_imu_extrinsics_inflated10x/head_rgb_imu_dynamic_20260429_131443_ros1_inflated10x-camchain-imucam.yaml \
+   multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/
+
+cp calibration/head/d435i_336222071386/camera_imu_extrinsics_inflated10x/head_d435i_imu_200hz_trim_first30min_inflated10x.yaml \
+   multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/
+```
+
+Transform convention warning:
+
+```text
+Kalibr reports T_ci as imu0-to-cam0 and T_ic as cam0-to-imu0.
+Use the final Kalibr camchain-imucam YAML as the source of truth.
+Before copying values into an OpenVINS config field, confirm whether that field expects T_cam_imu, T_imu_cam, T_CtoI, or T_ItoC.
+Do not invert or transpose the matrix unless the target config field explicitly requires that convention.
+```
+
+Runtime topics expected from the head D435i:
+
+```text
+/head/d435i_head/color/image_raw
+/head/d435i_head/imu
+```
+
+Keep the older `camera_intrinsics/` result for traceability, but prefer the dynamic-bag intrinsics already embedded in the final `camera_imu_extrinsics_inflated10x/*camchain-imucam.yaml` for OpenVINS testing.
+
 ## Future Redo Criteria
 
 Redo the calibration only if OpenVINS testing shows clear problems, such as:

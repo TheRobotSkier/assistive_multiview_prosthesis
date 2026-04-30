@@ -1,0 +1,51 @@
+[0.029s] Invoking command in '/miahand_ws/src/build_overlay/sensor_fusion_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/miahand_ws/install/realsense2_ros_mqtt_bridge:/opt/ros/jazzy /usr/bin/cmake /miahand_ws/src/multi_cam_localization/sensor_fusion_bringup -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/miahand_ws/src/install_overlay/sensor_fusion_bringup
+[0.180s] -- The C compiler identification is GNU 13.3.0
+[0.320s] -- The CXX compiler identification is GNU 13.3.0
+[0.362s] -- Detecting C compiler ABI info
+[0.571s] -- Detecting C compiler ABI info - done
+[0.607s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.608s] -- Detecting C compile features
+[0.609s] -- Detecting C compile features - done
+[0.632s] -- Detecting CXX compiler ABI info
+[0.877s] -- Detecting CXX compiler ABI info - done
+[0.907s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.908s] -- Detecting CXX compile features
+[0.909s] -- Detecting CXX compile features - done
+[0.925s] -- Found ament_cmake: 2.5.6 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[1.275s] -- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+[1.477s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[1.886s] -- Configuring done (1.8s)
+[1.895s] -- Generating done (0.0s)
+[1.900s] -- Build files have been written to: /miahand_ws/src/build_overlay/sensor_fusion_bringup
+[1.914s] Invoked command in '/miahand_ws/src/build_overlay/sensor_fusion_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/miahand_ws/install/realsense2_ros_mqtt_bridge:/opt/ros/jazzy /usr/bin/cmake /miahand_ws/src/multi_cam_localization/sensor_fusion_bringup -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/miahand_ws/src/install_overlay/sensor_fusion_bringup
+[1.918s] Invoking command in '/miahand_ws/src/build_overlay/sensor_fusion_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/miahand_ws/install/realsense2_ros_mqtt_bridge:/opt/ros/jazzy /usr/bin/cmake --build /miahand_ws/src/build_overlay/sensor_fusion_bringup
+[2.022s] Invoked command in '/miahand_ws/src/build_overlay/sensor_fusion_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/miahand_ws/install/realsense2_ros_mqtt_bridge:/opt/ros/jazzy /usr/bin/cmake --build /miahand_ws/src/build_overlay/sensor_fusion_bringup
+[2.052s] Invoking command in '/miahand_ws/src/build_overlay/sensor_fusion_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/miahand_ws/install/realsense2_ros_mqtt_bridge:/opt/ros/jazzy /usr/bin/cmake --install /miahand_ws/src/build_overlay/sensor_fusion_bringup
+[2.072s] -- Install configuration: ""
+[2.073s] -- Execute custom install script
+[2.074s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/dual_d435i.launch.py
+[2.098s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/single_d435i.launch.py
+[2.119s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/two_imus.launch.py
+[2.145s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/two_imus_ekf.launch.py
+[2.169s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/d435i_cameras.yaml
+[2.193s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/ekf_imu_only.yaml
+[2.216s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/estimator_config.yaml
+[2.239s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/imu_noise_inflated10x_source.yaml
+[2.262s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/kalibr_imu_chain.yaml
+[2.289s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/kalibr_imucam_chain.yaml
+[2.314s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/ament_index/resource_index/package_run_dependencies/sensor_fusion_bringup
+[2.340s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/ament_index/resource_index/parent_prefix_path/sensor_fusion_bringup
+[2.364s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/environment/ament_prefix_path.sh
+[2.387s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/environment/ament_prefix_path.dsv
+[2.410s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/environment/path.sh
+[2.434s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/environment/path.dsv
+[2.462s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/local_setup.bash
+[2.485s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/local_setup.sh
+[2.509s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/local_setup.zsh
+[2.533s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/local_setup.dsv
+[2.558s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/package.dsv
+[2.583s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/ament_index/resource_index/packages/sensor_fusion_bringup
+[2.606s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/cmake/sensor_fusion_bringupConfig.cmake
+[2.629s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/cmake/sensor_fusion_bringupConfig-version.cmake
+[2.652s] -- Symlinking: /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/package.xml
+[2.682s] Invoked command in '/miahand_ws/src/build_overlay/sensor_fusion_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/miahand_ws/install/realsense2_ros_mqtt_bridge:/opt/ros/jazzy /usr/bin/cmake --install /miahand_ws/src/build_overlay/sensor_fusion_bringup
