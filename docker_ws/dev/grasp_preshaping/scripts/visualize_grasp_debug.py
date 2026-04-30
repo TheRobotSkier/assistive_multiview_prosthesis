@@ -78,7 +78,7 @@ _HAND_TIP_CONTACTS = {finger: tip for finger, _, tip in _HAND_SKELETON_SPECS}
 # These are the contacts used for scoring; all others are sweep-only.
 _GRASP_SCORE_CONTACTS = {
     1: {  # cylindrical
-        "ThumbAbdPip", "ThumbAbdDip", "ThumbAbdTip",
+        "ThumbAddPip", "ThumbAddDip", "ThumbAddTip",
         "IndexMcp", "IndexDip", "IndexPip", "IndexTip",
         "MiddleMcp", "MiddlePip", "MiddleDip", "MiddleTip",
         "RingDip", "RingPip", "RingTip",
@@ -86,7 +86,7 @@ _GRASP_SCORE_CONTACTS = {
         "PalmProxUlna", "PalmProxRadi", "PalmDistUlna", "PalmDistRadi",
     },
     2: {  # pinch
-        "ThumbAbdTip", "IndexTip",
+        "ThumbAddTip", "IndexTip",
     },
     3: {  # lateral
         "ThumbAddTip",
@@ -104,6 +104,44 @@ _CONTACT_FINGER_COLORS = {
     "palm": "#6a994e",
 }
 
+# Per-group contact line topology.  Each list defines the chain(s) of
+# contact names that should be connected by lines within a finger group.
+# The ordering follows the kinematic chain (proximal -> distal).
+_CONTACT_LINES = {
+    "index": [
+        ["IndexMcp", "IndexPip", "IndexDip", "IndexTip"],       # palmar rail
+        ["IndexMcpSide", "IndexPipSide", "IndexDipSide", "IndexTipSide"],  # lateral rail
+        ["IndexMcp", "IndexMcpSide"],      # cross-links at each joint
+        ["IndexDip", "IndexDipSide"],
+        ["IndexPip", "IndexPipSide"],
+        ["IndexTip", "IndexTipSide"],
+    ],
+    "middle": [
+        ["MiddleMcp", "MiddlePip", "MiddleDip", "MiddleTip"],
+    ],
+    "ring": [
+        ["RingPip", "RingDip", "RingTip"],
+    ],
+    "little": [
+        ["LittlePip", "LittleDip", "LittleTip"],
+    ],
+    "thumb": [
+        ["ThumbAddPip", "ThumbAddDip", "ThumbAddTip"],
+    ],
+    "palm": [
+        ["PalmProxUlna", "PalmDistUlna"],     # ulnar rail
+        ["PalmProxRadi", "PalmDistRadi"],     # radial rail
+        ["PalmProxUlna", "PalmProxRadi"],     # cross-links
+        ["PalmDistUlna", "PalmDistRadi"],
+        ["PalmProxRadi", "ThumbAddPip"],      # Fingers
+        ["PalmProxRadi", "IndexMcp"],
+        ["PalmProxRadi", "MiddleMcp"],
+        ["PalmProxUlna", "RingPip"],
+        ["PalmProxUlna", "LittlePip"],
+        ["LittlePip", "RingPip", "MiddleMcp", "IndexMcp", "ThumbAddPip"],
+    ],
+}
+
 # Try to import pinocchio + model for hand skeleton support.
 _pin_hand_available = False
 try:
@@ -116,6 +154,7 @@ try:
         data as pin_data,
         get_q_full,
         _q_full_with_thumb_mode,
+        get_sampled_contact_transforms,
         CONTACT_DEFINITIONS,
         COLLISION_GEOMETRIES,
     )
@@ -475,7 +514,7 @@ def visualize_pyvista(dump: dict, args):
         "show_roi": True,
         "show_cameras": True,
         "show_hand": False,
-        "show_contacts": True,
+        "show_contacts": False,
         "show_info": True,
         "grasp_type_filter": 0,  # 0 = all, 1/2/3 = specific type
         "iteration_filter": max_iteration if n_grasps > 0 else None,  # default to last iteration
@@ -996,7 +1035,7 @@ def visualize_pyvista(dump: dict, args):
         lines.lines = np.hstack(line_cells)
         actor = plotter.add_mesh(
             lines,
-            color="#c9d1d9",
+            color="#ffbc85",
             line_width=line_width,
             opacity=min(0.7, opacity),
             label="Hand skeleton",
@@ -1109,7 +1148,8 @@ def visualize_pyvista(dump: dict, args):
         Uses Pinocchio FK via get_sampled_contact_transforms() to compute
         contact positions in hand-local frame, then transforms to world frame
         using the grasp's 4x4 pose matrix. Score contacts are rendered larger
-        than sweep-only contacts.
+        than sweep-only contacts.  Lines connect contacts within each finger
+        group to visualise the kinematic chain.
         """
         actor_groups["contact_points"].clear()
         if not _pin_hand_available:
@@ -1124,10 +1164,6 @@ def visualize_pyvista(dump: dict, args):
 
         # Use iteration-filtered best when filter is active.
         display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
-
-        all_positions = []
-        all_colors = []
-        all_sizes = []
 
         for idx in top_indices:
             if grasps["contact_score"][idx] <= 0.0:
@@ -1147,58 +1183,72 @@ def visualize_pyvista(dump: dict, args):
 
             score_contacts = _GRASP_SCORE_CONTACTS.get(gt, set())
 
+            # ---- Collect per-contact world positions ----
+            world_positions = {}  # contact_name -> world xyz
             for contact_name, contact_T in transforms.items():
-                # Transform from hand-local to world frame.
                 local_pos = contact_T[:3, 3]
-                world_pos = R @ local_pos + t
-                all_positions.append(world_pos)
+                world_positions[contact_name] = R @ local_pos + t
 
-                # Color by finger group.
+            # ---- Render contact points ----
+            points = []
+            point_colors = []
+            for contact_name in world_positions:
+                points.append(world_positions[contact_name])
                 group = contact_group_map.get(contact_name, "index")
                 hex_color = _CONTACT_FINGER_COLORS.get(group, "#ffffff")
                 r_c = int(hex_color[1:3], 16) / 255.0
                 g_c = int(hex_color[3:5], 16) / 255.0
                 b_c = int(hex_color[5:7], 16) / 255.0
-
-                # Score contacts are brighter; sweep-only are dimmer.
                 is_score = contact_name in score_contacts
                 if is_score:
-                    all_colors.append([r_c, g_c, b_c])
+                    point_colors.append([r_c, g_c, b_c])
                 else:
-                    all_colors.append([r_c * 0.5, g_c * 0.5, b_c * 0.5])
+                    point_colors.append([r_c * 0.5, g_c * 0.5, b_c * 0.5])
 
-                # Point size: best grasp score contacts are largest.
-                if is_best and is_score:
-                    all_sizes.append(12)
-                elif is_best:
-                    all_sizes.append(7)
-                elif is_score:
-                    all_sizes.append(8)
-                else:
-                    all_sizes.append(4)
+            if not points:
+                continue
 
-        if not all_positions:
-            return
+            pt_size = 10 if is_best else 6
+            pts = pv.PolyData(np.asarray(points, dtype=np.float64))
+            pts["colors"] = np.asarray(point_colors, dtype=np.float32)
+            actor = plotter.add_mesh(
+                pts,
+                scalars="colors",
+                rgb=True,
+                style="points",
+                point_size=pt_size,
+                render_points_as_spheres=True,
+                opacity=0.85 if is_best else 0.55,
+                label=f"Contacts ({len(points)} pts)" if is_best else None,
+            )
+            actor_groups["contact_points"].append(actor)
 
-        positions_arr = np.array(all_positions, dtype=np.float64)
-        colors_arr = np.array(all_colors, dtype=np.float32)
-        sizes_arr = np.array(all_sizes, dtype=np.float32)
+            # ---- Render per-group lines ----
+            line_points = []
+            line_cells = []
+            for group, chains in _CONTACT_LINES.items():
+                for chain in chains:
+                    chain_positions = []
+                    for cname in chain:
+                        if cname in world_positions:
+                            chain_positions.append(world_positions[cname])
+                    if len(chain_positions) < 2:
+                        continue
+                    start_idx = len(line_points)
+                    line_points.extend(chain_positions)
+                    for j in range(len(chain_positions) - 1):
+                        line_cells.append([2, start_idx + j, start_idx + j + 1])
 
-        cloud = pv.PolyData(positions_arr)
-        cloud["colors"] = colors_arr
-        cloud["sizes"] = sizes_arr
-
-        actor = plotter.add_mesh(
-            cloud,
-            scalars="colors",
-            rgb=True,
-            style="points",
-            point_size=8,
-            render_points_as_spheres=True,
-            opacity=0.85,
-            label=f"Contacts ({len(all_positions)} pts)",
-        )
-        actor_groups["contact_points"].append(actor)
+            if line_points:
+                lp = pv.PolyData(np.asarray(line_points, dtype=np.float64))
+                lp.lines = np.hstack(line_cells)
+                actor = plotter.add_mesh(
+                    lp,
+                    color="#a0c28d",
+                    line_width=3 if is_best else 1,
+                    opacity=0.6 if is_best else 0.3,
+                )
+                actor_groups["contact_points"].append(actor)
 
     if state["show_contacts"]:
         add_contact_points()
@@ -1255,15 +1305,14 @@ def visualize_pyvista(dump: dict, args):
     # Legend
     # ==================================================================
     legend_entries = [
-        ("TSDF voxels (coolwarm)", "cyan"),
         ("Point cloud", "white"),
         ("ROI box", "orange"),
         ("Best grasp", "gold"),
         ("Cylindrical", GRASP_TYPE_COLORS[1]),
         ("Pinch", GRASP_TYPE_COLORS[2]),
         ("Lateral", GRASP_TYPE_COLORS[3]),
-        ("Hand: unified", "#f4a261"),
-        ("Contact points", "#6a994e"),
+        ("Hand", "#ffbc85"),
+        ("Contact points", "#a0c28d"),
     ]
     plotter.add_legend(legend_entries, size=(0.18, 0.25), loc="upper left",
                        face="rectangle")
