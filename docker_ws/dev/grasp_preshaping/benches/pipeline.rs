@@ -3,7 +3,8 @@ use grasp_preshaping::lut_helper::{Contact, DualQuaternion, FingerLUT};
 use grasp_preshaping::planner::{score_cylindrical, score_lateral, score_pinch};
 use grasp_preshaping::pointcloud_helper::{get_tsdf, morton, prune, PointCloud};
 use grasp_preshaping::predictor::{
-    predict_roi_with_samples, PredictionConfig, Twist6, TwistCovariance,
+    predict_roi_with_samples, sample_initial_particles, resample_around_elites,
+    select_elite_indices, SmcParticle, PredictionConfig, Twist6, TwistCovariance,
 };
 use grasp_preshaping::config;
 use nalgebra::{Matrix4, Vector3};
@@ -214,12 +215,115 @@ fn bench_scoring_functions(c: &mut Criterion) {
     });
 }
 
+fn bench_smc_pipeline(c: &mut Criterion) {
+    let lut = match load_lut_or_skip() {
+        Some(l) => l,
+        None => {
+            println!("Skipping SMC pipeline benchmark: LUT file not found");
+            return;
+        }
+    };
+
+    let pred_config = create_pred_config();
+    let pose = black_box(identity_pose());
+    let twist = black_box(dummy_twist());
+    let twist_cov = black_box(TwistCovariance::fixed());
+    let index_tip = black_box(lut.get_location(Contact::IndexTip, 0.0));
+    let pc = black_box(demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 5000));
+
+    c.bench_function("smc_pipeline_8iter_1000samples", |b| {
+        b.iter(|| {
+            // Build ROI and TSDF once.
+            let (roi, _) =
+                predict_roi_with_samples(&pose, &twist, &twist_cov, &index_tip, &pred_config);
+            let pruned = prune(&pc, Some(roi));
+            if pruned.is_empty() {
+                return ();
+            }
+            let (morton_arr, offsets, start) = morton(&pruned, config::TSDF_RESOLUTION_M);
+            let tsdf = get_tsdf(
+                &morton_arr,
+                &offsets,
+                config::TRUNCATION_CELLS,
+                start,
+                config::TSDF_RESOLUTION_M,
+                &[],
+            );
+
+            let collision_tol = config::COLLISION_TOL_M;
+            let n_samples = config::PREDICTION_SAMPLES;
+
+            // SMC loop.
+            let mut rng = rand::rng();
+            let mut particles = sample_initial_particles(
+                &pose, &twist, &twist_cov, n_samples, pred_config.t_max, &mut rng,
+            );
+
+            for iteration in 0..config::ITERATIONS {
+                // Score all particles (sequential in benchmark for simplicity).
+                for p in particles.iter_mut() {
+                    let base_transform = p.pose.to_se3();
+                    let scorer: fn(&FingerLUT, &grasp_preshaping::pointcloud_helper::Tsdf, &Matrix4<f64>, f32) -> grasp_preshaping::planner::GraspScoreResult = match p.grasp_type {
+                        0 => score_cylindrical,
+                        1 => score_pinch,
+                        _ => score_lateral,
+                    };
+                    let result = scorer(&lut, &tsdf, &base_transform, collision_tol);
+                    let weights = grasp_preshaping::planner::GraspWeights::default();
+                    p.score = result.combined_score(&weights, p.sample_probability);
+                }
+
+                if iteration == config::ITERATIONS - 1 {
+                    break;
+                }
+
+                let elite_indices = select_elite_indices(&particles, config::ELITE_RATIO);
+                let elites: Vec<SmcParticle> = elite_indices.iter().map(|&idx| particles[idx].clone()).collect();
+                let decay = config::DECAY_RATE.powi(iteration as i32);
+                particles = resample_around_elites(
+                    &elites,
+                    n_samples,
+                    config::INITIAL_PROPOSAL_STD_V * decay,
+                    config::INITIAL_PROPOSAL_STD_OMEGA * decay,
+                    &mut rng,
+                );
+            }
+        })
+    });
+}
+
+fn bench_resample_around_elites(c: &mut Criterion) {
+    let pose = black_box(identity_pose());
+    let twist = black_box(dummy_twist());
+    let twist_cov = black_box(TwistCovariance::fixed());
+
+    let mut rng = rand::rng();
+    let particles = sample_initial_particles(
+        &pose, &twist, &twist_cov, 100, 5.0, &mut rng,
+    );
+
+    c.bench_function("resample_around_elites_1000_from_100", |b| {
+        b.iter(|| {
+            let mut rng = rand::rng();
+            resample_around_elites(
+                &particles,
+                1000,
+                config::INITIAL_PROPOSAL_STD_V,
+                config::INITIAL_PROPOSAL_STD_OMEGA,
+                &mut rng,
+            )
+        })
+    });
+}
+
 criterion_group!(
     benches,
     bench_roi_prediction,
     bench_pointcloud_pruning,
     bench_tsdf_construction,
     bench_full_pipeline,
+    bench_smc_pipeline,
+    bench_resample_around_elites,
     bench_scoring_functions
 );
 criterion_main!(benches);

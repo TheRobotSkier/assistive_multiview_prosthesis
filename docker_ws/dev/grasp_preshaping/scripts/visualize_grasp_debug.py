@@ -115,10 +115,12 @@ def load_dump(path: str) -> dict:
     pose = data["input_pose"]
     twist = data["input_twist"]
 
-    # Backward-compatible: handle 24-col, 25-col, 26-col, 27-col, and 28-col formats
+    # Backward-compatible: handle 24-col through 29-col formats
     raw_len = len(data["scored_grasps"])
     if raw_len > 0:
-        if raw_len % 28 == 0:
+        if raw_len % 29 == 0:
+            row_len = 29
+        elif raw_len % 28 == 0:
             row_len = 28
         elif raw_len % 27 == 0:
             row_len = 27
@@ -130,10 +132,10 @@ def load_dump(path: str) -> dict:
             row_len = 24
         grasps_raw = data["scored_grasps"].reshape(-1, row_len)
     else:
-        row_len = 28
+        row_len = 29
         grasps_raw = np.zeros((0, row_len))
 
-    if row_len == 28:
+    if row_len == 29:
         grasps = {
             "sample_index": grasps_raw[:, 0].astype(int),
             "grasp_type": grasps_raw[:, 1].astype(int),
@@ -147,6 +149,24 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 9],
             "probability": grasps_raw[:, 10],
             "wrist_rotation": grasps_raw[:, 11],
+            "smc_iteration": grasps_raw[:, 12].astype(int),
+            "pose_4x4": grasps_raw[:, 13:29].reshape(-1, 4, 4),
+        }
+    elif row_len == 28:
+        grasps = {
+            "sample_index": grasps_raw[:, 0].astype(int),
+            "grasp_type": grasps_raw[:, 1].astype(int),
+            "closure": grasps_raw[:, 2],
+            "alignment": grasps_raw[:, 3],
+            "force_closure": grasps_raw[:, 4],
+            "contact_count_score": grasps_raw[:, 5],
+            "contact_score": grasps_raw[:, 6],
+            "active_contact_count": grasps_raw[:, 7].astype(int),
+            "found_collision": grasps_raw[:, 8] > 0.5,
+            "combined": grasps_raw[:, 9],
+            "probability": grasps_raw[:, 10],
+            "wrist_rotation": grasps_raw[:, 11],
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 12:28].reshape(-1, 4, 4),
         }
     elif row_len == 27:
@@ -163,6 +183,7 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 8],
             "probability": grasps_raw[:, 9],
             "wrist_rotation": grasps_raw[:, 10],
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 11:27].reshape(-1, 4, 4),
         }
     elif row_len == 26:
@@ -179,6 +200,7 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 7],
             "probability": grasps_raw[:, 8],
             "wrist_rotation": grasps_raw[:, 9],
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 10:26].reshape(-1, 4, 4),
         }
     elif row_len == 25:
@@ -195,6 +217,7 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 7],
             "probability": grasps_raw[:, 8],
             "wrist_rotation": np.zeros(len(grasps_raw)),
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 9:25].reshape(-1, 4, 4),
         }
     else:
@@ -212,6 +235,7 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 6],
             "probability": grasps_raw[:, 7],
             "wrist_rotation": np.zeros(len(grasps_raw)),
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 8:24].reshape(-1, 4, 4),
         }
 
@@ -1276,7 +1300,10 @@ def main():
               ?  print help
         """),
     )
-    parser.add_argument("dump_path", help="Path to the .npz debug dump file")
+    parser.add_argument(
+        "dump_path", nargs="?", default=None,
+        help="Path to the .npz debug dump file (default: latest in data/debug/)",
+    )
     parser.add_argument(
         "--threshold", type=float, default=-np.inf,
         help="Minimum combined_score to display a grasp candidate (default: show all)",
@@ -1298,6 +1325,25 @@ def main():
         help="Print TSDF flat-index to (x,y,z) diagnostics in the console",
     )
     args = parser.parse_args()
+
+    # Resolve dump path: explicit or latest in data/debug/
+    if args.dump_path is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        default_dir = os.path.join(script_dir, "..", "data", "debug")
+        default_dir = os.path.normpath(default_dir)
+        if not os.path.isdir(default_dir):
+            print(f"Error: no dump path given and default dir not found: {default_dir}",
+                  file=sys.stderr)
+            sys.exit(1)
+        npz_files = sorted(
+            (f for f in os.listdir(default_dir) if f.endswith(".npz")),
+            key=lambda f: os.path.getmtime(os.path.join(default_dir, f)),
+        )
+        if not npz_files:
+            print(f"Error: no .npz files found in {default_dir}", file=sys.stderr)
+            sys.exit(1)
+        args.dump_path = os.path.join(default_dir, npz_files[-1])
+        print(f"No path given — using latest dump:")
 
     if not os.path.isfile(args.dump_path):
         print(f"Error: file not found: {args.dump_path}", file=sys.stderr)

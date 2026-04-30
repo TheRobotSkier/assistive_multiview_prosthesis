@@ -27,6 +27,15 @@ pub const WRIST_ROTATION_RANGE_RAD: f64 = std::f64::consts::FRAC_PI_2;
 pub const FIXED_COV_OMEGA: [f64; 3] = [0.001, 0.001, 0.001];
 pub const FIXED_COV_V: [f64; 3] = [0.0005, 0.0005, 0.0005];
 
+// SMC Optimization Constants
+pub const ITERATIONS: usize = 8; // Number of SMC iterations
+pub const DECAY_RATE: f64 = 0.75; // Geometric decay factor per iteration
+pub const ELITE_RATIO: f64 = 0.1; // Top fraction selected as elites
+
+// Starting Proposal Variance (The "Wide Net")
+pub const INITIAL_PROPOSAL_STD_V: f64 = 0.001; // metres
+pub const INITIAL_PROPOSAL_STD_OMEGA: f64 = 0.002; // radians
+
 // Grasp scoring weights
 pub const GRASP_WEIGHT_PROBABILITY: f64 = 0.5;
 pub const GRASP_WEIGHT_ALIGNMENT: f64 = 1.0;
@@ -39,7 +48,7 @@ pub const GRASP_WEIGHT_CONTACT_SCORE: f64 = 3.0;
 // trajectory node to apply progressively as the arm approaches the target.
 // Range: [0.0, 1.0].  A value of 0.3 means 30 % of the computed closure is
 // applied immediately, leaving 70 % for the trajectory node.
-pub const PRESHAPING_CLOSURE_FRACTION: f64 = 0.3;
+pub const PRESHAPING_CLOSURE_FRACTION: f64 = 1.0;
 
 // Debug visualization
 // When true, each pipeline invocation writes a single .npz file containing the

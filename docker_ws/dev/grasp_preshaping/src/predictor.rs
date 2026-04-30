@@ -203,6 +203,181 @@ pub fn sample_future_poses(
     poses
 }
 
+/// A particle in the Sequential Monte Carlo optimizer.
+///
+/// Unlike `SampledPose` which represents a one-shot sample from the motion model,
+/// `SmcParticle` carries forward state across SMC iterations and caches its score.
+#[derive(Debug, Clone)]
+pub struct SmcParticle {
+    pub pose: DualQuaternion,
+    pub sample_probability: f64,
+    /// Randomly assigned grasp type: 0 = cylindrical, 1 = pinch, 2 = lateral.
+    pub grasp_type: usize,
+    /// Wrist rotation angle around local Y axis in radians.
+    pub wrist_rotation: f64,
+    /// Combined score from the last evaluation iteration.
+    pub score: f64,
+}
+
+/// Generate the initial broad particle set for SMC iteration 0.
+///
+/// This is equivalent to `sample_future_poses` but produces `SmcParticle`s
+/// with a default score of 0.0 (to be filled by the scorer).
+pub fn sample_initial_particles(
+    current_pose: &DualQuaternion,
+    twist: &Twist6,
+    covariance: &TwistCovariance,
+    n_samples: usize,
+    t_max: f64,
+    rng: &mut impl Rng,
+) -> Vec<SmcParticle> {
+    let mut particles = Vec::with_capacity(n_samples);
+    for _ in 0..n_samples {
+        let t: f64 = rng.random_range(0.0..t_max);
+        let sampled = sample_twist(twist, covariance, t, rng);
+        let displacement_se3 = twist_to_se3(&sampled.twist.omega, &sampled.twist.v);
+        let displacement_dq = DualQuaternion::from_se3(&displacement_se3);
+        let future_pose = current_pose.multiply(&displacement_dq);
+
+        let grasp_type: usize = rng.random_range(0..3);
+        let wrist_rotation: f64 =
+            rng.random_range(-config::WRIST_ROTATION_RANGE_RAD..config::WRIST_ROTATION_RANGE_RAD);
+
+        let wrist_se3 = {
+            let rot = UnitQuaternion::from_axis_angle(&nalgebra::Vector3::y_axis(), wrist_rotation);
+            let mut m = Matrix4::identity();
+            m.fixed_view_mut::<3, 3>(0, 0)
+                .copy_from(rot.to_rotation_matrix().matrix());
+            m
+        };
+        let wrist_dq = DualQuaternion::from_se3(&wrist_se3);
+        let final_pose = future_pose.multiply(&wrist_dq);
+
+        let prob = compute_sample_probability(
+            &sampled.noise_omega,
+            &sampled.noise_v,
+            covariance,
+            sampled.t,
+        );
+
+        particles.push(SmcParticle {
+            pose: final_pose,
+            sample_probability: prob,
+            grasp_type,
+            wrist_rotation,
+            score: 0.0,
+        });
+    }
+    particles
+}
+
+/// Resample a full population of particles around the elite set.
+///
+/// For each new particle, a random elite is chosen and its pose is perturbed
+/// with Gaussian jitter (position and orientation) at the given proposal std.
+/// Grasp type and wrist rotation are re-randomized to maintain diversity.
+pub fn resample_around_elites(
+    elites: &[SmcParticle],
+    n_total: usize,
+    proposal_std_v: f64,
+    proposal_std_omega: f64,
+    rng: &mut impl Rng,
+) -> Vec<SmcParticle> {
+    assert!(!elites.is_empty(), "elite set must not be empty");
+
+    let n_elites = elites.len();
+    let mut particles = Vec::with_capacity(n_total);
+
+    let normal_v = Normal::new(0.0, proposal_std_v).unwrap();
+    let normal_omega = Normal::new(0.0, proposal_std_omega).unwrap();
+
+    for _ in 0..n_total {
+        let elite = &elites[rng.random_range(0..n_elites)];
+        let elite_se3 = elite.pose.to_se3();
+
+        // Extract position and rotation from elite pose.
+        let pos = Vector3::new(elite_se3[(0, 3)], elite_se3[(1, 3)], elite_se3[(2, 3)]);
+        let rot = elite_se3.fixed_view::<3, 3>(0, 0).clone_owned();
+        let rot3 = nalgebra::Rotation3::from_matrix_unchecked(rot);
+        let uq = UnitQuaternion::from_rotation_matrix(&rot3);
+
+        // Add position jitter.
+        let jitter_v = Vector3::new(
+            rng.sample(normal_v),
+            rng.sample(normal_v),
+            rng.sample(normal_v),
+        );
+        let new_pos = pos + jitter_v;
+
+        // Add orientation jitter as a small incremental rotation.
+        let jitter_omega = Vector3::new(
+            rng.sample(normal_omega),
+            rng.sample(normal_omega),
+            rng.sample(normal_omega),
+        );
+        let jitter_se3 = twist_to_se3(&jitter_omega, &Vector3::zeros());
+        let jitter_rot = jitter_se3.fixed_view::<3, 3>(0, 0).clone_owned();
+        let jitter_uq = UnitQuaternion::from_rotation_matrix(
+            &nalgebra::Rotation3::from_matrix_unchecked(jitter_rot),
+        );
+        let new_uq = jitter_uq * uq;
+
+        // Reconstruct SE(3) with jittered position and orientation.
+        let mut new_se3 = Matrix4::identity();
+        new_se3
+            .fixed_view_mut::<3, 3>(0, 0)
+            .copy_from(new_uq.to_rotation_matrix().matrix());
+        new_se3[(0, 3)] = new_pos.x;
+        new_se3[(1, 3)] = new_pos.y;
+        new_se3[(2, 3)] = new_pos.z;
+
+        let new_pose = DualQuaternion::from_se3(&new_se3);
+
+        // Re-randomize grasp type and wrist rotation for diversity.
+        let grasp_type: usize = rng.random_range(0..3);
+        let wrist_rotation: f64 =
+            rng.random_range(-config::WRIST_ROTATION_RANGE_RAD..config::WRIST_ROTATION_RANGE_RAD);
+
+        // Apply wrist rotation to the resampled pose.
+        let wrist_se3 = {
+            let rot = UnitQuaternion::from_axis_angle(&nalgebra::Vector3::y_axis(), wrist_rotation);
+            let mut m = Matrix4::identity();
+            m.fixed_view_mut::<3, 3>(0, 0)
+                .copy_from(rot.to_rotation_matrix().matrix());
+            m
+        };
+        let wrist_dq = DualQuaternion::from_se3(&wrist_se3);
+        let final_pose = new_pose.multiply(&wrist_dq);
+
+        particles.push(SmcParticle {
+            pose: final_pose,
+            sample_probability: elite.sample_probability,
+            grasp_type,
+            wrist_rotation,
+            score: 0.0,
+        });
+    }
+
+    particles
+}
+
+/// Select elites by sorting particles by score and returning the top fraction.
+/// Returns indices into the original particle array.
+pub fn select_elite_indices(particles: &[SmcParticle], elite_ratio: f64) -> Vec<usize> {
+    let n_elite = ((particles.len() as f64) * elite_ratio).ceil() as usize;
+    let n_elite = n_elite.max(1).min(particles.len());
+
+    let mut indexed: Vec<usize> = (0..particles.len()).collect();
+    indexed.sort_by(|&a, &b| {
+        particles[b]
+            .score
+            .partial_cmp(&particles[a].score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    indexed.truncate(n_elite);
+    indexed
+}
+
 pub fn project_index_tips(
     sampled_poses: &[SampledPose],
     current_pose: &DualQuaternion,

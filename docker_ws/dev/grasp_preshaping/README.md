@@ -192,3 +192,16 @@ I have a few things I want to change, namely:
 This means there is somthing with the postion where we need to get that from rust. keep the other definitions and topics, I did not mention.
 
 Make a plan on how to implment this change, find the correct files and sections, and verify your findings.
+
+## stuff
+
+That sounds like some interesting findings. I have a few notes:
+
+1. With grasps in tier, we might not have a massive truncations band. We can make these larger if you think, since it is a one time cost to make the tsdf, and not a huge part of the time equation. But it needs to make sense for makign the sampling more efficient.
+2. In realtion to 1, I wonder if the first iteration mainly is concerned with location, and not grasp type, and that we might carry bad grasp types forward because of that, perhaps there should be some grasp type resampling as well, but it liekly should not be totally random, but maybe we can do some sort of weighted resampling based on the scores of the different grasp types, so that we are more likely to sample grasp types that are performing better, but still have some chance of sampling the others, to prevent getting stuck in local minima. 
+    - As an extra note i wonder if we should allow more wrist rotations variance, or if the twist variance is good enough. What do you think? i am just nerveous that the inital sampling will not cover the space well wnough, and that we need to explore more with lower sample counts since it is a high demensional space.
+3. Early termination is a good idea, i want the stopping tol in the config.rs. 
+4. I think you r sugegstions on adjusting the perameters makes sense, but also i can not say that it will be a definete improvement.
+5. You said: "When max contact_score < 0.1, increase probability weight to 2.0 (from 0.5)". Is this to promote more probable positions early on?
+
+Could you go look into this and see if you perhaps want to refine your suggestions, or if you think there are other better paths for improvment on sampling effeciancy and overall speed? Please make sure to verify your findings, and then make a detailed plan on how to implement the changes you suggest, and what files and sections to modify.

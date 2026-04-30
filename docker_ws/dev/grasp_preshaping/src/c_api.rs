@@ -4,7 +4,8 @@ use crate::planner::{
 };
 use crate::pointcloud_helper::{get_tsdf, morton, prune, PointCloud};
 use crate::predictor::{
-    predict_roi_with_samples, PredictionConfig, SampledPose, Twist6, TwistCovariance,
+    predict_roi_with_samples, sample_initial_particles, resample_around_elites,
+    select_elite_indices, SmcParticle, PredictionConfig, Twist6, TwistCovariance,
     TwistWithCovariance,
 };
 use crate::config;
@@ -126,6 +127,7 @@ impl GraspType {
     }
 }
 
+#[derive(Clone)]
 struct ScoredGrasp {
     grasp_type: GraspType,
     result: GraspScoreResult,
@@ -166,46 +168,59 @@ static LUT: OnceLock<FingerLUT> = OnceLock::new();
 static PRED_CONFIG: OnceLock<PredictionConfig> = OnceLock::new();
 static INDEX_TIP_LOCAL: OnceLock<Vector3<f64>> = OnceLock::new();
 
-fn score_all_samples(
-    lut: &FingerLUT,
-    tsdf: &crate::pointcloud_helper::Tsdf,
-    samples: &[SampledPose],
-    collision_tol: f32,
-) -> Vec<ScoredGrasp> {
-    let weights = GraspWeights::default();
-
-    samples
-        .par_iter()
-        .map(|sp| {
-            let base_transform = sp.pose.to_se3();
-            let scorer: ScorerFn = match sp.grasp_type {
-                0 => score_cylindrical,
-                1 => score_pinch,
-                _ => score_lateral,
-            };
-            let grasp_type = match sp.grasp_type {
-                0 => GraspType::Cylindrical,
-                1 => GraspType::Pinch,
-                _ => GraspType::Lateral,
-            };
-
-            let result = scorer(lut, tsdf, &base_transform, collision_tol);
-            let combined = result.combined_score(&weights, sp.sample_probability);
-            ScoredGrasp {
-                grasp_type,
-                result,
-                combined,
-            }
-        })
-        .collect()
-}
-
 fn select_best_grasp(scored: &[ScoredGrasp]) -> Option<&ScoredGrasp> {
     scored.iter().max_by(|a, b| {
         a.combined
             .partial_cmp(&b.combined)
             .unwrap_or(std::cmp::Ordering::Equal)
     })
+}
+
+/// Score all SMC particles in parallel, returning scored grasps and updating
+/// each particle's `score` field in place.
+fn score_all_particles(
+    lut: &FingerLUT,
+    tsdf: &crate::pointcloud_helper::Tsdf,
+    particles: &mut [SmcParticle],
+    collision_tol: f32,
+) -> Vec<ScoredGrasp> {
+    let weights = GraspWeights::default();
+
+    // Score in parallel, collect (ScoredGrasp, combined_score) pairs.
+    let results: Vec<(ScoredGrasp, f64)> = particles
+        .par_iter()
+        .map(|p| {
+            let base_transform = p.pose.to_se3();
+            let scorer: ScorerFn = match p.grasp_type {
+                0 => score_cylindrical,
+                1 => score_pinch,
+                _ => score_lateral,
+            };
+            let grasp_type = match p.grasp_type {
+                0 => GraspType::Cylindrical,
+                1 => GraspType::Pinch,
+                _ => GraspType::Lateral,
+            };
+
+            let result = scorer(lut, tsdf, &base_transform, collision_tol);
+            let combined = result.combined_score(&weights, p.sample_probability);
+            (
+                ScoredGrasp {
+                    grasp_type,
+                    result,
+                    combined,
+                },
+                combined,
+            )
+        })
+        .collect();
+
+    // Write scores back into particles.
+    for (i, (_, score)) in results.iter().enumerate() {
+        particles[i].score = *score;
+    }
+
+    results.into_iter().map(|(sg, _)| sg).collect()
 }
 
 fn pose_to_dual_quaternion(pose: &GraspPoseFFI) -> DualQuaternion {
@@ -321,7 +336,10 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     let pred_config = get_prediction_config();
     let index_tip_local = get_index_tip_local();
 
-    let (roi, samples) = predict_roi_with_samples(
+    // --- ROI and TSDF construction (one-time cost) ---
+    // Use the original sample_future_poses for ROI prediction so the AABB
+    // covers the full initial search space.
+    let (roi, _samples_for_roi) = predict_roi_with_samples(
         &current_pose,
         &twist_with_cov.twist,
         &twist_with_cov.covariance,
@@ -354,77 +372,139 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     );
 
     let collision_tol = config::COLLISION_TOL_M;
-    let scored = score_all_samples(lut, &tsdf, &samples, collision_tol);
+
+    // --- SMC Optimization Loop ---
+    let n_samples = config::PREDICTION_SAMPLES;
+    let n_iterations = config::ITERATIONS;
+
+    // Iteration 0: broad sampling from the motion model.
+    let mut rng = rand::rng();
+    let mut particles = sample_initial_particles(
+        &current_pose,
+        &twist_with_cov.twist,
+        &twist_with_cov.covariance,
+        n_samples,
+        pred_config.t_max,
+        &mut rng,
+    );
+
+    // Collect debug data across all iterations: (particle_index, scored_grasp, iteration).
+    let mut all_debug: Option<Vec<(usize, ScoredGrasp, usize, SmcParticle)>> =
+        if config::DEBUG_VISUALIZATION {
+            Some(Vec::new())
+        } else {
+            None
+        };
+
+    let mut scored: Vec<ScoredGrasp> = Vec::new();
+
+    for iteration in 0..n_iterations {
+        scored = score_all_particles(lut, &tsdf, &mut particles, collision_tol);
+
+        // Store debug data for this iteration.
+        if let Some(ref mut debug) = all_debug {
+            for (i, sg) in scored.iter().enumerate() {
+                debug.push((i, sg.clone(), iteration, particles[i].clone()));
+            }
+        }
+
+        // Last iteration: no resampling needed.
+        if iteration == n_iterations - 1 {
+            break;
+        }
+
+        // Select elites and resample with decaying proposal variance.
+        let elite_indices = select_elite_indices(&particles, config::ELITE_RATIO);
+        let elites: Vec<SmcParticle> = elite_indices
+            .iter()
+            .map(|&idx| particles[idx].clone())
+            .collect();
+
+        let decay = config::DECAY_RATE.powi(iteration as i32);
+        let proposal_std_v = config::INITIAL_PROPOSAL_STD_V * decay;
+        let proposal_std_omega = config::INITIAL_PROPOSAL_STD_OMEGA * decay;
+
+        particles = resample_around_elites(
+            &elites,
+            n_samples,
+            proposal_std_v,
+            proposal_std_omega,
+            &mut rng,
+        );
+    }
 
     // --- Debug visualization export ---
     if config::DEBUG_VISUALIZATION {
-        let grasp_exports: Vec<crate::debug_export::ScoredGraspExport> = scored
-            .iter()
-            .enumerate()
-            .map(|(i, sg)| {
-                let se3 = samples[i].pose.to_se3();
-                let mut pose_se3 = [0.0f64; 16];
-                for row in 0..4 {
-                    for col in 0..4 {
-                        pose_se3[row * 4 + col] = se3[(row, col)];
+        if let Some(ref debug) = all_debug {
+            let grasp_exports: Vec<crate::debug_export::ScoredGraspExport> = debug
+                .iter()
+                .map(|(_idx, sg, iteration, particle)| {
+                    let se3 = particle.pose.to_se3();
+                    let mut pose_se3 = [0.0f64; 16];
+                    for row in 0..4 {
+                        for col in 0..4 {
+                            pose_se3[row * 4 + col] = se3[(row, col)];
+                        }
                     }
-                }
-                crate::debug_export::ScoredGraspExport {
-                    sample_index: i,
-                    grasp_type_i32: sg.grasp_type.to_ffi(),
-                    closure_amount: sg.result.closure_amount,
-                    alignment_score: sg.result.alignment_score,
-                    force_closure_score: sg.result.force_closure_score,
-                    contact_count_score: sg.result.contact_count_score,
-                    contact_score: sg.result.contact_score,
-                    active_contact_count: sg.result.active_contact_count,
-                    found_collision: sg.result.found_collision,
-                    combined_score: sg.combined,
-                    sample_probability: samples[i].sample_probability,
-                    pose_se3,
-                    wrist_rotation: samples[i].wrist_rotation,
-                }
-            })
-            .collect();
+                    crate::debug_export::ScoredGraspExport {
+                        sample_index: *_idx,
+                        grasp_type_i32: sg.grasp_type.to_ffi(),
+                        closure_amount: sg.result.closure_amount,
+                        alignment_score: sg.result.alignment_score,
+                        force_closure_score: sg.result.force_closure_score,
+                        contact_count_score: sg.result.contact_count_score,
+                        contact_score: sg.result.contact_score,
+                        active_contact_count: sg.result.active_contact_count,
+                        found_collision: sg.result.found_collision,
+                        combined_score: sg.combined,
+                        sample_probability: particle.sample_probability,
+                        pose_se3,
+                        wrist_rotation: particle.wrist_rotation,
+                        smc_iteration: *iteration,
+                    }
+                })
+                .collect();
 
-        let dump = crate::debug_export::DebugDump {
-            tsdf: &tsdf,
-            point_cloud: &pruned,
-            roi: &roi,
-            cameras: &cameras,
-            scored_grasps: &grasp_exports,
-            input_pose: [
-                request.pose.px,
-                request.pose.py,
-                request.pose.pz,
-                request.pose.qx,
-                request.pose.qy,
-                request.pose.qz,
-                request.pose.qw,
-            ],
-            input_twist: [
-                request.twist.lx,
-                request.twist.ly,
-                request.twist.lz,
-                request.twist.ax,
-                request.twist.ay,
-                request.twist.az,
-            ],
-        };
+            let dump = crate::debug_export::DebugDump {
+                tsdf: &tsdf,
+                point_cloud: &pruned,
+                roi: &roi,
+                cameras: &cameras,
+                scored_grasps: &grasp_exports,
+                input_pose: [
+                    request.pose.px,
+                    request.pose.py,
+                    request.pose.pz,
+                    request.pose.qx,
+                    request.pose.qy,
+                    request.pose.qz,
+                    request.pose.qw,
+                ],
+                input_twist: [
+                    request.twist.lx,
+                    request.twist.ly,
+                    request.twist.lz,
+                    request.twist.ax,
+                    request.twist.ay,
+                    request.twist.az,
+                ],
+            };
 
-        let path = crate::debug_export::debug_output_path();
-        match crate::debug_export::export_npz(&dump, &path) {
-            Ok(()) => eprintln!("[debug_viz] wrote {}", path.display()),
-            Err(e) => eprintln!("[debug_viz] FAILED to write {}: {}", path.display(), e),
+            let path = crate::debug_export::debug_output_path();
+            match crate::debug_export::export_npz(&dump, &path) {
+                Ok(()) => eprintln!("[debug_viz] wrote {}", path.display()),
+                Err(e) => eprintln!("[debug_viz] FAILED to write {}: {}", path.display(), e),
+            }
         }
     }
 
+    // --- Select best grasp from final iteration ---
     let best = select_best_grasp(&scored).ok_or("No valid grasps found")?;
 
     if best.result.contact_score == 0.0 {
         return Err(format!(
-            "No object in reach for any grasp type ({} samples evaluated, best contact_score=0.0)",
-            scored.len()
+            "No object in reach for any grasp type ({} particles x {} iterations, best contact_score=0.0)",
+            n_samples, n_iterations
         ));
     }
 
@@ -432,19 +512,21 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         compute_per_finger_output(best.grasp_type, best.result.closure_amount);
 
     // Extract wrist orientation quaternion from the best sample's pose.
-    let best_sample_idx = scored.iter().enumerate()
+    let best_idx = scored
+        .iter()
+        .enumerate()
         .filter(|(_, sg)| sg.combined == best.combined)
         .map(|(i, _)| i)
         .next()
         .unwrap_or(0);
-    let best_se3 = samples[best_sample_idx].pose.to_se3();
+    let best_se3 = particles[best_idx].pose.to_se3();
     let target_position = [best_se3[(0, 3)], best_se3[(1, 3)], best_se3[(2, 3)]];
     let rot = best_se3.fixed_view::<3, 3>(0, 0);
     let rot3 = nalgebra::Rotation3::from_matrix_unchecked(rot.clone_owned());
     let uq = nalgebra::UnitQuaternion::from_rotation_matrix(&rot3);
     let q = uq.quaternion();
     let wrist_quaternion = [q.i, q.j, q.k, q.w];
-    let wrist_rotation_deg = samples[best_sample_idx].wrist_rotation.to_degrees().rem_euclid(360.0);
+    let wrist_rotation_deg = particles[best_idx].wrist_rotation.to_degrees().rem_euclid(360.0);
 
     Ok(ComputeOutput {
         grasp_type: best.grasp_type,
@@ -476,7 +558,7 @@ fn write_message(buf: *mut c_char, buf_len: usize, msg: &str) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn grasp_preshaping_api_version() -> u32 {
-    3
+    4
 }
 
 #[unsafe(no_mangle)]

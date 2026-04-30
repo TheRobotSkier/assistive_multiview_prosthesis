@@ -160,6 +160,7 @@ fn main() {
             sample_probability: sp.sample_probability,
             pose_se3,
             wrist_rotation: sp.wrist_rotation,
+            smc_iteration: 0,
         });
     }
 
