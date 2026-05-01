@@ -13,7 +13,7 @@ pub const BINARY_SEARCH_TOL: f64 = 0.01;
 
 // ROI prediction
 pub const PREDICTION_HORIZON_S: f64 = 5.0;
-pub const PREDICTION_SAMPLES: usize = 1000;
+pub const PREDICTION_SAMPLES: usize = 5000;
 pub const HAND_RADIUS_M: f64 = 0.05;
 pub const MIN_TSDF_DIM_M: f32 = 0.1;
 pub const MAX_TSDF_DIM_M: f32 = 1.0;

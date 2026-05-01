@@ -845,7 +845,10 @@ void InteractiveSimulator::add_scene_section(mujoco::Simulate* sim)
 
   // Look up body IDs
   hand_body_id_       = mj_name2id(mj_model_, mjOBJ_BODY, "palm_r");
+  // Object body: try multiple names (sphere, cylinder, or generic)
   obj_body_id_        = mj_name2id(mj_model_, mjOBJ_BODY, "target_sphere_body");
+  if (obj_body_id_ < 0) obj_body_id_ = mj_name2id(mj_model_, mjOBJ_BODY, "target_cylinder_body");
+  if (obj_body_id_ < 0) obj_body_id_ = mj_name2id(mj_model_, mjOBJ_BODY, "target_object_body");
   cam_body_id_        = mj_name2id(mj_model_, mjOBJ_BODY, "depth_cam_body");
   wrist_cam_body_id_  = mj_name2id(mj_model_, mjOBJ_BODY, "wrist_cam_body");
 

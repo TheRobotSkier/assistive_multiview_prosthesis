@@ -101,7 +101,7 @@ services:
       bash -c "
         cd /miahand_ws &&
         source /opt/ros/jazzy/setup.bash &&
-        colcon build &&
+        colcon build --packages-select mia_hand_mujoco grasp_preshaping &&
         source install/setup.bash &&
         ros2 launch mia_hand_mujoco mia_hand_system_interface_launch.py scene:=${MUJOCO_OBJECT:-sphere} depth_target_geom_name:=target_${MUJOCO_OBJECT:-sphere} depth_pc_mode:=${MUJOCO_PC_MODE:-object} enable_depth_publisher:=true hardware_plugin:=mia_hand_mujoco/InteractiveSystemInterface;
         /bin/bash
