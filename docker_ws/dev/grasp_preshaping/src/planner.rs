@@ -521,7 +521,12 @@ fn find_active_contacts(
     for &contact in score_contacts {
         let p_hi = pos_at_control(lut, contact, hi_ctrl, base);
         let dist = tsdf.get_distance(p_hi.x, p_hi.y, p_hi.z);
-        if dist >= threshold {
+        // Skip contacts that are clearly outside the surface or deep inside
+        // the object. Only count contacts near the zero-crossing (actual
+        // surface). Strongly negative distances mean the finger penetrated
+        // well past the surface into the object interior — these are not
+        // meaningful surface contacts and would produce misleading scores.
+        if dist >= threshold || dist < -threshold {
             continue;
         }
 

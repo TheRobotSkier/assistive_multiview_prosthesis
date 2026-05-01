@@ -411,6 +411,28 @@ pub fn get_tsdf(
 
     let n_cams = cameras.len();
     if n_cams > 0 {
+        // Determine TSDF sign using per-camera ray-based occlusion checking.
+        // For each voxel, for each camera, we find the surface point closest
+        // to the camera-to-voxel ray (by perpendicular distance). If the voxel
+        // is farther along the ray than this surface point, the surface occludes
+        // the voxel from that camera → "inside" vote. If closer → "outside" vote.
+        //
+        // A voxel is negative (inside the object) when at least one camera
+        // confirms occlusion AND no camera sees it as unoccluded. This correctly
+        // handles opposing cameras where the globally-nearest surface point gives
+        // misleading information for one camera.
+
+        // Collect all surface point positions for fast access.
+        let surface_points: Vec<Vector3<f32>> = offsets
+            .iter()
+            .take(offsets.len() - 1)
+            .map(|&start| {
+                let mp = &morton_array[start];
+                Vector3::new(mp.x, mp.y, mp.z)
+            })
+            .collect();
+        let _n_surface = surface_points.len();
+
         distance
             .par_iter_mut()
             .enumerate()
@@ -426,35 +448,81 @@ pub fn get_tsdf(
 
                 let vw = origin + Vector3::new(gx as f32, gy as f32, gz as f32) * resolution_m;
 
-                let mp = &morton_array[nearest[flat_idx] as usize];
-                let pw = Vector3::new(mp.x, mp.y, mp.z);
-
-                let mut behind_count = 0usize;
                 let mut inside_votes = 0usize;
+                let mut outside_votes = 0usize;
 
                 for cam in cameras {
-                    let d_cv = (vw - cam.position).norm_squared();
-                    let d_cp = (pw - cam.position).norm_squared();
-                    if d_cv > d_cp {
-                        behind_count += 1;
-                        let to_voxel = vw - pw;
-                        let ray_dir = vw - cam.position;
-                        let to_voxel_len = to_voxel.norm();
-                        let ray_dir_len = ray_dir.norm();
-                        if to_voxel_len > 1e-10 && ray_dir_len > 1e-10 {
-                            let alignment = (ray_dir / ray_dir_len).dot(&(to_voxel / to_voxel_len));
-                            if alignment > config::RAY_ALIGNMENT_THRESHOLD {
+                    let to_voxel_from_cam = vw - cam.position;
+                    let ray_len = to_voxel_from_cam.norm();
+                    if ray_len < 1e-10 {
+                        // Camera is at the voxel — it trivially sees the voxel as
+                        // unoccluded (the voxel IS the camera). Count as outside.
+                        outside_votes += 1;
+                        continue;
+                    }
+                    let ray_dir = to_voxel_from_cam / ray_len;
+
+                    // Find the surface point closest to the camera-to-voxel ray.
+                    // Project each surface point onto the ray and find the one with
+                    // the smallest perpendicular distance.
+                    let mut best_surf_dist = f32::MAX;
+                    let mut best_proj = 0.0f32;
+
+                    for &sp in &surface_points {
+                        let to_surf = sp - cam.position;
+                        let proj = to_surf.dot(&ray_dir);
+                        if proj < 0.0 {
+                            continue; // Surface point is behind the camera.
+                        }
+                        // Alignment check: the direction from the surface point
+                        // to the voxel should be consistent with the camera-to-voxel
+                        // ray direction. This prevents surface points on the far side
+                        // of the object (approached from behind) from being treated
+                        // as occluders.
+                        let to_voxel_from_surf = vw - sp;
+                        let to_voxel_from_surf_len = to_voxel_from_surf.norm();
+                        if to_voxel_from_surf_len > 1e-10 {
+                            let surf_dir = to_voxel_from_surf / to_voxel_from_surf_len;
+                            let alignment = ray_dir.dot(&surf_dir);
+                            if alignment < config::RAY_ALIGNMENT_THRESHOLD {
+                                continue;
+                            }
+                        }
+                        let perp_sq = to_surf.norm_squared() - proj * proj;
+                        // Prefer the surface point closest to the camera-to-voxel ray
+                        // (smallest perpendicular distance). When tied (e.g., two points
+                        // on the same ray), prefer the one closer to the camera (smaller
+                        // projection) — that's the first surface the ray hits.
+                        if perp_sq < best_surf_dist
+                            || (perp_sq == best_surf_dist && proj < best_proj)
+                        {
+                            best_surf_dist = perp_sq;
+                            best_proj = proj;
+                        }
+                    }
+
+                    // Compare the voxel's projection onto the ray with the best
+                    // surface point's projection. If the voxel is farther along
+                    // the ray than the surface, it's behind the surface.
+                    let voxel_proj = ray_len; // Distance from camera to voxel along ray.
+
+                    if best_surf_dist < f32::MAX {
+                        // Threshold: only count if the surface point is close enough
+                        // to the ray to be a meaningful occluder.
+                        let max_perp = config::TRUNCATION_CELLS as f32 * resolution_m;
+                        if (best_surf_dist.sqrt()) < max_perp {
+                            if voxel_proj > best_proj {
                                 inside_votes += 1;
+                            } else {
+                                outside_votes += 1;
                             }
                         }
                     }
                 }
 
-                // Flip sign for voxels behind the surface (inside the object).
-                // A voxel is "behind" when it is farther from the camera than its
-                // nearest surface point, and the voxel-to-surface vector aligns
-                // with the camera-to-voxel ray.
-                if behind_count > n_cams / 2 && inside_votes > behind_count / 2 {
+                // A voxel is inside when at least one camera confirms it is behind
+                // the surface and no camera sees it in front.
+                if inside_votes > 0 && outside_votes == 0 {
                     *dist = -*dist;
                 }
             });
@@ -579,6 +647,51 @@ mod tests {
             d_inside < 0.0,
             "point inside cube shell should be negative, got {}",
             d_inside
+        );
+    }
+
+    #[test]
+    fn tsdf_sign_negative_inside_with_opposite_cameras() {
+        // Cube shell centered at (11,11,11) with cameras on opposite sides along Z.
+        // This tests the fix for the sign voting threshold: with 2 opposing cameras,
+        // a voxel at the center is "behind" the surface from only one camera, so a
+        // majority vote (behind_count > n_cams/2) fails. The fix uses inside_votes > 0.
+        let pc = PointCloud::new(vec![
+            Vector3::new(10.0, 10.0, 10.0),
+            Vector3::new(12.0, 10.0, 10.0),
+            Vector3::new(10.0, 12.0, 10.0),
+            Vector3::new(12.0, 12.0, 10.0),
+            Vector3::new(10.0, 10.0, 12.0),
+            Vector3::new(12.0, 10.0, 12.0),
+            Vector3::new(10.0, 12.0, 12.0),
+            Vector3::new(12.0, 12.0, 12.0),
+            Vector3::new(11.0, 11.0, 10.0),
+            Vector3::new(11.0, 11.0, 12.0),
+        ]);
+        let cameras = vec![
+            Camera {
+                position: Vector3::new(11.0, 11.0, 8.0),
+            },
+            Camera {
+                position: Vector3::new(11.0, 11.0, 14.0),
+            },
+        ];
+        let (morton_arr, offsets, start) = morton(&pc, 1.0);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &cameras);
+
+        let d_inside = tsdf.get_distance(11.0, 11.0, 11.0);
+        assert!(
+            d_inside < 0.0,
+            "point inside cube shell should be negative with opposite cameras, got {}",
+            d_inside
+        );
+
+        // Voxels outside the shell should remain positive.
+        let d_outside = tsdf.get_distance(11.0, 11.0, 8.5);
+        assert!(
+            d_outside > 0.0,
+            "point outside cube shell should be positive, got {}",
+            d_outside
         );
     }
 
