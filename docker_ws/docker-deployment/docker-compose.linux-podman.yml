@@ -212,6 +212,7 @@ services:
     network_mode: "host"
     tty: true
     stdin_open: true
+    profiles: [full_system]
     volumes:
       - ../dev/mindrove/data:/app/data
       - ../dev/mindrove/models:/app/models
@@ -262,6 +263,7 @@ services:
     privileged: true
     tty: true
     stdin_open: true
+    profiles: [full_system]
     devices:
       - /dev/bus/usb:/dev/bus/usb
     environment:
@@ -359,6 +361,7 @@ services:
   # ── Full system test — main Jazzy orchestration ───────────────────────────
   # Starts: MuJoCo mirror + haptic controller + segmentation node + RViz.
   # Start this AFTER: miahand_driver, haptic_band, multiview_full, mindrove_emg_ros.
+  # For one-command launch of the whole system: docker compose --profile full_system up
   full_system_test:
     build:
       context: .
@@ -368,6 +371,7 @@ services:
     privileged: true
     tty: true
     stdin_open: true
+    profiles: [full_system]
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${XAUTHORITY}:/tmp/.Xauthority:ro,z
@@ -385,27 +389,83 @@ services:
         ros2 launch /miahand_ws/src/dev/mujoco/launch/full_system_test_launch.py
       "
 
-  # ── Pointcloud segmentation (Jazzy + CUDA) ────────────────────────────────
-  # Wraps InterObject3D inference. Subscribes to /fused_pointcloud.
-  # Requires nvidia-container-toolkit for GPU access.
-  pc_segmentation:
+  # ── Segmentation: inference server (MinkowskiEngine, Python 3.8) ────────────
+  # Runs the Flask HTTP inference server on localhost:5678.
+  # Downloads weights automatically on first start.
+  # Usage: docker compose run --rm segmentation_inference
+  segmentation_inference:
     build:
       context: ../dev/pc_segmentation
-      dockerfile: Dockerfile
-    container_name: pc_segmentation
+      dockerfile: docker/Dockerfile.cpu
+    container_name: segmentation_inference
     network_mode: "host"
-    runtime: nvidia
-    tty: true
+    profiles: [full_system, segmentation]
+    volumes:
+      - ../dev/pc_segmentation/weights:/weights
+
+  # ── Segmentation: ROS2 node (Python 3.12, calls inference server over HTTP) ──
+  # Subscribes to:
+  #   /segmentation/input_cloud      (sensor_msgs/PointCloud2)
+  #   /segmentation/click_positive   (geometry_msgs/PointStamped)
+  #   /segmentation/click_negative   (geometry_msgs/PointStamped)
+  #   /segmentation/reset            (std_msgs/Empty)
+  # Publishes foreground points to:
+  #   /segmentation/object_cloud     (sensor_msgs/PointCloud2)
+  # Start AFTER segmentation_inference is healthy (use run_segmentation.sh).
+  segmentation_ros2:
+    extends: miahand_ros2
+    container_name: segmentation_ros2
+    profiles: [full_system, segmentation]
+    command: |
+      bash -c "
+        source /opt/ros/jazzy/setup.bash;
+        source /miahand_ws/install/setup.bash 2>/dev/null;
+        python3 /miahand_ws/src/dev/pc_segmentation/nodes/segmentation_ros2_node.py
+      "
+
+  # ── Segmentation: interactive demo (RViz2 + cloud publisher + click relay) ─
+  # Publishes D435_img_1.ply, opens RViz2, relays clicks to the segmentation node.
+  # Requires X11 forwarding and segmentation_ros2 running.
+  # In the terminal that opens: p=positive mode, n=negative mode, r=reset, q=quit
+  segmentation_demo:
+    extends: miahand_ros2
+    container_name: segmentation_demo
     stdin_open: true
-    environment:
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
-      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+    tty: true
+    command: |
+      bash -c "
+        source /opt/ros/jazzy/setup.bash;
+        source /miahand_ws/install/setup.bash 2>/dev/null;
+        ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx 0.7071 --qy 0 --qz 0 --qw 0.7071 --frame-id map --child-frame-id ply_camera &
+        python3 /miahand_ws/src/dev/pc_segmentation/nodes/demo_cloud_publisher_node.py --ply /miahand_ws/src/dev/pc_segmentation/depth_images/D435_img_1.ply &
+        rviz2 -d /miahand_ws/src/dev/pc_segmentation/demo_config.rviz &
+        python3 /miahand_ws/src/dev/pc_segmentation/nodes/demo_click_relay_node.py;
+        wait
+      "
+
+  # ── Segmentation: one-shot CPU inference test (no ROS) ───────────────────────
+  # Downloads weights on first run, then runs a single inference to verify setup.
+  segmentation_direct:
+    build:
+      context: ../dev/pc_segmentation
+      dockerfile: docker/Dockerfile.cpu
+    container_name: segmentation_direct
+    volumes:
+      - ../dev/pc_segmentation/weights:/weights
     command: >
       bash -c "
-        source /opt/ros/jazzy/setup.bash &&
-        python3 /app/nodes/segmentation_ros_node.py
+        if [ ! -f /weights/weights_exp14_14.pth ]; then
+          mkdir -p /weights &&
+          wget -q https://omnomnom.vision.rwth-aachen.de/data/3d_inter_obj_seg/scannet_official/weights/weights_exp14_14.pth
+               -O /weights/weights_exp14_14.pth;
+        fi &&
+        python run_inter3d.py
+          --verbal=True
+          --instance_counter_id=0
+          --number_of_instances=1
+          --cubeedge=0.05
+          --pretraining_weights=/weights/weights_exp14_14.pth
+          --dataset=scannet
       "
 
 volumes:

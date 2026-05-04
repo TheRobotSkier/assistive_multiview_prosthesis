@@ -5,7 +5,7 @@ FROM python:3.8-slim-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Build tools + Open3D runtime libs
+# Build tools + Open3D headless runtime requirements
 RUN apt-get update && apt-get install -y \
     git \
     ninja-build \
@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     libopenblas-dev \
     wget \
-    # Open3D headless runtime requirements
     libgl1 \
     libglib2.0-0 \
     libsm6 \
@@ -49,13 +48,17 @@ RUN pip install --no-cache-dir \
     tqdm \
     pandas \
     transforms3d \
-    matplotlib
+    matplotlib \
+    flask
 
 # Clone InterObject3D (pinned to a known-good commit)
 RUN git clone https://github.com/theodorakontogianni/InterObject3D /app && \
     cd /app && git checkout 827b350
 
 WORKDIR /app/InterObject3D/Minkowski/training
+
+# Copy the inference server node
+COPY nodes/inference_server.py /nodes/inference_server.py
 
 # Weights are expected at /weights/weights_exp14_14.pth (mount a volume or
 # set DOWNLOAD_WEIGHTS=1 at build time via --build-arg to bake them in).
@@ -67,4 +70,8 @@ RUN if [ "$DOWNLOAD_WEIGHTS" = "1" ]; then \
           -O /weights/weights_exp14_14.pth; \
     fi
 
-CMD ["python", "run_inter3d.py", "--help"]
+COPY docker/entrypoint.inference.sh /entrypoint.inference.sh
+RUN chmod +x /entrypoint.inference.sh
+
+ENTRYPOINT ["/entrypoint.inference.sh"]
+CMD ["python", "/nodes/inference_server.py"]

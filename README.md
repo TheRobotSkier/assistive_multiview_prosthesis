@@ -288,3 +288,66 @@ docker compose run --rm haptic_band_test
 Activates each of the 8 motors one at a time, ramping 0 → 100 % in 10 % steps (~1 s), then turns off before moving to the next motor.
 
 See `docker_ws/dev/haptic_band/README.md` for the full protocol details, address configuration, and file layout.
+
+---
+
+## Pointcloud Segmentation (InterObject3D)
+
+Interactive 3D object segmentation using the [InterObject3D](https://github.com/theodorakontogianni/InterObject3D) network. Click on an object in RViz2 to segment it from the scene. Runs in two separate containers: a Python 3.8 inference server (MinkowskiEngine) + a ROS 2 Jazzy bridge node.
+
+### Quick start
+
+From `docker_ws/docker-deployment/`:
+
+```bash
+# Build images (once, or after code changes):
+docker compose build segmentation_inference
+docker compose build miahand_ros2
+
+# Start inference server + ROS2 node:
+./run_segmentation.sh
+```
+
+Press `Ctrl+C` to stop both containers.
+
+### Interactive demo (with RViz2)
+
+In a second terminal while segmentation is running:
+
+```bash
+docker compose run --rm segmentation_demo
+```
+
+In the terminal that opens: `p` = positive mode | `n` = negative mode | `r` = reset | `q` = quit.
+Use the **Publish Point** tool in RViz2 to click on an object — segmented points appear as `/segmentation/object_cloud`.
+
+### One-shot inference test (no ROS)
+
+```bash
+docker compose run --rm segmentation_direct
+```
+
+Downloads weights on first run, then runs a single inference to verify the MinkowskiEngine image.
+
+### Topics
+
+| Topic | Type | Description |
+|-------|------|-------------|
+| `/segmentation/input_cloud` | `PointCloud2` | Input scene cloud |
+| `/segmentation/click_positive` | `PointStamped` | Positive (foreground) click |
+| `/segmentation/click_negative` | `PointStamped` | Negative (background) click |
+| `/segmentation/reset` | `Empty` | Clear all clicks and output |
+| `/segmentation/object_cloud` | `PointCloud2` | Segmented foreground points |
+
+---
+
+## Full System Test
+
+Launch the complete system (EMG + haptics + cameras + segmentation + MuJoCo mirror) with Docker profiles:
+
+```bash
+# From docker_ws/docker-deployment/
+docker compose --profile full_system up
+```
+
+This starts: `mindrove_emg_ros`, `multiview_full`, `segmentation_inference`, `segmentation_ros2`, and `full_system_test` (RViz + MuJoCo mirror + haptic controller). Hardware must be connected (Mia Hand on USB, haptic band via BT, D435 cameras on USB). See `docker_ws/dev/mujoco/launch/full_system_test_launch.py` for the full launch configuration.
