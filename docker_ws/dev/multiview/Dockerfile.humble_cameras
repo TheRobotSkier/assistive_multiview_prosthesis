@@ -1,18 +1,21 @@
+# syntax=docker/dockerfile:1
 FROM docker.io/ros:humble-ros-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
         ros-humble-realsense2-camera \
         ros-humble-realsense2-description \
         ros-humble-rmw-cyclonedds-cpp \
         ros-humble-tf2-sensor-msgs \
         ros-humble-sensor-msgs-py \
         ros-humble-launch-ros \
-        python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+        python3-pip
 
-RUN pip install --no-cache-dir numpy
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install numpy
 
 WORKDIR /ros_ws
 COPY launch/ /ros_ws/launch/

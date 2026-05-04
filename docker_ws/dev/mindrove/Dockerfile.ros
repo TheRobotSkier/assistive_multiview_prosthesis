@@ -1,14 +1,18 @@
+# syntax=docker/dockerfile:1
 # Extends ROS 2 Jazzy with the mindrove EMG classifier.
 # Used by the mindrove_emg_ros compose service.
-FROM ros:jazzy-ros-base
+FROM docker.io/ros:jazzy-ros-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3-pip libusb-1.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+        python3-pip libusb-1.0-0
 
-RUN pip install --no-cache-dir mindrove numpy scipy scikit-learn joblib
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --break-system-packages \
+        mindrove numpy scipy scikit-learn joblib
 
 WORKDIR /app
 COPY emg_classifier/ /app/emg_classifier/

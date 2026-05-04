@@ -1,33 +1,37 @@
+# syntax=docker/dockerfile:1
 # CPU-only Docker image for MinkowskiEngine + InterObject3D inference
 # Build from repo root: docker build -f docker/Dockerfile.cpu -t interobject3d-cpu .
 
-FROM python:3.8-slim-bullseye
+FROM docker.io/python:3.8-slim-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Build tools + Open3D headless runtime requirements
-RUN apt-get update && apt-get install -y \
-    git \
-    ninja-build \
-    cmake \
-    build-essential \
-    libopenblas-dev \
-    wget \
-    libgl1 \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender1 \
-    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        ninja-build \
+        cmake \
+        build-essential \
+        libopenblas-dev \
+        wget \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1
 
 # Pin numpy<2 before torch to avoid ABI mismatch with torch 1.12
-RUN pip install --no-cache-dir "numpy<2"
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install "numpy<2"
 
 # PyTorch CPU-only (1.12.1 is the last 1.x patch release)
-RUN pip install --no-cache-dir \
-    torch==1.12.1+cpu \
-    torchvision==0.13.1+cpu \
-    -f https://download.pytorch.org/whl/torch_stable.html
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install \
+        torch==1.12.1+cpu \
+        torchvision==0.13.1+cpu \
+        -f https://download.pytorch.org/whl/torch_stable.html
 
 # Copy local MinkowskiEngine source so the image uses this checkout
 COPY . /MinkowskiEngine-src
@@ -38,18 +42,19 @@ RUN cd /MinkowskiEngine-src && \
     cd / && rm -rf /MinkowskiEngine-src
 
 # Python inference dependencies
-RUN pip install --no-cache-dir \
-    "open3d>=0.12.0" \
-    trimesh \
-    pyviz3d \
-    scipy \
-    scikit-learn \
-    plyfile \
-    tqdm \
-    pandas \
-    transforms3d \
-    matplotlib \
-    flask
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install \
+        "open3d>=0.12.0" \
+        trimesh \
+        pyviz3d \
+        scipy \
+        scikit-learn \
+        plyfile \
+        tqdm \
+        pandas \
+        transforms3d \
+        matplotlib \
+        flask
 
 # Clone InterObject3D (pinned to a known-good commit)
 RUN git clone https://github.com/theodorakontogianni/InterObject3D /app && \

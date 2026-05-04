@@ -1,10 +1,11 @@
-FROM ros:jazzy-ros-base
+# syntax=docker/dockerfile:1
+FROM docker.io/ros:jazzy-ros-base
 
 # # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
-    ROS_DISTRO=jazzy 
+    ROS_DISTRO=jazzy
 
 ARG USER_UID=1000
 ARG USER_GID=1000
@@ -14,12 +15,13 @@ ARG USERNAME=user
 ARG MUJOCO_VERSION=3.3.4
 ARG CPU_ARCH=x86_64
 
-# Delete user if it exists in container 
+# Delete user if it exists in container
 RUN if id -u $USER_UID ; then userdel `id -un $USER_UID` ; fi
 
 # Install essential packages and ROS development tools
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
         bash-completion \
         git \
         nano \
@@ -33,17 +35,9 @@ RUN apt-get update && \
         wget \
         libglfw3-dev \
         usbutils \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-### OpenGL / MuJoCo rendering dependencies
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    libegl1 \
-    libgl1 \
-    libgomp1 \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
-###
+        libegl1 \
+        libgl1 \
+        libgomp1
 
 # Configure and install MuJoCo
 ENV MUJOCO_VERSION=${MUJOCO_VERSION}
@@ -59,20 +53,22 @@ RUN tar -xzf "mujoco-${MUJOCO_VERSION}-linux-${CPU_ARCH}.tar.gz" -C $(dirname "$
 
 
 # Setup user configuration
-# usermod --append --groups dialout $USERNAME 
+# usermod --append --groups dialout $USERNAME
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
-    && usermod -a -G dialout $USERNAME \ 
+    && usermod -a -G dialout $USERNAME \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME \
     && echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /home/$USERNAME/.bashrc \
     && echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> /home/$USERNAME/.bashrc \
     && echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:$MUJOCO_DIR/lib"  >> /home/$USERNAME/.bashrc \
-    && echo "export PS1='\u@\h:\[\e[32m\]\w\[\e[0m\]\$ '" >> /home/$USERNAME/.bashrc 
-    
+    && echo "export PS1='\u@\h:\[\e[32m\]\w\[\e[0m\]\$ '" >> /home/$USERNAME/.bashrc
+
 USER $USERNAME
 
-RUN sudo apt-get update \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    sudo apt-get update \
     && sudo apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-joint-state-publisher-gui \
         ros-${ROS_DISTRO}-hardware-interface \
@@ -89,23 +85,25 @@ RUN sudo apt-get update \
         ros-${ROS_DISTRO}-moveit-setup-assistant \
         ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
         ros-${ROS_DISTRO}-rqt \
-        ros-${ROS_DISTRO}-rqt-graph \
-    && sudo apt-get clean \
-    && sudo rm -rf /var/lib/apt/lists/*
+        ros-${ROS_DISTRO}-rqt-graph
 
 RUN echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> /home/$USERNAME/.bashrc
 
-RUN sudo python3 -m pip install --no-cache-dir --break-system-packages mujoco==${MUJOCO_VERSION}
+RUN --mount=type=cache,target=/root/.cache/pip \
+    sudo python3 -m pip install --break-system-packages mujoco==${MUJOCO_VERSION}
 
 ### Open3D
 # Open3D is only needed by the pc_segmentation service (which has its own
 # Dockerfile). Uncomment only if you need it in this base image as well.
-#RUN sudo python3 -m pip install --no-cache-dir --break-system-packages --upgrade open3d
+#RUN --mount=type=cache,target=/root/.cache/pip \
+#    sudo python3 -m pip install --break-system-packages --upgrade open3d
 ###
 
 # Misc pip packages
-RUN sudo python3 -m pip install --no-cache-dir --break-system-packages \
-    dynamixel-sdk
+RUN --mount=type=cache,target=/root/.cache/pip \
+    sudo python3 -m pip install --break-system-packages \
+        dynamixel-sdk \
+        requests
 
 WORKDIR /miahand_ws
 
@@ -115,7 +113,6 @@ RUN sudo chown -R $USERNAME:$USERNAME /miahand_ws \
     && sudo apt-get update \
     && rosdep update \
     && rosdep install --from-paths src --ignore-src --rosdistro $ROS_DISTRO -y \
-    && sudo apt-get clean \
     && sudo rm -rf /var/lib/apt/lists/* \
     && . "/opt/ros/${ROS_DISTRO}/setup.sh" \
     && colcon build \

@@ -1,4 +1,5 @@
-FROM rust:slim-bookworm
+# syntax=docker/dockerfile:1
+FROM docker.io/rust:slim-bookworm
 
 # Build-time dependencies for the preshaping crate (none beyond the Rust
 # toolchain itself — all crate deps are fetched by cargo at run time).
@@ -7,4 +8,4 @@ FROM rust:slim-bookworm
 
 WORKDIR /build
 
-CMD ["cargo", "build", "--release", "--lib"]
+CMD ["bash", "-c", "cargo build --release --lib"]

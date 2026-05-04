@@ -1,11 +1,13 @@
-FROM ubuntu:24.04
+# syntax=docker/dockerfile:1
+FROM docker.io/ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y \
-    cmake \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+        cmake \
+        g++
 
 # /sdk  — bind-mounted from host: docker_ws/dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64/
 # /src  — bind-mounted from host: docker_ws/dev/mindrove_cpp/

@@ -1,25 +1,26 @@
-FROM python:3.10-slim
+# syntax=docker/dockerfile:1
+FROM docker.io/python:3.10-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # System libraries required by OpenCV HighGUI (X11 display) and the MindRove SDK
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
         libusb-1.0-0 \
         libgl1 \
         libglib2.0-0 \
         libsm6 \
         libxext6 \
         libxrender1 \
-        libx11-6 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+        libx11-6
 
 WORKDIR /app
 
 # Pin numpy<1.24 (TensorFlow 2.12 is incompatible with numpy 1.24+ dtype changes)
 # and scikit-learn to a version compatible with the pre-built .pkl model artifacts.
-RUN pip install --no-cache-dir \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install \
         "numpy==1.23.5" \
         "scikit-learn==1.2.2" \
         "tensorflow==2.12.0" \
