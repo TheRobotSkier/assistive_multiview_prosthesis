@@ -13,4 +13,10 @@ install(
   DESTINATION share/${PROJECT_NAME}/config
 )
 
+install(
+  PROGRAMS
+    scripts/aruco_marker_pose_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

@@ -321,6 +321,9 @@ ament_cmake_symlink_install_directory("/miahand_ws/src/multi_cam_localization/se
 # install(DIRECTORY "config/" "DESTINATION" "share/sensor_fusion_bringup/config")
 ament_cmake_symlink_install_directory("/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup" DIRECTORY "config/" "DESTINATION" "share/sensor_fusion_bringup/config")
 
+# install(PROGRAMS "scripts/aruco_marker_pose_node.py" "DESTINATION" "lib/sensor_fusion_bringup")
+ament_cmake_symlink_install_programs("/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup" PROGRAMS "scripts/aruco_marker_pose_node.py" "DESTINATION" "lib/sensor_fusion_bringup")
+
 # install(FILES "/miahand_ws/src/build_overlay/sensor_fusion_bringup/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/sensor_fusion_bringup" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 ament_cmake_symlink_install_files("/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup" FILES "/miahand_ws/src/build_overlay/sensor_fusion_bringup/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/sensor_fusion_bringup" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 

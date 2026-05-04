@@ -1,0 +1,36 @@
+aruco:
+  dictionary: DICT_6X6_1000
+
+  # Use measured printed size.
+  # If the printer produced 154 mm instead of 160 mm, use 0.154.
+  default_marker_size_m: 0.154
+
+frames:
+  map_frame: marker_map
+  camera_frame: head_d435i_head_color_optical_frame
+  imu_frame: imu
+
+# OpenVINS/Kalibr camera-IMU calibration.
+# This gives the node camera intrinsics, distortion, and T_cam_imu.
+calibration:
+  kalibr_imucam_chain: /miahand_ws/src/multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/kalibr_imucam_chain.yaml
+
+topics:
+  image: /head/d435i_head/color/image_raw
+  openvins_odom: /ov_msckf/odomimu
+
+reanchoring:
+  enabled: true
+  update_continuously: true
+
+markers:
+  0:
+    size_m: 0.154
+
+    # Marker 0 defines the marker_map origin.
+    # T_map_marker means: pose of this marker frame in marker_map.
+    T_map_marker:
+      - [1.0, 0.0, 0.0, 0.0]
+      - [0.0, 1.0, 0.0, 0.0]
+      - [0.0, 0.0, 1.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]
