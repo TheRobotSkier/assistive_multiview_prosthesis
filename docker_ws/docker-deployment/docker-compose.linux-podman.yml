@@ -266,7 +266,7 @@ services:
     environment:
       RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
       ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
-    command: ["ros2", "launch", "/ros_ws/launch/two_d435_launch.py"]
+    command: ["ros2", "launch", "/ros_ws/launch/one_d435_launch.py"]
 
   # Variant: cameras + fusion pipeline
   multiview_full:
@@ -466,7 +466,7 @@ services:
     command: |
       bash -c "
         source /opt/ros/jazzy/setup.bash;
-        source /miahand_ws/install/setup.bash 2>/dev/null;
+        source /miahand_ws/install/setup.bash 2>/dev/null
         python3 /miahand_ws/src/dev/pc_segmentation/nodes/segmentation_ros2_node.py
       "
 
