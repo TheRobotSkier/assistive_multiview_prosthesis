@@ -204,6 +204,22 @@ services:
       - ../dev/mindrove/models:/app/models
     command: ["python", "scripts/run_classifier.py"]
 
+  mindrove_emg_ros:
+    build:
+      context: ../dev/mindrove
+      dockerfile: Dockerfile.ros
+    container_name: mindrove_emg_ros
+    network_mode: "host"
+    tty: true
+    stdin_open: true
+    volumes:
+      - ../dev/mindrove/data:/app/data
+      - ../dev/mindrove/models:/app/models
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+    command: ["python", "scripts/run_classifier.py"]
+
   mindrove_cpp:
     build:
       context: ../dev/mindrove_cpp
@@ -215,6 +231,43 @@ services:
     volumes:
       - ../dev/mindrove_cpp:/src:ro
       - ../dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64:/sdk:ro
+
+  # ── Multiview cameras — ROS Humble (dual D435 + pointcloud fusion) ────────
+  # Runs ROS Humble realsense camera nodes and fuses their pointclouds.
+  # Publishes /fused_pointcloud (sensor_msgs/PointCloud2) via DDS to all
+  # other containers (Humble → Jazzy cross-distro confirmed working).
+  multiview_cameras:
+    build:
+      context: ../dev/multiview
+      dockerfile: Dockerfile.humble_cameras
+    container_name: multiview_cameras
+    network_mode: "host"
+    privileged: true
+    tty: true
+    stdin_open: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+    command: ["ros2", "launch", "/ros_ws/launch/two_d435_launch.py"]
+
+  # Variant: cameras + fusion pipeline
+  multiview_full:
+    build:
+      context: ../dev/multiview
+      dockerfile: Dockerfile.humble_cameras
+    container_name: multiview_full
+    network_mode: "host"
+    privileged: true
+    tty: true
+    stdin_open: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    environment:
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+    command: ["ros2", "launch", "/ros_ws/launch/multiview_full_launch.py"]
 
   naviflame:
     build:
@@ -259,6 +312,8 @@ services:
     privileged: true
     tty: true
     stdin_open: true
+    volumes:
+      - ../:/miahand_ws/src:ro
     environment:
       RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
       ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
