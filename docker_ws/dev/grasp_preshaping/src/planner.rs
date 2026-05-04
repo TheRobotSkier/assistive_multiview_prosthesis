@@ -1,5 +1,5 @@
 use crate::config;
-use crate::lut_helper::{Contact, FingerLUT};
+use crate::lut_helper::{Contact, FingerGroup, FingerLUT};
 use crate::pointcloud_helper::Tsdf;
 use std::collections::HashSet;
 
@@ -371,15 +371,54 @@ fn score_grasp(
                 (active.len() as f64 / spec.min_contacts as f64).min(1.0)
             };
 
-            if finger_set.len() < spec.min_fingers {
+            let has_thumb = finger_set.contains(&FingerGroup::Thumb);
+            let has_index = finger_set.contains(&FingerGroup::Index);
+
+            if finger_set.len() < spec.min_fingers || !has_thumb || !has_index {
                 // Tier 2: Soft rejection — collision found, but too few distinct
-                // finger groups engaged. Minor adjustment could fix this.
+                // finger groups engaged or missing critical thumb/index.
+                
+                let mut missing_dist: f64 = 0.0;
+                let max_penalty_dist: f64 = 0.05; // 5cm penalty spread
+                
+                if !has_thumb {
+                    let mut min_d = f32::MAX;
+                    for sp in &spec.sweep_points {
+                        if sp.contact.finger_group() == FingerGroup::Thumb {
+                            let p = match sp.flex {
+                                Flex::Coupled => pos_at_control(lut, sp.contact, lo_ctrl, base_transform),
+                                Flex::Locked(locked_s) => pos_at_sample(lut, sp.contact, locked_s, base_transform),
+                            };
+                            let d = tsdf.get_distance(p.x, p.y, p.z);
+                            if d < min_d { min_d = d; }
+                        }
+                    }
+                    missing_dist += if min_d < f32::MAX { min_d.max(0.0) as f64 } else { max_penalty_dist };
+                }
+                
+                if !has_index {
+                    let mut min_d = f32::MAX;
+                    for sp in &spec.sweep_points {
+                        if sp.contact.finger_group() == FingerGroup::Index {
+                            let p = match sp.flex {
+                                Flex::Coupled => pos_at_control(lut, sp.contact, lo_ctrl, base_transform),
+                                Flex::Locked(locked_s) => pos_at_sample(lut, sp.contact, locked_s, base_transform),
+                            };
+                            let d = tsdf.get_distance(p.x, p.y, p.z);
+                            if d < min_d { min_d = d; }
+                        }
+                    }
+                    missing_dist += if min_d < f32::MAX { min_d.max(0.0) as f64 } else { max_penalty_dist };
+                }
+
+                let penalty_multiplier = 1.0 - (missing_dist / (max_penalty_dist * 2.0)).clamp(0.0, 1.0);
+
                 return GraspScoreResult {
                     closure_amount: lo,
                     alignment_score: compute_alignment(&active),
                     force_closure_score: compute_force_closure(&active),
                     contact_count_score,
-                    contact_score: contact_count_score * 0.5,
+                    contact_score: (contact_count_score * 0.25) + (penalty_multiplier * 0.25),
                     active_contact_count: active.len(),
                     found_collision: true,
                 };

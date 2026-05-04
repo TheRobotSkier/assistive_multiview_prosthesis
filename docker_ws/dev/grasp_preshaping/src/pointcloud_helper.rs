@@ -128,9 +128,12 @@ impl Tsdf {
         let gy = (y - self.origin.y) / self.resolution_m;
         let gz = (z - self.origin.z) / self.resolution_m;
 
-        let gx = gx.max(0.0).min((self.width - 1) as f32);
-        let gy = gy.max(0.0).min((self.height - 1) as f32);
-        let gz = gz.max(0.0).min((self.depth - 1) as f32);
+        if gx < 0.0 || gx >= (self.width - 1) as f32
+            || gy < 0.0 || gy >= (self.height - 1) as f32
+            || gz < 0.0 || gz >= (self.depth - 1) as f32
+        {
+            return f32::MAX;
+        }
 
         let x0 = (gx.floor() as usize).min(self.width - 1);
         let y0 = (gy.floor() as usize).min(self.height - 1);
