@@ -20,6 +20,7 @@ setup(
     entry_points={
         'console_scripts': [
             'bridge_node = haptic_bridge.bridge_node:main',
+            'haptic_controller_node = haptic_bridge.haptic_controller_node:main',
         ],
     },
 )

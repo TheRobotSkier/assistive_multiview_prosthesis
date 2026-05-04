@@ -28,7 +28,7 @@ REST_LABEL: int = 0
 
 # ── Classifier ────────────────────────────────────────────────────────────────
 CONFIDENCE_THRESHOLD: float = 0.55   # below → output REST
-PREDICTION_SMOOTHING_FRAMES: int = 3  # majority-vote over last N predictions
+PREDICTION_SMOOTHING_FRAMES: int = 5  # majority-vote over last N predictions
 
 # ── Data recording ────────────────────────────────────────────────────────────
 DEFAULT_RECORD_DURATION_S: float = 5.0   # seconds per gesture per rep

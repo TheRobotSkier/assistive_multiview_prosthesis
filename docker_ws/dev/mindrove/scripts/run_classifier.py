@@ -38,6 +38,15 @@ from emg_classifier.config import (
 from emg_classifier.features import compute_features
 from emg_classifier.preprocessing import OnlineFilter, RingBuffer
 
+# ── Optional ROS 2 bridge ──────────────────────────────────────────────────────
+_ros_state = None
+try:
+    from emg_classifier.ros_bridge_node import EmgState, spin_in_thread as _ros_spin
+    _ros_state = EmgState()
+    _ros_spin(_ros_state)
+    print("ROS 2 bridge active — publishing on /emg/* topics.")
+except ImportError:
+    pass  # rclpy not installed; ROS bridge silently disabled
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
 
@@ -202,6 +211,14 @@ def main() -> None:
 
             # Proportional control
             prop_val = prop_mod.compute_proportional(window, smoothed_label, calibration)
+
+            # Update ROS state (if bridge is active)
+            if _ros_state is not None:
+                with _ros_state.lock:
+                    _ros_state.label        = smoothed_label
+                    _ros_state.name         = gesture_names[smoothed_label]
+                    _ros_state.confidence   = float(confidence)
+                    _ros_state.proportional = float(prop_val)
 
             # FPS estimate
             now = time.monotonic()

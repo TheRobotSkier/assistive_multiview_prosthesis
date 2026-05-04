@@ -23,6 +23,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
 import joblib
+from collections import deque
 
 from .config import CONFIDENCE_THRESHOLD, GESTURE_NAMES, REST_LABEL
 
@@ -162,19 +163,27 @@ def predict(
 # ── Prediction smoother ───────────────────────────────────────────────────────
 
 class PredictionSmoother:
-    """Majority-vote smoother over a sliding window of recent predictions."""
+    """Majority-vote smoother over a sliding window of recent predictions.
 
-    def __init__(self, window: int = 3) -> None:
+    Tie-breaking: on a tie the previous smoothed output is returned unchanged,
+    avoiding the implicit bias toward label 0 that np.argmax produces.
+    """
+
+    def __init__(self, window: int = 5) -> None:
         self._window = window
-        self._history: list[int] = []
+        self._history: deque[int] = deque(maxlen=window)
+        self._last_output: int = 0
 
     def update(self, label: int) -> int:
         """Add a new raw prediction and return the smoothed label."""
         self._history.append(label)
-        if len(self._history) > self._window:
-            self._history.pop(0)
-        counts = np.bincount(self._history, minlength=len(GESTURE_NAMES))
-        return int(np.argmax(counts))
+        counts = np.bincount(list(self._history), minlength=len(GESTURE_NAMES))
+        majority = int(np.argmax(counts))
+        # On a tie, argmax returns the lowest-index label — keep previous instead
+        if counts[majority] * 2 > len(self._history):   # strict majority
+            self._last_output = majority
+        # else: leave _last_output unchanged (tie → hold)
+        return self._last_output
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
