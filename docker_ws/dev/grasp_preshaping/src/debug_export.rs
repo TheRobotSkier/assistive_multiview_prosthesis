@@ -5,6 +5,7 @@
 //! interactively in Python.
 
 use crate::pointcloud_helper::{Aabb, Camera, PointCloud, Tsdf};
+use crate::superquadric::SuperquadricParams;
 use nalgebra::Vector3;
 use npyz::npz::NpzWriter;
 use npyz::WriterBuilder;
@@ -49,6 +50,8 @@ pub struct DebugDump<'a> {
     pub input_pose: [f64; 7],
     /// Input twist: [lx, ly, lz, ax, ay, az].
     pub input_twist: [f64; 6],
+    /// Fitted superquadric parameters (None if fitting was skipped or failed).
+    pub sq_params: Option<&'a SuperquadricParams>,
 }
 
 /// Write all debug data to a single `.npz` file at `path`.
@@ -237,6 +240,46 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
             for &v in &g.pose_se3 {
                 writer.push(&v)?;
             }
+        }
+        writer.finish()?;
+    }
+
+    // --- sq_params (f32, 14) ---
+    // [ε₁, ε₂, a, b, c, tx, ty, tz, r00..r22 (9), fit_error]
+    // Only written when superquadric fitting succeeded.
+    if let Some(sq) = dump.sq_params {
+        let rot = sq.rotation.matrix();
+        let params: [f32; 14] = [
+            sq.epsilon1,
+            sq.epsilon2,
+            sq.a,
+            sq.b,
+            sq.c,
+            sq.translation.x,
+            sq.translation.y,
+            sq.translation.z,
+            rot[(0, 0)], rot[(0, 1)], rot[(0, 2)],
+            rot[(1, 0)], rot[(1, 1)], rot[(1, 2)],
+        ];
+        let mut writer = npz
+            .array::<f32>("sq_params", Default::default())?
+            .default_dtype()
+            .shape(&[14])
+            .begin_nd()?;
+        for &v in &params {
+            writer.push(&v)?;
+        }
+        writer.finish()?;
+
+        // sq_meta: [fit_error, template_index]
+        let meta: [f32; 2] = [sq.fit_error, sq.template_index as f32];
+        let mut writer = npz
+            .array::<f32>("sq_meta", Default::default())?
+            .default_dtype()
+            .shape(&[2])
+            .begin_nd()?;
+        for &v in &meta {
+            writer.push(&v)?;
         }
         writer.finish()?;
     }

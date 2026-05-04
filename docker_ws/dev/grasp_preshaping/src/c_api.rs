@@ -382,6 +382,15 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         .collect();
 
     let (morton_arr, offsets, start) = morton(&pruned, config::TSDF_RESOLUTION_M);
+
+    // --- Superquadric backside estimation ---
+    let sq_params: Option<crate::superquadric::SuperquadricParams> =
+        if config::SQ_ENABLE_BACKSIDE {
+            crate::superquadric::fit_best_superquadric(&pruned.points)
+        } else {
+            None
+        };
+
     let tsdf = get_tsdf(
         &morton_arr,
         &offsets,
@@ -389,6 +398,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         start,
         config::TSDF_RESOLUTION_M,
         &cameras,
+        sq_params.as_ref(),
     );
 
     let collision_tol = config::COLLISION_TOL_M;
@@ -533,6 +543,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
                     request.twist.ay,
                     request.twist.az,
                 ],
+                sq_params: sq_params.as_ref(),
             };
 
             let path = crate::debug_export::debug_output_path();

@@ -7,6 +7,7 @@ use grasp_preshaping::predictor::{
     select_elite_indices, SmcParticle, PredictionConfig, Twist6, TwistCovariance,
 };
 use grasp_preshaping::config;
+use grasp_preshaping::superquadric;
 use nalgebra::{Matrix4, Vector3};
 
 fn create_pred_config() -> PredictionConfig {
@@ -126,6 +127,7 @@ fn bench_tsdf_construction(c: &mut Criterion) {
                 start,
                 config::TSDF_RESOLUTION_M,
                 &[],
+                None,
             )
         })
     });
@@ -166,6 +168,7 @@ fn bench_full_pipeline(c: &mut Criterion) {
                 start,
                 config::TSDF_RESOLUTION_M,
                 &[],
+                None,
             );
 
             let collision_tol = config::COLLISION_TOL_M;
@@ -197,6 +200,7 @@ fn bench_scoring_functions(c: &mut Criterion) {
         start,
         config::TSDF_RESOLUTION_M,
         &[],
+        None,
     );
 
     let base_transform = black_box(Matrix4::identity());
@@ -248,6 +252,7 @@ fn bench_smc_pipeline(c: &mut Criterion) {
                 start,
                 config::TSDF_RESOLUTION_M,
                 &[],
+                None,
             );
 
             let collision_tol = config::COLLISION_TOL_M;
@@ -322,6 +327,38 @@ fn bench_resample_around_elites(c: &mut Criterion) {
     });
 }
 
+fn bench_superquadric_fitting(c: &mut Criterion) {
+    let pc = black_box(demo_sphere(Vector3::new(0.0, 0.1, 0.05), 0.02, 5000));
+
+    c.bench_function("superquadric_fitting_5000pts", |b| {
+        b.iter(|| superquadric::fit_best_superquadric(&pc.points))
+    });
+}
+
+fn bench_tsdf_with_superquadric(c: &mut Criterion) {
+    let center = Vector3::new(0.0, 0.1, 0.05);
+    let pc = black_box(demo_sphere(center, 0.02, 5000));
+    let cameras = vec![grasp_preshaping::pointcloud_helper::Camera {
+        position: Vector3::new(0.0, 0.1, -0.3),
+    }];
+
+    c.bench_function("tsdf_construction_with_superquadric_5000pts", |b| {
+        b.iter(|| {
+            let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+            let sq = superquadric::fit_best_superquadric(&pc.points);
+            get_tsdf(
+                &morton_arr,
+                &offsets,
+                config::TRUNCATION_CELLS,
+                start,
+                config::TSDF_RESOLUTION_M,
+                &cameras,
+                sq.as_ref(),
+            )
+        })
+    });
+}
+
 criterion_group!(
     benches,
     bench_roi_prediction,
@@ -330,6 +367,8 @@ criterion_group!(
     bench_full_pipeline,
     bench_smc_pipeline,
     bench_resample_around_elites,
-    bench_scoring_functions
+    bench_scoring_functions,
+    bench_superquadric_fitting,
+    bench_tsdf_with_superquadric
 );
 criterion_main!(benches);

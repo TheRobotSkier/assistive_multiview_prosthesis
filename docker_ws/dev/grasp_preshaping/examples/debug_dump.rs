@@ -119,6 +119,7 @@ fn main() {
         start,
         config::TSDF_RESOLUTION_M,
         &cameras,
+        None,
     );
 
     // Score all samples (unified: each sample has its own grasp type)
@@ -173,6 +174,7 @@ fn main() {
         scored_grasps: &grasp_exports,
         input_pose: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
         input_twist: [0.01, 0.0, 0.0, 0.0, 0.0, 0.1],
+        sq_params: None,
     };
 
     // Write

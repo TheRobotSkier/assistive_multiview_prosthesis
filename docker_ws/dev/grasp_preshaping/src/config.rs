@@ -55,6 +55,14 @@ pub const GRASP_WEIGHT_ALIGNMENT: f64 = 1.0;
 pub const GRASP_WEIGHT_FORCE_CLOSURE: f64 = 1.0;
 pub const GRASP_WEIGHT_CONTACT_SCORE: f64 = 3.0;
 
+// Superquadric backside estimation
+pub const SQ_ENABLE_BACKSIDE: bool = true;
+pub const SQ_MAX_GN_ITERATIONS: usize = 4;
+pub const SQ_GN_DAMPING: f32 = 0.1;
+pub const SQ_BLEND_DELTA_CELLS: usize = 3;
+pub const SQ_MIN_FIT_POINTS: usize = 20;
+pub const SQ_FIT_ERROR_THRESHOLD: f32 = 0.15;
+
 // Debug visualization
 // When true, each pipeline invocation writes a single .npz file containing the
 // scored grasp candidates.  When false the entire export path is eliminated by

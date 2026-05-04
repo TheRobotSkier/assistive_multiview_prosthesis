@@ -18,6 +18,7 @@ Keyboard shortcuts (PyVista viewer):
     c  - toggle camera markers
     h  - toggle hand skeleton (unified)
     k  - toggle LUT contact points
+    b  - toggle superquadric mesh
     i  - toggle info text
     +  - next SMC iteration filter
     -  - previous SMC iteration filter
@@ -45,6 +46,9 @@ GRASP_TYPE_NAMES = {1: "cylindrical", 2: "pinch", 3: "lateral"}
 GRASP_TYPE_COLORS = {1: "#e76f51", 2: "#2a9d8f", 3: "#457b9d"}
 GRASP_TYPE_SHORT = {1: "cyl", 2: "pinch", 3: "lat"}
 F32_MAX = np.float32(np.finfo(np.float32).max)
+
+# Superquadric template names (must match superquadric.rs TEMPLATES order).
+SQ_TEMPLATE_NAMES = ["sphere", "box", "cylinder"]
 
 # Truncation constant (must match config.rs TRUNCATION_CELLS).
 TRUNCATION_CELLS = 4
@@ -312,6 +316,29 @@ def load_dump(path: str) -> dict:
             "pose_4x4": grasps_raw[:, 8:24].reshape(-1, 4, 4),
         }
 
+    # Superquadric params (backward-compatible: older dumps lack these).
+    sq_params = None
+    sq_meta = None
+    if "sq_params" in data:
+        sq_raw = data["sq_params"]
+        if len(sq_raw) == 14:
+            sq_params = {
+                "epsilon1": float(sq_raw[0]),
+                "epsilon2": float(sq_raw[1]),
+                "a": float(sq_raw[2]),
+                "b": float(sq_raw[3]),
+                "c": float(sq_raw[4]),
+                "translation": sq_raw[5:8].astype(np.float64),
+                "rotation": sq_raw[8:14].reshape(2, 3).astype(np.float64),
+            }
+    if "sq_meta" in data:
+        meta_raw = data["sq_meta"]
+        if len(meta_raw) == 2:
+            sq_meta = {
+                "fit_error": float(meta_raw[0]),
+                "template_index": int(meta_raw[1]),
+            }
+
     return {
         "tsdf": tsdf,
         "tsdf_origin": origin,
@@ -322,6 +349,8 @@ def load_dump(path: str) -> dict:
         "input_pose": pose,
         "input_twist": twist,
         "grasps": grasps,
+        "sq_params": sq_params,
+        "sq_meta": sq_meta,
     }
 
 
@@ -449,6 +478,23 @@ def print_summary(dump: dict, path: str):
                 print(f"    {GRASP_TYPE_NAMES[gt_id]:12s}: {n_type:4d} colliding,"
                       f" best={grasps['combined'][col_mask].max():.4f}")
 
+    # Superquadric info
+    sq_params = dump.get("sq_params")
+    sq_meta = dump.get("sq_meta")
+    if sq_params is not None:
+        template_names = ["sphere", "box", "cylinder"]
+        tidx = sq_meta["template_index"] if sq_meta else 0
+        tname = template_names[tidx] if tidx < len(template_names) else "?"
+        fit_err = sq_meta["fit_error"] if sq_meta else float("nan")
+        print(f"  Superquadric:    {tname} (template {tidx})"
+              f"  fit_error={fit_err:.6f}")
+        print(f"    eps=({sq_params['epsilon1']:.2f}, {sq_params['epsilon2']:.2f})"
+              f"  scale=({sq_params['a']:.4f}, {sq_params['b']:.4f}, {sq_params['c']:.4f})")
+        t = sq_params["translation"]
+        print(f"    translation=({t[0]:.4f}, {t[1]:.4f}, {t[2]:.4f})")
+    else:
+        print(f"  Superquadric:    not available")
+
     if best_idx >= 0:
         gt = grasps["grasp_type"][best_idx]
         print(f"  Best grasp:      {GRASP_TYPE_NAMES.get(gt, '?')} (type {gt})")
@@ -472,6 +518,78 @@ GRASP_MODES = ["best", "all"]
 # TSDF display modes (cycle with 't' key)
 TSDF_MODES = ["surface", "points", "off"]
 
+
+def _build_sq_primitive_mesh(pv_mod, sq_params: dict, sq_meta: dict | None):
+    """Build a PyVista mesh approximating the fitted superquadric as a primitive.
+
+    Maps each winning template to a built-in PyVista primitive, then applies
+    the fitted rotation + translation.  This is much cheaper than evaluating
+    the implicit function on a dense grid and running marching cubes.
+
+    Parameters
+    ----------
+    pv_mod : module
+        The imported ``pyvista`` module.
+    sq_params : dict
+        Parsed superquadric parameters (epsilon1, epsilon2, a, b, c,
+        translation, rotation).
+    sq_meta : dict or None
+        Parsed superquadric metadata (fit_error, template_index).
+
+    Returns
+    -------
+    pyvista.PolyData or None
+        The transformed primitive mesh, or None if the template is unknown.
+    """
+    template_index = sq_meta["template_index"] if sq_meta else 0
+    a = max(sq_params["a"], 1e-4)
+    b = max(sq_params["b"], 1e-4)
+    c = max(sq_params["c"], 1e-4)
+
+    # Build the primitive in local frame centered at origin, aligned with axes.
+    if template_index == 0:
+        # Sphere template -> ellipsoid
+        mesh = pv_mod.Sphere(radius=1.0, theta_resolution=32, phi_resolution=32)
+        mesh.points[:, 0] *= a
+        mesh.points[:, 1] *= b
+        mesh.points[:, 2] *= c
+    elif template_index == 1:
+        # Box template -> rectangular cuboid with half-extents a, b, c
+        bounds = [-a, a, -b, b, -c, c]
+        mesh = pv_mod.Box(bounds=bounds)
+    elif template_index == 2:
+        # Cylinder template -> radius=a (use max of a,b for roundness),
+        # height=2*c.  Cylinder axis along Z by default.
+        radius = max(a, b)
+        mesh = pv_mod.Cylinder(
+            center=(0, 0, 0),
+            direction=(0, 0, 1),
+            radius=radius,
+            height=2 * c,
+            resolution=32,
+        )
+        # If a != b, scale the non-axis directions to make an elliptical cross-section.
+        if abs(a - b) > 1e-5:
+            mesh.points[:, 0] *= (a / radius)
+            mesh.points[:, 1] *= (b / radius)
+    else:
+        return None
+
+    # Apply rotation + translation from fitted params.
+    # sq_params["rotation"] is a (2, 3) array = first two rows of the 3x3 rotation.
+    rot_flat = sq_params["rotation"]  # shape (2, 3)
+    rot = np.eye(3)
+    rot[0, :] = rot_flat[0]
+    rot[1, :] = rot_flat[1]
+    # Reconstruct third row via cross product to ensure a proper rotation matrix.
+    rot[2, :] = np.cross(rot[0, :], rot[1, :])
+
+    translation = sq_params["translation"]
+
+    # Transform: rotate then translate.
+    mesh.points = (rot @ mesh.points.T).T + translation
+
+    return mesh
 
 
 def visualize_pyvista(dump: dict, args):
@@ -515,6 +633,7 @@ def visualize_pyvista(dump: dict, args):
         "show_cameras": True,
         "show_hand": False,
         "show_contacts": False,
+        "show_sq": False,
         "show_info": True,
         "grasp_type_filter": 0,  # 0 = all, 1/2/3 = specific type
         "iteration_filter": max_iteration if n_grasps > 0 else None,  # default to last iteration
@@ -536,6 +655,7 @@ def visualize_pyvista(dump: dict, args):
         "grasps": [],
         "hand_skeleton": [],
         "contact_points": [],
+        "sq_mesh": [],
         "info": [],
     }
 
@@ -1254,6 +1374,42 @@ def visualize_pyvista(dump: dict, args):
         add_contact_points()
 
     # ==================================================================
+    # Superquadric primitive mesh (toggleable)
+    # ==================================================================
+    def add_sq_actors():
+        """Render the fitted superquadric as a semi-transparent primitive mesh."""
+        actor_groups["sq_mesh"].clear()
+        sq_params = dump.get("sq_params")
+        sq_meta = dump.get("sq_meta")
+        if sq_params is None:
+            print("  SQ mesh: no superquadric data in dump")
+            return
+
+        mesh = _build_sq_primitive_mesh(pv, sq_params, sq_meta)
+        if mesh is None:
+            print("  SQ mesh: unknown template index")
+            return
+
+        tidx = sq_meta["template_index"] if sq_meta else 0
+        tname = SQ_TEMPLATE_NAMES[tidx] if tidx < len(SQ_TEMPLATE_NAMES) else "?"
+        n_cells = mesh.n_cells
+        print(f"  SQ mesh: {tname} primitive, {n_cells} cells")
+
+        actor = plotter.add_mesh(
+            mesh,
+            color="cyan",
+            opacity=0.25,
+            show_edges=True,
+            edge_color="cyan",
+            line_width=1,
+            label=f"Superquadric ({tname})",
+        )
+        actor_groups["sq_mesh"].append(actor)
+
+    if state["show_sq"]:
+        add_sq_actors()
+
+    # ==================================================================
     # Info text
     # ==================================================================
     def update_info_text():
@@ -1270,6 +1426,7 @@ def visualize_pyvista(dump: dict, args):
         tsdf_str = state["tsdf_mode"]
         hand_str = "unified"
         contacts_str = "on" if state["show_contacts"] else "off"
+        sq_str = "on" if state["show_sq"] else "off"
 
         iter_str = f"iter={state['iteration_filter']}" if state['iteration_filter'] is not None else f"iter=all(0-{max_iteration})"
         lines = [
@@ -1286,8 +1443,8 @@ def visualize_pyvista(dump: dict, args):
         else:
             lines.append("Best: none")
 
-        lines.append(f"TSDF: {tsdf_str}  Hand: {hand_str}  Contacts: {contacts_str}")
-        lines.append("Keys: t=TSDF  g=grasps  p=cloud  r=ROI  c=cam  h=hand  k=contacts  +/-/*=iter  ?=help")
+        lines.append(f"TSDF: {tsdf_str}  Hand: {hand_str}  Contacts: {contacts_str}  SQ: {sq_str}")
+        lines.append("Keys: t=TSDF  g=grasps  p=cloud  r=ROI  c=cam  h=hand  k=contacts  b=SQ  +/-/*=iter  ?=help")
 
         text = "\n".join(lines)
         actor = plotter.add_text(
@@ -1313,8 +1470,9 @@ def visualize_pyvista(dump: dict, args):
         ("Lateral", GRASP_TYPE_COLORS[3]),
         ("Hand", "#ffbc85"),
         ("Contact points", "#a0c28d"),
+        ("Superquadric", "cyan"),
     ]
-    plotter.add_legend(legend_entries, size=(0.18, 0.25), loc="upper left",
+    plotter.add_legend(legend_entries, size=(0.18, 0.28), loc="upper left",
                        face="rectangle")
 
     # ==================================================================
@@ -1428,6 +1586,21 @@ def visualize_pyvista(dump: dict, args):
     def on_key_i():
         toggle_actors("info")
 
+    def on_key_b():
+        """Toggle superquadric primitive mesh."""
+        state["show_sq"] = not state["show_sq"]
+        if state["show_sq"]:
+            if not actor_groups["sq_mesh"]:
+                add_sq_actors()
+            else:
+                for actor in actor_groups["sq_mesh"]:
+                    actor.SetVisibility(True)
+        else:
+            for actor in actor_groups["sq_mesh"]:
+                actor.SetVisibility(False)
+        update_info_text()
+        plotter.render()
+
     def on_key_0():
         state["grasp_type_filter"] = 0
         print("  Filter: all grasp types")
@@ -1491,6 +1664,7 @@ def visualize_pyvista(dump: dict, args):
         print("  c  - toggle camera markers")
         print("  h  - toggle hand skeleton (unified)")
         print("  k  - toggle LUT contact points")
+        print("  b  - toggle superquadric mesh")
         print("  i  - toggle info text")
         print("  +  - next SMC iteration filter")
         print("  -  - previous SMC iteration filter")
@@ -1508,6 +1682,7 @@ def visualize_pyvista(dump: dict, args):
     plotter.add_key_event("c", on_key_c)
     plotter.add_key_event("h", on_key_h)
     plotter.add_key_event("k", on_key_k)
+    plotter.add_key_event("b", on_key_b)
     plotter.add_key_event("i", on_key_i)
     plotter.add_key_event("0", on_key_0)
     plotter.add_key_event("1", on_key_1)
@@ -1615,6 +1790,7 @@ def main():
               p  toggle point cloud      r  toggle ROI box
               c  toggle cameras          h  toggle hand skeleton (unified)
               k  toggle LUT contact points
+              b  toggle superquadric mesh
               i  toggle info text        0-3  filter grasp types
               +/- cycle SMC iteration    * show all iterations
               ?  print help
