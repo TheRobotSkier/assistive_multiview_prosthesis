@@ -365,7 +365,7 @@ services:
   # Run this once before starting any simulation service that uses the grasp
   # planner, and re-run whenever the Rust source changes.
   #
-  #   docker compose run --rm rust_build
+  #   docker compose --profile standalone up rust_build
   #
   rust_build:
     build:
@@ -438,7 +438,7 @@ services:
   # ── Segmentation: inference server (MinkowskiEngine, Python 3.8) ────────────
   # Runs the Flask HTTP inference server on localhost:5678.
   # Downloads weights automatically on first start.
-  # Usage: docker compose run --rm segmentation_inference
+  # Usage: docker compose --profile segmentation up segmentation_inference
   segmentation_inference:
     build:
       context: ../dev/pc_segmentation
@@ -457,7 +457,8 @@ services:
   #   /segmentation/reset            (std_msgs/Empty)
   # Publishes foreground points to:
   #   /segmentation/object_cloud     (sensor_msgs/PointCloud2)
-  # Start AFTER segmentation_inference is healthy (use run_segmentation.sh).
+  # Start both together: docker compose --profile segmentation up
+  # (use run_segmentation.sh for health-poll ordering between the two)
   segmentation_ros2:
     extends: miahand_ros2
     container_name: segmentation_ros2
