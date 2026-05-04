@@ -118,5 +118,7 @@ RUN sudo chown -R $USERNAME:$USERNAME /miahand_ws \
     && colcon build \
     && echo "source install/setup.bash" >> /home/$USERNAME/.bashrc
 
-COPY ./docker-deployment/ros_entrypoint.sh /ros_entrypoint.sh
-RUN sudo chmod +x /ros_entrypoint.sh
+# ros_entrypoint.sh is already in the image at /miahand_ws/src/docker-deployment/
+# from the COPY above — no second COPY needed.
+RUN sudo cp /miahand_ws/src/docker-deployment/ros_entrypoint.sh /ros_entrypoint.sh \
+    && sudo chmod +x /ros_entrypoint.sh
