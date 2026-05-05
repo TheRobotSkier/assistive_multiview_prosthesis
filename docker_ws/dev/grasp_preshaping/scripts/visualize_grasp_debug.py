@@ -11,7 +11,7 @@ If pyvista is unavailable, falls back to a matplotlib-based viewer with
 reduced interactivity.
 
 Keyboard shortcuts (PyVista viewer):
-    t  - cycle TSDF mode: surface / points / off
+    t  - cycle TSDF mode: surface / points / signs / off
     g  - toggle grasp display: best / all
     p  - toggle point cloud
     r  - toggle ROI box
@@ -35,6 +35,10 @@ import sys
 import os
 import textwrap
 
+import warnings
+
+warnings.filterwarnings("ignore", message=".*pickpoint.*")
+
 import numpy as np
 
 
@@ -51,7 +55,11 @@ F32_MAX = np.float32(np.finfo(np.float32).max)
 SQ_TEMPLATE_NAMES = ["sphere", "box", "cylinder"]
 
 # Truncation constant (must match config.rs TRUNCATION_CELLS).
-TRUNCATION_CELLS = 4
+TRUNCATION_CELLS = 8
+
+# Surface band width for TSDF surface mode (cells from zero-crossing).
+# This is a visualization parameter, independent of the truncation distance.
+TSDF_SURFACE_BAND = 2.5
 
 # Unified hand skeleton: one compact topology for both best and all modes.
 # Each entry is (finger name, base frame name, tip contact name).
@@ -516,7 +524,7 @@ def print_summary(dump: dict, path: str):
 GRASP_MODES = ["best", "all"]
 
 # TSDF display modes (cycle with 't' key)
-TSDF_MODES = ["surface", "points", "off"]
+TSDF_MODES = ["surface", "points", "signs", "off"]
 
 
 def _build_sq_primitive_mesh(pv_mod, sq_params: dict, sq_meta: dict | None):
@@ -702,7 +710,7 @@ def visualize_pyvista(dump: dict, args):
         if mode == "surface":
             # Show only voxels near the zero-crossing (thin surface band).
             clipped = grid.threshold(
-                value=[-1.5, 1.5],
+                value=[-TSDF_SURFACE_BAND, TSDF_SURFACE_BAND],
                 scalars="distance",
             )
             if clipped.n_cells == 0:
@@ -731,9 +739,19 @@ def visualize_pyvista(dump: dict, args):
             actor_groups["tsdf"].append(actor)
 
         elif mode == "points":
-            # Show all observed voxels as points — zero occlusion.
-            clipped = grid.threshold(
-                value=[-TRUNCATION_CELLS - 0.5, TRUNCATION_CELLS + 0.5],
+            # Show observed voxels within the truncation band as points.
+            # Mask voxels at the grid edge (abs(distance) >= TRUNCATION_CELLS)
+            # to NaN so they are excluded. These are SQ-filled boundary voxels
+            # that are the least accurate and would otherwise fill the whole grid.
+            tsdf_vis_pts = tsdf_vis.copy()
+            tsdf_vis_pts[np.abs(tsdf_vis_pts) >= TRUNCATION_CELLS] = np.nan
+            grid_pts = pv.ImageData()
+            grid_pts.dimensions = np.array(tsdf_vis_pts.shape) + 1
+            grid_pts.origin = origin
+            grid_pts.spacing = [res, res, res]
+            grid_pts.cell_data["distance"] = tsdf_vis_pts.ravel(order="F")
+            clipped = grid_pts.threshold(
+                value=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
                 scalars="distance",
             )
             if clipped.n_cells == 0:
@@ -748,9 +766,9 @@ def visualize_pyvista(dump: dict, args):
                 cmap="coolwarm",
                 clim=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
                 style="points",
-                point_size=6,
+                point_size=4,
                 render_points_as_spheres=True,
-                opacity=0.8,
+                opacity=0.5,
                 show_scalar_bar=True,
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
@@ -762,6 +780,61 @@ def visualize_pyvista(dump: dict, args):
                     "height": 0.05,
                 },
                 label="TSDF points",
+            )
+            actor_groups["tsdf"].append(actor)
+
+        elif mode == "signs":
+            # Show inside/outside classification as colored points.
+            # Red = inside (negative), Blue = outside (positive), Green = surface (near-zero).
+            tsdf_vis_signs = tsdf_vis.copy()
+            tsdf_vis_signs[np.abs(tsdf_vis_signs) >= TRUNCATION_CELLS] = np.nan
+            grid_signs = pv.ImageData()
+            grid_signs.dimensions = np.array(tsdf_vis_signs.shape) + 1
+            grid_signs.origin = origin
+            grid_signs.spacing = [res, res, res]
+            grid_signs.cell_data["distance"] = tsdf_vis_signs.ravel(order="F")
+            clipped = grid_signs.threshold(
+                value=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
+                scalars="distance",
+            )
+            if clipped.n_cells == 0:
+                print("  TSDF [signs]: no observed voxels within truncation band")
+                return
+
+            # Create a sign classification array: -1=inside, 0=surface, +1=outside.
+            dist = clipped.cell_data["distance"]
+            sign_arr = np.zeros_like(dist)
+            sign_arr[dist < -0.5] = -1.0  # inside
+            sign_arr[dist > 0.5] = 1.0   # outside
+            # |dist| <= 0.5 stays 0.0 (surface)
+            clipped.cell_data["sign"] = sign_arr
+
+            n_inside = int((sign_arr < 0).sum())
+            n_surface = int((sign_arr == 0).sum())
+            n_outside = int((sign_arr > 0).sum())
+            print(f"  TSDF [signs]: rendering {clipped.n_cells} voxels "
+                  f"(in={n_inside}, surf={n_surface}, out={n_outside})")
+
+            centers = clipped.cell_centers()
+            actor = plotter.add_mesh(
+                centers,
+                scalars="sign",
+                cmap=["red", "lime", "dodgerblue"],
+                clim=[-1, 1],
+                style="points",
+                point_size=4,
+                render_points_as_spheres=True,
+                opacity=0.5,
+                show_scalar_bar=True,
+                scalar_bar_args={
+                    "title": "Sign (red=in, green=surf, blue=out)",
+                    "color": "white",
+                    "position_x": 0.35,
+                    "position_y": 0.02,
+                    "width": 0.3,
+                    "height": 0.05,
+                },
+                label="TSDF signs",
             )
             actor_groups["tsdf"].append(actor)
 
@@ -1471,8 +1544,11 @@ def visualize_pyvista(dump: dict, args):
         ("Hand", "#ffbc85"),
         ("Contact points", "#a0c28d"),
         ("Superquadric", "cyan"),
+        ("TSDF: inside", "red"),
+        ("TSDF: surface", "lime"),
+        ("TSDF: outside", "dodgerblue"),
     ]
-    plotter.add_legend(legend_entries, size=(0.18, 0.28), loc="upper left",
+    plotter.add_legend(legend_entries, size=(0.18, 0.36), loc="upper left",
                        face="rectangle")
 
     # ==================================================================
@@ -1657,7 +1733,7 @@ def visualize_pyvista(dump: dict, args):
 
     def on_key_help():
         print("\n  === Keyboard Shortcuts ===")
-        print("  t  - cycle TSDF mode: surface / points / off")
+        print("  t  - cycle TSDF mode: surface / points / signs / off")
         print("  g  - toggle grasp display: best / all")
         print("  p  - toggle point cloud")
         print("  r  - toggle ROI box")
@@ -1785,7 +1861,7 @@ def main():
               python visualize_grasp_debug.py dump.npz --show-all-grasps
 
             Keyboard shortcuts (PyVista):
-              t  cycle TSDF: surface/points/off
+              t  cycle TSDF: surface/points/signs/off
               g  toggle grasp mode (best/all)
               p  toggle point cloud      r  toggle ROI box
               c  toggle cameras          h  toggle hand skeleton (unified)

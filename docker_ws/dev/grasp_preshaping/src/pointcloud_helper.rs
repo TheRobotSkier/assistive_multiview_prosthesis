@@ -560,7 +560,7 @@ pub fn get_tsdf(
     if let Some(sq) = sq_params {
         let blend_start_agree = (truncation_cells - config::SQ_BLEND_DELTA_CELLS) as f32;
         let blend_end_agree = truncation_cells as f32;
-        let blend_start_disagree = 1.0; // Start transitioning at 1 cell from surface
+        let blend_start_disagree = config::SQ_MIN_SIGN_OVERRIDE_CELLS as f32;
         let blend_end_disagree = (truncation_cells - 1) as f32; // Full SQ at trunc-1 cells
 
         distance
@@ -632,7 +632,7 @@ pub fn get_tsdf(
                     }
                 } else {
                     // Signs agree — blend distances in the outer band only.
-                    if abs_cam >= blend_start_agree && abs_cam < blend_end_agree {
+                    if abs_cam >= blend_start_agree && abs_cam <= blend_end_agree {
                         let t = (abs_cam - blend_start_agree)
                             / (blend_end_agree - blend_start_agree);
                         let t = t.clamp(0.0, 1.0);
