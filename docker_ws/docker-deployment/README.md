@@ -16,8 +16,8 @@ An overview of the services is reported below:
 * `miahand_moveit`: planning and execution of motions with `Moveit2` by using a simulated, mock, or real hardware interface.
 * `miahand_mujoco`: simulate Mia Hand in `MuJoCo` and control the simulated hand through the `ROS2 Control` framework.
 * `miahand_ros2_control`: control Mia Hand through the `ROS2 Control` framework.
-* `rust_build`: **one-shot** — compiles `libgrasp_preshaping.so` from the Rust grasp-preshaping crate. Run before any simulation service that uses the grasp planner.
-
+* `rust_build`: **one-shot** -- compiles `libgrasp_preshaping.so` from the Rust grasp-preshaping crate. Run before any simulation service that uses the planner.
+* `digital_twin`: **standalone** -- visualizes real camera pointclouds, runs segmentation, computes grasps, and drives a simulated Mia Hand as a digital twin. Use this to validate the full perception-grasping pipeline without physical hand hardware.
 ### Using Docker Compose
 
 **Saving the current user id into a file:**
@@ -59,11 +59,44 @@ Launch the `miahand_ros2_control` service:
 USE_MOCK_HARDWARE=false docker compose run --rm miahand_ros2_control
 ```
 
+#### Digital Twin (validate pipeline without physical hand)
+
+The `digital_twin` service brings up a complete end-to-end test environment:
+real camera pointcloud → segmentation → grasp computation → simulated Mia Hand execution.
+This lets you verify the perception and grasping pipeline before acquiring the physical hand.
+
+**Prerequisites (must be running first):**
+1. `rust_build` -- one-shot, ensures `libgrasp_preshaping.so` exists
+2. `segmentation_inference` -- HTTP inference server on port 5678
+3. `multiview_full` -- publishes `/fused_pointcloud` from real D435 cameras
+
+**Start the digital twin:**
+```bash
+# Optional: auto-run hand trajectory to test proximity closure
+# export USE_TRAJECTORY=true
+
+# Optional: if inference server is not on localhost inside the container
+# export INFERENCE_URL=http://host.docker.internal:5678
+
+docker compose --profile standalone up digital_twin
+```
+
+**Interaction steps:**
+1. Wait for RViz to open. You should see the real pointcloud and the Mia Hand model.
+2. Select the **Publish Point** tool in RViz and click on an object in the pointcloud.
+3. Call the grasp service:
+   ```bash
+   ros2 service call /grasp_preshaping/compute_grasp std_srvs/srv/Trigger
+   ```
+4. The simulated hand will preshape (partial finger closure + wrist rotation).
+5. If `USE_TRAJECTORY=true`, the hand will automatically move toward the object and fully close the grasp when within range.
+   Otherwise, you can manually publish poses to `/mujoco/move_hand` to test proximity closure.
+
 #### Rust grasp-preshaping build (one-time / on Rust source change)
 
 The grasp-preshaping Rust library (`libgrasp_preshaping.so`) is built in its own container and
 **must be built before** starting any simulation service that uses the planner
-(`mujoco_dynamic`, `mujoco_interactive`, `mujoco_trajectory`).
+(`mujoco_dynamic`, `mujoco_interactive`, `mujoco_trajectory`, `digital_twin`).
 
 ```bash
 # First time, or after changing docker_ws/dev/grasp_preshaping/src/**

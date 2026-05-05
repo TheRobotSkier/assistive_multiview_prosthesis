@@ -138,6 +138,7 @@ class GraspProximityControllerNode(Node):
         self._current_hand_pose = msg
 
     def _try_commit_plan(self) -> None:
+    def _try_commit_plan(self) -> None:
         """Atomically commit buffered plan when all three parts have arrived."""
         if (self._buf_closures is not None
                 and self._buf_wrist_deg is not None
@@ -153,9 +154,15 @@ class GraspProximityControllerNode(Node):
             self._is_near = False
             self.get_logger().info(
                 f'New plan committed — closures={self._planned_closures}, '
-                f'wrist={self._planned_wrist_deg:.1f}°'
+                f'wrist={self._planned_wrist_deg:.1f}\u00b0'
             )
-
+            # Immediately send initial preshape (far mode)
+            self._publish_wrist_command(self._planned_wrist_deg)
+            self._publish_joint_commands(
+                self._partial_factor * self._planned_closures[0],
+                self._partial_factor * self._planned_closures[1],
+                self._partial_factor * self._planned_closures[2],
+            )
     # ── Control loop ──────────────────────────────────────────────────────────
 
     def _control_loop(self) -> None:

@@ -16,9 +16,8 @@ Provide the lightweight glue that connects the real camera stream (`/fused_point
 ## Acceptance Criteria
 
 - [ ] A mechanism exists to forward `/fused_pointcloud` → `/segmentation/input_cloud` without data loss or significant latency.
-- [ ] A static TF from `world` to `cam1_d435_1_color_optical_frame` is published, with transform parameters exposed as launch arguments.
-- [ ] If a second camera is used, a second static TF from `world` to `cam2_d435_2_color_optical_frame` is also published (or documented as manual setup).
-- [ ] The grasp preshaping bridge successfully resolves camera positions via TF lookup to `world`.
+- [ ] The grasp preshaping bridge successfully resolves camera positions via TF lookup to `world` (TF is provided by the camera node, not this step).
+- [ ] `publish_initial_commands` parameter is added to `preshaping_service_bridge_node.cpp` so the digital twin can suppress immediate controller commands.
 
 ---
 
@@ -72,65 +71,61 @@ if __name__ == '__main__':
 
 **Recommendation:** Check if `topic_tools` is already in the image. If yes, use it. If no, add the custom relay node to avoid forcing a Docker rebuild.
 
-### 3.2 Camera Static TF
+### 3.2 Preshaping Bridge `publish_initial_commands` Parameter
 
-The grasp preshaping bridge (`preshaping_service_bridge_node.cpp`) looks up camera frames in TF relative to `world`:
+Add a boolean parameter to `preshaping_service_bridge_node.cpp` (default `true` for backward compatibility):
+
 ```cpp
-tf_buffer_->lookupTransform("world", frame, tf2::TimePointZero);
+const bool publish_initial_commands_ = declare_parameter<bool>("publish_initial_commands", true);
 ```
 
-The RealSense ROS driver publishes internal camera TFs (e.g. `cam1_d435_1_link` → `cam1_d435_1_color_optical_frame`), but it does **not** know about `world`.
+In `try_handle_direct_request`, guard the immediate `publish_joint_commands()` and wrist pose publication:
 
-We must publish:
-```
-world → cam1_d435_1_color_optical_frame
+```cpp
+if (publish_initial_commands_) {
+    publish_joint_commands(preshape_thumb, preshape_index, preshape_mrl);
+    std_msgs::msg::Float64 wrist_msg;
+    wrist_msg.data = ffi_response.wrist_rotation_deg;
+    wrist_pose_pub_->publish(wrist_msg);
+}
 ```
 
-**In the launch file:**
+When `publish_initial_commands:=false`, the bridge still publishes planner topics (`/grasp_preshaping/*`) so the proximity controller can consume them and send the initial preshape itself.
+
+### 3.3 Proximity Controller Initial Preshape
+
+Modify `grasp_proximity_controller_node.py` so that `_try_commit_plan()` immediately sends the initial partial preshape and wrist rotation:
+
 ```python
-Node(
-    package='tf2_ros',
-    executable='static_transform_publisher',
-    arguments=[
-        camera_world_x, camera_world_y, camera_world_z,
-        camera_world_qx, camera_world_qy, camera_world_qz, camera_world_qw,
-        'world', 'cam1_d435_1_color_optical_frame',
-    ],
-    name='cam1_world_tf',
-)
+def _try_commit_plan(self) -> None:
+    if (self._buf_closures is not None
+            and self._buf_wrist_deg is not None
+            and self._buf_hand_frame is not None):
+        self._planned_closures = self._buf_closures
+        self._planned_wrist_deg = self._buf_wrist_deg
+        self._planned_hand_frame = self._buf_hand_frame
+        self._buf_closures = None
+        self._buf_wrist_deg = None
+        self._buf_hand_frame = None
+        self._is_near = False
+        self.get_logger().info(
+            f'New plan committed — closures={self._planned_closures}, '
+            f'wrist={self._planned_wrist_deg:.1f}°'
+        )
+        # Immediately send initial preshape (far mode)
+        self._publish_wrist_command(self._planned_wrist_deg)
+        self._publish_joint_commands(
+            self._partial_factor * self._planned_closures[0],
+            self._partial_factor * self._planned_closures[1],
+            self._partial_factor * self._planned_closures[2],
+        )
 ```
 
-**If two cameras are used**, add a second static TF:
-```python
-Node(
-    package='tf2_ros',
-    executable='static_transform_publisher',
-    arguments=[
-        camera2_world_x, ..., 'world', 'cam2_d435_2_color_optical_frame',
-    ],
-    name='cam2_world_tf',
-    condition=IfCondition(use_camera2),
-)
-```
+This ensures the hand begins moving as soon as the plan is available, even before the first control loop tick.
 
-For the first iteration, supporting one camera is sufficient. The second camera can be added later or configured manually by the user.
+### 3.4 Camera TF (external)
 
-**Determining the transform:**
-Users must measure or estimate the physical camera mounting pose relative to their chosen `world` origin. This is inherently site-specific. The launch arguments make it configurable without code changes.
-
-### 3.3 Verification
-
-Run:
-```bash
-ros2 topic echo /segmentation/input_cloud --once
-```
-While `multiview_full` is publishing `/fused_pointcloud`. You should see pointcloud data.
-
-Run:
-```bash
-ros2 run tf2_ros tf2_echo world cam1_d435_1_color_optical_frame
-```
-You should see the configured translation and rotation.
+**No action required in this step.** The camera node uses a CharUco board and AprilTag marker to localize itself relative to `world`. The marker location is the `world` frame, and the camera driver publishes the dynamic TF. The digital twin launch does **not** need a static TF publisher for the camera.
 
 ---
 
@@ -138,9 +133,10 @@ You should see the configured translation and rotation.
 
 1. Check if `topic_tools` is available in the current Docker image.
 2. If unavailable, create `dev/mujoco/nodes/pointcloud_relay_node.py`.
-3. Add static TF publisher node to the launch file with launch arguments.
-4. Verify relay and TF in a running container.
-5. Commit.
+3. Add `publish_initial_commands` parameter to `preshaping_service_bridge_node.cpp`.
+4. Modify `grasp_proximity_controller_node.py` to send initial preshape on plan commit.
+5. Verify relay and planner topics in a running container.
+6. Commit.
 
 ---
 
@@ -150,3 +146,5 @@ You should see the configured translation and rotation.
   - **Mitigation:** Make the camera frame name a launch argument with the RealSense default as the fallback.
 - **Risk:** TF frame names in the multiview launch vs. the RealSense driver may differ between Humble and Jazzy.
   - **Mitigation:** Verify the actual frame names published by `multiview_full` (they are `cam1_d435_1_color_optical_frame` and `cam2_d435_2_color_optical_frame` as shown in `pointcloud_fusion_node.py`).
+- **Risk:** Changing `preshaping_service_bridge_node.cpp` may break existing `full_system_test` launch.
+  - **Mitigation:** Default `publish_initial_commands:=true` preserves existing behavior. Only the digital twin launch sets it to `false`.

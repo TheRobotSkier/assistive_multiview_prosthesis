@@ -305,5 +305,40 @@ services:
       - ../dev/grasp_preshaping:/build
       - rust_cargo_cache:/usr/local/cargo/registry
 
+  # -- Digital Twin: real cameras + simulated Mia Hand ------------------------
+  # Visualizes real pointclouds, runs segmentation, computes grasps, and
+  # drives a simulated Mia Hand as a digital twin.
+  #
+  # Prerequisites:
+  #   1. rust_build   (one-shot) -- ensures libgrasp_preshaping.so exists.
+  #   2. segmentation_inference (standalone or full_system) -- HTTP server on :5678.
+  #   3. multiview_full (full_system) -- publishes /fused_pointcloud from real D435s.
+  #
+  # Usage:
+  #   docker compose --profile standalone up digital_twin
+  #
+  # After RViz opens:
+  #   - Click "Publish Point" tool, click on the object in the pointcloud.
+  #   - Call the grasp service:
+  #       ros2 service call /grasp_preshaping/compute_grasp std_srvs/srv/Trigger
+  #   - Watch the simulated hand preshape (far) and close (near).
+  digital_twin:
+    extends: miahand_ros2
+    container_name: miahand_digital_twin
+    profiles: [standalone]
+    environment:
+      - USE_TRAJECTORY=${USE_TRAJECTORY:-false}
+      - INFERENCE_URL=${INFERENCE_URL:-http://127.0.0.1:5678}
+      - SEGMENTATION_CUBEEDGE=${SEGMENTATION_CUBEEDGE:-0.05}
+    command: >
+      bash -c "
+        source install/setup.bash &&
+        ros2 launch /miahand_ws/src/dev/mujoco/launch/digital_twin_launch.py
+          use_trajectory:=${USE_TRAJECTORY:-false}
+          inference_url:=${INFERENCE_URL:-http://127.0.0.1:5678}
+          segmentation_cubeedge:=${SEGMENTATION_CUBEEDGE:-0.05};
+        /bin/bash
+      "
+
 volumes:
   rust_cargo_cache:

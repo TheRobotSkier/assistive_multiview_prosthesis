@@ -25,7 +25,7 @@ The project already has:
 |------|-------|-------------|-------------------|
 | 1 | [RViz Configuration](#step-1-rviz-configuration) | Create a dedicated RViz config that displays the fused pointcloud, segmented pointcloud, Mia Hand robot model, TF tree, and the interactive PublishPoint tool. | `rviz-config` |
 | 2 | [Digital Twin Launch File](#step-2-digital-twin-launch-file) | Create a ROS2 launch file that brings up the Mia Hand MuJoCo simulation (digital twin), segmentation node, click relay, grasp preshaping bridge, grasp proximity controller, and RViz. | `launch-digital-twin` |
-| 3 | [Topic & TF Bridges](#step-3-topic--tf-bridges) | Add lightweight nodes to remap `/fused_pointcloud` → `/segmentation/input_cloud` and publish a static TF aligning the real camera frame with the simulation `world` frame. | `bridge-nodes` |
+| 3 | [Topic & TF Bridges](#step-3-topic--tf-bridges) | Add lightweight node to remap `/fused_pointcloud` → `/segmentation/input_cloud`. Camera-to-world TF is provided by the camera node (CharUco/AprilTag) and is **not** hard-coded here. | `bridge-nodes` |
 | 4 | [Docker Service Definition](#step-4-docker-service-definition) | Add a new `digital_twin` service to `docker-compose.linux-podman.yml` (and `.windows.yml`) extending `miahand_ros2` with X11, the correct command, and a `standalone` profile. | `docker-service` |
 | 5 | [Integration, Test & Documentation](#step-5-integration-test--documentation) | Validate the full pipeline: pointcloud visible → segmentation with clicks → grasp service call → simulated hand preshapes and closes as "approach" is simulated. Write runbook. | `integration-test` |
 
@@ -74,18 +74,16 @@ Create `dev/mujoco/launch/digital_twin_launch.py`.
 
 5. **Grasp preshaping service bridge**
    - `preshaping_service_bridge_node`
-   - Parameters: `camera_frames:=['cam1_d435_1_color_optical_frame', 'cam2_d435_2_color_optical_frame']`, `preshaping_closure_fraction:=0.3`
+   - Parameters: `camera_frames:=['cam1_d435_1_color_optical_frame', 'cam2_d435_2_color_optical_frame']`, `preshaping_closure_fraction:=0.3`, `publish_initial_commands:=false`
+   - *Why `publish_initial_commands:=false`*: the proximity controller will send the initial preshape when it receives the plan, avoiding topic fighting.
    - *Note:* the service must be called manually (or via a trigger node) to compute the grasp.
 
 6. **Grasp proximity controller**
    - `python3 /miahand_ws/src/dev/grasp_preshaping/nodes/grasp_proximity_controller_node.py`
    - Parameters: `proximity_enter_threshold_m:=0.08`, `partial_closure_factor:=0.3`
+   - *Key behavior:* on plan commit, immediately publishes the initial partial preshape and wrist rotation. Then runs the 10 Hz control loop for far/near transitions.
 
-7. **Static TF publisher (camera → world)**
-   - `static_transform_publisher` from `world` to `cam1_d435_1_color_optical_frame`.
-   - Translation/rotation should be launch arguments so users can set them to their physical camera mounting pose.
-
-8. **RViz**
+7. **RViz**
    - `rviz2 -d /miahand_ws/src/dev/mujoco/config/digital_twin.rviz`
    - Delayed start (TimerAction, 5 s) to let other nodes initialise.
 
@@ -99,12 +97,10 @@ Create `dev/mujoco/launch/digital_twin_launch.py`.
 ### 3.1 Pointcloud Relay
 The real cameras publish on `/fused_pointcloud`. The segmentation node expects `/segmentation/input_cloud`. A `topic_tools relay` or small Python relay node closes this gap.
 
-### 3.2 Camera Static TF
-The grasp planner looks up camera frames relative to `world`. The RealSense driver does not know about `world`. We publish a static TF:
-```
-world → cam1_d435_1_color_optical_frame
-```
-with configurable translation and rotation (launch args). Users set these to match their physical camera rig.
+### 3.2 Camera TF (provided externally)
+The camera node uses a CharUco board and AprilTag marker to localize itself. The marker location is the `world` frame. Therefore, **no static TF publisher is needed** in the digital twin launch — the camera driver publishes `world → cam1_d435_1_color_optical_frame` dynamically.
+
+The grasp preshaping bridge looks up camera frames in TF as usual.
 
 ---
 

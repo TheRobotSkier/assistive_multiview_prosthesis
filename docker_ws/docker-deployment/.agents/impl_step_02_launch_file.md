@@ -19,10 +19,10 @@ Create `dev/mujoco/launch/digital_twin_launch.py` — a single ROS2 launch file 
 - [ ] Launch file is valid Python and passes `ros2 launch --show-args` syntax checks.
 - [ ] All required nodes are declared with appropriate `TimerAction` delays where needed.
 - [ ] Launch arguments exist for:
-  - `camera_world_{x,y,z,qx,qy,qz,qw}` — static TF from `world` to camera optical frame.
   - `use_trajectory` — optional flag to include the hand trajectory test node.
   - `inference_url` — URL of the segmentation inference server.
   - `segmentation_cubeedge` — click cube half-width.
+  - `publish_initial_commands` — whether the preshaping bridge publishes immediate joint commands (default `true`; digital twin sets `false`).
 - [ ] No hard-coded absolute paths that break when the workspace is moved.
 - [ ] Launch file can be invoked standalone:
   ```bash
@@ -36,14 +36,13 @@ Create `dev/mujoco/launch/digital_twin_launch.py` — a single ROS2 launch file 
 | # | Node / Launch | Package / Source | Purpose | Start Delay |
 |---|---------------|------------------|---------|-------------|
 | 1 | `mia_hand_system_interface_launch.py` | `mia_hand_mujoco` | MuJoCo simulation + ROS2 Control (digital twin) | 0 s |
-| 2 | `static_transform_publisher` | `tf2_ros` | `world → cam1_d435_1_color_optical_frame` | 0 s |
-| 3 | `topic relay` or `relay_node.py` | `topic_tools` or custom | `/fused_pointcloud` → `/segmentation/input_cloud` | 2 s |
-| 4 | `segmentation_ros2_node.py` | `pc_segmentation` | Segmentation ROS bridge | 3 s |
-| 5 | `demo_click_relay_node.py` | `pc_segmentation` | RViz click → segmentation clicks | 3 s |
-| 6 | `preshaping_service_bridge_node` | `grasp_preshaping` | Grasp planner service | 5 s |
-| 7 | `grasp_proximity_controller_node.py` | `grasp_preshaping` | Proximity-based grasp execution | 5 s |
-| 8 | `rviz2` | `rviz2` | Visualization | 8 s |
-| 9 | *(optional)* `mujoco_hand_trajectory_node.py` | `mia_hand_mujoco` | Automated hand approach test | 15 s |
+| 2 | `topic relay` or `relay_node.py` | `topic_tools` or custom | `/fused_pointcloud` → `/segmentation/input_cloud` | 2 s |
+| 3 | `segmentation_ros2_node.py` | `pc_segmentation` | Segmentation ROS bridge | 3 s |
+| 4 | `demo_click_relay_node.py` | `pc_segmentation` | RViz click → segmentation clicks | 3 s |
+| 5 | `preshaping_service_bridge_node` | `grasp_preshaping` | Grasp planner service | 5 s |
+| 6 | `grasp_proximity_controller_node.py` | `grasp_preshaping` | Proximity-based grasp execution (sends initial preshape + runs control loop) | 5 s |
+| 7 | `rviz2` | `rviz2` | Visualization | 8 s |
+| 8 | *(optional)* `mujoco_hand_trajectory_node.py` | `mia_hand_mujoco` | Automated hand approach test | 15 s |
 
 ---
 
@@ -76,30 +75,7 @@ IncludeLaunchDescription(
 - `enable_depth_publisher:=false` because we use the real camera pointcloud, not MuJoCo's simulated depth camera.
 - `enable_preshaping_service:=false` because we launch our own `preshaping_service_bridge_node` explicitly (gives us control over parameters like `camera_frames`).
 
-### 2.2 Static TF Publisher
-
-```python
-Node(
-    package='tf2_ros',
-    executable='static_transform_publisher',
-    arguments=[
-        LaunchConfiguration('camera_world_x'),
-        LaunchConfiguration('camera_world_y'),
-        LaunchConfiguration('camera_world_z'),
-        LaunchConfiguration('camera_world_qx'),
-        LaunchConfiguration('camera_world_qy'),
-        LaunchConfiguration('camera_world_qz'),
-        LaunchConfiguration('camera_world_qw'),
-        'world',
-        'cam1_d435_1_color_optical_frame',
-    ],
-    name='camera_world_tf',
-)
-```
-
-**Note:** If the multiview system also publishes a `cam1_d435_1_link` → `cam1_d435_1_color_optical_frame` TF (RealSense driver does), then publishing `world → cam1_d435_1_color_optical_frame` is sufficient. If the user has two cameras, add a second static TF argument set for `cam2_d435_2_color_optical_frame`.
-
-### 2.3 Pointcloud Relay
+### 2.2 Pointcloud Relay
 
 Option A — `topic_tools relay` (preferred, minimal code):
 ```python
@@ -117,7 +93,7 @@ A 20-line `rclpy` node that subscribes to `/fused_pointcloud` and republishes on
 
 **Decision:** Try Option A first. If `topic_tools` is not in the base image (`ros:jazzy-ros-base`), install it or fall back to Option B.
 
-### 2.4 Segmentation Node
+### 2.3 Segmentation Node
 
 ```python
 Node(
@@ -154,12 +130,15 @@ Node(
         'camera_frames': ['cam1_d435_1_color_optical_frame', 'cam2_d435_2_color_optical_frame'],
         'preshaping_closure_fraction': 0.3,
         'min_closure_amount': 0.1,
+        'publish_initial_commands': LaunchConfiguration('publish_initial_commands'),
     }],
     output='screen',
 )
 ```
 
-**Important:** The bridge subscribes to `/hand_pose`, `/hand_twist`, and `/segmented_object_cloud`. It will only compute a grasp when the service `/grasp_preshaping/compute_grasp` is called.
+**Important:** 
+- The bridge subscribes to `/hand_pose`, `/hand_twist`, and `/segmented_object_cloud`. It will only compute a grasp when the service `/grasp_preshaping/compute_grasp` is called.
+- When `publish_initial_commands:=false`, the bridge skips sending the immediate preshape to `*_pos_ff_controller/commands`. Instead, the proximity controller sends the initial preshape when it commits the plan.
 
 ### 2.7 Grasp Proximity Controller
 
@@ -178,6 +157,12 @@ Node(
     output='screen',
 )
 ```
+
+**Key behavior:** When the proximity controller commits a new plan (all three planner topics received), it **immediately** publishes:
+1. The wrist rotation command (`/wrist/set_position`).
+2. The partial finger closure (preshape) to `*_pos_ff_controller/commands`.
+
+Then, on each control loop tick, it evaluates distance and transitions between far (partial) and near (full) modes.
 
 ### 2.8 RViz
 
@@ -212,16 +197,10 @@ This node moves the simulated hand from far to near, automatically exercising th
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `camera_world_x` | `0.0` | Camera optical frame X in world |
-| `camera_world_y` | `0.0` | Camera optical frame Y in world |
-| `camera_world_z` | `1.0` | Camera optical frame Z in world |
-| `camera_world_qx` | `0.0` | Camera optical frame quaternion x |
-| `camera_world_qy` | `0.0` | Camera optical frame quaternion y |
-| `camera_world_qz` | `0.0` | Camera optical frame quaternion z |
-| `camera_world_qw` | `1.0` | Camera optical frame quaternion w |
 | `use_trajectory` | `false` | Include automated hand approach test |
 | `inference_url` | `http://127.0.0.1:5678` | Segmentation inference server URL |
 | `segmentation_cubeedge` | `0.05` | Click cube half-width (m) |
+| `publish_initial_commands` | `true` | If `true`, the preshaping bridge sends immediate joint commands on service call. Digital twin sets this to `false` so the proximity controller owns all controller commands. |
 
 ---
 
@@ -229,14 +208,13 @@ This node moves the simulated hand from far to near, automatically exercising th
 
 1. Scaffold `digital_twin_launch.py` with imports and `generate_launch_description()`.
 2. Add Mia Hand simulation include with correct arguments.
-3. Add static TF publisher with launch arguments.
-4. Add pointcloud relay (topic_tools or custom).
-5. Add segmentation, click relay, preshaping bridge, proximity controller nodes.
-6. Add RViz node with delayed start.
-7. Add optional trajectory node with condition.
-8. Declare all launch arguments.
-9. Syntax-check with `ros2 launch --show-args`.
-10. Commit.
+3. Add pointcloud relay (topic_tools or custom).
+4. Add segmentation, click relay, preshaping bridge, proximity controller nodes.
+5. Add RViz node with delayed start.
+6. Add optional trajectory node with condition.
+7. Declare all launch arguments.
+8. Syntax-check with `ros2 launch --show-args`.
+9. Commit.
 
 ---
 
@@ -246,5 +224,5 @@ This node moves the simulated hand from far to near, automatically exercising th
   - **Mitigation:** Check if available; if not, install `ros-jazzy-topic-tools` in Dockerfile or use a custom 20-line relay node.
 - **Risk:** `InteractiveSystemInterface` may conflict with ros2_control joint commands if not designed to run alongside them.
   - **Mitigation:** Test that joint commands from the proximity controller still reach the simulated fingers when using `InteractiveSystemInterface`. If not, we may need to use `SystemInterface` and add a small node that publishes `/hand_pose` from TF or MuJoCo body state.
-- **Risk:** The preshaping bridge publishes immediate preshape commands to `/*/pos_ff_controller/commands`, which may race with the proximity controller publishing to the same topics.
-  - **Mitigation:** This is acceptable for the first version — the bridge sends one-shot preshape on service call, then the proximity controller takes over at 10 Hz. If conflicts cause jitter, we can later parameterise the bridge to skip immediate publishing.
+- **Risk:** The preshaping bridge and proximity controller both publish to `/*/pos_ff_controller/commands`.
+  - **Mitigation:** The bridge is parameterised with `publish_initial_commands:=false` in the digital twin launch. The proximity controller owns all controller command publishing. The bridge still publishes planner topics (`/grasp_preshaping/*`) consumed by the controller.

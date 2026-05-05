@@ -18,7 +18,6 @@ Add a new `digital_twin` service to `docker-compose.linux-podman.yml` and `docke
 - [ ] `digital_twin` service exists in both `docker-compose.linux-podman.yml` and `docker-compose.windows.yml`.
 - [ ] Service extends `miahand_ros2` (reuses build, network, volumes, X11, etc.).
 - [ ] Service has profile `standalone`.
-- [ ] Service passes camera-world TF parameters via environment variables and launch arguments.
 - [ ] Service command sources the workspace and launches `digital_twin_launch.py`.
 - [ ] `docker compose --profile standalone config` validates without errors.
 - [ ] Documentation comment above the service explains prerequisites (`rust_build`, `segmentation_inference`, `multiview_full`).
@@ -54,13 +53,6 @@ Add to `docker-compose.linux-podman.yml` after the existing `full_system_test` s
     container_name: miahand_digital_twin
     profiles: [standalone]
     environment:
-      - CAMERA_FRAME_WORLD_X=${CAMERA_FRAME_WORLD_X:-0.0}
-      - CAMERA_FRAME_WORLD_Y=${CAMERA_FRAME_WORLD_Y:-0.0}
-      - CAMERA_FRAME_WORLD_Z=${CAMERA_FRAME_WORLD_Z:-1.0}
-      - CAMERA_FRAME_WORLD_QX=${CAMERA_FRAME_WORLD_QX:-0.0}
-      - CAMERA_FRAME_WORLD_QY=${CAMERA_FRAME_WORLD_QY:-0.0}
-      - CAMERA_FRAME_WORLD_QZ=${CAMERA_FRAME_WORLD_QZ:-0.0}
-      - CAMERA_FRAME_WORLD_QW=${CAMERA_FRAME_WORLD_QW:-1.0}
       - USE_TRAJECTORY=${USE_TRAJECTORY:-false}
       - INFERENCE_URL=${INFERENCE_URL:-http://127.0.0.1:5678}
       - SEGMENTATION_CUBEEDGE=${SEGMENTATION_CUBEEDGE:-0.05}
@@ -68,13 +60,6 @@ Add to `docker-compose.linux-podman.yml` after the existing `full_system_test` s
       bash -c "
         source install/setup.bash &&
         ros2 launch dev/mujoco/launch/digital_twin_launch.py
-          camera_world_x:=${CAMERA_FRAME_WORLD_X:-0.0}
-          camera_world_y:=${CAMERA_FRAME_WORLD_Y:-0.0}
-          camera_world_z:=${CAMERA_FRAME_WORLD_Z:-1.0}
-          camera_world_qx:=${CAMERA_FRAME_WORLD_QX:-0.0}
-          camera_world_qy:=${CAMERA_FRAME_WORLD_QY:-0.0}
-          camera_world_qz:=${CAMERA_FRAME_WORLD_QZ:-0.0}
-          camera_world_qw:=${CAMERA_FRAME_WORLD_QW:-1.0}
           use_trajectory:=${USE_TRAJECTORY:-false}
           inference_url:=${INFERENCE_URL:-http://127.0.0.1:5678}
           segmentation_cubeedge:=${SEGMENTATION_CUBEEDGE:-0.05};
@@ -114,3 +99,5 @@ This should print the resolved service configuration without YAML syntax errors.
   - **Mitigation:** The service sources `install/setup.bash`, which adds the workspace to the path. `dev/mujoco` is not a formal ROS package, so the launch file should be referenced by absolute path: `/miahand_ws/src/dev/mujoco/launch/digital_twin_launch.py`. Update the command accordingly.
 - **Risk:** The `extends` keyword requires Docker Compose v2.20+ or Podman Compose 1.0+.
   - **Mitigation:** The project already uses `extends` extensively (e.g. `miahand_description`, `miahand_driver`), so this is safe.
+- **Risk:** `127.0.0.1:5678` for inference will not work if the inference server is in a separate container and the digital twin container is not on host network.
+  - **Mitigation:** Pass `INFERENCE_URL` explicitly (e.g. `http://host.docker.internal:5678` on Docker Desktop, or the host bridge IP on Linux). Document this in the runbook.
