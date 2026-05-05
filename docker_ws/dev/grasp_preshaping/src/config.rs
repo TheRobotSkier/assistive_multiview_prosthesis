@@ -4,16 +4,16 @@
 
 // TSDF construction
 pub const TSDF_RESOLUTION_M: f32 = 0.005;
-pub const TRUNCATION_CELLS: usize = 8; 
+pub const TRUNCATION_CELLS: usize = 4; 
 pub const RAY_ALIGNMENT_THRESHOLD: f32 = 0.9;
 
 // Collision detection
-pub const COLLISION_TOL_M: f32 = 0.005;
-pub const BINARY_SEARCH_TOL: f64 = 0.01;
+pub const COLLISION_TOL_M: f32 = 0.01;
+pub const BINARY_SEARCH_TOL: f64 = 0.05;
 
 // ROI prediction
 pub const PREDICTION_HORIZON_S: f64 = 5.0;
-pub const PREDICTION_SAMPLES: usize = 5000;
+pub const PREDICTION_SAMPLES: usize = 1000000;
 pub const HAND_RADIUS_M: f64 = 0.05;
 pub const MIN_TSDF_DIM_M: f32 = 0.1;
 pub const MAX_TSDF_DIM_M: f32 = 0.5;
@@ -28,11 +28,11 @@ pub const FIXED_COV_OMEGA: [f64; 3] = [0.001, 0.001, 0.001];
 pub const FIXED_COV_V: [f64; 3] = [0.0005, 0.0005, 0.0005];
 
 // SMC Optimization Constants
-pub const ITERATIONS: usize = 10; // Number of SMC iterations
+pub const ITERATIONS: usize = 5; // Number of SMC iterations
 pub const DECAY_RATE: f64 = 0.7; // Geometric decay factor per iteration
-pub const ELITE_RATIO: f64 = 0.15; // Top fraction selected as elites
+pub const ELITE_RATIO: f64 = 0.05; // Top fraction selected as elites
 pub const SMC_CONVERGENCE_TOL: f64 = 0.01; // Combined score change threshold for early termination
-pub const SMC_MIN_ITERATIONS: usize = 5; // Minimum iterations before early termination is allowed
+pub const SMC_MIN_ITERATIONS: usize = 2; // Minimum iterations before early termination is allowed
 pub const GRASP_TYPE_MIN_PROBABILITY: f64 = 0.15; // Minimum probability floor for each grasp type in weighted resampling
 
 // Starting Proposal Variance
@@ -42,7 +42,7 @@ pub const INITIAL_PROPOSAL_STD_WRIST: f64 = 0.3; // radians (~17 degrees)
 
 // Elite injection: fraction of the new population preserved as unchanged
 // copies of the best elites. Ensures the best-so-far is never lost.
-pub const ELITE_PRESERVE_RATIO: f64 = 0.05;
+pub const ELITE_PRESERVE_RATIO: f64 = 0.01;
 
 // Grasp type mutation: probability that a resampled particle changes its
 // grasp type from the parent elite's type. With probability 1 - this value,
