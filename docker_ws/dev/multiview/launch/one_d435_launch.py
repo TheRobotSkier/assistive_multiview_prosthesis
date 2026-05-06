@@ -1,90 +1,61 @@
-"""Launch a single D435 camera through the official realsense2 package launch file.
+"""Launch a single D435 camera by directly executing realsense2_camera_node.
 
 USB 2.0 note: The D435 connected over USB 2.0/2.1 cannot stream depth + color
 simultaneously. Color is enabled by default because pointcloud.enable requires the
-color stream. Set enable_color:=false if on USB 2.0 (pointcloud won't work).
+color stream. Set REALSENSE_ENABLE_COLOR=false if on USB 2.0 (pointcloud won't work).
+
+Configurable via environment variables:
+    CAM1_SERIAL              Serial number (default: 829212072207)
+    REALSENSE_ENABLE_COLOR   "true" or "false" (default: true)
+    REALSENSE_INITIAL_RESET  "true" or "false" (default: false)
+
+Design note:
+    Uses ExecuteProcess (not Node/IncludeLaunchDescription) to avoid a YAML
+    serialisation bug: serial numbers composed of digits are written unquoted into
+    the temporary params file, parsed as integers, and rejected by the realsense
+    node with "parameter 'serial_no' has invalid type". The workaround is to pass
+    serial_no via --ros-args -p with YAML single-quotes surrounding the value:
+      -p "serial_no:='830213023028'"
 """
+
 import os
-
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, TimerAction
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-from launch.actions import IncludeLaunchDescription
+from launch.actions import ExecuteProcess, LogInfo
+
+_REALSENSE_NODE = '/opt/ros/humble/lib/realsense2_camera/realsense2_camera_node'
+_DEPTH_PROFILE = '640x480x15'
+
+_CAM1_SERIAL = os.environ.get('CAM1_SERIAL', os.environ.get('REALSENSE_SERIAL_NO', '829212072207'))
+_ENABLE_COLOR = os.environ.get('REALSENSE_ENABLE_COLOR', 'true')
+_INITIAL_RESET = os.environ.get('REALSENSE_INITIAL_RESET', 'false')
 
 
-DEFAULT_SERIAL = os.getenv('REALSENSE_SERIAL_NO', '')
-_DEFAULT_DEPTH_PROFILE = os.getenv('REALSENSE_DEPTH_PROFILE', '640x480x15')
-_DEFAULT_COLOR_PROFILE = os.getenv('REALSENSE_COLOR_PROFILE', '640x480x15')
-
-
-def _camera_launch(context, *_args, **_kwargs):
-    launch_arguments = {
-        'camera_namespace': 'cam1',
-        'camera_name': 'd435_1',
-        'enable_color': LaunchConfiguration('enable_color').perform(context),
-        'pointcloud.enable': 'true',
-        'align_depth.enable': 'true',
-        'enable_infra1': 'false',
-        'enable_infra2': 'false',
-        'initial_reset': LaunchConfiguration('initial_reset').perform(context),
-        'depth_module.depth_profile': LaunchConfiguration('depth_profile').perform(context),
-        'rgb_camera.color_profile': LaunchConfiguration('color_profile').perform(context),
-    }
-    serial_no = LaunchConfiguration('serial_no').perform(context).strip()
-    if serial_no:
-        launch_arguments['serial_no'] = serial_no
-
-    rs_launch = os.path.join(
-        get_package_share_directory('realsense2_camera'),
-        'launch',
-        'rs_launch.py',
-    )
-
-    return [
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(rs_launch),
-            launch_arguments=launch_arguments.items(),
-        ),
-        TimerAction(
-            period=6.0,
-            actions=[
-                ExecuteProcess(
-                    cmd=['ros2', 'param', 'set', '/cam1/d435_1', 'pointcloud.enable', 'true']
-                )
-            ],
-        ),
+def _realsense_cmd() -> list:
+    """Build the ExecuteProcess cmd list for one realsense2_camera_node."""
+    cmd = [
+        _REALSENSE_NODE,
+        '--ros-args', '--log-level', 'info',
+        '-r', '__node:=d435_1',
+        '-r', '__ns:=/cam1',
+        '-p', f'depth_module.depth_profile:={_DEPTH_PROFILE}',
+        '-p', 'pointcloud.enable:=true',
+        '-p', 'align_depth.enable:=true',
+        '-p', f'initial_reset:={_INITIAL_RESET}',
+        '-p', f'enable_color:={_ENABLE_COLOR}',
     ]
+    # Serial number: YAML single-quotes force string type
+    if _CAM1_SERIAL:
+        cmd.extend(['-p', f"serial_no:='{_CAM1_SERIAL}'"])
+    return cmd
 
 
 def generate_launch_description():
+    serial_display = _CAM1_SERIAL if _CAM1_SERIAL else '(auto-detect)'
     return LaunchDescription([
-        DeclareLaunchArgument(
-            'serial_no',
-            default_value=DEFAULT_SERIAL,
-            description='Serial number of the D435 camera to launch. Empty selects the first available camera.',
+        LogInfo(msg=f'Starting single D435 camera (serial={serial_display})'),
+        ExecuteProcess(
+            cmd=_realsense_cmd(),
+            output='screen',
+            emulate_tty=True,
         ),
-        DeclareLaunchArgument(
-            'enable_color',
-            default_value='true',
-            description='Enable RGB color stream (required for pointcloud.enable). Set false on USB 2.0 (disables pointcloud).',
-        ),
-        DeclareLaunchArgument(
-            'initial_reset',
-            default_value='false',
-            description='Reset the camera on startup. Disabled by default to avoid device renumbering races.',
-        ),
-        DeclareLaunchArgument(
-            'depth_profile',
-            default_value=_DEFAULT_DEPTH_PROFILE,
-            description='Depth stream profile in WIDTHxHEIGHTxFPS format.',
-        ),
-        DeclareLaunchArgument(
-            'color_profile',
-            default_value=_DEFAULT_COLOR_PROFILE,
-            description='Color stream profile in WIDTHxHEIGHTxFPS format.',
-        ),
-        OpaqueFunction(function=_camera_launch),
     ])
-

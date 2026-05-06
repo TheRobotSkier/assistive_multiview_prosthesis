@@ -1,25 +1,24 @@
 #!/usr/bin/env bash
-set -eo pipefail
+# Probe script for the RealSense camera(s) using the fixed launch files.
+#
+# This script uses one_d435_launch.py or two_d435_launch.py (which work around
+# the YAML serialisation bug by using ExecuteProcess directly).
+#
+# Environment variables (all optional):
+#   CAM1_SERIAL             Camera 1 serial (default: 829212072207)
+#   CAM2_SERIAL             Camera 2 serial (default: empty → single-camera mode)
+#   CAM2_OFFSET_X           X-offset cam1→cam2 (default: 0.15)
+#   REALSENSE_ENABLE_COLOR  "true" / "false" (default: true)
+#   REALSENSE_INITIAL_RESET "true" / "false" (default: false)
 
+set -eo pipefail
 source /opt/ros/humble/setup.bash
 set -u
 
-launch_args=(
-  "enable_color:=${REALSENSE_ENABLE_COLOR:-true}"
-  "pointcloud.enable:=${REALSENSE_ENABLE_POINTCLOUD:-true}"
-  "align_depth.enable:=${REALSENSE_ALIGN_DEPTH:-true}"
-  "depth_module.depth_profile:=${REALSENSE_DEPTH_PROFILE:-640x480x15}"
-  "rgb_camera.color_profile:=${REALSENSE_COLOR_PROFILE:-640x480x15}"
-  "camera_namespace:=${REALSENSE_CAMERA_NAMESPACE:-cam1}"
-  "camera_name:=${REALSENSE_CAMERA_NAME:-d435_1}"
-  "initial_reset:=${REALSENSE_INITIAL_RESET:-false}"
-)
-
-if [ -n "${REALSENSE_SERIAL_NO:-}" ]; then
-  launch_args+=("serial_no:=${REALSENSE_SERIAL_NO}")
+if [ -n "${CAM2_SERIAL:-}" ]; then
+  echo "=== Dual-camera mode: cam1=${CAM1_SERIAL:-829212072207} cam2=${CAM2_SERIAL:-827112072033} ==="
+  exec ros2 launch /ros_ws/launch/multiview_full_launch.py
+else
+  echo "=== Single-camera mode: cam1=${CAM1_SERIAL:-829212072207} ==="
+  exec ros2 launch /ros_ws/launch/one_d435_launch.py
 fi
-
-echo "Launching official realsense2_camera node with arguments:"
-printf '  %s\n' "${launch_args[@]}"
-
-exec ros2 launch realsense2_camera rs_launch.py "${launch_args[@]}"

@@ -248,25 +248,37 @@ services:
       - ../dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64:/sdk:ro
 
   # ── Multiview cameras — ROS Humble (RealSense camera access) ──────────────
-  # Runs the official realsense2_camera launch in ROS Humble.
-  # Device passthrough uses /dev and /run/udev so camera resets or video-node
-  # renumbering do not strand the container on stale /dev/videoN mappings.
+  # Runs the official realsense2_camera_node in ROS Humble.
+  # Uses explicit --device passthrough for each camera's video nodes (avoiding
+  # the stale /dev/videoN problem with -v /dev:/dev) plus --device /dev/bus/usb
+  # for USB-level camera enumeration by librealsense.
   multiview_cameras:
     build:
       context: ../dev/multiview
       dockerfile: Dockerfile.humble_cameras
     container_name: multiview_cameras
     network_mode: "host"
+    ipc: host
     privileged: true
     tty: true
     stdin_open: true
     profiles: [standalone, full_system]
-    volumes:
-      - /dev:/dev
-      - /run/udev:/run/udev:ro
+    devices:
+      # Camera 1 (serial 829212072207) — /dev/video11-14
+      - /dev/video11:/dev/video11
+      - /dev/video12:/dev/video12
+      - /dev/video13:/dev/video13
+      - /dev/video14:/dev/video14
+      # Camera 2 (serial 827112072033) — /dev/video4-7
+      - /dev/video4:/dev/video4
+      - /dev/video5:/dev/video5
+      - /dev/video6:/dev/video6
+      - /dev/video7:/dev/video7
+      # USB bus access for librealsense enumeration
+      - /dev/bus/usb:/dev/bus/usb
     environment:
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      REALSENSE_SERIAL_NO: ${REALSENSE_SERIAL_NO:-}
+      CAM1_SERIAL: ${CAM1_SERIAL:-829212072207}
       REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-true}
       REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
     command: ["ros2", "launch", "/ros_ws/launch/one_d435_launch.py"]
@@ -297,32 +309,42 @@ services:
     userns_mode: "keep-id"
 
   # Variant: cameras + `/fused_pointcloud` publisher.
-  # With one camera it republishes cam1 directly; with two cameras it fuses both
-  # clouds once the second serial is provided.
+  # Launches both cameras (via two_d435_launch.py) and the pointcloud_fusion_node.
+  # Uses explicit --device passthrough for each camera's video nodes.
   multiview_full:
     build:
       context: ../dev/multiview
       dockerfile: Dockerfile.humble_cameras
     container_name: multiview_full
     network_mode: "host"
+    ipc: host
     privileged: true
     tty: true
     stdin_open: true
     profiles: [standalone, full_system]
-    volumes:
-      - /dev:/dev
-      - /run/udev:/run/udev:ro
+    devices:
+      # Camera 1 (serial 829212072207) — /dev/video11-14
+      - /dev/video11:/dev/video11
+      - /dev/video12:/dev/video12
+      - /dev/video13:/dev/video13
+      - /dev/video14:/dev/video14
+      # Camera 2 (serial 827112072033) — /dev/video4-7
+      - /dev/video4:/dev/video4
+      - /dev/video5:/dev/video5
+      - /dev/video6:/dev/video6
+      - /dev/video7:/dev/video7
+      # USB bus access for librealsense enumeration
+      - /dev/bus/usb:/dev/bus/usb
     environment:
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      REALSENSE_SERIAL_NO: ${REALSENSE_SERIAL_NO:-}
-      REALSENSE_CAM1_SERIAL: ${REALSENSE_CAM1_SERIAL:-}
-      REALSENSE_CAM2_SERIAL: ${REALSENSE_CAM2_SERIAL:-}
+      CAM1_SERIAL: ${CAM1_SERIAL:-829212072207}
+      CAM2_SERIAL: ${CAM2_SERIAL:-827112072033}
+      CAM2_OFFSET_X: ${CAM2_OFFSET_X:-0.15}
       REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-true}
       REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
     command: ["ros2", "launch", "/ros_ws/launch/multiview_full_launch.py"]
 
   naviflame:
-    build:
       context: ../dev/mindrove_naviflame
       dockerfile: Dockerfile
     container_name: naviflame
