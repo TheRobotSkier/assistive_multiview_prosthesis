@@ -47,10 +47,10 @@ pub struct GraspWeights {
 impl Default for GraspWeights {
     fn default() -> Self {
         Self {
-            w_probability: config::GRASP_WEIGHT_PROBABILITY,
-            w_alignment: config::GRASP_WEIGHT_ALIGNMENT,
-            w_force_closure: config::GRASP_WEIGHT_FORCE_CLOSURE,
-            w_contact_score: config::GRASP_WEIGHT_CONTACT_SCORE,
+            w_probability: config::GRASP_WEIGHT_PROBABILITY(),
+            w_alignment: config::GRASP_WEIGHT_ALIGNMENT(),
+            w_force_closure: config::GRASP_WEIGHT_FORCE_CLOSURE(),
+            w_contact_score: config::GRASP_WEIGHT_CONTACT_SCORE(),
         }
     }
 }
@@ -307,7 +307,7 @@ fn score_grasp(
             let proximity_score = if min_dist < f32::MAX {
                 // Convert distance to a score in [0.0, 0.05].
                 // Distance 0 → score 0.05, distance at truncation → score 0.0.
-                let trunc_dist = config::TRUNCATION_CELLS as f32 * config::TSDF_RESOLUTION_M;
+                let trunc_dist = config::TRUNCATION_CELLS() as f32 * config::TSDF_RESOLUTION_M();
                 let normalized = (min_dist / trunc_dist).clamp(0.0, 1.0);
                 0.05 * (1.0 - normalized)
             } else {
@@ -500,7 +500,7 @@ fn refine_binary(
     mut lo: f64,
     mut hi: f64,
 ) -> (f64, f64) {
-    while hi - lo > config::BINARY_SEARCH_TOL {
+    while hi - lo > config::BINARY_SEARCH_TOL() {
         let mid = (lo + hi) * 0.5;
         if collides_at_control(lut, tsdf, base, sweep_points, mid, collision_tol) {
             hi = mid;

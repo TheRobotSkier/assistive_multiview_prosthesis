@@ -335,18 +335,18 @@ fn get_lut() -> &'static FingerLUT {
 
 fn get_prediction_config() -> &'static PredictionConfig {
     PRED_CONFIG.get_or_init(|| PredictionConfig {
-        t_max: config::PREDICTION_HORIZON_S,
-        n_samples: config::PREDICTION_SAMPLES,
-        hand_radius: config::HAND_RADIUS_M,
+        t_max: config::PREDICTION_HORIZON_S(),
+        n_samples: config::PREDICTION_SAMPLES(),
+        hand_radius: config::HAND_RADIUS_M(),
         min_tsdf_dims: Vector3::new(
-            config::MIN_TSDF_DIM_M as f64,
-            config::MIN_TSDF_DIM_M as f64,
-            config::MIN_TSDF_DIM_M as f64,
+            config::MIN_TSDF_DIM_M() as f64,
+            config::MIN_TSDF_DIM_M() as f64,
+            config::MIN_TSDF_DIM_M() as f64,
         ),
         max_tsdf_dims: Vector3::new(
-            config::MAX_TSDF_DIM_M as f64,
-            config::MAX_TSDF_DIM_M as f64,
-            config::MAX_TSDF_DIM_M as f64,
+            config::MAX_TSDF_DIM_M() as f64,
+            config::MAX_TSDF_DIM_M() as f64,
+            config::MAX_TSDF_DIM_M() as f64,
         ),
     })
 }
@@ -390,11 +390,11 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         })
         .collect();
 
-    let (morton_arr, offsets, start) = morton(&pruned, config::TSDF_RESOLUTION_M);
+    let (morton_arr, offsets, start) = morton(&pruned, config::TSDF_RESOLUTION_M());
 
     // --- Superquadric backside estimation ---
     let sq_params: Option<crate::superquadric::SuperquadricParams> =
-        if config::SQ_ENABLE_BACKSIDE {
+        if config::SQ_ENABLE_BACKSIDE() {
             crate::superquadric::fit_best_superquadric(&pruned.points)
         } else {
             None
@@ -403,18 +403,18 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     let tsdf = get_tsdf(
         &morton_arr,
         &offsets,
-        config::TRUNCATION_CELLS,
+        config::TRUNCATION_CELLS(),
         start,
-        config::TSDF_RESOLUTION_M,
+        config::TSDF_RESOLUTION_M(),
         &cameras,
         sq_params.as_ref(),
     );
 
-    let collision_tol = config::COLLISION_TOL_M;
+    let collision_tol = config::COLLISION_TOL_M();
 
     // --- SMC Optimization Loop ---
-    let n_samples = config::PREDICTION_SAMPLES;
-    let n_iterations = config::ITERATIONS;
+    let n_samples = config::PREDICTION_SAMPLES();
+    let n_iterations = config::ITERATIONS();
 
     // Iteration 0: broad sampling from the motion model.
     let mut rng = rand::rng();
@@ -429,7 +429,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
 
     // Collect debug data across all iterations: (particle_index, scored_grasp, iteration).
     let mut all_debug: Option<Vec<(usize, ScoredGrasp, usize, SmcParticle)>> =
-        if config::DEBUG_VISUALIZATION {
+        if config::DEBUG_VISUALIZATION() {
             Some(Vec::new())
         } else {
             None
@@ -456,9 +456,9 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         }
 
         // Check for convergence (early termination) after minimum iterations.
-        if iteration >= config::SMC_MIN_ITERATIONS {
+        if iteration >= config::SMC_MIN_ITERATIONS() {
             if let Some(prev) = prev_best_score {
-                if (current_best_score - prev).abs() < config::SMC_CONVERGENCE_TOL {
+                if (current_best_score - prev).abs() < config::SMC_CONVERGENCE_TOL() {
                     // Converged - stop iterating.
                     break;
                 }
@@ -472,7 +472,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         }
 
         // Select elites and resample with decaying proposal variance.
-        let elite_indices = select_elite_indices(&particles, config::ELITE_RATIO);
+        let elite_indices = select_elite_indices(&particles, config::ELITE_RATIO());
         let elites: Vec<SmcParticle> = elite_indices
             .iter()
             .map(|&idx| particles[idx].clone())
@@ -481,10 +481,10 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         // Compute weighted grasp type probabilities based on current population performance.
         let grasp_type_weights = compute_grasp_type_weights(&particles);
 
-        let decay = config::DECAY_RATE.powi(iteration as i32);
-        let proposal_std_v = config::INITIAL_PROPOSAL_STD_V * decay;
-        let proposal_std_omega = config::INITIAL_PROPOSAL_STD_OMEGA * decay;
-        let proposal_std_wrist = config::INITIAL_PROPOSAL_STD_WRIST * decay;
+        let decay = config::DECAY_RATE().powi(iteration as i32);
+        let proposal_std_v = config::INITIAL_PROPOSAL_STD_V() * decay;
+        let proposal_std_omega = config::INITIAL_PROPOSAL_STD_OMEGA() * decay;
+        let proposal_std_wrist = config::INITIAL_PROPOSAL_STD_WRIST() * decay;
 
         particles = resample_around_elites(
             &elites,
@@ -498,7 +498,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     }
 
     // --- Debug visualization export ---
-    if config::DEBUG_VISUALIZATION {
+    if config::DEBUG_VISUALIZATION() {
         if let Some(ref debug) = all_debug {
             let grasp_exports: Vec<crate::debug_export::ScoredGraspExport> = debug
                 .iter()

@@ -1,6 +1,6 @@
 //! Debug visualization export for the grasp preshaping pipeline.
 //!
-//! When `config::DEBUG_VISUALIZATION` is `true`, the pipeline writes a single
+//! When `config::DEBUG_VISUALIZATION()` returns `true`, the pipeline writes a single
 //! `.npz` file containing all intermediate results so they can be inspected
 //! interactively in Python.
 
@@ -291,7 +291,7 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
 /// Generate a timestamped output path under the crate's `data/debug/` directory.
 pub fn debug_output_path() -> std::path::PathBuf {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let base = std::path::Path::new(manifest_dir).join(crate::config::DEBUG_OUTPUT_DIR);
+    let base = std::path::Path::new(manifest_dir).join(crate::config::DEBUG_OUTPUT_DIR());
 
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

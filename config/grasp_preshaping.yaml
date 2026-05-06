@@ -1,0 +1,66 @@
+# Grasp Preshaping Pipeline Configuration
+# ========================================
+# All values are optional — only include what you want to override.
+# Defaults are defined in src/runtime_config.rs (defaults module).
+# Config resolution: GRASP_CONFIG_PATH env var → this file → compile-time defaults
+
+# TSDF construction
+tsdf_resolution_m: 0.005
+truncation_cells: 4
+ray_alignment_threshold: 0.9
+
+# Collision detection
+collision_tol_m: 0.01
+binary_search_tol: 0.05
+
+# ROI prediction
+prediction_horizon_s: 5.0
+prediction_samples: 20000
+hand_radius_m: 0.05
+min_tsdf_dim_m: 0.1
+max_tsdf_dim_m: 0.5
+
+# Wrist rotation range (radians, half-range)
+wrist_rotation_range_rad: 1.5707963267948966  # pi/2
+
+# Fixed twist covariance
+fixed_cov_omega: [0.001, 0.001, 0.001]
+fixed_cov_v: [0.0005, 0.0005, 0.0005]
+
+# SMC optimization
+iterations: 5
+decay_rate: 0.7
+elite_ratio: 0.05
+smc_convergence_tol: 0.01
+smc_min_iterations: 3
+grasp_type_min_probability: 0.15
+
+# Starting proposal variance
+initial_proposal_std_v: 0.002
+initial_proposal_std_omega: 0.005
+initial_proposal_std_wrist: 0.3
+
+# Elite injection
+elite_preserve_ratio: 0.01
+
+# Grasp type mutation
+grasp_type_mutation_rate: 0.1
+
+# Grasp scoring weights
+grasp_weight_probability: 1.0
+grasp_weight_alignment: 1.0
+grasp_weight_force_closure: 1.0
+grasp_weight_contact_score: 3.0
+
+# Superquadric backside estimation
+sq_enable_backside: true
+sq_max_gn_iterations: 4
+sq_gn_damping: 0.1
+sq_blend_delta_cells: 3
+sq_min_fit_points: 20
+sq_fit_error_threshold: 0.15
+sq_min_sign_override_cells: 2
+
+# Debug visualization
+debug_visualization: false
+debug_output_dir: "data/debug"

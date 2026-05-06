@@ -476,7 +476,7 @@ pub fn get_tsdf(
                     if to_voxel_from_surf_len > 1e-10 {
                         let surf_dir = to_voxel_from_surf / to_voxel_from_surf_len;
                         let alignment = ray_dir.dot(&surf_dir);
-                        if alignment < config::RAY_ALIGNMENT_THRESHOLD {
+                        if alignment < config::RAY_ALIGNMENT_THRESHOLD() {
                             // Misaligned, means we are wrapping around the object
                             // and the nearest point is on a surface facing away
                             // from this camera ray path. We can't trust it for this camera.
@@ -486,7 +486,7 @@ pub fn get_tsdf(
                     }
 
                     let perp_sq = to_surf.norm_squared() - proj * proj;
-                    let max_perp = config::TRUNCATION_CELLS as f32 * resolution_m;
+                    let max_perp = config::TRUNCATION_CELLS() as f32 * resolution_m;
                     
                     // Only vote if the nearest point is close enough to the ray
                     if (perp_sq.sqrt()) < max_perp {
@@ -541,9 +541,9 @@ pub fn get_tsdf(
     // will have signs that agree with SQ (both "outside"), so the SQ pass
     // would be a no-op for them.
     if let Some(sq) = sq_params {
-        let blend_start_agree = (truncation_cells - config::SQ_BLEND_DELTA_CELLS) as f32;
+        let blend_start_agree = (truncation_cells - config::SQ_BLEND_DELTA_CELLS()) as f32;
         let blend_end_agree = truncation_cells as f32;
-        let blend_start_disagree = config::SQ_MIN_SIGN_OVERRIDE_CELLS as f32;
+        let blend_start_disagree = config::SQ_MIN_SIGN_OVERRIDE_CELLS() as f32;
         let blend_end_disagree = (truncation_cells - 1) as f32; // Full SQ at trunc-1 cells
 
         // Build a sparse mask of voxels that need SQ evaluation.
@@ -972,15 +972,15 @@ mod tests {
             position: Vector3::new(center.x, center.y, center.z - 0.3),
         }];
 
-        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M());
 
         // With superquadric
         let sq = crate::superquadric::fit_best_superquadric(&pc.points);
         assert!(sq.is_some(), "superquadric fitting should succeed");
 
         let tsdf_with_sq = get_tsdf(
-            &morton_arr, &offsets, config::TRUNCATION_CELLS,
-            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+            &morton_arr, &offsets, config::TRUNCATION_CELLS(),
+            start, config::TSDF_RESOLUTION_M(), &cameras, sq.as_ref(),
         );
 
         // The center of the sphere should be inside (negative).
@@ -1015,14 +1015,14 @@ mod tests {
             position: Vector3::new(center.x, center.y, center.z - 0.3),
         }];
 
-        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M());
 
         let sq = crate::superquadric::fit_best_superquadric(&pc.points);
         assert!(sq.is_some(), "superquadric fitting should succeed");
 
         let tsdf = get_tsdf(
-            &morton_arr, &offsets, config::TRUNCATION_CELLS,
-            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+            &morton_arr, &offsets, config::TRUNCATION_CELLS(),
+            start, config::TSDF_RESOLUTION_M(), &cameras, sq.as_ref(),
         );
 
         // A point at the center of the sphere should be inside (negative)
@@ -1050,13 +1050,13 @@ mod tests {
             },
         ];
 
-        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M());
 
         let sq = crate::superquadric::fit_best_superquadric(&pc.points);
 
         let tsdf = get_tsdf(
-            &morton_arr, &offsets, config::TRUNCATION_CELLS,
-            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+            &morton_arr, &offsets, config::TRUNCATION_CELLS(),
+            start, config::TSDF_RESOLUTION_M(), &cameras, sq.as_ref(),
         );
 
         // Center should still be negative (inside) even with opposing cameras
@@ -1079,13 +1079,13 @@ mod tests {
             position: Vector3::new(center.x, center.y, center.z - 0.3),
         }];
 
-        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M());
         let sq = crate::superquadric::fit_best_superquadric(&pc.points);
         assert!(sq.is_some(), "superquadric fitting should succeed");
 
         let tsdf = get_tsdf(
-            &morton_arr, &offsets, config::TRUNCATION_CELLS,
-            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+            &morton_arr, &offsets, config::TRUNCATION_CELLS(),
+            start, config::TSDF_RESOLUTION_M(), &cameras, sq.as_ref(),
         );
 
         // A point just outside the back of the sphere should be positive.
@@ -1109,20 +1109,20 @@ mod tests {
             position: Vector3::new(center.x, center.y, center.z - 0.3),
         }];
 
-        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M());
         let sq = crate::superquadric::fit_best_superquadric(&pc.points);
         assert!(sq.is_some(), "superquadric fitting should succeed");
 
         let tsdf = get_tsdf(
-            &morton_arr, &offsets, config::TRUNCATION_CELLS,
-            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+            &morton_arr, &offsets, config::TRUNCATION_CELLS(),
+            start, config::TSDF_RESOLUTION_M(), &cameras, sq.as_ref(),
         );
 
         // Sample points along the backside (+Z direction from center) and
         // verify monotonic increase in TSDF distance.
-        let step = config::TSDF_RESOLUTION_M;
+        let step = config::TSDF_RESOLUTION_M();
         let mut prev_d: Option<f32> = None;
-        for i in 0..(config::TRUNCATION_CELLS + 2) {
+        for i in 0..(config::TRUNCATION_CELLS() + 2) {
             let offset_z = radius + (i as f32) * step;
             let p = center + Vector3::new(0.0, 0.0, offset_z);
             let d = tsdf.get_distance(p.x, p.y, p.z);

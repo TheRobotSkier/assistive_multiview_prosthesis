@@ -41,14 +41,14 @@ impl TwistCovariance {
     pub fn fixed() -> Self {
         Self {
             diagonal: Vector3::new(
-                config::FIXED_COV_OMEGA[0],
-                config::FIXED_COV_OMEGA[1],
-                config::FIXED_COV_OMEGA[2],
+                config::FIXED_COV_OMEGA()[0],
+                config::FIXED_COV_OMEGA()[1],
+                config::FIXED_COV_OMEGA()[2],
             ),
             diagonal_v: Vector3::new(
-                config::FIXED_COV_V[0],
-                config::FIXED_COV_V[1],
-                config::FIXED_COV_V[2],
+                config::FIXED_COV_V()[0],
+                config::FIXED_COV_V()[1],
+                config::FIXED_COV_V()[2],
             ),
         }
     }
@@ -171,7 +171,7 @@ pub fn sample_future_poses(
         let grasp_type: usize = rng.random_range(0..3);
 
         // Random wrist rotation around local Y axis.
-        let wrist_rotation: f64 = rng.random_range(-config::WRIST_ROTATION_RANGE_RAD..config::WRIST_ROTATION_RANGE_RAD);
+        let wrist_rotation: f64 = rng.random_range(-config::WRIST_ROTATION_RANGE_RAD()..config::WRIST_ROTATION_RANGE_RAD());
 
         // Apply wrist rotation to the sampled pose.
         let wrist_se3 = {
@@ -241,7 +241,7 @@ pub fn sample_initial_particles(
 
         let grasp_type: usize = rng.random_range(0..3);
         let wrist_rotation: f64 =
-            rng.random_range(-config::WRIST_ROTATION_RANGE_RAD..config::WRIST_ROTATION_RANGE_RAD);
+            rng.random_range(-config::WRIST_ROTATION_RANGE_RAD()..config::WRIST_ROTATION_RANGE_RAD());
 
         let wrist_se3 = {
             let rot = UnitQuaternion::from_axis_angle(&nalgebra::Vector3::y_axis(), wrist_rotation);
@@ -312,7 +312,7 @@ pub fn resample_around_elites(
     };
 
     // How many particles to preserve as elite injection.
-    let n_preserve = ((n_total as f64) * config::ELITE_PRESERVE_RATIO).round() as usize;
+    let n_preserve = ((n_total as f64) * config::ELITE_PRESERVE_RATIO()).round() as usize;
     let n_preserve = n_preserve.min(n_elites).min(n_total);
 
     let mut particles = Vec::with_capacity(n_total);
@@ -388,7 +388,7 @@ pub fn resample_around_elites(
         let new_pose = DualQuaternion::from_se3(&new_se3);
 
         // Grasp type: inherit from parent with mutation probability.
-        let grasp_type = if rng.random::<f64>() < config::GRASP_TYPE_MUTATION_RATE {
+        let grasp_type = if rng.random::<f64>() < config::GRASP_TYPE_MUTATION_RATE() {
             // Mutate: sample from weighted distribution.
             weighted_choice(grasp_type_weights, rng)
         } else {
@@ -481,7 +481,7 @@ pub fn compute_grasp_type_weights(particles: &[SmcParticle]) -> [f64; 3] {
     }
 
     // Apply minimum probability floor
-    let min_prob = config::GRASP_TYPE_MIN_PROBABILITY;
+    let min_prob = config::GRASP_TYPE_MIN_PROBABILITY();
     let sum_shifted: f64 = shifted.iter().sum();
 
     if sum_shifted > 0.0 {

@@ -53,3 +53,6 @@ docker_ws/dev/grasp_preshaping/data/debug/
 AGENTS.md
 CLAUDE.md
 .claude/
+
+# Include preshaping binary
+!libgrasp_preshaping.so

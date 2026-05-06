@@ -481,8 +481,8 @@ pub fn fit_superquadric_template(
 ) -> (SuperquadricParams, f32) {
     let e1 = template.epsilon1;
     let e2 = template.epsilon2;
-    let max_iter = config::SQ_MAX_GN_ITERATIONS;
-    let damping = config::SQ_GN_DAMPING;
+    let max_iter = config::SQ_MAX_GN_ITERATIONS();
+    let damping = config::SQ_GN_DAMPING();
 
     let mut params = pack_params(initial_a, initial_b, initial_c, initial_translation);
 
@@ -610,7 +610,7 @@ pub fn fit_superquadric_template(
 ///
 /// Returns `None` if the point cloud is too small or fitting fails.
 pub fn fit_best_superquadric(points: &[Vector3<f32>]) -> Option<SuperquadricParams> {
-    if points.len() < config::SQ_MIN_FIT_POINTS {
+    if points.len() < config::SQ_MIN_FIT_POINTS() {
         return None;
     }
 
@@ -647,7 +647,7 @@ pub fn fit_best_superquadric(points: &[Vector3<f32>]) -> Option<SuperquadricPara
         .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))?;
 
     // If the fitting error is too high, skip backside estimation
-    if best_error > config::SQ_FIT_ERROR_THRESHOLD {
+    if best_error > config::SQ_FIT_ERROR_THRESHOLD() {
         return None;
     }
 
