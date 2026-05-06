@@ -47,14 +47,14 @@ Visualization Manager:
     - Alpha: 0.5
       Autocompute Intensity Bounds: true
       Class: rviz_default_plugins/PointCloud2
-      Color: 0; 255; 0
-      Color Transformer: FlatColor
+      Color: 255; 255; 255
+      Color Transformer: RGB8
       Decay Time: 0
       Enabled: true
-      Name: FusedPointCloud
+      Name: PointCloud2 (cam2 depth/color/points)
       Position Transformer: XYZ
       Selectable: true
-      Size (Pixels): 3
+      Size (Pixels): 2
       Size (m): 0.01
       Style: Points
       Topic:
@@ -62,9 +62,9 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /fused_pointcloud
+        Value: /cam2/d435_2/depth/color/points
       Use Fixed Frame: true
-      Use rainbow: false
+      Use rainbow: true
       Value: true
     - Class: rviz_default_plugins/TF
       Enabled: true

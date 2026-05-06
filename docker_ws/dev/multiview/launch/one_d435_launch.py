@@ -23,7 +23,8 @@ from launch import LaunchDescription
 from launch.actions import ExecuteProcess, LogInfo
 
 _REALSENSE_NODE = '/opt/ros/humble/lib/realsense2_camera/realsense2_camera_node'
-_DEPTH_PROFILE = '640x480x15'
+_DEPTH_PROFILE = '640x480x6'
+_COLOR_PROFILE = '640x480x6'
 
 _CAM1_SERIAL = os.environ.get('CAM1_SERIAL', os.environ.get('REALSENSE_SERIAL_NO', '829212072207'))
 _ENABLE_COLOR = os.environ.get('REALSENSE_ENABLE_COLOR', 'true')
@@ -38,8 +39,11 @@ def _realsense_cmd() -> list:
         '-r', '__node:=d435_1',
         '-r', '__ns:=/cam1',
         '-p', f'depth_module.depth_profile:={_DEPTH_PROFILE}',
+        '-p', f'rgb_camera.color_profile:={_COLOR_PROFILE}',
         '-p', 'pointcloud.enable:=true',
         '-p', 'align_depth.enable:=true',
+        '-p', 'enable_infra1:=false',
+        '-p', 'enable_infra2:=false',
         '-p', f'initial_reset:={_INITIAL_RESET}',
         '-p', f'enable_color:={_ENABLE_COLOR}',
     ]

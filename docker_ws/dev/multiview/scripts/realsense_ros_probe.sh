@@ -17,7 +17,7 @@ set -u
 
 if [ -n "${CAM2_SERIAL:-}" ]; then
   echo "=== Dual-camera mode: cam1=${CAM1_SERIAL:-829212072207} cam2=${CAM2_SERIAL:-827112072033} ==="
-  exec ros2 launch /ros_ws/launch/multiview_full_launch.py
+  exec ros2 launch /ros_ws/launch/two_d435_launch.py
 else
   echo "=== Single-camera mode: cam1=${CAM1_SERIAL:-829212072207} ==="
   exec ros2 launch /ros_ws/launch/one_d435_launch.py

@@ -28,11 +28,12 @@ import launch_ros.actions
 
 
 _REALSENSE_NODE = '/opt/ros/humble/lib/realsense2_camera/realsense2_camera_node'
-_DEPTH_PROFILE = '640x480x15'
+_DEPTH_PROFILE = '640x480x6'
+_COLOR_PROFILE = '640x480x6'
 
 _CAM1_SERIAL = os.environ.get('CAM1_SERIAL', '829212072207')
 _CAM2_SERIAL = os.environ.get('CAM2_SERIAL', '827112072033')
-_CAM2_OFFSET_X = os.environ.get('CAM2_OFFSET_X', '0.15')
+_CAM2_OFFSET_X = os.environ.get('CAM2_OFFSET_X', '0.5')
 
 
 def _realsense_cmd(serial: str, namespace: str, node_name: str) -> list:
@@ -46,8 +47,11 @@ def _realsense_cmd(serial: str, namespace: str, node_name: str) -> list:
         '-p', f"serial_no:='{serial}'",
         '-p', 'enable_color:=true',
         '-p', f'depth_module.depth_profile:={_DEPTH_PROFILE}',
+        '-p', f'rgb_camera.color_profile:={_COLOR_PROFILE}',
         '-p', 'pointcloud.enable:=true',
         '-p', 'align_depth.enable:=true',
+        '-p', 'enable_infra1:=false',
+        '-p', 'enable_infra2:=false',
         '-p', 'initial_reset:=false',
     ]
 
@@ -85,10 +89,5 @@ def generate_launch_description():
             emulate_tty=True,
         ),
 
-        # --- Pointcloud fusion ---
-        ExecuteProcess(
-            cmd=['python3', '/ros_ws/nodes/pointcloud_fusion_node.py'],
-            output='screen',
-            emulate_tty=True,
-        ),
+        # Pointcloud fusion removed per user feedback: individual clouds only
     ])
