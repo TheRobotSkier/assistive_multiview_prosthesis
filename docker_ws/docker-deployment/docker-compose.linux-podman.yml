@@ -247,10 +247,10 @@ services:
       - ../dev/mindrove_cpp:/src:ro
       - ../dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64:/sdk:ro
 
-  # ── Multiview cameras — ROS Humble (dual D435 + pointcloud fusion) ────────
-  # Runs ROS Humble realsense camera nodes and fuses their pointclouds.
-  # Publishes /fused_pointcloud (sensor_msgs/PointCloud2) via DDS to all
-  # other containers (Humble → Jazzy cross-distro confirmed working).
+  # ── Multiview cameras — ROS Humble (RealSense camera access) ──────────────
+  # Runs the official realsense2_camera launch in ROS Humble.
+  # Device passthrough uses /dev and /run/udev so camera resets or video-node
+  # renumbering do not strand the container on stale /dev/videoN mappings.
   multiview_cameras:
     build:
       context: ../dev/multiview
@@ -260,15 +260,20 @@ services:
     privileged: true
     tty: true
     stdin_open: true
-    profiles: [full_system]
-    devices:
-      - /dev/bus/usb:/dev/bus/usb
+    profiles: [standalone, full_system]
+    volumes:
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
     environment:
-      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      REALSENSE_SERIAL_NO: ${REALSENSE_SERIAL_NO:-}
+      REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-false}
+      REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
     command: ["ros2", "launch", "/ros_ws/launch/one_d435_launch.py"]
 
-  # Variant: cameras + fusion pipeline
+  # Variant: cameras + `/fused_pointcloud` publisher.
+  # With one camera it republishes cam1 directly; with two cameras it fuses both
+  # clouds once the second serial is provided.
   multiview_full:
     build:
       context: ../dev/multiview
@@ -278,12 +283,17 @@ services:
     privileged: true
     tty: true
     stdin_open: true
-    profiles: [full_system]
-    devices:
-      - /dev/bus/usb:/dev/bus/usb
+    profiles: [standalone, full_system]
+    volumes:
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
     environment:
-      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      REALSENSE_SERIAL_NO: ${REALSENSE_SERIAL_NO:-}
+      REALSENSE_CAM1_SERIAL: ${REALSENSE_CAM1_SERIAL:-}
+      REALSENSE_CAM2_SERIAL: ${REALSENSE_CAM2_SERIAL:-}
+      REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-false}
+      REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
     command: ["ros2", "launch", "/ros_ws/launch/multiview_full_launch.py"]
 
   naviflame:
@@ -379,8 +389,10 @@ services:
       - rust_cargo_cache:/usr/local/cargo/registry
 
   # ── Full system test — main Jazzy orchestration ───────────────────────────
-  # Starts: MuJoCo mirror + haptic controller + segmentation node + RViz.
-  # Start this AFTER: miahand_driver, haptic_band, multiview_full, mindrove_emg_ros.
+  # Starts: MuJoCo mirror + haptic controller + segmentation + RViz.
+  # Camera access is expected to come from the `multiview_full` service, which
+  # now republishes a single-camera pointcloud to `/fused_pointcloud` when a
+  # second RealSense is not configured.
   # For one-command launch of the whole system: docker compose --profile full_system up
   full_system_test:
     build:
@@ -400,8 +412,7 @@ services:
       DISPLAY: $DISPLAY
       XAUTHORITY: /tmp/.Xauthority
       QT_X11_NO_MITSHM: 1
-      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
     command: >
       bash -c "
         source /opt/ros/jazzy/setup.bash &&
@@ -493,13 +504,14 @@ services:
       "
 
   # -- Digital Twin: real cameras + simulated Mia Hand ------------------------
-  # Visualizes real pointclouds, runs segmentation, computes grasps, and
+  # Visualizes real camera pointclouds, runs segmentation, computes grasps, and
   # drives a simulated Mia Hand as a digital twin.
   #
   # Prerequisites:
   #   1. rust_build   (one-shot) -- ensures libgrasp_preshaping.so exists.
   #   2. segmentation_inference (standalone or full_system) -- HTTP server on :5678.
-  #   3. multiview_full (full_system) -- publishes /fused_pointcloud from real D435s.
+  #   3. multiview_full (standalone or full_system) -- publishes `/fused_pointcloud`
+  #      from one or two real D435 cameras using the official realsense2_camera node.
   #
   # Usage:
   #   docker compose --profile standalone up digital_twin
@@ -514,6 +526,7 @@ services:
     container_name: miahand_digital_twin
     profiles: [standalone]
     environment:
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - USE_TRAJECTORY=${USE_TRAJECTORY:-false}
       - INFERENCE_URL=${INFERENCE_URL:-http://127.0.0.1:5678}
       - SEGMENTATION_CUBEEDGE=${SEGMENTATION_CUBEEDGE:-0.05}

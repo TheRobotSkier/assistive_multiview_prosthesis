@@ -3,26 +3,33 @@ FROM docker.io/ros:humble-ros-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-humble-realsense2-camera \
         ros-humble-realsense2-description \
         ros-humble-rmw-cyclonedds-cpp \
+        ros-humble-rmw-fastrtps-cpp \
         ros-humble-tf2-sensor-msgs \
         ros-humble-sensor-msgs-py \
         ros-humble-launch-ros \
-        python3-pip
+        python3-pip \
+        usbutils \
+        v4l-utils
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install numpy
+RUN pip install numpy
 
 WORKDIR /ros_ws
 COPY launch/ /ros_ws/launch/
 COPY nodes/  /ros_ws/nodes/
+COPY scripts/ /ros_ws/scripts/
+RUN chmod +x /ros_ws/scripts/*.sh
 
-ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-ENV ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+# FastDDS (rmw_fastrtps_cpp) is the ROS2 Humble default and the only
+# RMW reliably passing intra-container peer discovery on this kernel/Docker stack.
+# CycloneDDS is kept as an installable alternative but must be opted into at runtime:
+#   RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+#ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+#ENV ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
 
 ENTRYPOINT ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && exec \"$@\"", "--"]
-CMD ["ros2", "launch", "/ros_ws/launch/two_d435_launch.py"]
+CMD ["/ros_ws/scripts/realsense_ros_probe.sh"]
+

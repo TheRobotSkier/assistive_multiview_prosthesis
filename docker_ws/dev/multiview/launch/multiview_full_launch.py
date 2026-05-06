@@ -1,4 +1,8 @@
-"""Launch cameras + static TF + pointcloud fusion node."""
+"""Launch RealSense cameras, a placeholder inter-camera TF, and fused pointcloud publishing.
+
+If only cam1 is available, the fusion node republishes cam1 directly to
+`/fused_pointcloud`. If cam2 is also active, the node merges both clouds.
+"""
 import os
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, TimerAction
