@@ -51,7 +51,7 @@
          j_wrist_rotation lives on palm_r (child) so the joint axis tracks palm_r's LOCAL Y —
          which is the forearm axis regardless of what orientation the motion planner has applied.
          Pose matches the hardcoded default MuJoCo hand transform used by grasp_preshaping. -->
-    <body name="wrist_body" pos="-0.1 0 0.2" quat="0.707388 0.706825 0 0">
+    <body name="wrist_body" pos="-0.1 -0.02 0.18" quat="0.707388 0.706825 0 0">
     <body name="palm_r" pos="0 0 0">
       <!-- Joint on palm_r: axis "0 1 0" = palm_r local Y = forearm direction.
            When apply_body_pose() tilts palm_r's reference orientation, this joint
@@ -130,7 +130,7 @@
 
       <!-- Wrist-mounted camera: fixed to back of hand, at knuckle level, pointing toward fingertips.
            pos=[0, 0.08, -0.04] in palm_r frame: Y≈0.08 (knuckle row), Z≈-0.04 (~1.5cm above dorsum).
-           Camera looks along palm_r +Y (fingertip direction): euler="-1.5708 0 0" rotates -Z → +Y. -->
+           Camera looks along palm_r +Y (fingertip direction): euler="-1.5708 0 0" rotates -Z → +Y. 
       <body name="wrist_cam_body" pos="0 0.095 -0.04">
         <site name="wrist_imu_site" pos="0 0 0" size="0.005" rgba="0 0 0 0"/>
         <camera name="wrist_cam" pos="0 0 0" euler="-1.5708 0 0" fovy="60"/>
@@ -138,6 +138,7 @@
           pos="0 0 0" euler="-1.5708 0 3.14159"
           contype="0" conaffinity="0" group="0" rgba="0.2 0.2 0.2 1"/>
       </body>
+      -->
     </body>   <!-- palm_r -->
     </body>   <!-- wrist_body -->
   </worldbody>

@@ -213,3 +213,83 @@ I have a few things I want to change, namely:
 This means there is somthing with the postion where we need to get that from rust. keep the other definitions and topics, I did not mention.
 
 Make a plan on how to implment this change, find the correct files and sections, and verify your findings.
+
+## stuff
+
+That sounds like some interesting findings. I have a few notes:
+
+1. With grasps in tier, we might not have a massive truncations band. We can make these larger if you think, since it is a one time cost to make the tsdf, and not a huge part of the time equation. But it needs to make sense for makign the sampling more efficient.
+2. In realtion to 1, I wonder if the first iteration mainly is concerned with location, and not grasp type, and that we might carry bad grasp types forward because of that, perhaps there should be some grasp type resampling as well, but it liekly should not be totally random, but maybe we can do some sort of weighted resampling based on the scores of the different grasp types, so that we are more likely to sample grasp types that are performing better, but still have some chance of sampling the others, to prevent getting stuck in local minima. 
+    - As an extra note i wonder if we should allow more wrist rotations variance, or if the twist variance is good enough. What do you think? i am just nerveous that the inital sampling will not cover the space well wnough, and that we need to explore more with lower sample counts since it is a high demensional space.
+3. Early termination is a good idea, i want the stopping tol in the config.rs. 
+4. I think you r sugegstions on adjusting the perameters makes sense, but also i can not say that it will be a definete improvement.
+5. You said: "When max contact_score < 0.1, increase probability weight to 2.0 (from 0.5)". Is this to promote more probable positions early on?
+
+Could you go look into this and see if you perhaps want to refine your suggestions, or if you think there are other better paths for improvment on sampling effeciancy and overall speed? Please make sure to verify your findings, and then make a detailed plan on how to implement the changes you suggest, and what files and sections to modify.
+
+## Backside estimation
+
+Here is the complete, start-to-finish blueprint of the real-time, hybrid shape-completion pipeline we have designed. 
+
+This architecture is specifically optimized to execute in **under 50ms** using Rust, leveraging parallel processing (`rayon`) and stack-allocated linear algebra (`nalgebra`) to avoid memory bottlenecks.
+
+---
+
+### Phase 0: Prerequisites & Initialization
+*   **Input:** A segmented, partial 3D point cloud of a single object.
+*   **Environment:** Rust, using `nalgebra` for math and `rayon` for multi-threading.
+*   **Priors:** Define your Superquadric Templates (e.g., Sphere: $\epsilon_1=1.0, \epsilon_2=1.0$; Box: $\epsilon_1=0.1, \epsilon_2=0.1$; Cylinder: $\epsilon_1=0.1, \epsilon_2=1.0$).
+
+---
+
+### Phase 1: Shape Estimation (The Math Phase)
+*The goal of this phase is to find the mathematical equation for the unobserved backside as fast as possible.*
+
+**1. PCA & Oriented Bounding Box (OBB)**
+*   Calculate the centroid to center the points.
+*   Compute the Covariance Matrix and extract the Eigenvectors (`nalgebra`).
+*   **Lock the Rotation:** These Eigenvectors become the fixed orientation (quaternion) of your shape.
+*   Project points onto these axes to find the min/max extents. This gives you your **Starting Guess** for scale ($a, b, c$) and translation ($t_x, t_y, t_z$).
+
+**2. Parallel Template Matching**
+*   Use `rayon` to spawn a thread for each of your predefined shape templates (Box, Sphere, Cylinder).
+*   In each thread, run a **Custom 6-Parameter Gauss-Newton Solver**.
+    *   **Optimize:** Scale ($a, b, c$) and Translation ($t_x, t_y, t_z$). 
+    *   **Behavior:** The solver will naturally push the center point backward into the unobserved shadow to make the mathematical curve fit the front-facing point cloud.
+    *   **Speed Hack:** Use an analytical Jacobian (hardcoded derivatives). Hard-cap the solver to a maximum of 3 or 4 iterations.
+*   Compare the final error of all threads. The template with the lowest error wins. You now have your definitive Superquadric function: $F(x,y,z)$.
+
+---
+
+### Phase 2: TSDF Fusion (The Memory Phase)
+*The goal of this phase is to fuse the high-resolution camera data with the mathematical backside to create a watertight, highly detailed mesh.*
+
+**1. Grid Allocation & Spatial Sorting**
+*   Allocate your 3D Voxel Grid in memory.
+*   Calculate **Morton Codes** for your full point cloud to ensure blazing-fast, cache-friendly spatial lookups.
+
+**2. Parallel Voxel Evaluation (Domains of Authority)**
+*   Iterate through every voxel in your grid (parallelized via `rayon` and ideally vectorized with SIMD).
+*   For each voxel, determine its "Domain" based on the camera's line of sight and the truncation band ($\tau$).
+
+**Domain A: The Camera's Authority (The Front Shell)**
+*   *Condition:* The voxel is between the camera and the surface, OR slightly inside the object but within the truncation band.
+*   *Distance (TDF):* Perform a Nearest-Neighbor lookup against the full point cloud.
+*   *Sign:* Positive if in empty space between the camera and object. Negative if immediately behind the visible surface.
+
+**Domain B: The Superquadric's Authority (The Deep Interior & Backside)**
+*   *Condition:* The voxel is deeper than the truncation band (or custom threshold), or completely occluded in the camera's shadow. 
+*   *Distance (TDF):* Execute the **Taubin Distance Approximation**: 
+    $$ D \approx \frac{|F(x,y,z) - 1|}{\|\nabla F(x,y,z)\|} $$
+    *(This mathematical step replaces expensive raycasting or virtual point sampling).*
+*   *Sign:* Plug the voxel coordinate into $F(x,y,z)$. If $< 1$, the sign is Negative (inside). If $> 1$, the sign is Positive (outside).
+
+**Domain C: The Blending Zone (The Surface Seam)**
+*   *Condition:* The voxel is transitioning from the camera's vision into the unobserved shadow (nearing the custom threshold $\delta$).
+*   *Distance & Sign (TDF):* Calculate both the Camera TDF and the Superquadric TDF, then smoothly interpolate between them to prevent jagged ridges or holes at the seam where the zero-crossing physically jumps from the point cloud to the mathematical curve.
+    *   If $D_{camera}$ is very small (safely in front), weight $w = 1.0$.
+    *   If $D_{camera} > \delta$ (safely in the shadow), weight $w = 0.0$.
+    *   If $D_{camera}$ is approaching $\delta$, weight $w$ smoothly transitions from $1.0$ down to $0.0$.
+    *   **Final Blend:** $$ TDF_{final} = w \cdot TDF_{camera} + (1 - w) \cdot TDF_{SQ} $$
+    *(Note: Discontinuities deep inside the negative space do not matter for Marching Cubes, as it only looks for zero-crossings. The blending zone is only crucial at the surface seam.)*
+

@@ -11,13 +11,18 @@ If pyvista is unavailable, falls back to a matplotlib-based viewer with
 reduced interactivity.
 
 Keyboard shortcuts (PyVista viewer):
-    t  - cycle TSDF mode: surface / points / off
+    t  - cycle TSDF mode: surface / points / signs / off
     g  - toggle grasp display: best / all
     p  - toggle point cloud
     r  - toggle ROI box
     c  - toggle camera markers
     h  - toggle hand skeleton (unified)
+    k  - toggle LUT contact points
+    b  - toggle superquadric mesh
     i  - toggle info text
+    +  - next SMC iteration filter
+    -  - previous SMC iteration filter
+    *  - show all iterations (reset filter)
     1  - filter grasps: cylindrical only
     2  - filter grasps: pinch only
     3  - filter grasps: lateral only
@@ -29,6 +34,10 @@ import argparse
 import sys
 import os
 import textwrap
+
+import warnings
+
+warnings.filterwarnings("ignore", message=".*pickpoint.*")
 
 import numpy as np
 
@@ -42,8 +51,15 @@ GRASP_TYPE_COLORS = {1: "#e76f51", 2: "#2a9d8f", 3: "#457b9d"}
 GRASP_TYPE_SHORT = {1: "cyl", 2: "pinch", 3: "lat"}
 F32_MAX = np.float32(np.finfo(np.float32).max)
 
+# Superquadric template names (must match superquadric.rs TEMPLATES order).
+SQ_TEMPLATE_NAMES = ["sphere", "box", "cylinder"]
+
 # Truncation constant (must match config.rs TRUNCATION_CELLS).
-TRUNCATION_CELLS = 4
+TRUNCATION_CELLS = 8
+
+# Surface band width for TSDF surface mode (cells from zero-crossing).
+# This is a visualization parameter, independent of the truncation distance.
+TSDF_SURFACE_BAND = 2.5
 
 # Unified hand skeleton: one compact topology for both best and all modes.
 # Each entry is (finger name, base frame name, tip contact name).
@@ -70,6 +86,74 @@ _HAND_BASE_FRAMES = {finger: base for finger, base, _ in _HAND_SKELETON_SPECS}
 # Map finger name -> contact tip name.
 _HAND_TIP_CONTACTS = {finger: tip for finger, _, tip in _HAND_SKELETON_SPECS}
 
+# Grasp-type-specific score contact names (from planner.rs grasp specs).
+# These are the contacts used for scoring; all others are sweep-only.
+_GRASP_SCORE_CONTACTS = {
+    1: {  # cylindrical
+        "ThumbAddPip", "ThumbAddDip", "ThumbAddTip",
+        "IndexMcp", "IndexDip", "IndexPip", "IndexTip",
+        "MiddleMcp", "MiddlePip", "MiddleDip", "MiddleTip",
+        "RingDip", "RingPip", "RingTip",
+        "LittleDip", "LittlePip", "LittleTip",
+        "PalmProxUlna", "PalmProxRadi", "PalmDistUlna", "PalmDistRadi",
+    },
+    2: {  # pinch
+        "ThumbAddTip", "IndexTip",
+    },
+    3: {  # lateral
+        "ThumbAddTip",
+        "IndexMcpSide", "IndexDipSide", "IndexPipSide", "IndexTipSide",
+    },
+}
+
+# Finger group colors for contact points (same as hand skeleton).
+_CONTACT_FINGER_COLORS = {
+    "thumb": "#f4a261",
+    "index": "#e76f51",
+    "middle": "#2a9d8f",
+    "ring": "#457b9d",
+    "little": "#8d99ae",
+    "palm": "#6a994e",
+}
+
+# Per-group contact line topology.  Each list defines the chain(s) of
+# contact names that should be connected by lines within a finger group.
+# The ordering follows the kinematic chain (proximal -> distal).
+_CONTACT_LINES = {
+    "index": [
+        ["IndexMcp", "IndexPip", "IndexDip", "IndexTip"],       # palmar rail
+        ["IndexMcpSide", "IndexPipSide", "IndexDipSide", "IndexTipSide"],  # lateral rail
+        ["IndexMcp", "IndexMcpSide"],      # cross-links at each joint
+        ["IndexDip", "IndexDipSide"],
+        ["IndexPip", "IndexPipSide"],
+        ["IndexTip", "IndexTipSide"],
+    ],
+    "middle": [
+        ["MiddleMcp", "MiddlePip", "MiddleDip", "MiddleTip"],
+    ],
+    "ring": [
+        ["RingPip", "RingDip", "RingTip"],
+    ],
+    "little": [
+        ["LittlePip", "LittleDip", "LittleTip"],
+    ],
+    "thumb": [
+        ["ThumbAddPip", "ThumbAddDip", "ThumbAddTip"],
+    ],
+    "palm": [
+        ["PalmProxUlna", "PalmDistUlna"],     # ulnar rail
+        ["PalmProxRadi", "PalmDistRadi"],     # radial rail
+        ["PalmProxUlna", "PalmProxRadi"],     # cross-links
+        ["PalmDistUlna", "PalmDistRadi"],
+        ["PalmProxRadi", "ThumbAddPip"],      # Fingers
+        ["PalmProxRadi", "IndexMcp"],
+        ["PalmProxRadi", "MiddleMcp"],
+        ["PalmProxUlna", "RingPip"],
+        ["PalmProxUlna", "LittlePip"],
+        ["LittlePip", "RingPip", "MiddleMcp", "IndexMcp", "ThumbAddPip"],
+    ],
+}
+
 # Try to import pinocchio + model for hand skeleton support.
 _pin_hand_available = False
 try:
@@ -82,6 +166,7 @@ try:
         data as pin_data,
         get_q_full,
         _q_full_with_thumb_mode,
+        get_sampled_contact_transforms,
         CONTACT_DEFINITIONS,
         COLLISION_GEOMETRIES,
     )
@@ -115,10 +200,12 @@ def load_dump(path: str) -> dict:
     pose = data["input_pose"]
     twist = data["input_twist"]
 
-    # Backward-compatible: handle 24-col, 25-col, 26-col, 27-col, and 28-col formats
+    # Backward-compatible: handle 24-col through 29-col formats
     raw_len = len(data["scored_grasps"])
     if raw_len > 0:
-        if raw_len % 28 == 0:
+        if raw_len % 29 == 0:
+            row_len = 29
+        elif raw_len % 28 == 0:
             row_len = 28
         elif raw_len % 27 == 0:
             row_len = 27
@@ -130,10 +217,10 @@ def load_dump(path: str) -> dict:
             row_len = 24
         grasps_raw = data["scored_grasps"].reshape(-1, row_len)
     else:
-        row_len = 28
+        row_len = 29
         grasps_raw = np.zeros((0, row_len))
 
-    if row_len == 28:
+    if row_len == 29:
         grasps = {
             "sample_index": grasps_raw[:, 0].astype(int),
             "grasp_type": grasps_raw[:, 1].astype(int),
@@ -147,6 +234,24 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 9],
             "probability": grasps_raw[:, 10],
             "wrist_rotation": grasps_raw[:, 11],
+            "smc_iteration": grasps_raw[:, 12].astype(int),
+            "pose_4x4": grasps_raw[:, 13:29].reshape(-1, 4, 4),
+        }
+    elif row_len == 28:
+        grasps = {
+            "sample_index": grasps_raw[:, 0].astype(int),
+            "grasp_type": grasps_raw[:, 1].astype(int),
+            "closure": grasps_raw[:, 2],
+            "alignment": grasps_raw[:, 3],
+            "force_closure": grasps_raw[:, 4],
+            "contact_count_score": grasps_raw[:, 5],
+            "contact_score": grasps_raw[:, 6],
+            "active_contact_count": grasps_raw[:, 7].astype(int),
+            "found_collision": grasps_raw[:, 8] > 0.5,
+            "combined": grasps_raw[:, 9],
+            "probability": grasps_raw[:, 10],
+            "wrist_rotation": grasps_raw[:, 11],
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 12:28].reshape(-1, 4, 4),
         }
     elif row_len == 27:
@@ -163,6 +268,7 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 8],
             "probability": grasps_raw[:, 9],
             "wrist_rotation": grasps_raw[:, 10],
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 11:27].reshape(-1, 4, 4),
         }
     elif row_len == 26:
@@ -179,6 +285,7 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 7],
             "probability": grasps_raw[:, 8],
             "wrist_rotation": grasps_raw[:, 9],
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 10:26].reshape(-1, 4, 4),
         }
     elif row_len == 25:
@@ -195,6 +302,7 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 7],
             "probability": grasps_raw[:, 8],
             "wrist_rotation": np.zeros(len(grasps_raw)),
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 9:25].reshape(-1, 4, 4),
         }
     else:
@@ -212,8 +320,32 @@ def load_dump(path: str) -> dict:
             "combined": grasps_raw[:, 6],
             "probability": grasps_raw[:, 7],
             "wrist_rotation": np.zeros(len(grasps_raw)),
+            "smc_iteration": np.zeros(len(grasps_raw), dtype=int),
             "pose_4x4": grasps_raw[:, 8:24].reshape(-1, 4, 4),
         }
+
+    # Superquadric params (backward-compatible: older dumps lack these).
+    sq_params = None
+    sq_meta = None
+    if "sq_params" in data:
+        sq_raw = data["sq_params"]
+        if len(sq_raw) == 14:
+            sq_params = {
+                "epsilon1": float(sq_raw[0]),
+                "epsilon2": float(sq_raw[1]),
+                "a": float(sq_raw[2]),
+                "b": float(sq_raw[3]),
+                "c": float(sq_raw[4]),
+                "translation": sq_raw[5:8].astype(np.float64),
+                "rotation": sq_raw[8:14].reshape(2, 3).astype(np.float64),
+            }
+    if "sq_meta" in data:
+        meta_raw = data["sq_meta"]
+        if len(meta_raw) == 2:
+            sq_meta = {
+                "fit_error": float(meta_raw[0]),
+                "template_index": int(meta_raw[1]),
+            }
 
     return {
         "tsdf": tsdf,
@@ -225,6 +357,8 @@ def load_dump(path: str) -> dict:
         "input_pose": pose,
         "input_twist": twist,
         "grasps": grasps,
+        "sq_params": sq_params,
+        "sq_meta": sq_meta,
     }
 
 
@@ -352,6 +486,23 @@ def print_summary(dump: dict, path: str):
                 print(f"    {GRASP_TYPE_NAMES[gt_id]:12s}: {n_type:4d} colliding,"
                       f" best={grasps['combined'][col_mask].max():.4f}")
 
+    # Superquadric info
+    sq_params = dump.get("sq_params")
+    sq_meta = dump.get("sq_meta")
+    if sq_params is not None:
+        template_names = ["sphere", "box", "cylinder"]
+        tidx = sq_meta["template_index"] if sq_meta else 0
+        tname = template_names[tidx] if tidx < len(template_names) else "?"
+        fit_err = sq_meta["fit_error"] if sq_meta else float("nan")
+        print(f"  Superquadric:    {tname} (template {tidx})"
+              f"  fit_error={fit_err:.6f}")
+        print(f"    eps=({sq_params['epsilon1']:.2f}, {sq_params['epsilon2']:.2f})"
+              f"  scale=({sq_params['a']:.4f}, {sq_params['b']:.4f}, {sq_params['c']:.4f})")
+        t = sq_params["translation"]
+        print(f"    translation=({t[0]:.4f}, {t[1]:.4f}, {t[2]:.4f})")
+    else:
+        print(f"  Superquadric:    not available")
+
     if best_idx >= 0:
         gt = grasps["grasp_type"][best_idx]
         print(f"  Best grasp:      {GRASP_TYPE_NAMES.get(gt, '?')} (type {gt})")
@@ -373,8 +524,80 @@ def print_summary(dump: dict, path: str):
 GRASP_MODES = ["best", "all"]
 
 # TSDF display modes (cycle with 't' key)
-TSDF_MODES = ["surface", "points", "off"]
+TSDF_MODES = ["surface", "points", "signs", "off"]
 
+
+def _build_sq_primitive_mesh(pv_mod, sq_params: dict, sq_meta: dict | None):
+    """Build a PyVista mesh approximating the fitted superquadric as a primitive.
+
+    Maps each winning template to a built-in PyVista primitive, then applies
+    the fitted rotation + translation.  This is much cheaper than evaluating
+    the implicit function on a dense grid and running marching cubes.
+
+    Parameters
+    ----------
+    pv_mod : module
+        The imported ``pyvista`` module.
+    sq_params : dict
+        Parsed superquadric parameters (epsilon1, epsilon2, a, b, c,
+        translation, rotation).
+    sq_meta : dict or None
+        Parsed superquadric metadata (fit_error, template_index).
+
+    Returns
+    -------
+    pyvista.PolyData or None
+        The transformed primitive mesh, or None if the template is unknown.
+    """
+    template_index = sq_meta["template_index"] if sq_meta else 0
+    a = max(sq_params["a"], 1e-4)
+    b = max(sq_params["b"], 1e-4)
+    c = max(sq_params["c"], 1e-4)
+
+    # Build the primitive in local frame centered at origin, aligned with axes.
+    if template_index == 0:
+        # Sphere template -> ellipsoid
+        mesh = pv_mod.Sphere(radius=1.0, theta_resolution=32, phi_resolution=32)
+        mesh.points[:, 0] *= a
+        mesh.points[:, 1] *= b
+        mesh.points[:, 2] *= c
+    elif template_index == 1:
+        # Box template -> rectangular cuboid with half-extents a, b, c
+        bounds = [-a, a, -b, b, -c, c]
+        mesh = pv_mod.Box(bounds=bounds)
+    elif template_index == 2:
+        # Cylinder template -> radius=a (use max of a,b for roundness),
+        # height=2*c.  Cylinder axis along Z by default.
+        radius = max(a, b)
+        mesh = pv_mod.Cylinder(
+            center=(0, 0, 0),
+            direction=(0, 0, 1),
+            radius=radius,
+            height=2 * c,
+            resolution=32,
+        )
+        # If a != b, scale the non-axis directions to make an elliptical cross-section.
+        if abs(a - b) > 1e-5:
+            mesh.points[:, 0] *= (a / radius)
+            mesh.points[:, 1] *= (b / radius)
+    else:
+        return None
+
+    # Apply rotation + translation from fitted params.
+    # sq_params["rotation"] is a (2, 3) array = first two rows of the 3x3 rotation.
+    rot_flat = sq_params["rotation"]  # shape (2, 3)
+    rot = np.eye(3)
+    rot[0, :] = rot_flat[0]
+    rot[1, :] = rot_flat[1]
+    # Reconstruct third row via cross product to ensure a proper rotation matrix.
+    rot[2, :] = np.cross(rot[0, :], rot[1, :])
+
+    translation = sq_params["translation"]
+
+    # Transform: rotate then translate.
+    mesh.points = (rot @ mesh.points.T).T + translation
+
+    return mesh
 
 
 def visualize_pyvista(dump: dict, args):
@@ -402,17 +625,29 @@ def visualize_pyvista(dump: dict, args):
     marker_size = min(scene_extent * 0.15, roi_diag * 0.08)
     marker_size = max(marker_size, 0.005)  # at least 5mm
 
+    # ---- Determine available SMC iterations (needed for default state) ----
+    n_grasps = len(dump["grasps"]["combined"])
+    if n_grasps > 0 and "smc_iteration" in dump["grasps"]:
+        max_iteration = int(dump["grasps"]["smc_iteration"].max())
+    else:
+        max_iteration = 0
+
     # ---- Mutable state for interactive toggles ----
     state = {
-        "tsdf_mode": "surface" if not args.no_tsdf else "off",
-        "grasp_mode": "best" if not args.show_all_grasps else "all",
+        "tsdf_mode": "off",
+        "grasp_mode": "all",
         "show_pc": True,
         "show_roi": True,
         "show_cameras": True,
         "show_hand": False,
+        "show_contacts": False,
+        "show_sq": False,
         "show_info": True,
         "grasp_type_filter": 0,  # 0 = all, 1/2/3 = specific type
+        "iteration_filter": max_iteration if n_grasps > 0 else None,  # default to last iteration
     }
+
+
 
     plotter = pv.Plotter(title="Grasp Preshaping Debug Viewer")
     plotter.set_background("#1e1e2e", top="#2d2d44")
@@ -427,6 +662,8 @@ def visualize_pyvista(dump: dict, args):
         "twist": [],
         "grasps": [],
         "hand_skeleton": [],
+        "contact_points": [],
+        "sq_mesh": [],
         "info": [],
     }
 
@@ -473,7 +710,7 @@ def visualize_pyvista(dump: dict, args):
         if mode == "surface":
             # Show only voxels near the zero-crossing (thin surface band).
             clipped = grid.threshold(
-                value=[-1.5, 1.5],
+                value=[-TSDF_SURFACE_BAND, TSDF_SURFACE_BAND],
                 scalars="distance",
             )
             if clipped.n_cells == 0:
@@ -489,6 +726,7 @@ def visualize_pyvista(dump: dict, args):
                 show_scalar_bar=True,
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
+                    "color": "white",
                     # position the scalar bar centered at the bottom of the view
                     "position_x": 0.35,
                     "position_y": 0.02,
@@ -501,9 +739,19 @@ def visualize_pyvista(dump: dict, args):
             actor_groups["tsdf"].append(actor)
 
         elif mode == "points":
-            # Show all observed voxels as points — zero occlusion.
-            clipped = grid.threshold(
-                value=[-TRUNCATION_CELLS - 0.5, TRUNCATION_CELLS + 0.5],
+            # Show observed voxels within the truncation band as points.
+            # Mask voxels at the grid edge (abs(distance) >= TRUNCATION_CELLS)
+            # to NaN so they are excluded. These are SQ-filled boundary voxels
+            # that are the least accurate and would otherwise fill the whole grid.
+            tsdf_vis_pts = tsdf_vis.copy()
+            tsdf_vis_pts[np.abs(tsdf_vis_pts) >= TRUNCATION_CELLS] = np.nan
+            grid_pts = pv.ImageData()
+            grid_pts.dimensions = np.array(tsdf_vis_pts.shape) + 1
+            grid_pts.origin = origin
+            grid_pts.spacing = [res, res, res]
+            grid_pts.cell_data["distance"] = tsdf_vis_pts.ravel(order="F")
+            clipped = grid_pts.threshold(
+                value=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
                 scalars="distance",
             )
             if clipped.n_cells == 0:
@@ -518,12 +766,13 @@ def visualize_pyvista(dump: dict, args):
                 cmap="coolwarm",
                 clim=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
                 style="points",
-                point_size=6,
+                point_size=4,
                 render_points_as_spheres=True,
-                opacity=0.8,
+                opacity=0.5,
                 show_scalar_bar=True,
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
+                    "color": "white",
                     # position the scalar bar centered at the bottom of the view
                     "position_x": 0.35,
                     "position_y": 0.02,
@@ -531,6 +780,61 @@ def visualize_pyvista(dump: dict, args):
                     "height": 0.05,
                 },
                 label="TSDF points",
+            )
+            actor_groups["tsdf"].append(actor)
+
+        elif mode == "signs":
+            # Show inside/outside classification as colored points.
+            # Red = inside (negative), Blue = outside (positive), Green = surface (near-zero).
+            tsdf_vis_signs = tsdf_vis.copy()
+            tsdf_vis_signs[np.abs(tsdf_vis_signs) >= TRUNCATION_CELLS] = np.nan
+            grid_signs = pv.ImageData()
+            grid_signs.dimensions = np.array(tsdf_vis_signs.shape) + 1
+            grid_signs.origin = origin
+            grid_signs.spacing = [res, res, res]
+            grid_signs.cell_data["distance"] = tsdf_vis_signs.ravel(order="F")
+            clipped = grid_signs.threshold(
+                value=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
+                scalars="distance",
+            )
+            if clipped.n_cells == 0:
+                print("  TSDF [signs]: no observed voxels within truncation band")
+                return
+
+            # Create a sign classification array: -1=inside, 0=surface, +1=outside.
+            dist = clipped.cell_data["distance"]
+            sign_arr = np.zeros_like(dist)
+            sign_arr[dist < -0.5] = -1.0  # inside
+            sign_arr[dist > 0.5] = 1.0   # outside
+            # |dist| <= 0.5 stays 0.0 (surface)
+            clipped.cell_data["sign"] = sign_arr
+
+            n_inside = int((sign_arr < 0).sum())
+            n_surface = int((sign_arr == 0).sum())
+            n_outside = int((sign_arr > 0).sum())
+            print(f"  TSDF [signs]: rendering {clipped.n_cells} voxels "
+                  f"(in={n_inside}, surf={n_surface}, out={n_outside})")
+
+            centers = clipped.cell_centers()
+            actor = plotter.add_mesh(
+                centers,
+                scalars="sign",
+                cmap=["red", "lime", "dodgerblue"],
+                clim=[-1, 1],
+                style="points",
+                point_size=4,
+                render_points_as_spheres=True,
+                opacity=0.5,
+                show_scalar_bar=True,
+                scalar_bar_args={
+                    "title": "Sign (red=in, green=surf, blue=out)",
+                    "color": "white",
+                    "position_x": 0.35,
+                    "position_y": 0.02,
+                    "width": 0.3,
+                    "height": 0.05,
+                },
+                label="TSDF signs",
             )
             actor_groups["tsdf"].append(actor)
 
@@ -656,10 +960,28 @@ def visualize_pyvista(dump: dict, args):
     # ==================================================================
     # Grasp candidates
     # ==================================================================
-    n_grasps = len(grasps["combined"])
+    # n_grasps and max_iteration already computed above (before state dict).
+
     threshold = args.threshold
 
     best_idx, best_combined = _find_best_grasp(grasps, threshold)
+
+    # Iteration-filtered best grasp (for display when iteration filter is active).
+    def _iteration_mask():
+        """Return a boolean mask for the current iteration filter."""
+        if state["iteration_filter"] is None:
+            return np.ones(n_grasps, dtype=bool)
+        return grasps["smc_iteration"] == state["iteration_filter"]
+
+    def _filtered_best():
+        """Find the best grasp within the current iteration filter."""
+        mask = _iteration_mask()
+        if not mask.any():
+            return -1, -np.inf
+        filtered_indices = np.where(mask)[0]
+        scores = grasps["combined"][filtered_indices]
+        best_local = int(np.argmax(scores))
+        return int(filtered_indices[best_local]), float(scores[best_local])
 
     def get_grasp_indices():
         """Compute which grasp indices to show based on current state.
@@ -670,7 +992,10 @@ def visualize_pyvista(dump: dict, args):
         rendering Tier 4 (no object in reach) as clutter.
         """
         candidates = []
+        iter_mask = _iteration_mask()
         for i in range(n_grasps):
+            if not iter_mask[i]:
+                continue
             if grasps["contact_score"][i] <= 0.0:
                 # Tier 4: no collision at all — skip rendering.
                 continue
@@ -685,9 +1010,12 @@ def visualize_pyvista(dump: dict, args):
         # Sort descending by score for top 10 extraction
         candidates.sort(key=lambda i: grasps["combined"][i], reverse=True)
 
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
+
         if state["grasp_mode"] == "best":
-            if best_idx >= 0 and best_idx in candidates:
-                return [best_idx], [best_idx]
+            if display_best >= 0 and display_best in candidates:
+                return [display_best], [display_best]
             elif candidates:
                 return [candidates[0]], [candidates[0]]  # best available
             return [], []
@@ -706,9 +1034,11 @@ def visualize_pyvista(dump: dict, args):
         positions = []
         point_colors = []
 
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
         for i in all_indices:
             gt = grasps["grasp_type"][i]
-            is_best = (i == best_idx)
+            is_best = (i == display_best)
             T = grasps["pose_4x4"][i]
             positions.append(T[:3, 3])
 
@@ -747,9 +1077,11 @@ def visualize_pyvista(dump: dict, args):
         score_range = score_max - score_min if score_max > score_min else 1.0
 
         # Render top grasps as separate actors, similar to the camera markers.
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
         for idx in top_indices:
             gt = grasps["grasp_type"][idx]
-            is_best = (idx == best_idx)
+            is_best = (idx == display_best)
             T = grasps["pose_4x4"][idx]
             pos = T[:3, 3]
             R = T[:3, :3]
@@ -896,7 +1228,7 @@ def visualize_pyvista(dump: dict, args):
         lines.lines = np.hstack(line_cells)
         actor = plotter.add_mesh(
             lines,
-            color="#c9d1d9",
+            color="#ffbc85",
             line_width=line_width,
             opacity=min(0.7, opacity),
             label="Hand skeleton",
@@ -954,10 +1286,12 @@ def visualize_pyvista(dump: dict, args):
         if not top_indices:
             return
 
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
         for i in top_indices:
             if grasps["contact_score"][i] <= 0.0:
                 continue
-            is_best = (i == best_idx)
+            is_best = (i == display_best)
             positions = _compute_hand_positions(i)
             if is_best:
                 _add_single_hand(
@@ -980,6 +1314,175 @@ def visualize_pyvista(dump: dict, args):
         add_hand_skeletons()
 
     # ==================================================================
+    # LUT contact points (all 25 contacts per top grasp)
+    # ==================================================================
+    def _grasp_to_fk_params(grasp_type, closure):
+        """Map grasp type + closure to (q_active, thumb_opp_mode) for FK.
+
+        Mirrors the grasp specs in planner.rs:
+          cylindrical: all fingers close, thumb in abduction (opposition)
+          pinch: thumb + index close, MRL locked open, thumb in abduction
+          lateral: thumb + index close, MRL locked open, thumb in adduction
+        """
+        if grasp_type == 1:  # cylindrical
+            q_active = np.array([closure, closure, closure], dtype=float)
+            thumb_mode = 1.0
+        elif grasp_type == 2:  # pinch
+            q_active = np.array([closure, closure, 0.0], dtype=float)
+            thumb_mode = 1.0
+        else:  # lateral (type 3)
+            q_active = np.array([closure, closure, 0.0], dtype=float)
+            thumb_mode = 0.0
+        return q_active, thumb_mode
+
+    def add_contact_points():
+        """Render all 25 LUT contact points for the top grasps.
+
+        Uses Pinocchio FK via get_sampled_contact_transforms() to compute
+        contact positions in hand-local frame, then transforms to world frame
+        using the grasp's 4x4 pose matrix. Score contacts are rendered larger
+        than sweep-only contacts.  Lines connect contacts within each finger
+        group to visualise the kinematic chain.
+        """
+        actor_groups["contact_points"].clear()
+        if not _pin_hand_available:
+            return
+
+        all_indices, top_indices = get_grasp_indices()
+        if not top_indices:
+            return
+
+        # Build a contact-name -> group lookup from model.py CONTACT_DEFINITIONS.
+        contact_group_map = {c["name"]: c["group"] for c in CONTACT_DEFINITIONS}
+
+        # Use iteration-filtered best when filter is active.
+        display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
+
+        for idx in top_indices:
+            if grasps["contact_score"][idx] <= 0.0:
+                continue
+
+            gt = grasps["grasp_type"][idx]
+            T = grasps["pose_4x4"][idx]
+            closure = grasps["closure"][idx]
+            R, t = T[:3, :3], T[:3, 3]
+            is_best = (idx == display_best)
+
+            q_active, thumb_mode = _grasp_to_fk_params(gt, closure)
+            try:
+                transforms = get_sampled_contact_transforms(q_active, thumb_opp_mode=thumb_mode)
+            except Exception:
+                continue
+
+            score_contacts = _GRASP_SCORE_CONTACTS.get(gt, set())
+
+            # ---- Collect per-contact world positions ----
+            world_positions = {}  # contact_name -> world xyz
+            for contact_name, contact_T in transforms.items():
+                local_pos = contact_T[:3, 3]
+                world_positions[contact_name] = R @ local_pos + t
+
+            # ---- Render contact points ----
+            points = []
+            point_colors = []
+            for contact_name in world_positions:
+                points.append(world_positions[contact_name])
+                group = contact_group_map.get(contact_name, "index")
+                hex_color = _CONTACT_FINGER_COLORS.get(group, "#ffffff")
+                r_c = int(hex_color[1:3], 16) / 255.0
+                g_c = int(hex_color[3:5], 16) / 255.0
+                b_c = int(hex_color[5:7], 16) / 255.0
+                is_score = contact_name in score_contacts
+                if is_score:
+                    point_colors.append([r_c, g_c, b_c])
+                else:
+                    point_colors.append([r_c * 0.5, g_c * 0.5, b_c * 0.5])
+
+            if not points:
+                continue
+
+            pt_size = 10 if is_best else 6
+            pts = pv.PolyData(np.asarray(points, dtype=np.float64))
+            pts["colors"] = np.asarray(point_colors, dtype=np.float32)
+            actor = plotter.add_mesh(
+                pts,
+                scalars="colors",
+                rgb=True,
+                style="points",
+                point_size=pt_size,
+                render_points_as_spheres=True,
+                opacity=0.85 if is_best else 0.55,
+                label=f"Contacts ({len(points)} pts)" if is_best else None,
+            )
+            actor_groups["contact_points"].append(actor)
+
+            # ---- Render per-group lines ----
+            line_points = []
+            line_cells = []
+            for group, chains in _CONTACT_LINES.items():
+                for chain in chains:
+                    chain_positions = []
+                    for cname in chain:
+                        if cname in world_positions:
+                            chain_positions.append(world_positions[cname])
+                    if len(chain_positions) < 2:
+                        continue
+                    start_idx = len(line_points)
+                    line_points.extend(chain_positions)
+                    for j in range(len(chain_positions) - 1):
+                        line_cells.append([2, start_idx + j, start_idx + j + 1])
+
+            if line_points:
+                lp = pv.PolyData(np.asarray(line_points, dtype=np.float64))
+                lp.lines = np.hstack(line_cells)
+                actor = plotter.add_mesh(
+                    lp,
+                    color="#a0c28d",
+                    line_width=3 if is_best else 1,
+                    opacity=0.6 if is_best else 0.3,
+                )
+                actor_groups["contact_points"].append(actor)
+
+    if state["show_contacts"]:
+        add_contact_points()
+
+    # ==================================================================
+    # Superquadric primitive mesh (toggleable)
+    # ==================================================================
+    def add_sq_actors():
+        """Render the fitted superquadric as a semi-transparent primitive mesh."""
+        actor_groups["sq_mesh"].clear()
+        sq_params = dump.get("sq_params")
+        sq_meta = dump.get("sq_meta")
+        if sq_params is None:
+            print("  SQ mesh: no superquadric data in dump")
+            return
+
+        mesh = _build_sq_primitive_mesh(pv, sq_params, sq_meta)
+        if mesh is None:
+            print("  SQ mesh: unknown template index")
+            return
+
+        tidx = sq_meta["template_index"] if sq_meta else 0
+        tname = SQ_TEMPLATE_NAMES[tidx] if tidx < len(SQ_TEMPLATE_NAMES) else "?"
+        n_cells = mesh.n_cells
+        print(f"  SQ mesh: {tname} primitive, {n_cells} cells")
+
+        actor = plotter.add_mesh(
+            mesh,
+            color="cyan",
+            opacity=0.25,
+            show_edges=True,
+            edge_color="cyan",
+            line_width=1,
+            label=f"Superquadric ({tname})",
+        )
+        actor_groups["sq_mesh"].append(actor)
+
+    if state["show_sq"]:
+        add_sq_actors()
+
+    # ==================================================================
     # Info text
     # ==================================================================
     def update_info_text():
@@ -995,20 +1498,26 @@ def visualize_pyvista(dump: dict, args):
 
         tsdf_str = state["tsdf_mode"]
         hand_str = "unified"
+        contacts_str = "on" if state["show_contacts"] else "off"
+        sq_str = "on" if state["show_sq"] else "off"
 
+        iter_str = f"iter={state['iteration_filter']}" if state['iteration_filter'] is not None else f"iter=all(0-{max_iteration})"
         lines = [
-            f"Grasps: {n_shown} points, top {n_top} rendered (mode={mode_str}, threshold>={threshold:.2f})",
+            f"Grasps: {n_shown} points, top {n_top} rendered (mode={mode_str}, threshold>={threshold:.2f}, {iter_str})",
         ]
-        if best_idx >= 0:
-            gt = grasps["grasp_type"][best_idx]
+        # Show iteration-filtered best when filter is active.
+        display_best_idx = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
+        display_best_score = best_combined if state["iteration_filter"] is None else _filtered_best()[1]
+        if display_best_idx >= 0:
+            gt = grasps["grasp_type"][display_best_idx]
             lines.append(
-                f"Best: {GRASP_TYPE_NAMES.get(gt, '?')}  combined={best_combined:.4f}"
+                f"Best: {GRASP_TYPE_NAMES.get(gt, '?')}  combined={display_best_score:.4f}"
             )
         else:
             lines.append("Best: none")
 
-        lines.append(f"TSDF: {tsdf_str}  Hand: {hand_str}")
-        lines.append("Keys: t=TSDF  g=grasps  p=cloud  r=ROI  c=cam  h=hand  ?=help")
+        lines.append(f"TSDF: {tsdf_str}  Hand: {hand_str}  Contacts: {contacts_str}  SQ: {sq_str}")
+        lines.append("Keys: t=TSDF  g=grasps  p=cloud  r=ROI  c=cam  h=hand  k=contacts  b=SQ  +/-/*=iter  ?=help")
 
         text = "\n".join(lines)
         actor = plotter.add_text(
@@ -1026,16 +1535,20 @@ def visualize_pyvista(dump: dict, args):
     # Legend
     # ==================================================================
     legend_entries = [
-        ("TSDF voxels (coolwarm)", "cyan"),
         ("Point cloud", "white"),
         ("ROI box", "orange"),
         ("Best grasp", "gold"),
         ("Cylindrical", GRASP_TYPE_COLORS[1]),
         ("Pinch", GRASP_TYPE_COLORS[2]),
         ("Lateral", GRASP_TYPE_COLORS[3]),
-        ("Hand: unified", "#f4a261"),
+        ("Hand", "#ffbc85"),
+        ("Contact points", "#a0c28d"),
+        ("Superquadric", "cyan"),
+        ("TSDF: inside", "red"),
+        ("TSDF: surface", "lime"),
+        ("TSDF: outside", "dodgerblue"),
     ]
-    plotter.add_legend(legend_entries, size=(0.18, 0.22), loc="upper left",
+    plotter.add_legend(legend_entries, size=(0.18, 0.36), loc="upper left",
                        face="rectangle")
 
     # ==================================================================
@@ -1073,6 +1586,12 @@ def visualize_pyvista(dump: dict, args):
         actor_groups["hand_skeleton"].clear()
         if state["show_hand"]:
             add_hand_skeletons()
+        # Contact points also depend on which grasps are displayed.
+        for actor in actor_groups["contact_points"]:
+            plotter.remove_actor(actor)
+        actor_groups["contact_points"].clear()
+        if state["show_contacts"]:
+            add_contact_points()
         update_info_text()
         plotter.render()
 
@@ -1125,8 +1644,38 @@ def visualize_pyvista(dump: dict, args):
         update_info_text()
         plotter.render()
 
+    def on_key_k():
+        """Toggle LUT contact points."""
+        state["show_contacts"] = not state["show_contacts"]
+        if state["show_contacts"]:
+            if not actor_groups["contact_points"]:
+                add_contact_points()
+            else:
+                for actor in actor_groups["contact_points"]:
+                    actor.SetVisibility(True)
+        else:
+            for actor in actor_groups["contact_points"]:
+                actor.SetVisibility(False)
+        update_info_text()
+        plotter.render()
+
     def on_key_i():
         toggle_actors("info")
+
+    def on_key_b():
+        """Toggle superquadric primitive mesh."""
+        state["show_sq"] = not state["show_sq"]
+        if state["show_sq"]:
+            if not actor_groups["sq_mesh"]:
+                add_sq_actors()
+            else:
+                for actor in actor_groups["sq_mesh"]:
+                    actor.SetVisibility(True)
+        else:
+            for actor in actor_groups["sq_mesh"]:
+                actor.SetVisibility(False)
+        update_info_text()
+        plotter.render()
 
     def on_key_0():
         state["grasp_type_filter"] = 0
@@ -1148,15 +1697,54 @@ def visualize_pyvista(dump: dict, args):
         print("  Filter: lateral only")
         rebuild_grasps()
 
+    def on_key_plus():
+        """Advance to the next SMC iteration filter."""
+        if max_iteration == 0:
+            return
+        if state["iteration_filter"] is None:
+            state["iteration_filter"] = 0
+        elif state["iteration_filter"] < max_iteration:
+            state["iteration_filter"] += 1
+        else:
+            state["iteration_filter"] = None  # wrap to all
+        iter_str = f"iter {state['iteration_filter']}" if state['iteration_filter'] is not None else "all"
+        print(f"  Iteration filter: {iter_str}")
+        rebuild_grasps()
+
+    def on_key_minus():
+        """Go back to the previous SMC iteration filter."""
+        if max_iteration == 0:
+            return
+        if state["iteration_filter"] is None:
+            state["iteration_filter"] = max_iteration
+        elif state["iteration_filter"] > 0:
+            state["iteration_filter"] -= 1
+        else:
+            state["iteration_filter"] = None  # wrap to all
+        iter_str = f"iter {state['iteration_filter']}" if state['iteration_filter'] is not None else "all"
+        print(f"  Iteration filter: {iter_str}")
+        rebuild_grasps()
+
+    def on_key_star():
+        """Reset iteration filter to show all iterations."""
+        state["iteration_filter"] = None
+        print("  Iteration filter: all")
+        rebuild_grasps()
+
     def on_key_help():
         print("\n  === Keyboard Shortcuts ===")
-        print("  t  - cycle TSDF mode: surface / points / off")
+        print("  t  - cycle TSDF mode: surface / points / signs / off")
         print("  g  - toggle grasp display: best / all")
         print("  p  - toggle point cloud")
         print("  r  - toggle ROI box")
         print("  c  - toggle camera markers")
         print("  h  - toggle hand skeleton (unified)")
+        print("  k  - toggle LUT contact points")
+        print("  b  - toggle superquadric mesh")
         print("  i  - toggle info text")
+        print("  +  - next SMC iteration filter")
+        print("  -  - previous SMC iteration filter")
+        print("  *  - show all iterations (reset filter)")
         print("  1  - filter: cylindrical only")
         print("  2  - filter: pinch only")
         print("  3  - filter: lateral only")
@@ -1169,11 +1757,16 @@ def visualize_pyvista(dump: dict, args):
     plotter.add_key_event("r", on_key_r)
     plotter.add_key_event("c", on_key_c)
     plotter.add_key_event("h", on_key_h)
+    plotter.add_key_event("k", on_key_k)
+    plotter.add_key_event("b", on_key_b)
     plotter.add_key_event("i", on_key_i)
     plotter.add_key_event("0", on_key_0)
     plotter.add_key_event("1", on_key_1)
     plotter.add_key_event("2", on_key_2)
     plotter.add_key_event("3", on_key_3)
+    plotter.add_key_event("plus", on_key_plus)
+    plotter.add_key_event("minus", on_key_minus)
+    plotter.add_key_event("asterisk", on_key_star)
     plotter.add_key_event("question", on_key_help)
 
     plotter.add_axes()
@@ -1268,15 +1861,21 @@ def main():
               python visualize_grasp_debug.py dump.npz --show-all-grasps
 
             Keyboard shortcuts (PyVista):
-              t  cycle TSDF: surface/points/off
+              t  cycle TSDF: surface/points/signs/off
               g  toggle grasp mode (best/all)
               p  toggle point cloud      r  toggle ROI box
               c  toggle cameras          h  toggle hand skeleton (unified)
+              k  toggle LUT contact points
+              b  toggle superquadric mesh
               i  toggle info text        0-3  filter grasp types
+              +/- cycle SMC iteration    * show all iterations
               ?  print help
         """),
     )
-    parser.add_argument("dump_path", help="Path to the .npz debug dump file")
+    parser.add_argument(
+        "dump_path", nargs="?", default=None,
+        help="Path to the .npz debug dump file (default: latest in data/debug/)",
+    )
     parser.add_argument(
         "--threshold", type=float, default=-np.inf,
         help="Minimum combined_score to display a grasp candidate (default: show all)",
@@ -1298,6 +1897,25 @@ def main():
         help="Print TSDF flat-index to (x,y,z) diagnostics in the console",
     )
     args = parser.parse_args()
+
+    # Resolve dump path: explicit or latest in data/debug/
+    if args.dump_path is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        default_dir = os.path.join(script_dir, "..", "data", "debug")
+        default_dir = os.path.normpath(default_dir)
+        if not os.path.isdir(default_dir):
+            print(f"Error: no dump path given and default dir not found: {default_dir}",
+                  file=sys.stderr)
+            sys.exit(1)
+        npz_files = sorted(
+            (f for f in os.listdir(default_dir) if f.endswith(".npz")),
+            key=lambda f: os.path.getmtime(os.path.join(default_dir, f)),
+        )
+        if not npz_files:
+            print(f"Error: no .npz files found in {default_dir}", file=sys.stderr)
+            sys.exit(1)
+        args.dump_path = os.path.join(default_dir, npz_files[-1])
+        print(f"No path given — using latest dump:")
 
     if not os.path.isfile(args.dump_path):
         print(f"Error: file not found: {args.dump_path}", file=sys.stderr)

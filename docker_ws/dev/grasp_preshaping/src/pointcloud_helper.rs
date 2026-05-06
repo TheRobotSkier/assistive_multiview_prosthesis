@@ -1,4 +1,5 @@
 use crate::config;
+use crate::superquadric::SuperquadricParams;
 use nalgebra::Vector3;
 use rayon::prelude::*;
 use std::collections::VecDeque;
@@ -128,9 +129,12 @@ impl Tsdf {
         let gy = (y - self.origin.y) / self.resolution_m;
         let gz = (z - self.origin.z) / self.resolution_m;
 
-        let gx = gx.max(0.0).min((self.width - 1) as f32);
-        let gy = gy.max(0.0).min((self.height - 1) as f32);
-        let gz = gz.max(0.0).min((self.depth - 1) as f32);
+        if gx < 0.0 || gx >= (self.width - 1) as f32
+            || gy < 0.0 || gy >= (self.height - 1) as f32
+            || gz < 0.0 || gz >= (self.depth - 1) as f32
+        {
+            return f32::MAX;
+        }
 
         let x0 = (gx.floor() as usize).min(self.width - 1);
         let y0 = (gy.floor() as usize).min(self.height - 1);
@@ -330,6 +334,7 @@ pub fn get_tsdf(
     start_coords: Vector3<f32>,
     resolution_m: f32,
     cameras: &[Camera],
+    sq_params: Option<&SuperquadricParams>,
 ) -> Tsdf {
     assert!(!morton_array.is_empty(), "empty morton array");
     assert!(resolution_m > 0.0, "resolution must be positive");
@@ -411,6 +416,17 @@ pub fn get_tsdf(
 
     let n_cams = cameras.len();
     if n_cams > 0 {
+        // Determine TSDF sign using per-camera ray-based occlusion checking.
+        // For each voxel, for each camera, we find the surface point closest
+        // to the camera-to-voxel ray (by perpendicular distance). If the voxel
+        // is farther along the ray than this surface point, the surface occludes
+        // the voxel from that camera → "inside" vote. If closer → "outside" vote.
+        //
+        // A voxel is negative (inside the object) when at least one camera
+        // confirms occlusion AND no camera sees it as unoccluded. This correctly
+        // handles opposing cameras where the globally-nearest surface point gives
+        // misleading information for one camera.
+
         distance
             .par_iter_mut()
             .enumerate()
@@ -426,36 +442,225 @@ pub fn get_tsdf(
 
                 let vw = origin + Vector3::new(gx as f32, gy as f32, gz as f32) * resolution_m;
 
-                let mp = &morton_array[nearest[flat_idx] as usize];
-                let pw = Vector3::new(mp.x, mp.y, mp.z);
+                let nearest_idx = nearest[flat_idx] as usize;
+                let mp = &morton_array[nearest_idx];
+                let sp = Vector3::new(mp.x, mp.y, mp.z);
 
-                let mut behind_count = 0usize;
                 let mut inside_votes = 0usize;
+                let mut outside_votes = 0usize;
 
                 for cam in cameras {
-                    let d_cv = (vw - cam.position).norm_squared();
-                    let d_cp = (pw - cam.position).norm_squared();
-                    if d_cv > d_cp {
-                        behind_count += 1;
-                        let to_voxel = vw - pw;
-                        let ray_dir = vw - cam.position;
-                        let to_voxel_len = to_voxel.norm();
-                        let ray_dir_len = ray_dir.norm();
-                        if to_voxel_len > 1e-10 && ray_dir_len > 1e-10 {
-                            let alignment = (ray_dir / ray_dir_len).dot(&(to_voxel / to_voxel_len));
-                            if alignment > config::RAY_ALIGNMENT_THRESHOLD {
-                                inside_votes += 1;
-                            }
+                    let to_voxel_from_cam = vw - cam.position;
+                    let ray_len = to_voxel_from_cam.norm();
+                    if ray_len < 1e-10 {
+                        outside_votes += 1;
+                        continue;
+                    }
+                    let ray_dir = to_voxel_from_cam / ray_len;
+
+                    let to_surf = sp - cam.position;
+                    let proj = to_surf.dot(&ray_dir);
+                    
+                    if proj < 0.0 {
+                        // Surface point is behind the camera.
+                        // Can't reliably use it, assume outside.
+                        outside_votes += 1;
+                        continue; 
+                    }
+
+                    // Alignment check: the direction from the surface point
+                    // to the voxel should be consistent with the camera-to-voxel
+                    // ray direction.
+                    let to_voxel_from_surf = vw - sp;
+                    let to_voxel_from_surf_len = to_voxel_from_surf.norm();
+                    if to_voxel_from_surf_len > 1e-10 {
+                        let surf_dir = to_voxel_from_surf / to_voxel_from_surf_len;
+                        let alignment = ray_dir.dot(&surf_dir);
+                        if alignment < config::RAY_ALIGNMENT_THRESHOLD {
+                            // Misaligned, means we are wrapping around the object
+                            // and the nearest point is on a surface facing away
+                            // from this camera ray path. We can't trust it for this camera.
+                            // In a multi-camera setup, another camera might see it better.
+                            continue;
+                        }
+                    }
+
+                    let perp_sq = to_surf.norm_squared() - proj * proj;
+                    let max_perp = config::TRUNCATION_CELLS as f32 * resolution_m;
+                    
+                    // Only vote if the nearest point is close enough to the ray
+                    if (perp_sq.sqrt()) < max_perp {
+                        let voxel_proj = ray_len;
+                        if voxel_proj > proj {
+                            inside_votes += 1;
+                        } else {
+                            outside_votes += 1;
                         }
                     }
                 }
 
-                // Flip sign for voxels behind the surface (inside the object).
-                // A voxel is "behind" when it is farther from the camera than its
-                // nearest surface point, and the voxel-to-surface vector aligns
-                // with the camera-to-voxel ray.
-                if behind_count > n_cams / 2 && inside_votes > behind_count / 2 {
+                // A voxel is inside when at least one camera confirms it is behind
+                // the surface and no camera sees it in front.
+                //
+                // When cameras disagree (both inside and outside votes), use
+                // the superquadric as a tiebreaker if available.
+                if inside_votes > 0 && outside_votes == 0 {
                     *dist = -*dist;
+                } else if inside_votes > 0 && outside_votes > 0 {
+                    // Opposing cameras disagree — use superquadric tiebreaker.
+                    if let Some(sq) = sq_params {
+                        if sq.is_inside(vw) {
+                            *dist = -*dist;
+                        }
+                    }
+                    // If no superquadric available, leave sign positive (outside).
+                }
+            });
+    }
+
+    // ── Unified SQ sign-correction and distance blend ────────────────────
+    //
+    // After Domain A (camera authority with ray-based sign), apply SQ
+    // corrections. The key insight: the SQ sign is authoritative for
+    // determining inside/outside, while the camera distance is authoritative
+    // near the visible surface.
+    //
+    // For each voxel:
+    // - If camera and SQ signs agree: keep camera data (possibly blend
+    //   distances in the outer band for smoothness)
+    // - If camera and SQ signs disagree: the camera sign is wrong (backside
+    //   voxel marked as outside). Use SQ sign and blend distances based on
+    //   proximity to the visible surface.
+    //
+    // Performance optimization: only evaluate the expensive taubin_distance
+    // on voxels that could possibly need SQ correction. These are:
+    //   - Voxels with negative distance (inside the object)
+    //   - Voxels with f32::MAX (unobserved)
+    //   - Voxels within truncation_cells of either of the above
+    // Voxels that are positive and far from any negative/unobserved region
+    // will have signs that agree with SQ (both "outside"), so the SQ pass
+    // would be a no-op for them.
+    if let Some(sq) = sq_params {
+        let blend_start_agree = (truncation_cells - config::SQ_BLEND_DELTA_CELLS) as f32;
+        let blend_end_agree = truncation_cells as f32;
+        let blend_start_disagree = config::SQ_MIN_SIGN_OVERRIDE_CELLS as f32;
+        let blend_end_disagree = (truncation_cells - 1) as f32; // Full SQ at trunc-1 cells
+
+        // Build a sparse mask of voxels that need SQ evaluation.
+        // Phase 1: mark negative and unobserved voxels.
+        let mut sq_mask = vec![false; total];
+        for (i, &d) in distance.iter().enumerate() {
+            if d < 0.0 || d == f32::MAX {
+                sq_mask[i] = true;
+            }
+        }
+
+        // Phase 2: dilate the mask by truncation_cells in all 3D directions.
+        // This captures the transition zone where blending occurs.
+        // We do this in-place by scanning the mask and marking neighbors.
+        // Multiple dilation passes of 1 cell each are simpler than variable-radius.
+        for _pass in 0..truncation_cells {
+            let mut next_mask = sq_mask.clone();
+            for gz in 0..depth {
+                for gy in 0..height {
+                    for gx in 0..width {
+                        let idx = gx + gy * stride_y + gz * stride_z;
+                        if sq_mask[idx] {
+                            // Mark 6-connected neighbors
+                            if gx > 0 { next_mask[idx - 1] = true; }
+                            if gx + 1 < width { next_mask[idx + 1] = true; }
+                            if gy > 0 { next_mask[idx - stride_y] = true; }
+                            if gy + 1 < height { next_mask[idx + stride_y] = true; }
+                            if gz > 0 { next_mask[idx - stride_z] = true; }
+                            if gz + 1 < depth { next_mask[idx + stride_z] = true; }
+                        }
+                    }
+                }
+            }
+            sq_mask = next_mask;
+        }
+
+        distance
+            .par_iter_mut()
+            .enumerate()
+            .for_each(|(flat_idx, dist)| {
+                // Skip voxels outside the SQ evaluation mask
+                if !sq_mask[flat_idx] {
+                    return;
+                }
+
+                let cam_tdf = *dist;
+
+                // Skip surface voxels and truly unvisited voxels
+                if cam_tdf == 0.0 || cam_tdf == f32::MAX {
+                    if cam_tdf == f32::MAX {
+                        // Shouldn't happen given grid sizing, but handle it
+                        let gz = flat_idx / stride_z;
+                        let rem = flat_idx - gz * stride_z;
+                        let gy = rem / stride_y;
+                        let gx = rem % stride_y;
+                        let vw = origin
+                            + Vector3::new(gx as f32, gy as f32, gz as f32)
+                                * resolution_m;
+                        let sq_dist = sq.taubin_distance(vw);
+                        let sq_tdf = sq_dist / resolution_m;
+                        *dist = sq_tdf.clamp(
+                            -(truncation_cells as f32),
+                            truncation_cells as f32,
+                        );
+                    }
+                    return;
+                }
+
+                // Compute world position of this voxel
+                let gz = flat_idx / stride_z;
+                let rem = flat_idx - gz * stride_z;
+                let gy = rem / stride_y;
+                let gx = rem % stride_y;
+                let vw =
+                    origin + Vector3::new(gx as f32, gy as f32, gz as f32) * resolution_m;
+
+                // SQ distance and sign
+                let sq_dist = sq.taubin_distance(vw);
+                let sq_tdf = sq_dist / resolution_m;
+                let sq_tdf_clamped =
+                    sq_tdf.clamp(-(truncation_cells as f32), truncation_cells as f32);
+                let sq_inside = sq.evaluate(vw) < 0.0;
+
+                let abs_cam = cam_tdf.abs();
+                let cam_inside = cam_tdf < 0.0;
+                let signs_agree = cam_inside == sq_inside;
+
+                if !signs_agree {
+                    // Camera and SQ disagree on sign.
+                    // Trust SQ for sign, blend distances based on proximity
+                    // to the visible surface.
+                    if abs_cam <= blend_start_disagree {
+                        // Very close to visible surface — camera distance is
+                        // good, but flip the sign to match SQ.
+                        *dist = if sq_inside { -abs_cam } else { abs_cam };
+                    } else if abs_cam >= blend_end_disagree {
+                        // Far from surface — SQ is fully authoritative.
+                        *dist = sq_tdf_clamped;
+                    } else {
+                        // Transition zone — blend absolute distances, use SQ sign.
+                        let t = (abs_cam - blend_start_disagree)
+                            / (blend_end_disagree - blend_start_disagree);
+                        let t = t.clamp(0.0, 1.0);
+                        // Smoothstep: w goes from 1 (camera) to 0 (SQ)
+                        let w = 1.0 - t * t * (3.0 - 2.0 * t);
+                        let blended_abs = w * abs_cam + (1.0 - w) * sq_tdf_clamped.abs();
+                        *dist = if sq_inside { -blended_abs } else { blended_abs };
+                    }
+                } else {
+                    // Signs agree — blend distances in the outer band only.
+                    if abs_cam >= blend_start_agree && abs_cam <= blend_end_agree {
+                        let t = (abs_cam - blend_start_agree)
+                            / (blend_end_agree - blend_start_agree);
+                        let t = t.clamp(0.0, 1.0);
+                        let w = 1.0 - t * t * (3.0 - 2.0 * t);
+                        *dist = w * cam_tdf + (1.0 - w) * sq_tdf_clamped;
+                    }
                 }
             });
     }
@@ -524,7 +729,7 @@ mod tests {
     fn tsdf_surface_voxels_have_zero_distance() {
         let pc = PointCloud::new(vec![Vector3::new(5.0, 5.0, 5.0)]);
         let (morton_arr, offsets, start) = morton(&pc, 1.0);
-        let tsdf = get_tsdf(&morton_arr, &offsets, 3, start, 1.0, &[]);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 3, start, 1.0, &[], None);
 
         let d = tsdf.get_distance(5.0, 5.0, 5.0);
         assert!(d.abs() < 0.01, "surface distance should be ~0, got {}", d);
@@ -534,7 +739,7 @@ mod tests {
     fn tsdf_distance_increases_away_from_surface() {
         let pc = PointCloud::new(vec![Vector3::new(10.0, 10.0, 10.0)]);
         let (morton_arr, offsets, start) = morton(&pc, 1.0);
-        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &[]);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &[], None);
 
         let d0 = tsdf.get_distance(10.0, 10.0, 10.0);
         let d1 = tsdf.get_distance(11.0, 10.0, 10.0);
@@ -549,7 +754,7 @@ mod tests {
         let pc = PointCloud::new(vec![Vector3::new(20.0, 20.0, 20.0)]);
         let trunc = 3;
         let (morton_arr, offsets, start) = morton(&pc, 1.0);
-        let tsdf = get_tsdf(&morton_arr, &offsets, trunc, start, 1.0, &[]);
+        let tsdf = get_tsdf(&morton_arr, &offsets, trunc, start, 1.0, &[], None);
 
         let d_far = tsdf.get_distance(30.0, 20.0, 20.0);
         assert_eq!(d_far, f32::MAX, "beyond truncation should be f32::MAX");
@@ -572,7 +777,7 @@ mod tests {
             position: Vector3::new(11.0, 11.0, 8.0),
         }];
         let (morton_arr, offsets, start) = morton(&pc, 1.0);
-        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &cameras);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &cameras, None);
 
         let d_inside = tsdf.get_distance(11.0, 11.0, 11.0);
         assert!(
@@ -583,10 +788,55 @@ mod tests {
     }
 
     #[test]
+    fn tsdf_sign_negative_inside_with_opposite_cameras() {
+        // Cube shell centered at (11,11,11) with cameras on opposite sides along Z.
+        // This tests the fix for the sign voting threshold: with 2 opposing cameras,
+        // a voxel at the center is "behind" the surface from only one camera, so a
+        // majority vote (behind_count > n_cams/2) fails. The fix uses inside_votes > 0.
+        let pc = PointCloud::new(vec![
+            Vector3::new(10.0, 10.0, 10.0),
+            Vector3::new(12.0, 10.0, 10.0),
+            Vector3::new(10.0, 12.0, 10.0),
+            Vector3::new(12.0, 12.0, 10.0),
+            Vector3::new(10.0, 10.0, 12.0),
+            Vector3::new(12.0, 10.0, 12.0),
+            Vector3::new(10.0, 12.0, 12.0),
+            Vector3::new(12.0, 12.0, 12.0),
+            Vector3::new(11.0, 11.0, 10.0),
+            Vector3::new(11.0, 11.0, 12.0),
+        ]);
+        let cameras = vec![
+            Camera {
+                position: Vector3::new(11.0, 11.0, 8.0),
+            },
+            Camera {
+                position: Vector3::new(11.0, 11.0, 14.0),
+            },
+        ];
+        let (morton_arr, offsets, start) = morton(&pc, 1.0);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &cameras, None);
+
+        let d_inside = tsdf.get_distance(11.0, 11.0, 11.0);
+        assert!(
+            d_inside < 0.0,
+            "point inside cube shell should be negative with opposite cameras, got {}",
+            d_inside
+        );
+
+        // Voxels outside the shell should remain positive.
+        let d_outside = tsdf.get_distance(11.0, 11.0, 8.5);
+        assert!(
+            d_outside > 0.0,
+            "point outside cube shell should be positive, got {}",
+            d_outside
+        );
+    }
+
+    #[test]
     fn surface_normal_points_outward() {
         let pc = PointCloud::new(vec![Vector3::new(10.0, 10.0, 10.0)]);
         let (morton_arr, offsets, start) = morton(&pc, 1.0);
-        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &[]);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 5, start, 1.0, &[], None);
 
         let normal = tsdf.get_surface_normal(12.0, 10.0, 10.0);
         let dir = Vector3::new(1.0, 0.0, 0.0);
@@ -628,7 +878,7 @@ mod tests {
         let pruned = prune(&pc, Some(roi));
         assert_eq!(pruned.len(), 2);
         let (morton_arr, offsets, start) = morton(&pruned, 1.0);
-        let tsdf = get_tsdf(&morton_arr, &offsets, 3, start, 1.0, &[]);
+        let tsdf = get_tsdf(&morton_arr, &offsets, 3, start, 1.0, &[], None);
         let d0 = tsdf.get_distance(0.0, 0.0, 0.0);
         let d10 = tsdf.get_distance(10.0, 10.0, 10.0);
         assert!(
@@ -689,6 +939,206 @@ mod tests {
         aabb.clip_max_dims(&Vector3::new(0.2, 0.2, 0.2), &anchor);
         assert!((aabb.min.x - (-0.1)).abs() < 1e-6, "min.x = {}", aabb.min.x);
         assert!((aabb.max.x - 0.1).abs() < 1e-6, "max.x = {}", aabb.max.x);
+    }
+
+    // ── Superquadric backside integration tests ─────────────────────────
+
+    /// Helper: generate points on the front hemisphere of a sphere.
+    fn front_hemisphere_points(center: Vector3<f32>, radius: f32, n: usize) -> PointCloud {
+        use std::f32::consts::PI;
+        let mut points = Vec::new();
+        for i in 0..n {
+            let theta = PI * (i as f32 / n as f32); // 0 to PI (front half)
+            for j in 0..20 {
+                let phi = 2.0 * PI * (j as f32 / 20.0);
+                let x = center.x + radius * theta.sin() * phi.cos();
+                let y = center.y + radius * theta.sin() * phi.sin();
+                let z = center.z + radius * theta.cos();
+                points.push(Vector3::new(x, y, z));
+            }
+        }
+        PointCloud::new(points)
+    }
+
+    #[test]
+    fn tsdf_with_superquadric_fills_backside_voxels() {
+        // Front hemisphere observed by a camera in front.
+        // With superquadric, voxels deep inside the object (beyond camera
+        // visibility) should get correct signs from the superquadric.
+        let center = Vector3::new(0.1, 0.1, 0.1);
+        let radius = 0.03_f32;
+        let pc = front_hemisphere_points(center, radius, 100);
+        let cameras = vec![Camera {
+            position: Vector3::new(center.x, center.y, center.z - 0.3),
+        }];
+
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+
+        // With superquadric
+        let sq = crate::superquadric::fit_best_superquadric(&pc.points);
+        assert!(sq.is_some(), "superquadric fitting should succeed");
+
+        let tsdf_with_sq = get_tsdf(
+            &morton_arr, &offsets, config::TRUNCATION_CELLS,
+            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+        );
+
+        // The center of the sphere should be inside (negative).
+        // Without superquadric, this might have wrong sign due to the
+        // camera not seeing the backside. With SQ, the sign is correct.
+        let d_center = tsdf_with_sq.get_distance(center.x, center.y, center.z);
+        assert!(
+            d_center < 0.0,
+            "center should be negative (inside) with SQ, got {}",
+            d_center
+        );
+
+        // A point just outside the back of the sphere should be positive.
+        // The superquadric provides the distance estimate here.
+        let back_outside = center + Vector3::new(0.0, 0.0, radius + 0.01);
+        let d_back = tsdf_with_sq.get_distance(back_outside.x, back_outside.y, back_outside.z);
+        // This should not be f32::MAX — the SQ fill should have covered it
+        // (it's within the truncation band of the surface).
+        assert!(
+            d_back != f32::MAX,
+            "back outside point should have valid distance with SQ, got f32::MAX"
+        );
+    }
+
+    #[test]
+    fn tsdf_superquadric_inside_negative() {
+        // With superquadric, a point inside the fitted shape should be negative.
+        let center = Vector3::new(0.1, 0.1, 0.1);
+        let radius = 0.03_f32;
+        let pc = front_hemisphere_points(center, radius, 100);
+        let cameras = vec![Camera {
+            position: Vector3::new(center.x, center.y, center.z - 0.3),
+        }];
+
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+
+        let sq = crate::superquadric::fit_best_superquadric(&pc.points);
+        assert!(sq.is_some(), "superquadric fitting should succeed");
+
+        let tsdf = get_tsdf(
+            &morton_arr, &offsets, config::TRUNCATION_CELLS,
+            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+        );
+
+        // A point at the center of the sphere should be inside (negative)
+        let d_center = tsdf.get_distance(center.x, center.y, center.z);
+        assert!(
+            d_center < 0.0,
+            "center of sphere should be negative (inside), got {}",
+            d_center
+        );
+    }
+
+    #[test]
+    fn tsdf_superquadric_sign_tiebreaker_with_opposing_cameras() {
+        // When opposing cameras disagree on the sign, the superquadric
+        // should act as a tiebreaker to correctly determine inside/outside.
+        let center = Vector3::new(0.1, 0.1, 0.1);
+        let radius = 0.03_f32;
+        let pc = front_hemisphere_points(center, radius, 100);
+        let cameras = vec![
+            Camera {
+                position: Vector3::new(center.x, center.y, center.z - 0.3),
+            },
+            Camera {
+                position: Vector3::new(center.x, center.y, center.z + 0.3),
+            },
+        ];
+
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+
+        let sq = crate::superquadric::fit_best_superquadric(&pc.points);
+
+        let tsdf = get_tsdf(
+            &morton_arr, &offsets, config::TRUNCATION_CELLS,
+            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+        );
+
+        // Center should still be negative (inside) even with opposing cameras
+        let d_center = tsdf.get_distance(center.x, center.y, center.z);
+        assert!(
+            d_center < 0.0,
+            "center should be negative with SQ tiebreaker, got {}",
+            d_center
+        );
+    }
+
+    #[test]
+    fn tsdf_backside_outside_positive() {
+        // Generate a front hemisphere, fit SQ, verify that a point just
+        // outside the BACK of the sphere has a POSITIVE TSDF distance.
+        let center = Vector3::new(0.1, 0.1, 0.1);
+        let radius = 0.03_f32;
+        let pc = front_hemisphere_points(center, radius, 100);
+        let cameras = vec![Camera {
+            position: Vector3::new(center.x, center.y, center.z - 0.3),
+        }];
+
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+        let sq = crate::superquadric::fit_best_superquadric(&pc.points);
+        assert!(sq.is_some(), "superquadric fitting should succeed");
+
+        let tsdf = get_tsdf(
+            &morton_arr, &offsets, config::TRUNCATION_CELLS,
+            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+        );
+
+        // A point just outside the back of the sphere should be positive.
+        let back_outside = center + Vector3::new(0.0, 0.0, radius + 0.005);
+        let d_back = tsdf.get_distance(back_outside.x, back_outside.y, back_outside.z);
+        assert!(
+            d_back > 0.0,
+            "point just outside the BACK of the sphere should have positive TSDF, got {}",
+            d_back
+        );
+    }
+
+    #[test]
+    fn tsdf_backside_monotonic() {
+        // Verify that TSDF distances on the backside increase monotonically
+        // as you move away from the object (no floating markers or sign flips).
+        let center = Vector3::new(0.1, 0.1, 0.1);
+        let radius = 0.03_f32;
+        let pc = front_hemisphere_points(center, radius, 100);
+        let cameras = vec![Camera {
+            position: Vector3::new(center.x, center.y, center.z - 0.3),
+        }];
+
+        let (morton_arr, offsets, start) = morton(&pc, config::TSDF_RESOLUTION_M);
+        let sq = crate::superquadric::fit_best_superquadric(&pc.points);
+        assert!(sq.is_some(), "superquadric fitting should succeed");
+
+        let tsdf = get_tsdf(
+            &morton_arr, &offsets, config::TRUNCATION_CELLS,
+            start, config::TSDF_RESOLUTION_M, &cameras, sq.as_ref(),
+        );
+
+        // Sample points along the backside (+Z direction from center) and
+        // verify monotonic increase in TSDF distance.
+        let step = config::TSDF_RESOLUTION_M;
+        let mut prev_d: Option<f32> = None;
+        for i in 0..(config::TRUNCATION_CELLS + 2) {
+            let offset_z = radius + (i as f32) * step;
+            let p = center + Vector3::new(0.0, 0.0, offset_z);
+            let d = tsdf.get_distance(p.x, p.y, p.z);
+            if d == f32::MAX {
+                break; // Beyond grid
+            }
+            if let Some(prev) = prev_d {
+                assert!(
+                    d >= prev - 0.5, // Allow small numerical tolerance
+                    "TSDF should be monotonically non-decreasing on backside: \
+                     prev={}, current={} at offset={}",
+                    prev, d, offset_z
+                );
+            }
+            prev_d = Some(d);
+        }
     }
 
 }

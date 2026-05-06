@@ -1,7 +1,6 @@
 use crate::config;
-use crate::lut_helper::{Contact, FingerLUT};
+use crate::lut_helper::{Contact, FingerGroup, FingerLUT};
 use crate::pointcloud_helper::Tsdf;
-use std::collections::HashSet;
 
 use nalgebra::{Matrix4, Vector3};
 
@@ -296,15 +295,34 @@ fn score_grasp(
 ) -> GraspScoreResult {
     match sweep_for_collision(lut, tsdf, base_transform, &spec.sweep_points, collision_tol, max_closure) {
         // Tier 4: No collision — hand swept fully closed and hit nothing.
-        // Empty space; the optimizer must translate toward the object.
-        None => GraspScoreResult {
-            closure_amount: 0.0,
-            alignment_score: 0.0,
-            force_closure_score: 0.0,
-            contact_count_score: 0.0,
-            contact_score: 0.0,
-            active_contact_count: 0,
-            found_collision: false,
+        // With wider truncation band, we can provide a proximity score based on how
+        // close the hand is to the surface, giving the optimizer directional information.
+        None => {
+            // Compute proximity score using a sparse key-point check at mid-closure.
+            // Instead of evaluating all ~25 sweep points, we check only the palm center
+            // and key finger tips. This gives the SMC optimizer coarse directional
+            // information at much lower cost.
+            let mid_closure = 0.5;
+            let min_dist = sparse_proximity_distance(lut, tsdf, base_transform, mid_closure);
+            let proximity_score = if min_dist < f32::MAX {
+                // Convert distance to a score in [0.0, 0.05].
+                // Distance 0 → score 0.05, distance at truncation → score 0.0.
+                let trunc_dist = config::TRUNCATION_CELLS as f32 * config::TSDF_RESOLUTION_M;
+                let normalized = (min_dist / trunc_dist).clamp(0.0, 1.0);
+                0.05 * (1.0 - normalized)
+            } else {
+                0.0
+            };
+
+            GraspScoreResult {
+                closure_amount: 0.0,
+                alignment_score: 0.0,
+                force_closure_score: 0.0,
+                contact_count_score: 0.0,
+                contact_score: proximity_score as f64,
+                active_contact_count: 0,
+                found_collision: false,
+            }
         },
         // Tier 3: Start-position collision — palm or open-hand fingers already
         // inside the object. The hand is "in" the object. Back up!
@@ -342,9 +360,17 @@ fn score_grasp(
             );
 
             // Check finger diversity — contacts concentrated on too few fingers.
-            let mut finger_set = HashSet::new();
+            let mut finger_bits: u8 = 0;
             for &(contact, _) in &active_with_contacts {
-                finger_set.insert(contact.finger_group());
+                let bit = match contact.finger_group() {
+                    crate::lut_helper::FingerGroup::Thumb => 1 << 0,
+                    crate::lut_helper::FingerGroup::Index => 1 << 1,
+                    crate::lut_helper::FingerGroup::Middle => 1 << 2,
+                    crate::lut_helper::FingerGroup::Ring => 1 << 3,
+                    crate::lut_helper::FingerGroup::Little => 1 << 4,
+                    crate::lut_helper::FingerGroup::Palm => 1 << 5,
+                };
+                finger_bits |= bit;
             }
 
             let active: Vec<_> = active_with_contacts.into_iter().map(|(_, ac)| ac).collect();
@@ -354,15 +380,55 @@ fn score_grasp(
                 (active.len() as f64 / spec.min_contacts as f64).min(1.0)
             };
 
-            if finger_set.len() < spec.min_fingers {
+            let finger_count = finger_bits.count_ones() as usize;
+            let has_thumb = (finger_bits & (1 << 0)) != 0;
+            let has_index = (finger_bits & (1 << 1)) != 0;
+
+            if finger_count < spec.min_fingers || !has_thumb || !has_index {
                 // Tier 2: Soft rejection — collision found, but too few distinct
-                // finger groups engaged. Minor adjustment could fix this.
+                // finger groups engaged or missing critical thumb/index.
+                
+                let mut missing_dist: f64 = 0.0;
+                let max_penalty_dist: f64 = 0.05; // 5cm penalty spread
+                
+                if !has_thumb {
+                    let mut min_d = f32::MAX;
+                    for sp in &spec.sweep_points {
+                        if sp.contact.finger_group() == FingerGroup::Thumb {
+                            let p = match sp.flex {
+                                Flex::Coupled => pos_at_control(lut, sp.contact, lo_ctrl, base_transform),
+                                Flex::Locked(locked_s) => pos_at_sample(lut, sp.contact, locked_s, base_transform),
+                            };
+                            let d = tsdf.get_distance(p.x, p.y, p.z);
+                            if d < min_d { min_d = d; }
+                        }
+                    }
+                    missing_dist += if min_d < f32::MAX { min_d.max(0.0) as f64 } else { max_penalty_dist };
+                }
+                
+                if !has_index {
+                    let mut min_d = f32::MAX;
+                    for sp in &spec.sweep_points {
+                        if sp.contact.finger_group() == FingerGroup::Index {
+                            let p = match sp.flex {
+                                Flex::Coupled => pos_at_control(lut, sp.contact, lo_ctrl, base_transform),
+                                Flex::Locked(locked_s) => pos_at_sample(lut, sp.contact, locked_s, base_transform),
+                            };
+                            let d = tsdf.get_distance(p.x, p.y, p.z);
+                            if d < min_d { min_d = d; }
+                        }
+                    }
+                    missing_dist += if min_d < f32::MAX { min_d.max(0.0) as f64 } else { max_penalty_dist };
+                }
+
+                let penalty_multiplier = 1.0 - (missing_dist / (max_penalty_dist * 2.0)).clamp(0.0, 1.0);
+
                 return GraspScoreResult {
                     closure_amount: lo,
                     alignment_score: compute_alignment(&active),
                     force_closure_score: compute_force_closure(&active),
                     contact_count_score,
-                    contact_score: contact_count_score * 0.5,
+                    contact_score: (contact_count_score * 0.25) + (penalty_multiplier * 0.25),
                     active_contact_count: active.len(),
                     found_collision: true,
                 };
@@ -465,6 +531,36 @@ fn collides_at_control(
     false
 }
 
+/// Sparse proximity check for Tier 4 (no collision) grasps.
+/// Evaluates only 3 key points — palm center, index tip, and thumb tip —
+/// at mid-closure. This gives the SMC optimizer coarse directional information
+/// at ~8× lower cost than checking all sweep points.
+fn sparse_proximity_distance(
+    lut: &FingerLUT,
+    tsdf: &Tsdf,
+    base: &Matrix4<f64>,
+    control: f64,
+) -> f32 {
+    let mut min_dist = f32::MAX;
+
+    // Palm center (locked, doesn't move with closure)
+    let palm = pos_at_sample(lut, Contact::PalmDistRadi, 0, base);
+    let d = tsdf.get_distance(palm.x, palm.y, palm.z);
+    if d < min_dist { min_dist = d; }
+
+    // Index tip at mid-closure (coupled, moves with closure)
+    let index_tip = pos_at_control(lut, Contact::IndexTip, control, base);
+    let d = tsdf.get_distance(index_tip.x, index_tip.y, index_tip.z);
+    if d < min_dist { min_dist = d; }
+
+    // Thumb tip at mid-closure (coupled, moves with closure)
+    let thumb_tip = pos_at_control(lut, Contact::ThumbAbdTip, control, base);
+    let d = tsdf.get_distance(thumb_tip.x, thumb_tip.y, thumb_tip.z);
+    if d < min_dist { min_dist = d; }
+
+    min_dist
+}
+
 fn find_active_contacts(
     lut: &FingerLUT,
     tsdf: &Tsdf,
@@ -480,7 +576,12 @@ fn find_active_contacts(
     for &contact in score_contacts {
         let p_hi = pos_at_control(lut, contact, hi_ctrl, base);
         let dist = tsdf.get_distance(p_hi.x, p_hi.y, p_hi.z);
-        if dist >= threshold {
+        // Skip contacts that are clearly outside the surface or deep inside
+        // the object. Only count contacts near the zero-crossing (actual
+        // surface). Strongly negative distances mean the finger penetrated
+        // well past the surface into the object interior — these are not
+        // meaningful surface contacts and would produce misleading scores.
+        if dist >= threshold || dist < -threshold {
             continue;
         }
 

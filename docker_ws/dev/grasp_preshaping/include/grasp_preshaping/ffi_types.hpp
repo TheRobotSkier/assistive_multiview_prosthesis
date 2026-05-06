@@ -72,9 +72,17 @@ struct GraspComputeResponseFFI
   double closure_amount;
   double combined_score;
   std::int32_t grasp_type;
+  double alignment_score;
+  double force_closure_score;
+  double contact_count_score;
+  double contact_score;
+  double second_best_combined_score;
+  std::int32_t second_best_grasp_type;
   double thumb_closure;
   double index_closure;
   double mrl_closure;
+  std::uint32_t pipeline_time_ms;
+  std::uint32_t smc_iterations_used;
   // Target hand position from the best scored grasp sample (world frame).
   double target_px;
   double target_py;

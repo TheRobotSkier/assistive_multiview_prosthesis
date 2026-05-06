@@ -224,6 +224,7 @@ install(FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_custom.xml
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_static.xml
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_dynamic.xml
+  ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/scene_right_cylinder.xml
   ${CMAKE_CURRENT_SOURCE_DIR}/../dev/mujoco/scenes/mia_hand_right_grasp_frame.xml
   DESTINATION share/${PROJECT_NAME}/mia_hand
 )

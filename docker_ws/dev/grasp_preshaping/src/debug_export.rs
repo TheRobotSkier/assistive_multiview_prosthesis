@@ -5,6 +5,7 @@
 //! interactively in Python.
 
 use crate::pointcloud_helper::{Aabb, Camera, PointCloud, Tsdf};
+use crate::superquadric::SuperquadricParams;
 use nalgebra::Vector3;
 use npyz::npz::NpzWriter;
 use npyz::WriterBuilder;
@@ -34,6 +35,8 @@ pub struct ScoredGraspExport {
     pub pose_se3: [f64; 16],
     /// Wrist rotation angle around local Y axis in radians.
     pub wrist_rotation: f64,
+    /// SMC iteration that produced this grasp (0 = initial broad sampling).
+    pub smc_iteration: usize,
 }
 
 /// Collected artifacts from one pipeline invocation.
@@ -47,6 +50,8 @@ pub struct DebugDump<'a> {
     pub input_pose: [f64; 7],
     /// Input twist: [lx, ly, lz, ax, ay, az].
     pub input_twist: [f64; 6],
+    /// Fitted superquadric parameters (None if fitting was skipped or failed).
+    pub sq_params: Option<&'a SuperquadricParams>,
 }
 
 /// Write all debug data to a single `.npz` file at `path`.
@@ -62,11 +67,12 @@ pub struct DebugDump<'a> {
 /// | `cameras`         | f32   | (C*3,)      | Camera positions |
 /// | `input_pose`      | f64   | (7,)        | [px,py,pz,qx,qy,qz,qw] |
 /// | `input_twist`     | f64   | (6,)        | [lx,ly,lz,ax,ay,az] |
-/// | `scored_grasps`   | f64   | (M*28,)     | Flat rows (see below) |
+/// | `scored_grasps`   | f64   | (M*29,)     | Flat rows (see below) |
 ///
-/// Each scored_grasps row has 28 columns:
+/// Each scored_grasps row has 29 columns:
 ///   [sample_idx, grasp_type, closure, alignment, force_closure,
 ///    contact_count, contact_score, active_contact_count, found_collision(0|1), combined, probability, wrist_rotation,
+///    smc_iteration,
 ///    pose_4x4(16)]
 pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
@@ -193,8 +199,8 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
         writer.finish()?;
     }
 
-    // --- scored_grasps (f64, M*28 flat) ---
-    // Columns per row (28 total):
+    // --- scored_grasps (f64, M*29 flat) ---
+    // Columns per row (29 total):
     //   [0]  sample_index
     //   [1]  grasp_type (1=cyl, 2=pinch, 3=lat)
     //   [2]  closure_amount
@@ -207,10 +213,11 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
     //   [9]  combined_score
     //   [10] sample_probability
     //   [11] wrist_rotation (radians)
-    //   [12..28]  pose_se3 row-major 4x4
+    //   [12] smc_iteration
+    //   [13..29]  pose_se3 row-major 4x4
     {
         let m = dump.scored_grasps.len();
-        let total = m * 28;
+        let total = m * 29;
         let mut writer = npz
             .array::<f64>("scored_grasps", Default::default())?
             .default_dtype()
@@ -229,9 +236,50 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
             writer.push(&g.combined_score)?;
             writer.push(&g.sample_probability)?;
             writer.push(&g.wrist_rotation)?;
+            writer.push(&(g.smc_iteration as f64))?;
             for &v in &g.pose_se3 {
                 writer.push(&v)?;
             }
+        }
+        writer.finish()?;
+    }
+
+    // --- sq_params (f32, 14) ---
+    // [ε₁, ε₂, a, b, c, tx, ty, tz, r00..r22 (9), fit_error]
+    // Only written when superquadric fitting succeeded.
+    if let Some(sq) = dump.sq_params {
+        let rot = sq.rotation.matrix();
+        let params: [f32; 14] = [
+            sq.epsilon1,
+            sq.epsilon2,
+            sq.a,
+            sq.b,
+            sq.c,
+            sq.translation.x,
+            sq.translation.y,
+            sq.translation.z,
+            rot[(0, 0)], rot[(0, 1)], rot[(0, 2)],
+            rot[(1, 0)], rot[(1, 1)], rot[(1, 2)],
+        ];
+        let mut writer = npz
+            .array::<f32>("sq_params", Default::default())?
+            .default_dtype()
+            .shape(&[14])
+            .begin_nd()?;
+        for &v in &params {
+            writer.push(&v)?;
+        }
+        writer.finish()?;
+
+        // sq_meta: [fit_error, template_index]
+        let meta: [f32; 2] = [sq.fit_error, sq.template_index as f32];
+        let mut writer = npz
+            .array::<f32>("sq_meta", Default::default())?
+            .default_dtype()
+            .shape(&[2])
+            .begin_nd()?;
+        for &v in &meta {
+            writer.push(&v)?;
         }
         writer.finish()?;
     }
