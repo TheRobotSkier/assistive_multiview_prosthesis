@@ -1,7 +1,6 @@
 use crate::config;
 use crate::lut_helper::{Contact, FingerGroup, FingerLUT};
 use crate::pointcloud_helper::Tsdf;
-use std::collections::HashSet;
 
 use nalgebra::{Matrix4, Vector3};
 
@@ -299,10 +298,12 @@ fn score_grasp(
         // With wider truncation band, we can provide a proximity score based on how
         // close the hand is to the surface, giving the optimizer directional information.
         None => {
-            // Compute proximity score using minimum TSDF distance at mid-closure.
-            // This gives a small gradient (0.0-0.05) to guide the optimizer toward the object.
+            // Compute proximity score using a sparse key-point check at mid-closure.
+            // Instead of evaluating all ~25 sweep points, we check only the palm center
+            // and key finger tips. This gives the SMC optimizer coarse directional
+            // information at much lower cost.
             let mid_closure = 0.5;
-            let min_dist = min_tsdf_distance(lut, tsdf, base_transform, &spec.sweep_points, mid_closure);
+            let min_dist = sparse_proximity_distance(lut, tsdf, base_transform, mid_closure);
             let proximity_score = if min_dist < f32::MAX {
                 // Convert distance to a score in [0.0, 0.05].
                 // Distance 0 → score 0.05, distance at truncation → score 0.0.
@@ -359,9 +360,17 @@ fn score_grasp(
             );
 
             // Check finger diversity — contacts concentrated on too few fingers.
-            let mut finger_set = HashSet::new();
+            let mut finger_bits: u8 = 0;
             for &(contact, _) in &active_with_contacts {
-                finger_set.insert(contact.finger_group());
+                let bit = match contact.finger_group() {
+                    crate::lut_helper::FingerGroup::Thumb => 1 << 0,
+                    crate::lut_helper::FingerGroup::Index => 1 << 1,
+                    crate::lut_helper::FingerGroup::Middle => 1 << 2,
+                    crate::lut_helper::FingerGroup::Ring => 1 << 3,
+                    crate::lut_helper::FingerGroup::Little => 1 << 4,
+                    crate::lut_helper::FingerGroup::Palm => 1 << 5,
+                };
+                finger_bits |= bit;
             }
 
             let active: Vec<_> = active_with_contacts.into_iter().map(|(_, ac)| ac).collect();
@@ -371,10 +380,11 @@ fn score_grasp(
                 (active.len() as f64 / spec.min_contacts as f64).min(1.0)
             };
 
-            let has_thumb = finger_set.contains(&FingerGroup::Thumb);
-            let has_index = finger_set.contains(&FingerGroup::Index);
+            let finger_count = finger_bits.count_ones() as usize;
+            let has_thumb = (finger_bits & (1 << 0)) != 0;
+            let has_index = (finger_bits & (1 << 1)) != 0;
 
-            if finger_set.len() < spec.min_fingers || !has_thumb || !has_index {
+            if finger_count < spec.min_fingers || !has_thumb || !has_index {
                 // Tier 2: Soft rejection — collision found, but too few distinct
                 // finger groups engaged or missing critical thumb/index.
                 
@@ -521,27 +531,33 @@ fn collides_at_control(
     false
 }
 
-/// Compute the minimum TSDF distance across all sweep points at a given control value.
-/// Returns the minimum non-MAX distance found, or f32::MAX if all points are unobserved.
-/// This is used for proximity-based scoring of Tier 4 (no collision) grasps.
-fn min_tsdf_distance(
+/// Sparse proximity check for Tier 4 (no collision) grasps.
+/// Evaluates only 3 key points — palm center, index tip, and thumb tip —
+/// at mid-closure. This gives the SMC optimizer coarse directional information
+/// at ~8× lower cost than checking all sweep points.
+fn sparse_proximity_distance(
     lut: &FingerLUT,
     tsdf: &Tsdf,
     base: &Matrix4<f64>,
-    sweep_points: &[SweepPoint],
     control: f64,
 ) -> f32 {
     let mut min_dist = f32::MAX;
-    for sp in sweep_points {
-        let p = match sp.flex {
-            Flex::Coupled => pos_at_control(lut, sp.contact, control, base),
-            Flex::Locked(locked_s) => pos_at_sample(lut, sp.contact, locked_s, base),
-        };
-        let dist = tsdf.get_distance(p.x, p.y, p.z);
-        if dist < min_dist {
-            min_dist = dist;
-        }
-    }
+
+    // Palm center (locked, doesn't move with closure)
+    let palm = pos_at_sample(lut, Contact::PalmDistRadi, 0, base);
+    let d = tsdf.get_distance(palm.x, palm.y, palm.z);
+    if d < min_dist { min_dist = d; }
+
+    // Index tip at mid-closure (coupled, moves with closure)
+    let index_tip = pos_at_control(lut, Contact::IndexTip, control, base);
+    let d = tsdf.get_distance(index_tip.x, index_tip.y, index_tip.z);
+    if d < min_dist { min_dist = d; }
+
+    // Thumb tip at mid-closure (coupled, moves with closure)
+    let thumb_tip = pos_at_control(lut, Contact::ThumbAbdTip, control, base);
+    let d = tsdf.get_distance(thumb_tip.x, thumb_tip.y, thumb_tip.z);
+    if d < min_dist { min_dist = d; }
+
     min_dist
 }
 

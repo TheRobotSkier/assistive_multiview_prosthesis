@@ -427,17 +427,6 @@ pub fn get_tsdf(
         // handles opposing cameras where the globally-nearest surface point gives
         // misleading information for one camera.
 
-        // Collect all surface point positions for fast access.
-        let surface_points: Vec<Vector3<f32>> = offsets
-            .iter()
-            .take(offsets.len() - 1)
-            .map(|&start| {
-                let mp = &morton_array[start];
-                Vector3::new(mp.x, mp.y, mp.z)
-            })
-            .collect();
-        let _n_surface = surface_points.len();
-
         distance
             .par_iter_mut()
             .enumerate()
@@ -453,6 +442,10 @@ pub fn get_tsdf(
 
                 let vw = origin + Vector3::new(gx as f32, gy as f32, gz as f32) * resolution_m;
 
+                let nearest_idx = nearest[flat_idx] as usize;
+                let mp = &morton_array[nearest_idx];
+                let sp = Vector3::new(mp.x, mp.y, mp.z);
+
                 let mut inside_votes = 0usize;
                 let mut outside_votes = 0usize;
 
@@ -460,67 +453,48 @@ pub fn get_tsdf(
                     let to_voxel_from_cam = vw - cam.position;
                     let ray_len = to_voxel_from_cam.norm();
                     if ray_len < 1e-10 {
-                        // Camera is at the voxel — it trivially sees the voxel as
-                        // unoccluded (the voxel IS the camera). Count as outside.
                         outside_votes += 1;
                         continue;
                     }
                     let ray_dir = to_voxel_from_cam / ray_len;
 
-                    // Find the surface point closest to the camera-to-voxel ray.
-                    // Project each surface point onto the ray and find the one with
-                    // the smallest perpendicular distance.
-                    let mut best_surf_dist = f32::MAX;
-                    let mut best_proj = 0.0f32;
+                    let to_surf = sp - cam.position;
+                    let proj = to_surf.dot(&ray_dir);
+                    
+                    if proj < 0.0 {
+                        // Surface point is behind the camera.
+                        // Can't reliably use it, assume outside.
+                        outside_votes += 1;
+                        continue; 
+                    }
 
-                    for &sp in &surface_points {
-                        let to_surf = sp - cam.position;
-                        let proj = to_surf.dot(&ray_dir);
-                        if proj < 0.0 {
-                            continue; // Surface point is behind the camera.
-                        }
-                        // Alignment check: the direction from the surface point
-                        // to the voxel should be consistent with the camera-to-voxel
-                        // ray direction. This prevents surface points on the far side
-                        // of the object (approached from behind) from being treated
-                        // as occluders.
-                        let to_voxel_from_surf = vw - sp;
-                        let to_voxel_from_surf_len = to_voxel_from_surf.norm();
-                        if to_voxel_from_surf_len > 1e-10 {
-                            let surf_dir = to_voxel_from_surf / to_voxel_from_surf_len;
-                            let alignment = ray_dir.dot(&surf_dir);
-                            if alignment < config::RAY_ALIGNMENT_THRESHOLD {
-                                continue;
-                            }
-                        }
-                        let perp_sq = to_surf.norm_squared() - proj * proj;
-                        // Prefer the surface point closest to the camera-to-voxel ray
-                        // (smallest perpendicular distance). When tied (e.g., two points
-                        // on the same ray), prefer the one closer to the camera (smaller
-                        // projection) — that's the first surface the ray hits.
-                        if perp_sq < best_surf_dist
-                            || (perp_sq == best_surf_dist && proj < best_proj)
-                        {
-                            best_surf_dist = perp_sq;
-                            best_proj = proj;
+                    // Alignment check: the direction from the surface point
+                    // to the voxel should be consistent with the camera-to-voxel
+                    // ray direction.
+                    let to_voxel_from_surf = vw - sp;
+                    let to_voxel_from_surf_len = to_voxel_from_surf.norm();
+                    if to_voxel_from_surf_len > 1e-10 {
+                        let surf_dir = to_voxel_from_surf / to_voxel_from_surf_len;
+                        let alignment = ray_dir.dot(&surf_dir);
+                        if alignment < config::RAY_ALIGNMENT_THRESHOLD {
+                            // Misaligned, means we are wrapping around the object
+                            // and the nearest point is on a surface facing away
+                            // from this camera ray path. We can't trust it for this camera.
+                            // In a multi-camera setup, another camera might see it better.
+                            continue;
                         }
                     }
 
-                    // Compare the voxel's projection onto the ray with the best
-                    // surface point's projection. If the voxel is farther along
-                    // the ray than the surface, it's behind the surface.
-                    let voxel_proj = ray_len; // Distance from camera to voxel along ray.
-
-                    if best_surf_dist < f32::MAX {
-                        // Threshold: only count if the surface point is close enough
-                        // to the ray to be a meaningful occluder.
-                        let max_perp = config::TRUNCATION_CELLS as f32 * resolution_m;
-                        if (best_surf_dist.sqrt()) < max_perp {
-                            if voxel_proj > best_proj {
-                                inside_votes += 1;
-                            } else {
-                                outside_votes += 1;
-                            }
+                    let perp_sq = to_surf.norm_squared() - proj * proj;
+                    let max_perp = config::TRUNCATION_CELLS as f32 * resolution_m;
+                    
+                    // Only vote if the nearest point is close enough to the ray
+                    if (perp_sq.sqrt()) < max_perp {
+                        let voxel_proj = ray_len;
+                        if voxel_proj > proj {
+                            inside_votes += 1;
+                        } else {
+                            outside_votes += 1;
                         }
                     }
                 }
@@ -557,16 +531,64 @@ pub fn get_tsdf(
     // - If camera and SQ signs disagree: the camera sign is wrong (backside
     //   voxel marked as outside). Use SQ sign and blend distances based on
     //   proximity to the visible surface.
+    //
+    // Performance optimization: only evaluate the expensive taubin_distance
+    // on voxels that could possibly need SQ correction. These are:
+    //   - Voxels with negative distance (inside the object)
+    //   - Voxels with f32::MAX (unobserved)
+    //   - Voxels within truncation_cells of either of the above
+    // Voxels that are positive and far from any negative/unobserved region
+    // will have signs that agree with SQ (both "outside"), so the SQ pass
+    // would be a no-op for them.
     if let Some(sq) = sq_params {
         let blend_start_agree = (truncation_cells - config::SQ_BLEND_DELTA_CELLS) as f32;
         let blend_end_agree = truncation_cells as f32;
         let blend_start_disagree = config::SQ_MIN_SIGN_OVERRIDE_CELLS as f32;
         let blend_end_disagree = (truncation_cells - 1) as f32; // Full SQ at trunc-1 cells
 
+        // Build a sparse mask of voxels that need SQ evaluation.
+        // Phase 1: mark negative and unobserved voxels.
+        let mut sq_mask = vec![false; total];
+        for (i, &d) in distance.iter().enumerate() {
+            if d < 0.0 || d == f32::MAX {
+                sq_mask[i] = true;
+            }
+        }
+
+        // Phase 2: dilate the mask by truncation_cells in all 3D directions.
+        // This captures the transition zone where blending occurs.
+        // We do this in-place by scanning the mask and marking neighbors.
+        // Multiple dilation passes of 1 cell each are simpler than variable-radius.
+        for _pass in 0..truncation_cells {
+            let mut next_mask = sq_mask.clone();
+            for gz in 0..depth {
+                for gy in 0..height {
+                    for gx in 0..width {
+                        let idx = gx + gy * stride_y + gz * stride_z;
+                        if sq_mask[idx] {
+                            // Mark 6-connected neighbors
+                            if gx > 0 { next_mask[idx - 1] = true; }
+                            if gx + 1 < width { next_mask[idx + 1] = true; }
+                            if gy > 0 { next_mask[idx - stride_y] = true; }
+                            if gy + 1 < height { next_mask[idx + stride_y] = true; }
+                            if gz > 0 { next_mask[idx - stride_z] = true; }
+                            if gz + 1 < depth { next_mask[idx + stride_z] = true; }
+                        }
+                    }
+                }
+            }
+            sq_mask = next_mask;
+        }
+
         distance
             .par_iter_mut()
             .enumerate()
             .for_each(|(flat_idx, dist)| {
+                // Skip voxels outside the SQ evaluation mask
+                if !sq_mask[flat_idx] {
+                    return;
+                }
+
                 let cam_tdf = *dist;
 
                 // Skip surface voxels and truly unvisited voxels

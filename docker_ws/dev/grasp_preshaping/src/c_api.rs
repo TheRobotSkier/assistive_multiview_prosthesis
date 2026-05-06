@@ -185,14 +185,23 @@ static PRED_CONFIG: OnceLock<PredictionConfig> = OnceLock::new();
 static INDEX_TIP_LOCAL: OnceLock<Vector3<f64>> = OnceLock::new();
 
 fn select_best_grasps(scored: &[ScoredGrasp]) -> (Option<&ScoredGrasp>, Option<&ScoredGrasp>) {
-    let mut ranked: Vec<&ScoredGrasp> = scored.iter().collect();
-    ranked.sort_by(|a, b| {
-        b.combined
-            .partial_cmp(&a.combined)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    let mut best: Option<&ScoredGrasp> = None;
+    let mut second_best: Option<&ScoredGrasp> = None;
 
-    (ranked.first().copied(), ranked.get(1).copied())
+    for grasp in scored {
+        if let Some(b) = best {
+            if grasp.combined > b.combined {
+                second_best = best;
+                best = Some(grasp);
+            } else if second_best.map_or(true, |sb| grasp.combined > sb.combined) {
+                second_best = Some(grasp);
+            }
+        } else {
+            best = Some(grasp);
+        }
+    }
+
+    (best, second_best)
 }
 
 /// Score all SMC particles in parallel, returning scored grasps and updating

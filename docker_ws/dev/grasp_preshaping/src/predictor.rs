@@ -429,13 +429,25 @@ pub fn select_elite_indices(particles: &[SmcParticle], elite_ratio: f64) -> Vec<
     let n_elite = n_elite.max(1).min(particles.len());
 
     let mut indexed: Vec<usize> = (0..particles.len()).collect();
+    
+    if n_elite < indexed.len() {
+        indexed.select_nth_unstable_by(n_elite - 1, |&a, &b| {
+            particles[b]
+                .score
+                .partial_cmp(&particles[a].score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        indexed.truncate(n_elite);
+    }
+    
+    // Sort only the elites so that the absolute best are at the front
     indexed.sort_by(|&a, &b| {
         particles[b]
             .score
             .partial_cmp(&particles[a].score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    indexed.truncate(n_elite);
+    
     indexed
 }
 

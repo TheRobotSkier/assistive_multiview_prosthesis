@@ -13,7 +13,7 @@ pub const BINARY_SEARCH_TOL: f64 = 0.05;
 
 // ROI prediction
 pub const PREDICTION_HORIZON_S: f64 = 5.0;
-pub const PREDICTION_SAMPLES: usize = 1000000;
+pub const PREDICTION_SAMPLES: usize = 25000;
 pub const HAND_RADIUS_M: f64 = 0.05;
 pub const MIN_TSDF_DIM_M: f32 = 0.1;
 pub const MAX_TSDF_DIM_M: f32 = 0.5;
@@ -32,7 +32,7 @@ pub const ITERATIONS: usize = 5; // Number of SMC iterations
 pub const DECAY_RATE: f64 = 0.7; // Geometric decay factor per iteration
 pub const ELITE_RATIO: f64 = 0.05; // Top fraction selected as elites
 pub const SMC_CONVERGENCE_TOL: f64 = 0.01; // Combined score change threshold for early termination
-pub const SMC_MIN_ITERATIONS: usize = 2; // Minimum iterations before early termination is allowed
+pub const SMC_MIN_ITERATIONS: usize = 3; // Minimum iterations before early termination is allowed
 pub const GRASP_TYPE_MIN_PROBABILITY: f64 = 0.15; // Minimum probability floor for each grasp type in weighted resampling
 
 // Starting Proposal Variance
@@ -68,6 +68,6 @@ pub const SQ_MIN_SIGN_OVERRIDE_CELLS: usize = 2;
 // When true, each pipeline invocation writes a single .npz file containing the
 // scored grasp candidates.  When false the entire export path is eliminated by
 // the compiler (zero runtime cost).
-pub const DEBUG_VISUALIZATION: bool = true;
+pub const DEBUG_VISUALIZATION: bool = false;
 // Output directory (relative to the crate manifest directory).
 pub const DEBUG_OUTPUT_DIR: &str = "data/debug"; 
