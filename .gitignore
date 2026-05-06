@@ -53,3 +53,4 @@ docker_ws/dev/grasp_preshaping/data/debug/
 AGENTS.md
 CLAUDE.md
 .claude/
+.agents/
