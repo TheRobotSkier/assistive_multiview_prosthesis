@@ -157,13 +157,19 @@ Visualization Manager:
           Value: true
         global:
           Value: true
+        head_d435i_head_color_optical_frame_body_display:
+          Value: true
         head_d435i_head_color_optical_frame_from_marker:
+          Value: true
+        head_d435i_head_color_optical_frame_raw:
           Value: true
         imu:
           Value: true
         imu_from_marker:
           Value: true
         imu_openvins_corrected:
+          Value: true
+        marker_0:
           Value: true
         marker_map:
           Value: true
@@ -173,17 +179,18 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        global:
-          imu:
-            cam0:
-              {}
         marker_map:
+          head_d435i_head_color_optical_frame_body_display:
+            {}
           head_d435i_head_color_optical_frame_from_marker:
             {}
           imu_from_marker:
             {}
           imu_openvins_corrected:
             {}
+          marker_0:
+            head_d435i_head_color_optical_frame_raw:
+              {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -191,7 +198,7 @@ Visualization Manager:
       Axes Radius: 0.10000000149011612
       Class: rviz_default_plugins/Pose
       Color: 255; 25; 0
-      Enabled: true
+      Enabled: false
       Head Length: 0.30000001192092896
       Head Radius: 0.10000000149011612
       Name: Pose
@@ -204,14 +211,14 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /head/marker_pose/camera_pose
-      Value: true
+        Value: /head/marker_pose/camera_pose_raw
+      Value: false
     - Alpha: 1
       Axes Length: 1
       Axes Radius: 0.10000000149011612
       Class: rviz_default_plugins/Pose
       Color: 255; 25; 0
-      Enabled: true
+      Enabled: false
       Head Length: 0.30000001192092896
       Head Radius: 0.10000000149011612
       Name: Pose
@@ -225,7 +232,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /head/marker_pose/imu_pose
-      Value: true
+      Value: false
     - Angle Tolerance: 0.10000000149011612
       Class: rviz_default_plugins/Odometry
       Covariance:
@@ -264,6 +271,26 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /head/marker_pose/ov_corrected_odom
+      Value: true
+    - Alpha: 1
+      Axes Length: 1
+      Axes Radius: 0.10000000149011612
+      Class: rviz_default_plugins/Pose
+      Color: 255; 25; 0
+      Enabled: true
+      Head Length: 0.30000001192092896
+      Head Radius: 0.10000000149011612
+      Name: Pose
+      Shaft Length: 1
+      Shaft Radius: 0.05000000074505806
+      Shape: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /head/marker_pose/camera_body_pose
       Value: true
   Enabled: true
   Global Options:
@@ -311,7 +338,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 13.849963188171387
+      Distance: 5.539864540100098
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -326,10 +353,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4203979969024658
+      Pitch: 0.34039801359176636
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 6.233583927154541
+      Yaw: 5.4335832595825195
     Saved: ~
 Window Geometry:
   Displays:

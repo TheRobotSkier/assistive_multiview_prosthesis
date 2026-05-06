@@ -14,9 +14,19 @@ install(
 )
 
 install(
+  DIRECTORY docs/
+  DESTINATION share/${PROJECT_NAME}/docs
+)
+
+install(
   PROGRAMS
     scripts/aruco_marker_pose_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_aruco_marker_pose_math test/test_aruco_marker_pose_math.py)
+endif()
 
 ament_package()

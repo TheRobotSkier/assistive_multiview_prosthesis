@@ -1,1 +1,13 @@
 _local_backups/
+
+# Local Python environments and scratch artifacts.
+.venvs/
+debug_patches/
+
+# ROS 2 overlay build/install/log outputs generated inside Docker/Jazzy.
+build_overlay/
+install_overlay/
+log_overlay/
+
+# Recorded bags are large local validation artifacts.
+bags/
