@@ -271,6 +271,31 @@ services:
       REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
     command: ["ros2", "launch", "/ros_ws/launch/one_d435_launch.py"]
 
+  # ── RViz2 pointcloud viewer — ROS Humble ──────────────────────────────────
+  # Displays the RealSense depth pointcloud from multiview_cameras in RViz2.
+  # Requires X11 forwarding to the host display.
+  # Start with: docker compose --profile standalone up multiview_cameras multiview_rviz2
+  multiview_rviz2:
+    build:
+      context: ../dev/multiview
+      dockerfile: Dockerfile.rviz2
+    container_name: multiview_rviz2
+    network_mode: "host"
+    ipc: host
+    tty: true
+    stdin_open: true
+    profiles: [standalone, full_system]
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${XAUTHORITY}:/tmp/.Xauthority:ro,z
+    environment:
+      DISPLAY: $DISPLAY
+      XAUTHORITY: /tmp/.Xauthority
+      QT_X11_NO_MITSHM: 1
+      HOME: /tmp
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+    userns_mode: "keep-id"
+
   # Variant: cameras + `/fused_pointcloud` publisher.
   # With one camera it republishes cam1 directly; with two cameras it fuses both
   # clouds once the second serial is provided.

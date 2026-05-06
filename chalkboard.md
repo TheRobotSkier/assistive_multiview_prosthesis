@@ -58,3 +58,12 @@ After the first format-setting attempt fails (I/O error), subsequent retries hit
 - Frame ID: `d435_1_depth_optical_frame`
 - Timestamps are live (not stale)
 - No permissions or I/O errors when the full device set is available
+
+### RViz2 pointcloud viewer container
+- Created `Dockerfile.rviz2` based on `ros:humble-ros-base` with `ros-humble-rviz2`
+- Created `config/realsense_pointcloud.rviz` — subscribes to `/cam1/d435_1/depth/color/points` and `/fused_pointcloud`
+- Started camera + rviz2 containers: `ros2 topic info` confirms 1 publisher (camera) + 1 subscriber (rviz2) on the pointcloud topic
+- OpenGL 4.5 initialised with software rendering (MESA fallback, no GPU passthrough needed)
+- X11 forwarding required: `--network host -e DISPLAY -v /tmp/.X11-unix -e XAUTHORITY -v ${XAUTHORITY}:/tmp/.Xauthority`
+- HOME must be set to `/tmp` inside the rviz2 container to avoid `.ros/log` permissions error with `--userns=keep-id`
+- Service added to `docker-compose.linux-podman.yml` as `multiview_rviz2` (profiles: standalone, full_system)
