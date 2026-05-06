@@ -267,7 +267,7 @@ services:
     environment:
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
       REALSENSE_SERIAL_NO: ${REALSENSE_SERIAL_NO:-}
-      REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-false}
+      REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-true}
       REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
     command: ["ros2", "launch", "/ros_ws/launch/one_d435_launch.py"]
 
@@ -317,7 +317,7 @@ services:
       REALSENSE_SERIAL_NO: ${REALSENSE_SERIAL_NO:-}
       REALSENSE_CAM1_SERIAL: ${REALSENSE_CAM1_SERIAL:-}
       REALSENSE_CAM2_SERIAL: ${REALSENSE_CAM2_SERIAL:-}
-      REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-false}
+      REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-true}
       REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
     command: ["ros2", "launch", "/ros_ws/launch/multiview_full_launch.py"]
 

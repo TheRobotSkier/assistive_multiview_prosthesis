@@ -1,8 +1,8 @@
 """Launch a single D435 camera through the official realsense2 package launch file.
 
 USB 2.0 note: The D435 connected over USB 2.0/2.1 cannot stream depth + color
-simultaneously. Color is disabled by default; enable it only on USB 3.0+ ports.
-Override with: ros2 launch ... enable_color:=true
+simultaneously. Color is enabled by default because pointcloud.enable requires the
+color stream. Set enable_color:=false if on USB 2.0 (pointcloud won't work).
 """
 import os
 
@@ -67,8 +67,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'enable_color',
-            default_value='false',
-            description='Enable RGB color stream (requires USB 3.0+)',
+            default_value='true',
+            description='Enable RGB color stream (required for pointcloud.enable). Set false on USB 2.0 (disables pointcloud).',
         ),
         DeclareLaunchArgument(
             'initial_reset',

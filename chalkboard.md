@@ -67,3 +67,11 @@ After the first format-setting attempt fails (I/O error), subsequent retries hit
 - X11 forwarding required: `--network host -e DISPLAY -v /tmp/.X11-unix -e XAUTHORITY -v ${XAUTHORITY}:/tmp/.Xauthority`
 - HOME must be set to `/tmp` inside the rviz2 container to avoid `.ros/log` permissions error with `--userns=keep-id`
 - Service added to `docker-compose.linux-podman.yml` as `multiview_rviz2` (profiles: standalone, full_system)
+
+## Final verification — all working
+
+1. **Camera with `enable_color:=false`**: depth image streams, pointcloud topic advertised but **no data published**. The `/depth/color/points` topic needs the color stream to produce points.
+2. **Camera with `enable_color:=true`**: pointcloud `/cam1/d435_1/depth/color/points` publishes **90,415 valid points** at ~3.2m range, 1.8 MB/frame, 640×480×15 Z16 with RGB texture. Frame ID: `d435_1_depth_optical_frame`.
+3. **RViz2 subscriber confirmed**: `ros2 topic info` reports Publisher count: 1, Subscription count: 1 (rviz2).
+4. **RViz2 window opens on host display**: OpenGL 4.5 (software render), points visible in full color at default view settings.
+5. **Default configs updated**: `one_d435_launch.py`, `realsense_ros_probe.sh`, and `docker-compose.linux-podman.yml` all changed to default `enable_color:=true` since pointcloud depends on it. Override with env var `REALSENSE_ENABLE_COLOR=false` on USB 2.0.

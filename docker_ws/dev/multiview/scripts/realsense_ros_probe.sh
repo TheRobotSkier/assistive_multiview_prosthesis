@@ -5,7 +5,7 @@ source /opt/ros/humble/setup.bash
 set -u
 
 launch_args=(
-  "enable_color:=${REALSENSE_ENABLE_COLOR:-false}"
+  "enable_color:=${REALSENSE_ENABLE_COLOR:-true}"
   "pointcloud.enable:=${REALSENSE_ENABLE_POINTCLOUD:-true}"
   "align_depth.enable:=${REALSENSE_ALIGN_DEPTH:-true}"
   "depth_module.depth_profile:=${REALSENSE_DEPTH_PROFILE:-640x480x15}"
