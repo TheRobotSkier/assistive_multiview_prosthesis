@@ -1,0 +1,81 @@
+# CPU-only Docker image for MinkowskiEngine + InterObject3D inference.
+# Isolated from the main ROS container — this runs Python 3.8 + PyTorch 1.12.
+# The ROS bridge node talks to this container over HTTP.
+
+FROM docker.io/python:3.8-slim-bullseye
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Build tools + Open3D headless runtime requirements
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        ninja-build \
+        cmake \
+        build-essential \
+        libopenblas-dev \
+        wget \
+        libgl1 \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin numpy<2 before torch to avoid ABI mismatch with torch 1.12
+RUN pip install --no-cache-dir "numpy<2"
+
+# PyTorch CPU-only (1.12.1 is the last 1.x patch release)
+RUN pip install --no-cache-dir \
+        torch==1.12.1+cpu \
+        torchvision==0.13.1+cpu \
+        -f https://download.pytorch.org/whl/torch_stable.html
+
+# Copy local MinkowskiEngine source and build
+COPY MinkowskiEngine/ /MinkowskiEngine-src/
+COPY setup.minkowski.py /MinkowskiEngine-src/setup.py
+COPY src/ /MinkowskiEngine-src/src/
+COPY pybind/ /MinkowskiEngine-src/pybind/
+COPY MANIFEST.in /MinkowskiEngine-src/MANIFEST.in
+ENV MAX_JOBS=4
+RUN cd /MinkowskiEngine-src && \
+    python setup.py install --blas=openblas --cpu_only && \
+    cd / && rm -rf /MinkowskiEngine-src
+
+# Python inference dependencies
+RUN pip install --no-cache-dir \
+        "open3d>=0.12.0" \
+        trimesh \
+        pyviz3d \
+        scipy \
+        scikit-learn \
+        plyfile \
+        tqdm \
+        pandas \
+        transforms3d \
+        matplotlib \
+        flask
+
+# Clone InterObject3D (pinned to a known-good commit)
+RUN git clone https://github.com/theodorakontogianni/InterObject3D /app && \
+    cd /app && git checkout 827b350
+
+WORKDIR /app/InterObject3D/Minkowski/training
+
+# Copy the inference server
+COPY nodes/inference_server.py /nodes/inference_server.py
+
+# Weights are expected at /weights/weights_exp14_14.pth
+# Downloaded at runtime by the entrypoint script if not present.
+ARG DOWNLOAD_WEIGHTS=0
+RUN if [ "$DOWNLOAD_WEIGHTS" = "1" ]; then \
+        mkdir -p /weights && \
+        wget -q \
+          https://omnomnom.vision.rwth-aachen.de/data/3d_inter_obj_seg/scannet_official/weights/weights_exp14_14.pth \
+          -O /weights/weights_exp14_14.pth; \
+    fi
+
+COPY docker/entrypoint.inference.sh /entrypoint.inference.sh
+RUN chmod +x /entrypoint.inference.sh
+
+ENTRYPOINT ["/entrypoint.inference.sh"]
+CMD ["python", "/nodes/inference_server.py"]

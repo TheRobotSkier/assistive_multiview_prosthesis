@@ -1,0 +1,102 @@
+# ── Central Prosthesis Configuration ──────────────────────────────────────────
+# All parameters are loaded by the pipeline launch file and passed to nodes.
+# Topic names, thresholds, hardware ports, and tuning parameters live here.
+
+# ── ROS Topics ────────────────────────────────────────────────────────────────
+topics:
+  # Hand tracking
+  hand_pose: "/hand_pose"
+  hand_twist: "/hand_twist"
+
+  # Segmentation
+  segmentation_input_cloud: "/segmentation/input_cloud"
+  segmentation_click_positive: "/segmentation/click_positive"
+  segmentation_click_negative: "/segmentation/click_negative"
+  segmentation_reset: "/segmentation/reset"
+  segmented_object_cloud: "/segmented_object_cloud"
+
+  # Grasp preshaping
+  compute_grasp_service: "/grasp_preshaping/compute_grasp"
+  preshaping_wrist_pose: "/grasp_preshaping/wrist_pose"
+  preshaping_target_hand_pose: "/grasp_preshaping/target_hand_pose"
+  preshaping_target_closures: "/grasp_preshaping/target_finger_closures"
+  preshaping_grasp_type: "/grasp_preshaping/grasp_type"
+
+  # Joint commands (forward position controllers)
+  thumb_cmd: "/thumb_pos_ff_controller/commands"
+  index_cmd: "/index_pos_ff_controller/commands"
+  mrl_cmd: "/mrl_pos_ff_controller/commands"
+
+  # Wrist
+  wrist_set_position: "/wrist/set_position"
+  wrist_state: "/wrist/state"
+
+  # EMG
+  emg_gesture_label: "/emg/gesture_label"
+  emg_gesture_name: "/emg/gesture_name"
+  emg_confidence: "/emg/confidence"
+  emg_proportional: "/emg/proportional"
+
+  # Pipeline
+  pipeline_state: "/pipeline/state"
+
+  # Haptic
+  haptic_motors: "/haptic_band/motors"
+
+  # Force
+  finger_forces: "data_streams/fingers/forces/data"
+  force_stream_switch: "data_streams/fingers/forces/switch"
+
+# ── TF Frames ─────────────────────────────────────────────────────────────────
+frames:
+  world: "world"
+  hand: "hand_link"
+  camera_front: "camera_front_depth"
+  camera_wrist: "camera_wrist"
+
+# ── EMG ───────────────────────────────────────────────────────────────────────
+emg:
+  confidence_threshold: 0.55
+  gesture_names: ["REST", "POWER", "PINCH", "OPEN", "POINT"]
+  # Gesture to pipeline action mapping
+  gesture_actions:
+    POWER: "start_grasp"
+    PINCH: "start_grasp"
+    OPEN: "release"
+    POINT: "start_grasp"
+
+# ── Segmentation ──────────────────────────────────────────────────────────────
+segmentation:
+  inference_url: "http://127.0.0.1:5678"
+  cubeedge: 0.05
+
+# ── Grasp Preshaping ─────────────────────────────────────────────────────────
+preshaping:
+  min_closure_amount: 0.1
+  preshaping_closure_fraction: 1.0
+  camera_frames: ["camera_front_depth", "camera_wrist"]
+
+# ── Proximity Execution ──────────────────────────────────────────────────────
+execution:
+  proximity_enter_threshold_m: 0.08
+  proximity_exit_threshold_m: 0.10
+  partial_closure_factor: 0.3
+  min_closure_amount: 0.1
+  wrist_accel_deg_s2: 180.0
+  control_rate_hz: 10.0
+
+# ── Force Control ─────────────────────────────────────────────────────────────
+force:
+  target_force_min: 50.0
+  target_force_max: 200.0
+  kp: 0.01
+  ki: 0.001
+  update_rate_hz: 10.0
+
+# ── Hardware ──────────────────────────────────────────────────────────────────
+hardware:
+  mia_serial_port: "/dev/ttyUSB1"
+  wrist_port: "/dev/ttyUSB0"
+  wrist_baudrate: 57600
+  wrist_motor_id: 1
+  haptic_bt_addr1: "84:2E:14:09:E1:4E"

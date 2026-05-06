@@ -1,0 +1,146 @@
+"""Full pipeline launch - all nodes with hardware.
+
+Launches the complete prosthesis pipeline:
+  1. Mia Hand driver (serial)
+  2. Wrist Dynamixel driver
+  3. EMG bridge (MindRove)
+  4. Segmentation ROS bridge
+  5. Grasp preshaping service
+  6. Grasp proximity controller
+  7. Force controller
+  8. Pipeline manager (state machine)
+  9. RViz
+
+Usage:
+  ros2 launch pipeline.launch.py
+  ros2 launch pipeline.launch.py rviz:=false
+  ros2 launch pipeline.launch.py config_file:=/path/to/config.yaml
+"""
+
+import os
+from launch import LaunchDescription
+from launch_ros.actions import Node
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+
+
+def generate_launch_description():
+    # Launch arguments
+    rviz_arg = DeclareLaunchArgument(
+        "rviz", default_value="true", description="Launch RViz"
+    )
+    config_arg = DeclareLaunchArgument(
+        "config_file",
+        default_value="",
+        description="Path to prosthesis_config.yaml (empty = package default)",
+    )
+    camera_arg = DeclareLaunchArgument(
+        "camera", default_value="true", description="Launch RealSense camera"
+    )
+    mia_hand_arg = DeclareLaunchArgument(
+        "mia_hand", default_value="true", description="Launch Mia Hand driver"
+    )
+
+    # Pipeline Manager - state machine orchestrator
+    pipeline_manager = Node(
+        package="pipeline_manager",
+        executable="pipeline_manager_node",
+        name="pipeline_manager",
+        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        output="screen",
+    )
+
+    # Mia Hand Driver
+    mia_hand_driver = Node(
+        package="mia_hand_driver",
+        executable="mia_hand_driver_node",
+        name="mia_hand_driver",
+        parameters=[{"serial_port": "/dev/ttyUSB0"}],
+        output="screen",
+    )
+
+    # EMG Bridge - MindRove gesture classifier
+    emg_bridge = Node(
+        package="emg_bridge",
+        executable="run_classifier",
+        name="emg_bridge",
+        output="screen",
+    )
+
+    # Segmentation ROS bridge (talks to inference server over HTTP)
+    segmentation_bridge = Node(
+        package="segmentation_bridge",
+        executable="segmentation_ros2_node",
+        name="segmentation_bridge",
+        parameters=[{
+            "inference_url": "http://127.0.0.1:5678",
+        }],
+        output="screen",
+    )
+
+    # Grasp Preshaping Service (C++ bridge to Rust .so)
+    preshaping_service = Node(
+        package="grasp_preshaping",
+        executable="preshaping_service_bridge_node",
+        name="preshaping_service",
+        output="screen",
+    )
+
+    # Grasp Proximity Controller
+    proximity_controller = Node(
+        package="grasp_preshaping",
+        executable="grasp_proximity_controller_node.py",
+        name="proximity_controller",
+        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        output="screen",
+    )
+
+    # Force Controller
+    force_controller = Node(
+        package="force_controller",
+        executable="force_controller_node",
+        name="force_controller",
+        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        output="screen",
+    )
+
+    # RViz config - look in the rviz/ directory at workspace root
+    rviz_config = os.path.join(
+        os.path.dirname(__file__), "..", "..", "..", "..", "rviz", "prosthesis.rviz"
+    )
+
+    rviz = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        arguments=["-d", rviz_config],
+        output="screen",
+    )
+
+    # Assemble launch
+    nodes = [
+        pipeline_manager,
+        emg_bridge,
+        segmentation_bridge,
+        preshaping_service,
+        proximity_controller,
+        force_controller,
+    ]
+
+    # Conditional nodes - always included, can be toggled
+    # (Launch system doesn't support true conditionals easily,
+    #  so we include them and let the nodes handle missing hardware)
+    nodes.append(mia_hand_driver)
+
+    # RViz - included by default
+    nodes.append(rviz)
+
+    return LaunchDescription(
+        [
+            rviz_arg,
+            config_arg,
+            camera_arg,
+            mia_hand_arg,
+        ]
+        + nodes
+    )

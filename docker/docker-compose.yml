@@ -1,0 +1,44 @@
+# Prosthesis — minimal Docker Compose
+# Usage:
+#   docker compose up                        # mock hardware (default)
+#   docker compose --profile hardware up     # real hardware (USB devices mapped)
+
+services:
+  # ── Main ROS 2 container ─────────────────────────────────────────────────
+  prosthesis:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=0
+    network_mode: host
+    volumes:
+      # X11 forwarding (works on Linux and WSL2 with WSLg)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    profiles:
+      - mock
+    stdin_open: true
+    tty: true
+
+  # ── Hardware variant: same image with USB devices ────────────────────────
+  prosthesis-hw:
+    extends: prosthesis
+    devices:
+      - ${MIA_SERIAL_PORT:-/dev/ttyUSB1}:/dev/ttyUSB1
+      - ${WRIST_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0
+    profiles:
+      - hardware
+
+  # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
+  segmentation:
+    build:
+      context: ../src/segmentation
+      dockerfile: ../../docker/Dockerfile.segmentation
+    environment:
+      - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
+    network_mode: host

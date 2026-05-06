@@ -1,6 +1,0 @@
-# Default initial positions for mia_hand_robot's ros2_control fake system
-
-initial_positions:
-  j_index_fle: 0
-  j_mrl_fle: 0
-  j_thumb_fle: 0
