@@ -42,7 +42,7 @@ Visualization Manager:
         Reliability Policy: Best Effort
         Value: /cam1/d435_1/depth/color/points
       Use Fixed Frame: true
-      Use rainbow: true
+      Use rainbow: false
       Value: true
     - Alpha: 0.5
       Autocompute Intensity Bounds: true
@@ -64,7 +64,7 @@ Visualization Manager:
         Reliability Policy: Best Effort
         Value: /cam2/d435_2/depth/color/points
       Use Fixed Frame: true
-      Use rainbow: true
+      Use rainbow: false
       Value: true
     - Class: rviz_default_plugins/TF
       Enabled: true

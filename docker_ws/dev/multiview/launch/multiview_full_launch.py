@@ -1,12 +1,12 @@
-"""Launch the full multiview pipeline: dual cameras, static TF, pointcloud fusion.
+"""Launch the full multiview pipeline: dual cameras with static TF alignment.
 
-This delegates the actual camera launch to two_d435_launch.py (which handles the
-serial_no YAML quoting workaround) and adds the pointcloud_fusion_node.
+Simply delegates to two_d435_launch.py (which handles the serial_no YAML quoting
+workaround and publishes individual pointcloud streams + static TF).
 
 Configurable via environment variables (passed through to two_d435_launch.py):
     CAM1_SERIAL       Serial for camera 1 (default: 829212072207)
     CAM2_SERIAL       Serial for camera 2 (default: 827112072033)
-    CAM2_OFFSET_X     X-offset from cam1 to cam2 depth frame (default: 0.15)
+    CAM2_OFFSET_X     X-offset from cam1 to cam2 depth frame (default: 0.5)
 """
 
 import os

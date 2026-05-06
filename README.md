@@ -223,9 +223,9 @@ This will launch the dynamic simulation, and you should have a GUI for selecting
 
 The legacy standalone CLI (`cargo run -- --mode ros`) has been removed. The grasp preshaping pipeline is now integrated as a ROS 2 service node that is launched automatically with the interactive or dynamic simulation. Use the interactive simulation (recommended) or the dynamic simulation described above.
 
-**Multiview**:
-The multiview system presumes launch on the Nvidia Jetson, and is not containerized-- This will be harder to set up to run on your own systems.
-For using the launch script in the multiview folder, change the directory path in the .sh file as: RVIZ_CONFIG.
+**Multiview** (RealSense D435 cameras):
+
+See the [RealSense Camera Setup](#intel-realsense-d435-camera-setup) section below for setup and launch instructions.
 
 ---
 
@@ -341,6 +341,98 @@ Downloads weights on first run, then runs a single inference to verify the Minko
 
 ---
 
+## Intel RealSense D435 Camera Setup
+
+Two Intel RealSense D435 cameras are supported, publishing RGB pointclouds via ROS Humble. The pipeline runs inside a single Docker container (no host ROS installation needed).
+
+### Prerequisites
+
+Ensure both cameras are plugged into USB 3 ports. Check they are visible:
+
+```bash
+lsusb | grep -i intel
+v4l2-ctl --list-devices 2>/dev/null | grep -A1 D435 || echo "(v4l2-ctl not available — that's OK, librealsense uses USB directly)"
+```
+
+You only need `podman` (not Docker) and the project's `compose.yaml`.
+
+### Build the camera images (once)
+
+```bash
+cd docker_ws/dev/multiview
+podman build --no-cache -t localhost/multiview-humble-realsense:latest -f Dockerfile.humble_cameras .
+podman build -t localhost/multiview-rviz2:latest -f Dockerfile.rviz2 .
+cd ../../docker-deployment
+```
+
+### Single camera
+
+```bash
+# Terminal 1 — start the camera:
+podman run --rm --privileged --network host --ipc host \
+  --device /dev/bus/usb:/dev/bus/usb \
+  -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
+  -e CAM1_SERIAL=829212072207 \
+  localhost/multiview-humble-realsense:latest
+
+# Terminal 2 — launch RViz2:
+podman run -d --network host --ipc host \
+  -e DISPLAY=:0 -e QT_X11_NO_MITSHM=1 -e HOME=/tmp \
+  -v /tmp/.X11-unix:/tmp/.X11-unix \
+  -e XAUTHORITY=/tmp/.Xauthority -v ${XAUTHORITY}:/tmp/.Xauthority:ro,z \
+  --userns=keep-id \
+  localhost/multiview-rviz2:latest
+```
+
+In RViz, the panel at left should show `cam1/d435_1/depth/color/points` already added (loaded from the config file). If not, use **Add → PointCloud2** and set the topic.
+
+### Dual cameras
+
+```bash
+# Terminal 1:
+podman run --rm --privileged --network host --ipc host \
+  --device /dev/bus/usb:/dev/bus/usb \
+  -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
+  -e CAM1_SERIAL=829212072207 \
+  -e CAM2_SERIAL=827112072033 \
+  -e CAM2_OFFSET_X=0.5 \
+  localhost/multiview-humble-realsense:latest
+
+# Terminal 2 — same RViz command as above
+```
+
+RViz config already includes both `/cam1/d435_1/depth/color/points` and `/cam2/d435_2/depth/color/points`. Camera 2 is positioned at +0.5 m X-offset from camera 1 via a static TF transform.
+
+### Via Docker Compose
+
+From `docker_ws/docker-deployment/`:
+
+```bash
+# Single camera:
+docker compose --profile standalone up multiview_cameras
+
+# Single camera + RViz2:
+docker compose --profile standalone up multiview_cameras multiview_rviz2
+
+# Dual cameras + RViz2:
+CAM1_SERIAL=829212072207 CAM2_SERIAL=827112072033 \
+  docker compose --profile standalone up multiview_full multiview_rviz2
+```
+
+### Key design decisions
+
+| Decision | Why |
+|----------|-----|
+| `rmw_fastrtps_cpp` | CycloneDDS SHM discovery fails inside containers; FastDDS discovers over `localhost` reliably. |
+| `--device /dev/bus/usb:/dev/bus/usb` only | Librealsense enumerates cameras via USB descriptors; explicit `/dev/videoN` mappings become stale on reconnect. |
+| `ExecuteProcess` instead of launch `Node` | The launch framework writes serial numbers unquoted in YAML — the realsense node rejects `serial_no=829212072207` as `{integer}`. `-p "serial_no:='SERIAL'"` forces string type. |
+| `pointcloud.stream_filter:=2` (color) | Forces pointcloud RGB texture from the color stream; without this the `rgb` field is missing. |
+| `enable_infra1:=false, enable_infra2:=false` | Disables the two IR streams to reduce USB isochronous bandwidth. Two D435s at 640×480×15 with infra overflow without this. |
+| `enable_sync:=true` (in probe script) | Hardware frame sync between depth + color so the pointcloud has valid RGB data. |
+| Depth/color at 640×480×6 FPS | 6 fps keeps USB bandwidth well within limits (≈9 MB/s per camera vs ≈32 MB/s at 15 fps). |
+
+---
+
 ## Full System Test
 
 Launch the complete system (EMG + haptics + cameras + segmentation + MuJoCo mirror) with Docker profiles:
@@ -350,4 +442,6 @@ Launch the complete system (EMG + haptics + cameras + segmentation + MuJoCo mirr
 docker compose --profile full_system up
 ```
 
-This starts: `mindrove_emg_ros`, `multiview_full`, `segmentation_inference`, `segmentation_ros2`, and `full_system_test` (RViz + MuJoCo mirror + haptic controller). Hardware must be connected (Mia Hand on USB, haptic band via BT, D435 cameras on USB). See `docker_ws/dev/mujoco/launch/full_system_test_launch.py` for the full launch configuration.
+This starts: `mindrove_emg_ros`, `multiview_cameras`, `segmentation_inference`, `segmentation_ros2`, and `full_system_test` (RViz + MuJoCo mirror + haptic controller). Hardware must be connected (Mia Hand on USB, haptic band via BT, D435 cameras on USB). Camera pointcloud topics are `/cam1/d435_1/depth/color/points` and `/cam2/d435_2/depth/color/points`. See `docker_ws/dev/mujoco/launch/full_system_test_launch.py` for the full launch configuration.
+
+---

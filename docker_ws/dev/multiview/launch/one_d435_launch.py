@@ -6,7 +6,6 @@ color stream. Set REALSENSE_ENABLE_COLOR=false if on USB 2.0 (pointcloud won't w
 
 Configurable via environment variables:
     CAM1_SERIAL              Serial number (default: 829212072207)
-    REALSENSE_ENABLE_COLOR   "true" or "false" (default: true)
     REALSENSE_INITIAL_RESET  "true" or "false" (default: false)
 
 Design note:
@@ -41,6 +40,7 @@ def _realsense_cmd() -> list:
         '-p', f'depth_module.depth_profile:={_DEPTH_PROFILE}',
         '-p', f'rgb_camera.color_profile:={_COLOR_PROFILE}',
         '-p', 'pointcloud.enable:=true',
+        '-p', 'pointcloud.stream_filter:=2',
         '-p', 'align_depth.enable:=true',
         '-p', 'enable_infra1:=false',
         '-p', 'enable_infra2:=false',

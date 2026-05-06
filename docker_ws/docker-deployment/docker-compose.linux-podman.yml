@@ -248,10 +248,18 @@ services:
       - ../dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64:/sdk:ro
 
   # ── Multiview cameras — ROS Humble (RealSense camera access) ──────────────
-  # Runs the official realsense2_camera_node in ROS Humble.
-  # Uses --device /dev/bus/usb for USB-level camera enumeration by librealsense.
-  # Explicit /dev/videoN passthrough is NOT needed (and will break when device
-  # numbers change across reboots/reconnects).
+  # Runs the official realsense2_camera launch in ROS Humble.
+  # Device passthrough uses only /dev/bus/usb (librealsense enumerates via USB
+  # descriptors; explicit /dev/videoN mappings become stale on reconnect).
+  #
+  # Single camera (default):
+  #   docker compose --profile standalone up multiview_cameras
+  #
+  # Dual cameras (set CAM2_SERIAL):
+  #   CAM1_SERIAL=829212072207 CAM2_SERIAL=827112072033 \
+  #     docker compose --profile standalone up multiview_cameras
+  #
+  # The probe script auto-detects dual mode when CAM2_SERIAL is set.
   multiview_cameras:
     build:
       context: ../dev/multiview
@@ -264,20 +272,19 @@ services:
     stdin_open: true
     profiles: [standalone, full_system]
     devices:
-      # USB bus access for librealsense enumeration (video device numbers change
-      # on every reconnect, so /dev/bus/usb is the stable interface)
       - /dev/bus/usb:/dev/bus/usb
     environment:
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
       CAM1_SERIAL: ${CAM1_SERIAL:-829212072207}
-      REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-true}
-      REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
-    command: ["ros2", "launch", "/ros_ws/launch/one_d435_launch.py"]
+      CAM2_SERIAL: ${CAM2_SERIAL:-}
+    command: ["/ros_ws/scripts/realsense_ros_probe.sh"]
 
   # ── RViz2 pointcloud viewer — ROS Humble ──────────────────────────────────
-  # Displays the RealSense depth pointcloud from multiview_cameras in RViz2.
+  # Displays the RealSense depth pointcloud(s) (cam1 and cam2 individually,
+  # plus /fused_pointcloud if fusion is enabled) in RViz2.
   # Requires X11 forwarding to the host display.
-  # Start with: docker compose --profile standalone up multiview_cameras multiview_rviz2
+  # Start with cameras:
+  #   docker compose --profile standalone up multiview_cameras multiview_rviz2
   multiview_rviz2:
     build:
       context: ../dev/multiview
@@ -299,9 +306,11 @@ services:
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
     userns_mode: "keep-id"
 
-  # Variant: dual cameras + static TF for side-by-side visualization.
-  # Launches both cameras (via two_d435_launch.py). Offset cam2 by
-  # CAM2_OFFSET_X along the X axis (default 0.5 m) for side-by-side viewing.
+  # Variant: dual cameras with multiview_full_launch.py (includes static TF
+  # alignment). Provides individual pointclouds on:
+  #   /cam1/d435_1/depth/color/points
+  #   /cam2/d435_2/depth/color/points
+  # Configure both camera serials and an X-offset for alignment.
   multiview_full:
     build:
       context: ../dev/multiview
@@ -314,7 +323,6 @@ services:
     stdin_open: true
     profiles: [standalone, full_system]
     devices:
-      # USB bus access for librealsense enumeration
       - /dev/bus/usb:/dev/bus/usb
     environment:
       RMW_IMPLEMENTATION: rmw_fastrtps_cpp
@@ -322,10 +330,10 @@ services:
       CAM2_SERIAL: ${CAM2_SERIAL:-827112072033}
       CAM2_OFFSET_X: ${CAM2_OFFSET_X:-0.5}
       REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-true}
-      REALSENSE_INITIAL_RESET: ${REALSENSE_INITIAL_RESET:-false}
     command: ["ros2", "launch", "/ros_ws/launch/multiview_full_launch.py"]
 
   naviflame:
+    build:
       context: ../dev/mindrove_naviflame
       dockerfile: Dockerfile
     container_name: naviflame
@@ -418,10 +426,9 @@ services:
 
   # ── Full system test — main Jazzy orchestration ───────────────────────────
   # Starts: MuJoCo mirror + haptic controller + segmentation + RViz.
-  # Camera access is expected to come from the `multiview_full` service, which
-  # now republishes a single-camera pointcloud to `/fused_pointcloud` when a
-  # second RealSense is not configured.
-  # For one-command launch of the whole system: docker compose --profile full_system up
+  # Camera access is expected from the `multiview_cameras` service (single or dual).
+  # Individual pointcloud topics: /cam1/d435_1/depth/color/points
+  #                               /cam2/d435_2/depth/color/points
   full_system_test:
     build:
       context: .
@@ -538,8 +545,13 @@ services:
   # Prerequisites:
   #   1. rust_build   (one-shot) -- ensures libgrasp_preshaping.so exists.
   #   2. segmentation_inference (standalone or full_system) -- HTTP server on :5678.
-  #   3. multiview_full (standalone or full_system) -- publishes `/fused_pointcloud`
-  #      from one or two real D435 cameras using the official realsense2_camera node.
+  #   3. multiview_cameras (standalone or full_system) -- publishes individual
+  #      depth pointclouds from one or two real D435 cameras under
+  #      /cam{1,2}/d435_{1,2}/depth/color/points and /fused_pointcloud.
+  #
+  # Individual pointcloud topics:
+  #   /cam1/d435_1/depth/color/points
+  #   /cam2/d435_2/depth/color/points
   #
   # Usage:
   #   docker compose --profile standalone up digital_twin

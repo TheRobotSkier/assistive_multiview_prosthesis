@@ -1,8 +1,7 @@
-"""Launch two RealSense D435 cameras with pointcloud fusion.
+"""Launch two RealSense D435 cameras with individual pointcloud streams.
 
-Launches two realsense2_camera_node instances (one per serial), a static TF
-publisher relating their depth optical frames, and the pointcloud_fusion_node
-that merges both clouds into /fused_pointcloud.
+Launches two realsense2_camera_node instances (one per serial) and a static TF
+publisher relating their depth optical frames for alignment in RViz.
 
 Usage (inside container):
     ros2 launch /ros_ws/launch/two_d435_launch.py
@@ -10,7 +9,7 @@ Usage (inside container):
 Configurable via environment variables:
     CAM1_SERIAL       Serial for camera 1 (default: 829212072207)
     CAM2_SERIAL       Serial for camera 2 (default: 827112072033)
-    CAM2_OFFSET_X     X-offset from cam1 to cam2 depth frame (default: 0.15)
+    CAM2_OFFSET_X     X-offset from cam1 to cam2 depth frame (default: 0.5)
 
 Design note:
     Uses ExecuteProcess (not Node) for the realsense nodes because the launch
@@ -18,7 +17,7 @@ Design note:
     without quotes, causing the realsense node to reject them as "invalid type:
     parameter 'serial_no' is of type {string}, setting it to {integer}".
     The workaround: pass serial_no via --ros-args -p with explicit YAML single
-    quotes (-p "serial_no:='830213023028'") which forces string interpretation.
+    quotes (-p "serial_no:='SERIAL'") which forces string interpretation.
 """
 
 import os
@@ -49,6 +48,7 @@ def _realsense_cmd(serial: str, namespace: str, node_name: str) -> list:
         '-p', f'depth_module.depth_profile:={_DEPTH_PROFILE}',
         '-p', f'rgb_camera.color_profile:={_COLOR_PROFILE}',
         '-p', 'pointcloud.enable:=true',
+        '-p', 'pointcloud.stream_filter:=2',
         '-p', 'align_depth.enable:=true',
         '-p', 'enable_infra1:=false',
         '-p', 'enable_infra2:=false',
