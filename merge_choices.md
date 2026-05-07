@@ -61,9 +61,9 @@ All `docker_ws/dev/` files that `rviz_pointcloud_visibility` modified were **del
 | `docker_ws/dev/multiview/config/realsense_pointcloud.rviz` | `rviz/realsense_pointcloud.rviz` | Ported to top-level rviz/ |
 | `docker_ws/dev/multiview/scripts/realsense_ros_probe.sh` | `scripts/realsense_ros_probe.sh` | Ported |
 | `docker_ws/dev/multiview/host_launch_multiview.sh` | `scripts/host_launch_multiview.sh` | Ported |
-| `docker_ws/dev/mujoco/config/digital_twin.rviz` | — | Not ported — mujoco removed in structural |
-| `docker_ws/dev/mujoco/launch/digital_twin_launch.py` | — | Not ported — references old paths |
-| `docker_ws/dev/mujoco/nodes/pointcloud_relay_node.py` | — | Not ported — simple relay, can be recreated |
+| `docker_ws/dev/mujoco/config/digital_twin.rviz` | `rviz/digital_twin.rviz` | Ported to top-level rviz/ (2026-05-07) |
+| `docker_ws/dev/mujoco/launch/digital_twin_launch.py` | `src/prosthesis_launch/launch/digital_twin.launch.py` | Ported (2026-05-07) — old raw-path commands replaced with ROS2 Node definitions |
+| `docker_ws/dev/mujoco/nodes/pointcloud_relay_node.py` | `src/camera/camera/pointcloud_relay_node.py` | Ported (2026-05-07) |
 | `docker_ws/dev/grasp_preshaping/files` | `src/grasp_preshaping/` | Renamed via git (auto-merge) |
 | `docker_ws/docker-deployment/` | `docker/` | Replaced by new structure |
 | `multiview/` (root-level) | — | Deleted — was a duplicate of docker_ws/dev/multiview/ |
@@ -96,6 +96,32 @@ The following rviz_pointcloud_visibility improvements were manually ported to th
 | `scripts/host_launch_multiview.sh` | rviz `docker_ws/dev/multiview/host_launch_multiview.sh` | Host-side RealSense launch helper |
 | `src/camera/camera/__init__.py` | New | Package init for Python import |
 | `src/camera/setup.py` (updated) | New | Added charuco_tf_node entry point, opencv/cv-bridge deps |
+| `rviz/digital_twin.rviz` | rviz `docker_ws/dev/mujoco/config/digital_twin.rviz` | Digital twin RViz config (ported 2026-05-07) |
+| `src/prosthesis_launch/launch/digital_twin.launch.py` | rviz `docker_ws/dev/mujoco/launch/digital_twin_launch.py` | Digital twin launch (ported 2026-05-07) |
+| `src/camera/camera/pointcloud_relay_node.py` | rviz `docker_ws/dev/mujoco/nodes/pointcloud_relay_node.py` | Pointcloud topic relay (ported 2026-05-07) |
+
+### Digital Twin Porting Details (2026-05-07)
+
+The digital_twin components were ported from the old `docker_ws/dev/mujoco/` paths to the new structure:
+
+| Old Path | New Path | Changes Made |
+|----------|----------|-------------|
+| `docker_ws/dev/mujoco/config/digital_twin.rviz` | `rviz/digital_twin.rviz` | Upgraded to full RViz2 format with Views section. All displays preserved: TF, RobotModel, FusedCloud, SegmentedCloud, SeedMarkers, PublishPoint tool. |
+| `docker_ws/dev/mujoco/launch/digital_twin_launch.py` | `src/prosthesis_launch/launch/digital_twin.launch.py` | Replaced all raw `python3 /old/path/...` calls with proper ROS2 Node(package=..., executable=...) definitions. MuJoCo simulation left as commented-out IncludeLaunchDescription (not ported yet). |
+| `docker_ws/dev/mujoco/nodes/pointcloud_relay_node.py` | `src/camera/camera/pointcloud_relay_node.py` | Same logic, entry point registered in setup.py. |
+
+### MuJoCo Interactive Simulator Status
+
+The MuJoCo interactive simulator (from commit `5600cf0`) is **not ported**. It consisted of:
+- `docker_ws/mia_hand_mujoco/` — CMakeLists.txt and related files for MuJoCo ROS2 integration
+- `docker_ws/interactive_simulator/` — C++ interactive simulator (14k+ lines) with GLFW window, LodePNG, simulation loop
+
+These files were part of the old `docker_ws/` structure that was deleted during the structural-rework. Porting them would require:
+1. Creating a new `src/mia_hand_mujoco/` package
+2. Restoring the C++ MuJoCo integration from git history
+3. Adapting to the new Docker/Jazzy environment
+
+Current status: Mia Hand MuJoCo simulation is commented out in `digital_twin.launch.py` with a note to restore when the package is ported.
 
 ### Files NOT Ported (with reasons)
 
@@ -103,9 +129,8 @@ The following rviz_pointcloud_visibility improvements were manually ported to th
 |------|------------------|
 | `docker_ws/dev/multiview/Dockerfile.rviz2` | Structural-rework uses Jazzy; rviz2 Dockerfile used Humble. Separate container deployment is a deployment concern. Can be recreated if RViz2 is needed in a separate container. |
 | `docker_ws/dev/multiview/Dockerfile.humble_cameras` | Structural-rework uses `docker/Dockerfile` for Jazzy-based ROS. Camera config is now part of that. |
-| `docker_ws/dev/mujoco/config/digital_twin.rviz` | mujoco directory was removed in structural-rework. Digital twin concept needs rethinking for the new structure. |
-| `docker_ws/dev/mujoco/launch/digital_twin_launch.py` | References old paths (`/miahand_ws/src/dev/...`). Needs adaptation to new structure. |
-| `docker_ws/dev/mujoco/nodes/pointcloud_relay_node.py` | Simple relay node (sub→pub). Easy to recreate if needed. |
 | `multiview/` (root-level files) | These were duplicates/copies of files in `docker_ws/dev/multiview/`. |
 | `docker_ws/dev/grasp_preshaping/README.md` changes | rviz removed backside shape estimation docs. Structural-rework has its own README. |
 | `.agents/` planning documents | These were implementation plans, not code. Not relevant for the final merge. |
+| `docker_ws/mia_hand_mujoco/` (MuJoCo simulator) | Old docker_ws structure, deleted in structural-rework. Git commit `5600cf0` has original files. Needs dedicated porting effort. |
+| `docker_ws/interactive_simulator/` (C++ simulation) | 14k+ lines of C++ code, old structure. Git commit `5600cf0` has original files. Needs dedicated porting effort. |

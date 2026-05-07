@@ -13,6 +13,7 @@ setup(
         "console_scripts": [
             "charuco_tf_node = camera.charuco_tf_node:main",
             "hand_pose_publisher = camera.hand_pose_publisher:main",
+            "pointcloud_relay_node = camera.pointcloud_relay_node:main",
         ],
     },
     data_files=[

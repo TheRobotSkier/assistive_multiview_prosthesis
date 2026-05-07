@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test test shell clean logs
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin test shell clean logs
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -44,6 +44,13 @@ down-grasp-test:
 
 logs-grasp-test:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test logs -f
+
+# ── Digital Twin ────────────────────────────────────────────────────────────
+up-digital-twin:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin up -d digital_twin
+
+down-digital-twin:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin down
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:

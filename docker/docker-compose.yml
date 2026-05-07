@@ -70,6 +70,16 @@ services:
     stdin_open: true
     tty: true
 
+  # ── Digital twin: fused pointcloud -> segmentation -> preshaping -> proximity ──
+  digital_twin:
+    image: prosthesis:latest
+    extends: prosthesis
+    command: ros2 launch prosthesis_launch digital_twin.launch.py
+    depends_on:
+      - segmentation
+    profiles:
+      - digital_twin
+
   # ── Test runner: reuses prosthesis image, runs smoke tests, exits ────────
   test:
     image: prosthesis:latest

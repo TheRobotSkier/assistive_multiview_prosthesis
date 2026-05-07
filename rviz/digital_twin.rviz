@@ -1,0 +1,91 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Tools
+    Name: Tools
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Value: true
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Value: true
+      Description Topic:
+        Depth: 5
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /robot_description
+    - Class: rviz_default_plugins/PointCloud2
+      Name: FusedCloud
+      Enabled: true
+      Value: true
+      Topic:
+        Depth: 5
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /fused_pointcloud
+      Color Transformer: AxisColor
+      Axis: Z
+      Size (m): 0.003
+    - Class: rviz_default_plugins/PointCloud2
+      Name: SegmentedCloud
+      Enabled: true
+      Value: true
+      Topic:
+        Depth: 5
+        History Policy: Keep Last
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+        Value: /segmentation/object_cloud
+      Color Transformer: FlatColor
+      Color: 255; 100; 0
+      Size (m): 0.005
+    - Class: rviz_default_plugins/MarkerArray
+      Name: SeedMarkers
+      Enabled: true
+      Value: true
+      Topic:
+        Depth: 5
+        Value: /segmentation/seed_markers
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: world
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/PublishPoint
+      Topic: /clicked_point
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 1.0
+      Enable Stereo Rendering:
+        Value: false
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.3
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.01
+      Pitch: 0.4
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 3.14
+Window Geometry:
+  Height: 900
+  Width: 1400
+  X: 0
+  Y: 0
