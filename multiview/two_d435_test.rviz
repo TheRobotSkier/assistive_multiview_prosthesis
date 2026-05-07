@@ -117,7 +117,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cam1/d435_1/color/image_raw
+        Value: /cam1/d435_1/camera/color/image_raw
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -131,7 +131,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cam1/d435_1/depth/image_rect_raw
+        Value: /cam1/d435_1/camera/depth/image_rect_raw
       Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
@@ -163,7 +163,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cam1/d435_1/depth/color/points
+        Value: /cam1/d435_1/camera/depth/color/points
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -179,7 +179,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cam2/d435_2/depth/image_rect_raw
+        Value: /cam2/d435_2/camera/depth/image_rect_raw
       Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
@@ -211,7 +211,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cam2/d435_2/depth/color/points
+        Value: /cam2/d435_2/camera/depth/color/points
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -227,7 +227,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /cam2/d435_2/color/image_raw
+        Value: /cam2/d435_2/camera/color/image_raw
       Value: true
   Enabled: true
   Global Options:

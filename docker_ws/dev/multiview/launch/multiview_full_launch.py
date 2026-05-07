@@ -1,4 +1,4 @@
-"""Launch cameras + static TF + pointcloud fusion node."""
+"""Launch cameras + static TF + pointcloud fusion node + charuco TF node."""
 import os
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, TimerAction
@@ -29,6 +29,15 @@ def generate_launch_description():
         output='screen',
     )
 
+    # ChArUco board detector and TF publisher.
+    # Uses the CHARUCO_NODE_NAME env var (default charuco_tf_node) for unique naming.
+    charuco = Node(
+        executable='python3',
+        arguments=['/ros_ws/nodes/charuco_tf_node.py'],
+        name='charuco_tf_node',
+        output='screen',
+    )
+
     # Start fusion node after cameras and TF are ready
     fusion = TimerAction(period=8.0, actions=[
         Node(
@@ -39,4 +48,4 @@ def generate_launch_description():
         )
     ])
 
-    return LaunchDescription([cameras, static_tf, fusion])
+    return LaunchDescription([cameras, static_tf, charuco, fusion])
