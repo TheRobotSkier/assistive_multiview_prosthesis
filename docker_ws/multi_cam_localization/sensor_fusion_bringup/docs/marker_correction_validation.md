@@ -4,6 +4,16 @@ Run these inside the ROS 2 Jazzy container after building and sourcing the works
 
 ## Live Head D435i
 
+The default head marker config is:
+
+```text
+multi_cam_localization/sensor_fusion_bringup/config/markers/head_aruco_map.yaml
+```
+
+It is for the final fixed reference marker ID 0 printed at `100 mm x 100 mm`
+(`size_m: 0.100`). Use a size-specific config override for old replay bags or
+the 160 mm bench-test marker.
+
 ```bash
 ros2 launch sensor_fusion_bringup head_d435i_openvins.launch.py
 ros2 launch sensor_fusion_bringup launch/head_marker_pose.launch.py
@@ -14,6 +24,7 @@ Watch the correction status:
 ```bash
 ros2 topic echo /head/marker_pose/marker_valid
 ros2 topic echo /head/marker_pose/vio_valid
+ros2 topic echo /head/marker_pose/marker_quality
 ros2 topic echo /head/marker_pose/reanchor_event
 ```
 
@@ -23,6 +34,7 @@ Pose topics:
 - `/head/marker_pose/camera_body_pose`: visualization-only body frame in `marker_map`. Axes are `+X` forward, `+Y` left, `+Z` up. This topic is not used by the correction filter.
 - `/head/marker_pose/imu_pose`: true calibrated IMU pose in `marker_map`. Its axes are the actual calibrated IMU frame and may not be intuitive in RViz.
 - `/head/marker_pose/ov_corrected_odom`: corrected OpenVINS odom in `marker_map`.
+- `/head/marker_pose/marker_quality`: JSON marker quality and covariance metrics for each valid marker measurement.
 
 Request a manual hard reanchor:
 
@@ -52,12 +64,73 @@ new_z = -old_y
 
 Do not change `imu_pose` axes just to make RViz look nicer. Display-only axis preferences belong in `/head/marker_pose/camera_body_pose`.
 
+## Marker Covariance And Quality
+
+The marker node publishes marker-derived 6D diagonal covariance for
+`x,y,z,roll,pitch,yaw` on `/head/marker_pose/imu_pose`. The external correction
+layer uses the same covariance for innovation gating, hard reanchor covariance
+seeding, and periodic soft-update weighting.
+
+This is still Phase 1 external covariance. It does not repair or rewrite the
+internal OpenVINS EKF pose, velocity, or covariance.
+
+The model increases uncertainty when marker geometry gets worse:
+
+- larger reprojection error
+- smaller marker size in pixels
+- greater marker distance
+- steeper view angle
+- missing marker stability frames
+- odom-compensated temporal correction jitter when VIO is valid
+- poor corner geometry that still passes the hard gates
+
+Hard rejection gates still run before covariance weighting. Known marker ID,
+duplicate ID, marker area, distance, reprojection error, corner geometry, pose
+jump, odom timestamp matching, and correction innovation gates can reject a
+measurement before covariance affects correction.
+
+Inspect `/head/marker_pose/marker_quality` when tuning or validating. It is
+`std_msgs/String` JSON and includes marker pixel size, distance, view angle,
+reprojection error, temporal residuals, marker-map covariance standard
+deviations, camera-frame covariance standard deviations, and hard-gate status.
+`/head/marker_pose/reanchor_event` includes the same marker quality fields as
+additive JSON keys for correction decisions that had a valid marker
+measurement.
+
+For covariance-estimation bags with multiple visible 100 mm markers, run
+`marker_quality_monitor.py` and record `/head/marker_pose/all_marker_quality`.
+That monitor detects all visible marker IDs independently; the correction node
+still uses the active fixed-map marker path.
+
+## Marker Size Configs
+
+Use the config that matches the physical marker used in the recording or live
+test:
+
+- `head_aruco_map.yaml`: final fixed reference marker ID 0, `100 mm`.
+- `head_aruco_map_replay_1533mm.yaml`: old May 2026 replay bags, measured
+  marker ID 0 size `153.3 mm`.
+- `head_aruco_map_large_160mm.yaml`: newly printed bench-test marker ID 0,
+  `160 mm`.
+
+Do not add arm-mounted marker ID 1 as a fixed map marker in this Phase 1 node.
+The current marker map assumes listed markers are stationary in `marker_map`;
+the arm marker moves with the prosthetic arm and belongs in a later dynamic
+marker/multiview fusion path.
+
 ## Recorded Bag Replay
 
 For detailed commands, see:
 
 ```text
 multi_cam_localization/sensor_fusion_bringup/docs/head_openvins_marker_bag_replay_validation.md
+```
+
+For the next covariance calibration recordings with the final 100 mm marker,
+see:
+
+```text
+multi_cam_localization/sensor_fusion_bringup/docs/marker_covariance_empirical_validation.md
 ```
 
 A good Phase 1 replay-validation bag should include:
@@ -82,6 +155,7 @@ Scenarios verified:
 - VIO drift case: camera moves to a texture-only view, OpenVINS drifts, then marker is seen again.
 - Manual reanchor service accepts when marker quality and odom timestamp matching pass.
 - `reanchor_event` contains accepted/rejected reasons.
+- `marker_quality` contains pixel geometry, reprojection, view angle, temporal residuals, and covariance standard deviations.
 - Corrected odom reanchors in `marker_map` when marker is visible again.
 - Replay option A: recorded marker outputs inspected in RViz2.
 - Replay option B: marker outputs regenerated from raw image + OpenVINS odom replay.

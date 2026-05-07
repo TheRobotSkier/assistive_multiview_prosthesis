@@ -1,6 +1,17 @@
 # Marker Pose Covariance Plan
 
-This is a planning document only. Do not treat it as implemented behavior.
+Status on 2026-05-07: the Phase 1 external marker node has a heuristic 6D
+diagonal covariance implementation, publishes marker quality JSON, and has been
+reviewed against the recorded 100 mm marker covariance bags. The analysis in
+`docker_ws/bags/openvins_tests/head_marker_covariance/analysis_phase1_marker_covariance/analysis_report.md`
+shows the current covariance model is conservative on stationary repeatability,
+so no covariance config tuning was applied. A live sanity check confirmed the
+expected Phase 1 behavior: when VIO drifts and marker ID 0 is reacquired,
+`/head/marker_pose/ov_corrected_odom` snaps back to the marker-consistent pose,
+but the internal OpenVINS state, covariance, and velocity remain uncorrected and
+can keep drifting/growing. Phase 1 is ready to commit as the external baseline;
+Phase 2 should address marker updates inside OpenVINS, including principled
+state uncertainty and velocity handling.
 
 ## A. Goal
 
@@ -144,9 +155,11 @@ For Phase 2, marker measurements should become proper EKF measurement updates:
 - correct velocity or velocity cross-covariances only through a principled EKF
   update or explicit reset/reinitialize path supported by the estimator design
 - avoid direct covariance hacking that makes the filter inconsistent
+- explicitly investigate velocity handling: a pose-only marker update may not
+  be enough when OpenVINS velocity has already become inconsistent during drift
 
-This work should start only after the external marker correction behavior is
-validated and committed.
+This work should start only after the external marker correction baseline is
+committed.
 
 ## G. Validation Plan
 

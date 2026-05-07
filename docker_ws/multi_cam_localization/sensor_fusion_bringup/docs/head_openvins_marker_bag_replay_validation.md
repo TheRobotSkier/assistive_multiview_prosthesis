@@ -224,6 +224,7 @@ docker exec -it openvins_phase1_live bash -lc '
     /head/marker_pose/camera_body_pose \
     /head/marker_pose/imu_pose \
     /head/marker_pose/marker_valid \
+    /head/marker_pose/marker_quality \
     /head/marker_pose/vio_valid \
     /head/marker_pose/ov_corrected_odom \
     /head/marker_pose/reanchor_event \
@@ -259,6 +260,7 @@ docker exec -it openvins_phase1_live bash -lc '
     /head/marker_pose/camera_body_pose \
     /head/marker_pose/imu_pose \
     /head/marker_pose/marker_valid \
+    /head/marker_pose/marker_quality \
     /head/marker_pose/vio_valid \
     /head/marker_pose/ov_corrected_odom \
     /head/marker_pose/reanchor_event \
@@ -335,6 +337,7 @@ docker exec -it openvins_phase1_output_replay bash -lc '
   source /miahand_ws/src/install_overlay/setup.bash
 
   ros2 topic echo --once /head/marker_pose/marker_valid
+  ros2 topic echo --once /head/marker_pose/marker_quality
   ros2 topic echo --once /head/marker_pose/reanchor_event
   ros2 topic hz /head/marker_pose/ov_corrected_odom
 '
@@ -344,6 +347,10 @@ docker exec -it openvins_phase1_output_replay bash -lc '
 
 This replay excludes recorded `/head/marker_pose/*` topics so the marker node
 can regenerate outputs from the raw image stream and recorded OpenVINS odom.
+These May 2026 bags used a marker ID 0 that was later measured at 153.3 mm, so
+the marker node should use `head_aruco_map_replay_1533mm.yaml` for regenerated
+outputs. The default `head_aruco_map.yaml` is now reserved for the final
+100 mm marker setup.
 
 ```bash
 cd ~/Documents/assistive_multiview_prosthesis/docker_ws/docker-deployment
@@ -374,7 +381,8 @@ docker exec -it openvins_phase1_raw_replay bash -lc '
   source /miahand_ws/install/setup.bash
   source /miahand_ws/src/install_overlay/setup.bash
 
-  ros2 launch sensor_fusion_bringup head_marker_pose.launch.py
+  ros2 launch sensor_fusion_bringup head_marker_pose.launch.py \
+    config_file:=/miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/markers/head_aruco_map_replay_1533mm.yaml
 '
 ```
 
@@ -400,6 +408,7 @@ docker exec -it openvins_phase1_raw_replay bash -lc '
 
   ros2 topic echo --once /head/marker_pose/marker_valid
   ros2 topic echo --once /head/marker_pose/active_marker_id
+  ros2 topic echo --once /head/marker_pose/marker_quality
   ros2 topic echo --once /head/marker_pose/reanchor_event
   ros2 topic hz /head/marker_pose/ov_corrected_odom
 '

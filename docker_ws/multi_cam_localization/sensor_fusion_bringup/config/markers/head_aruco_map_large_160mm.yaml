@@ -1,9 +1,9 @@
 aruco:
   dictionary: DICT_6X6_1000
 
-  # Final prosthesis setup uses the measured printed marker size.
-  # Use a size-specific config for old replay bags or larger bench-test prints.
-  default_marker_size_m: 0.100
+  # Bench-test marker size for the newly printed 160 mm marker ID 0.
+  # Use the 100 mm default config for final prosthesis validation.
+  default_marker_size_m: 0.160
 
 frames:
   map_frame: marker_map
@@ -53,17 +53,12 @@ covariance:
   initial_correction_std_m: 0.20
   initial_correction_std_deg: 20.0
 
-  # Legacy scalar floors/caps remain as fallbacks for configs that do not set
-  # the axis-specific model below.
   min_marker_position_std_m: 0.02
   max_marker_position_std_m: 0.75
   min_marker_rotation_std_deg: 2.0
   max_marker_rotation_std_deg: 45.0
   marker_covariance_area_ref_px2: 10000.0
 
-  # Marker-derived 6D covariance model. The node estimates uncertainty in the
-  # camera optical frame, rotates it into marker_map, and publishes the diagonal
-  # x/y/z/roll/pitch/yaw covariance.
   corner_noise_floor_px: 0.35
   max_view_angle_deg: 75.0
   max_view_penalty: 4.0
@@ -107,7 +102,7 @@ vio_health:
 markers:
   0:
     frame_id: marker_0
-    size_m: 0.100
+    size_m: 0.160
 
     # T_map_marker maps marker_0 coordinates into marker_map.
     # Empirical axis correction from live validation:

@@ -172,6 +172,11 @@ def covariance_from_diag(diag6: np.ndarray) -> list[float]:
     return cov
 
 
+def covariance_diag_to_std(diag6: np.ndarray) -> np.ndarray:
+    values = np.asarray(diag6, dtype=float).reshape(6)
+    return np.sqrt(np.maximum(values, 0.0))
+
+
 def pose_covariance_diag(msg: Odometry, fallback_diag: np.ndarray) -> np.ndarray:
     cov = np.asarray(msg.pose.covariance, dtype=float).reshape(6, 6)
     diag = np.array([cov[0, 0], cov[1, 1], cov[2, 2], cov[3, 3], cov[4, 4], cov[5, 5]], dtype=float)
@@ -264,6 +269,256 @@ def marker_object_points(size_m: float) -> np.ndarray:
     )
 
 
+def clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def marker_side_lengths_px(image_points: np.ndarray) -> np.ndarray:
+    points = np.asarray(image_points, dtype=float).reshape(4, 2)
+    return np.array(
+        [np.linalg.norm(points[(i + 1) % 4] - points[i]) for i in range(4)],
+        dtype=float,
+    )
+
+
+def marker_view_angle_deg(T_cam_marker: np.ndarray) -> float:
+    R_cam_marker = np.asarray(T_cam_marker, dtype=float).reshape(4, 4)[:3, :3]
+    marker_normal_cam = R_cam_marker @ np.array([0.0, 0.0, 1.0], dtype=float)
+    norm = float(np.linalg.norm(marker_normal_cam))
+    if norm <= 1e-9 or not math.isfinite(norm):
+        return 90.0
+    cos_angle = abs(float(marker_normal_cam[2] / norm))
+    cos_angle = clamp(cos_angle, -1.0, 1.0)
+    return math.degrees(math.acos(cos_angle))
+
+
+@dataclass
+class MarkerQualityMetrics:
+    area_px2: float
+    sqrt_area_px: float
+    side_mean_px: float
+    side_min_px: float
+    distance_m: float
+    reprojection_error_px: float
+    view_angle_deg: float
+
+
+@dataclass
+class MarkerTemporalStats:
+    stable_frames: int
+    stable: bool
+    stability_factor: float
+    detection_translation_delta_m: Optional[float]
+    detection_rotation_delta_deg: Optional[float]
+    correction_translation_delta_m: Optional[float]
+    correction_rotation_delta_deg: Optional[float]
+    odom_match_dt: Optional[float]
+
+
+@dataclass
+class MarkerCovarianceModelConfig:
+    corner_noise_floor_px: float
+    max_view_angle_deg: float
+    max_view_penalty: float
+    min_xy_std_m: float
+    min_z_std_m: float
+    max_xy_std_m: float
+    max_z_std_m: float
+    min_roll_pitch_std_deg: float
+    min_yaw_std_deg: float
+    max_roll_pitch_std_deg: float
+    max_yaw_std_deg: float
+    xy_std_px_gain: float
+    z_std_px_gain: float
+    roll_pitch_std_px_gain: float
+    yaw_std_px_gain: float
+    temporal_missing_position_std_m: float
+    temporal_missing_rotation_std_deg: float
+    temporal_correction_position_gain: float
+    temporal_correction_rotation_gain: float
+    geometry_position_std_m: float
+    geometry_rotation_std_deg: float
+
+    @classmethod
+    def from_mapping(
+        cls,
+        cfg: dict[str, Any],
+        legacy_min_position_std_m: float = 0.02,
+        legacy_max_position_std_m: float = 0.75,
+        legacy_min_rotation_std_deg: float = 2.0,
+        legacy_max_rotation_std_deg: float = 45.0,
+    ) -> "MarkerCovarianceModelConfig":
+        return cls(
+            corner_noise_floor_px=float(cfg.get("corner_noise_floor_px", 0.35)),
+            max_view_angle_deg=float(cfg.get("max_view_angle_deg", 75.0)),
+            max_view_penalty=float(cfg.get("max_view_penalty", 4.0)),
+            min_xy_std_m=float(cfg.get("min_marker_xy_std_m", legacy_min_position_std_m)),
+            min_z_std_m=float(cfg.get("min_marker_z_std_m", legacy_min_position_std_m)),
+            max_xy_std_m=float(cfg.get("max_marker_xy_std_m", legacy_max_position_std_m)),
+            max_z_std_m=float(cfg.get("max_marker_z_std_m", legacy_max_position_std_m)),
+            min_roll_pitch_std_deg=float(
+                cfg.get("min_marker_roll_pitch_std_deg", legacy_min_rotation_std_deg)
+            ),
+            min_yaw_std_deg=float(cfg.get("min_marker_yaw_std_deg", legacy_min_rotation_std_deg)),
+            max_roll_pitch_std_deg=float(
+                cfg.get("max_marker_roll_pitch_std_deg", legacy_max_rotation_std_deg)
+            ),
+            max_yaw_std_deg=float(cfg.get("max_marker_yaw_std_deg", legacy_max_rotation_std_deg)),
+            xy_std_px_gain=float(cfg.get("marker_xy_std_px_gain", 8.0)),
+            z_std_px_gain=float(cfg.get("marker_z_std_px_gain", 2.0)),
+            roll_pitch_std_px_gain=float(cfg.get("marker_roll_pitch_std_px_gain", 5.0)),
+            yaw_std_px_gain=float(cfg.get("marker_yaw_std_px_gain", 3.0)),
+            temporal_missing_position_std_m=float(cfg.get("temporal_missing_position_std_m", 0.05)),
+            temporal_missing_rotation_std_deg=float(cfg.get("temporal_missing_rotation_std_deg", 8.0)),
+            temporal_correction_position_gain=float(cfg.get("temporal_correction_position_gain", 0.50)),
+            temporal_correction_rotation_gain=float(cfg.get("temporal_correction_rotation_gain", 0.50)),
+            geometry_position_std_m=float(cfg.get("geometry_position_std_m", 0.03)),
+            geometry_rotation_std_deg=float(cfg.get("geometry_rotation_std_deg", 5.0)),
+        )
+
+
+@dataclass
+class MarkerCovarianceEstimate:
+    diag: np.ndarray
+    std_diag: np.ndarray
+    camera_std_diag: np.ndarray
+    sigma_px: float
+    view_penalty: float
+
+
+@dataclass
+class MarkerPoseHistoryEntry:
+    T_map_imu: np.ndarray
+    T_meas_map_global: Optional[np.ndarray]
+
+
+def marker_quality_metrics(
+    image_points: np.ndarray,
+    T_cam_marker: np.ndarray,
+    reprojection_error_px: float,
+    area_px2: Optional[float] = None,
+) -> MarkerQualityMetrics:
+    area = abs(float(cv2.contourArea(np.asarray(image_points, dtype=np.float32).reshape(4, 2))))
+    if area_px2 is not None:
+        area = float(area_px2)
+    side_lengths = marker_side_lengths_px(image_points)
+    distance_m = float(np.linalg.norm(np.asarray(T_cam_marker, dtype=float).reshape(4, 4)[:3, 3]))
+    return MarkerQualityMetrics(
+        area_px2=area,
+        sqrt_area_px=math.sqrt(max(area, 0.0)),
+        side_mean_px=float(np.mean(side_lengths)),
+        side_min_px=float(np.min(side_lengths)),
+        distance_m=distance_m,
+        reprojection_error_px=float(reprojection_error_px),
+        view_angle_deg=marker_view_angle_deg(T_cam_marker),
+    )
+
+
+def covariance_view_penalty(view_angle_deg: float, cfg: MarkerCovarianceModelConfig) -> float:
+    cos_view = math.cos(math.radians(clamp(float(view_angle_deg), 0.0, 89.9)))
+    cos_limit = math.cos(math.radians(clamp(float(cfg.max_view_angle_deg), 0.0, 89.9)))
+    penalty = 1.0 / max(cos_view, cos_limit, 1e-6)
+    return clamp(penalty, 1.0, max(1.0, float(cfg.max_view_penalty)))
+
+
+def rotate_covariance_diag(diag: np.ndarray, R_target_source: np.ndarray) -> np.ndarray:
+    values = np.asarray(diag, dtype=float).reshape(3)
+    R = np.asarray(R_target_source, dtype=float).reshape(3, 3)
+    cov = R @ np.diag(np.maximum(values, 0.0)) @ R.T
+    return np.maximum(np.diag(cov), 0.0)
+
+
+def estimate_marker_covariance_v2(
+    metrics: MarkerQualityMetrics,
+    T_map_cam: np.ndarray,
+    f_avg_px: float,
+    temporal_stats: MarkerTemporalStats,
+    geometry_score: float,
+    cfg: MarkerCovarianceModelConfig,
+) -> MarkerCovarianceEstimate:
+    sigma_px = max(float(cfg.corner_noise_floor_px), float(metrics.reprojection_error_px))
+    side_mean_px = max(float(metrics.side_mean_px), 1.0)
+    f_avg = max(float(f_avg_px), 1.0)
+    view_penalty = covariance_view_penalty(metrics.view_angle_deg, cfg)
+    distance_m = max(float(metrics.distance_m), 0.0)
+    geometry_penalty = clamp(1.0 - float(geometry_score), 0.0, 1.0)
+    stability_factor = clamp(float(temporal_stats.stability_factor), 0.0, 1.0)
+
+    sigma_xy_cam = cfg.min_xy_std_m + cfg.xy_std_px_gain * distance_m * sigma_px / f_avg
+    sigma_z_cam = cfg.min_z_std_m + cfg.z_std_px_gain * distance_m * sigma_px / side_mean_px * view_penalty
+    sigma_roll_pitch = math.radians(cfg.min_roll_pitch_std_deg) + (
+        cfg.roll_pitch_std_px_gain * sigma_px / side_mean_px * view_penalty
+    )
+    sigma_yaw = math.radians(cfg.min_yaw_std_deg) + cfg.yaw_std_px_gain * sigma_px / side_mean_px
+
+    sigma_xy_cam += cfg.temporal_missing_position_std_m * stability_factor
+    sigma_z_cam += cfg.temporal_missing_position_std_m * stability_factor
+    temporal_rot = math.radians(cfg.temporal_missing_rotation_std_deg) * stability_factor
+    sigma_roll_pitch += temporal_rot
+    sigma_yaw += temporal_rot
+
+    if temporal_stats.correction_translation_delta_m is not None:
+        temporal_pos = cfg.temporal_correction_position_gain * max(
+            0.0, float(temporal_stats.correction_translation_delta_m)
+        )
+        sigma_xy_cam += temporal_pos
+        sigma_z_cam += temporal_pos
+
+    if temporal_stats.correction_rotation_delta_deg is not None:
+        temporal_rot = math.radians(
+            cfg.temporal_correction_rotation_gain * max(0.0, float(temporal_stats.correction_rotation_delta_deg))
+        )
+        sigma_roll_pitch += temporal_rot
+        sigma_yaw += temporal_rot
+
+    sigma_xy_cam += cfg.geometry_position_std_m * geometry_penalty
+    sigma_z_cam += cfg.geometry_position_std_m * geometry_penalty
+    geometry_rot = math.radians(cfg.geometry_rotation_std_deg) * geometry_penalty
+    sigma_roll_pitch += geometry_rot
+    sigma_yaw += geometry_rot
+
+    sigma_xy_cam = clamp(sigma_xy_cam, cfg.min_xy_std_m, cfg.max_xy_std_m)
+    sigma_z_cam = clamp(sigma_z_cam, cfg.min_z_std_m, cfg.max_z_std_m)
+    sigma_roll_pitch = clamp(
+        sigma_roll_pitch,
+        math.radians(cfg.min_roll_pitch_std_deg),
+        math.radians(cfg.max_roll_pitch_std_deg),
+    )
+    sigma_yaw = clamp(sigma_yaw, math.radians(cfg.min_yaw_std_deg), math.radians(cfg.max_yaw_std_deg))
+
+    R_map_cam = np.asarray(T_map_cam, dtype=float).reshape(4, 4)[:3, :3]
+    pos_diag_map = rotate_covariance_diag(
+        np.array([sigma_xy_cam**2, sigma_xy_cam**2, sigma_z_cam**2], dtype=float),
+        R_map_cam,
+    )
+    rot_diag_map = rotate_covariance_diag(
+        np.array([sigma_roll_pitch**2, sigma_roll_pitch**2, sigma_yaw**2], dtype=float),
+        R_map_cam,
+    )
+
+    max_position_var = max(cfg.max_xy_std_m, cfg.max_z_std_m) ** 2
+    max_rotation_var = math.radians(max(cfg.max_roll_pitch_std_deg, cfg.max_yaw_std_deg)) ** 2
+    diag = np.concatenate(
+        [
+            np.clip(pos_diag_map, min(cfg.min_xy_std_m, cfg.min_z_std_m) ** 2, max_position_var),
+            np.clip(
+                rot_diag_map,
+                math.radians(min(cfg.min_roll_pitch_std_deg, cfg.min_yaw_std_deg)) ** 2,
+                max_rotation_var,
+            ),
+        ]
+    )
+    std_diag = covariance_diag_to_std(diag)
+    camera_std_diag = np.array([sigma_xy_cam, sigma_xy_cam, sigma_z_cam, sigma_roll_pitch, sigma_roll_pitch, sigma_yaw])
+    return MarkerCovarianceEstimate(
+        diag=diag,
+        std_diag=std_diag,
+        camera_std_diag=camera_std_diag,
+        sigma_px=sigma_px,
+        view_penalty=view_penalty,
+    )
+
+
 def compute_marker_map_poses(T_map_marker: np.ndarray, T_cam_marker: np.ndarray, T_cam_imu: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return T_map_cam and T_map_imu from the solvePnP marker pose.
 
@@ -310,11 +565,25 @@ class MarkerMeasurement:
     T_map_imu: np.ndarray
     T_map_marker: np.ndarray
     area_px2: float
+    sqrt_area_px: float
+    side_mean_px: float
+    side_min_px: float
     distance_m: float
     reprojection_error_px: float
+    view_angle_deg: float
+    view_penalty: float
     covariance_diag: np.ndarray
+    covariance_std_diag: np.ndarray
+    covariance_camera_std_diag: np.ndarray
+    covariance_sigma_px: float
     stable_frames: int
     stable: bool
+    stability_factor: float
+    temporal_detection_translation_m: Optional[float]
+    temporal_detection_rotation_deg: Optional[float]
+    temporal_correction_translation_m: Optional[float]
+    temporal_correction_rotation_deg: Optional[float]
+    temporal_odom_match_dt: Optional[float]
     geometry_score: float
     image_width: int
     image_height: int
@@ -384,10 +653,18 @@ class ArucoMarkerPoseNode(Node):
         self.min_marker_rotation_std_deg = float(covariance_cfg.get("min_marker_rotation_std_deg", 2.0))
         self.max_marker_rotation_std_deg = float(covariance_cfg.get("max_marker_rotation_std_deg", 45.0))
         self.marker_covariance_area_ref_px2 = float(covariance_cfg.get("marker_covariance_area_ref_px2", 10000.0))
+        self.marker_covariance_model = MarkerCovarianceModelConfig.from_mapping(
+            covariance_cfg,
+            legacy_min_position_std_m=self.min_marker_position_std_m,
+            legacy_max_position_std_m=self.max_marker_position_std_m,
+            legacy_min_rotation_std_deg=self.min_marker_rotation_std_deg,
+            legacy_max_rotation_std_deg=self.max_marker_rotation_std_deg,
+        )
         self.correction_position_growth_std_mps = float(covariance_cfg.get("correction_position_growth_std_mps", 0.03))
         self.correction_rotation_growth_std_degps = float(covariance_cfg.get("correction_rotation_growth_std_degps", 2.0))
         self.high_position_std_m = float(covariance_cfg.get("high_position_std_m", 2.0))
         self.high_rotation_std_deg = float(covariance_cfg.get("high_rotation_std_deg", 90.0))
+        self.camera_f_avg_px = float(0.5 * (self.K[0, 0] + self.K[1, 1]))
 
         twist_cfg = self.config.get("twist", {})
         self.zero_twist_on_large_reanchor = bool(twist_cfg.get("zero_twist_on_large_reanchor", True))
@@ -468,6 +745,7 @@ class ArucoMarkerPoseNode(Node):
         self.camera_body_pose_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_body_pose", 10)
         self.imu_pose_pub = self.create_publisher(PoseWithCovarianceStamped, f"{self.output_prefix}/imu_pose", 10)
         self.corrected_odom_pub = self.create_publisher(Odometry, f"{self.output_prefix}/ov_corrected_odom", 20)
+        self.marker_quality_pub = self.create_publisher(String, f"{self.output_prefix}/marker_quality", 10)
         self.active_marker_pub = self.create_publisher(Int32, f"{self.output_prefix}/active_marker_id", 10)
         self.marker_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/marker_valid", 10)
         self.vio_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/vio_valid", 10)
@@ -475,7 +753,7 @@ class ArucoMarkerPoseNode(Node):
         self.reanchor_srv = self.create_service(Trigger, f"{self.output_prefix}/request_reanchor", self.request_reanchor_cb)
 
         self.odom_buffer: deque[Odometry] = deque()
-        self.marker_histories: dict[int, deque[MarkerMeasurement]] = {}
+        self.marker_histories: dict[int, deque[MarkerPoseHistoryEntry]] = {}
         self.last_marker_measurement: Optional[MarkerMeasurement] = None
         self.last_marker_valid = False
         self.last_vio_valid = False
@@ -599,6 +877,7 @@ class ArucoMarkerPoseNode(Node):
 
         self.publish_marker_state(True, measurement.marker_id)
         self.publish_marker_poses(measurement)
+        self.publish_marker_quality(measurement, hard_gate_status="accepted")
         self.try_apply_marker_correction(measurement, force_manual=False)
 
     def build_marker_measurement(
@@ -650,6 +929,13 @@ class ArucoMarkerPoseNode(Node):
         if reprojection_error_px > self.max_reprojection_error_px:
             return None, "reprojection_error_too_high"
 
+        metrics = marker_quality_metrics(
+            image_points,
+            T_cam_marker,
+            reprojection_error_px,
+            area_px2=area,
+        )
+
         T_map_marker = marker_cfg["T_map_marker"]
         T_map_cam, T_map_imu = compute_marker_map_poses(T_map_marker, T_cam_marker, self.T_cam_imu)
         T_marker_cam = T_inv(T_cam_marker)
@@ -658,14 +944,18 @@ class ArucoMarkerPoseNode(Node):
         if not jump_ok:
             return None, jump_reason
 
-        stable_frames = self.record_marker_history_count(marker_id, T_map_imu)
-        stable = stable_frames >= self.stable_frames_required
-        covariance_diag = self.estimate_marker_covariance(
-            area,
-            distance_m,
-            reprojection_error_px,
+        T_meas_map_global: Optional[np.ndarray] = None
+        odom_match_dt: Optional[float] = None
+        matched_odom, odom_match_dt = self.find_nearest_odom(stamp_to_sec(msg.header.stamp))
+        if self.vio_valid and matched_odom is not None:
+            T_meas_map_global = T_map_imu @ T_inv(odom_to_T(matched_odom))
+
+        temporal_stats = self.record_marker_history(marker_id, T_map_imu, T_meas_map_global, odom_match_dt)
+        covariance_estimate = self.estimate_marker_covariance(
+            metrics,
+            T_map_cam,
             geometry_score,
-            stable_frames,
+            temporal_stats,
         )
 
         return (
@@ -679,12 +969,26 @@ class ArucoMarkerPoseNode(Node):
                 T_map_cam=T_map_cam,
                 T_map_imu=T_map_imu,
                 T_map_marker=T_map_marker,
-                area_px2=area,
-                distance_m=distance_m,
-                reprojection_error_px=reprojection_error_px,
-                covariance_diag=covariance_diag,
-                stable_frames=stable_frames,
-                stable=stable,
+                area_px2=metrics.area_px2,
+                sqrt_area_px=metrics.sqrt_area_px,
+                side_mean_px=metrics.side_mean_px,
+                side_min_px=metrics.side_min_px,
+                distance_m=metrics.distance_m,
+                reprojection_error_px=metrics.reprojection_error_px,
+                view_angle_deg=metrics.view_angle_deg,
+                view_penalty=covariance_estimate.view_penalty,
+                covariance_diag=covariance_estimate.diag,
+                covariance_std_diag=covariance_estimate.std_diag,
+                covariance_camera_std_diag=covariance_estimate.camera_std_diag,
+                covariance_sigma_px=covariance_estimate.sigma_px,
+                stable_frames=temporal_stats.stable_frames,
+                stable=temporal_stats.stable,
+                stability_factor=temporal_stats.stability_factor,
+                temporal_detection_translation_m=temporal_stats.detection_translation_delta_m,
+                temporal_detection_rotation_deg=temporal_stats.detection_rotation_delta_deg,
+                temporal_correction_translation_m=temporal_stats.correction_translation_delta_m,
+                temporal_correction_rotation_deg=temporal_stats.correction_rotation_delta_deg,
+                temporal_odom_match_dt=temporal_stats.odom_match_dt,
                 geometry_score=geometry_score,
                 image_width=image_width,
                 image_height=image_height,
@@ -757,67 +1061,70 @@ class ArucoMarkerPoseNode(Node):
             return False, "marker_rotation_jump"
         return True, ""
 
-    def record_marker_history_count(self, marker_id: int, T_map_imu: np.ndarray) -> int:
+    def record_marker_history(
+        self,
+        marker_id: int,
+        T_map_imu: np.ndarray,
+        T_meas_map_global: Optional[np.ndarray],
+        odom_match_dt: Optional[float],
+    ) -> MarkerTemporalStats:
         if marker_id not in self.marker_histories:
             self.marker_histories[marker_id] = deque(maxlen=max(self.stable_frames_required, 1))
 
-        # Store a tiny placeholder-like measurement with only the pose needed
-        # for future jump checks. The full measurement is returned separately.
-        placeholder = MarkerMeasurement(
-            stamp=None,
-            stamp_sec=0.0,
-            marker_id=marker_id,
-            marker_frame=self.markers[marker_id]["frame_id"],
-            T_cam_marker=np.eye(4),
-            T_marker_cam=np.eye(4),
-            T_map_cam=np.eye(4),
-            T_map_imu=T_map_imu.copy(),
-            T_map_marker=self.markers[marker_id]["T_map_marker"],
-            area_px2=0.0,
-            distance_m=0.0,
-            reprojection_error_px=0.0,
-            covariance_diag=self.default_pose_cov_diag.copy(),
-            stable_frames=0,
-            stable=False,
-            geometry_score=1.0,
-            image_width=0,
-            image_height=0,
+        history = self.marker_histories[marker_id]
+        previous = history[-1] if history else None
+        detection_translation_delta_m = None
+        detection_rotation_delta_deg = None
+        correction_translation_delta_m = None
+        correction_rotation_delta_deg = None
+
+        if previous is not None:
+            detection_translation_delta_m = float(np.linalg.norm(T_map_imu[:3, 3] - previous.T_map_imu[:3, 3]))
+            detection_rotation_delta_deg = rotation_angle_deg(T_map_imu[:3, :3] @ previous.T_map_imu[:3, :3].T)
+            if T_meas_map_global is not None and previous.T_meas_map_global is not None:
+                correction_translation_delta_m = float(
+                    np.linalg.norm(T_meas_map_global[:3, 3] - previous.T_meas_map_global[:3, 3])
+                )
+                correction_rotation_delta_deg = rotation_angle_deg(
+                    T_meas_map_global[:3, :3] @ previous.T_meas_map_global[:3, :3].T
+                )
+
+        history.append(
+            MarkerPoseHistoryEntry(
+                T_map_imu=T_map_imu.copy(),
+                T_meas_map_global=None if T_meas_map_global is None else T_meas_map_global.copy(),
+            )
         )
-        self.marker_histories[marker_id].append(placeholder)
-        return len(self.marker_histories[marker_id])
+        stable_frames = len(history)
+        stable = stable_frames >= self.stable_frames_required
+        stability_missing = max(0, self.stable_frames_required - stable_frames)
+        stability_factor = stability_missing / max(1, self.stable_frames_required)
+        return MarkerTemporalStats(
+            stable_frames=stable_frames,
+            stable=stable,
+            stability_factor=stability_factor,
+            detection_translation_delta_m=detection_translation_delta_m,
+            detection_rotation_delta_deg=detection_rotation_delta_deg,
+            correction_translation_delta_m=correction_translation_delta_m,
+            correction_rotation_delta_deg=correction_rotation_delta_deg,
+            odom_match_dt=odom_match_dt,
+        )
 
     def estimate_marker_covariance(
         self,
-        area_px2: float,
-        distance_m: float,
-        reprojection_error_px: float,
+        metrics: MarkerQualityMetrics,
+        T_map_cam: np.ndarray,
         geometry_score: float,
-        stable_frames: int,
-    ) -> np.ndarray:
-        area_factor = math.sqrt(self.marker_covariance_area_ref_px2 / max(area_px2, 1.0))
-        area_factor = max(0.5, min(6.0, area_factor))
-        stability_missing = max(0, self.stable_frames_required - stable_frames)
-        stability_factor = stability_missing / max(1, self.stable_frames_required)
-        geometry_penalty = max(0.0, 1.0 - geometry_score)
-
-        pos_std = (
-            self.min_marker_position_std_m * area_factor
-            + 0.015 * distance_m * distance_m
-            + 0.010 * reprojection_error_px
-            + 0.050 * stability_factor
-            + 0.030 * geometry_penalty
+        temporal_stats: MarkerTemporalStats,
+    ) -> MarkerCovarianceEstimate:
+        return estimate_marker_covariance_v2(
+            metrics=metrics,
+            T_map_cam=T_map_cam,
+            f_avg_px=self.camera_f_avg_px,
+            temporal_stats=temporal_stats,
+            geometry_score=geometry_score,
+            cfg=self.marker_covariance_model,
         )
-        rot_std_deg = (
-            self.min_marker_rotation_std_deg * area_factor
-            + 1.5 * reprojection_error_px
-            + 2.0 * distance_m
-            + 8.0 * stability_factor
-            + 5.0 * geometry_penalty
-        )
-
-        pos_std = max(self.min_marker_position_std_m, min(self.max_marker_position_std_m, pos_std))
-        rot_std = math.radians(max(self.min_marker_rotation_std_deg, min(self.max_marker_rotation_std_deg, rot_std_deg)))
-        return np.array([pos_std**2, pos_std**2, pos_std**2, rot_std**2, rot_std**2, rot_std**2], dtype=float)
 
     def publish_marker_state(self, marker_valid: bool, marker_id: int) -> None:
         valid_msg = Bool()
@@ -862,6 +1169,66 @@ class ArucoMarkerPoseNode(Node):
         self.publish_tf(measurement.stamp, self.map_frame, f"{self.detected_camera_frame}_from_marker", measurement.T_map_cam)
         self.publish_tf(measurement.stamp, self.map_frame, f"{self.detected_camera_frame}_body_display", T_map_body)
         self.publish_tf(measurement.stamp, self.map_frame, f"{self.imu_frame}_from_marker", measurement.T_map_imu)
+
+    def marker_quality_payload(self, measurement: MarkerMeasurement, hard_gate_status: str) -> dict[str, Any]:
+        std = measurement.covariance_std_diag
+        cam_std = measurement.covariance_camera_std_diag
+        return {
+            "marker_id": int(measurement.marker_id),
+            "hard_gate_status": hard_gate_status,
+            "hard_gate_passed": hard_gate_status == "accepted",
+            "marker_area_px2": round(float(measurement.area_px2), 3),
+            "marker_sqrt_area_px": round(float(measurement.sqrt_area_px), 3),
+            "marker_side_mean_px": round(float(measurement.side_mean_px), 3),
+            "marker_side_min_px": round(float(measurement.side_min_px), 3),
+            "marker_reprojection_error_px": round(float(measurement.reprojection_error_px), 4),
+            "marker_distance_m": round(float(measurement.distance_m), 4),
+            "marker_view_angle_deg": round(float(measurement.view_angle_deg), 4),
+            "marker_view_penalty": round(float(measurement.view_penalty), 4),
+            "marker_geometry_score": round(float(measurement.geometry_score), 4),
+            "marker_stable_frames": int(measurement.stable_frames),
+            "marker_stable": bool(measurement.stable),
+            "marker_stability_factor": round(float(measurement.stability_factor), 4),
+            "marker_temporal_detection_translation_m": None
+            if measurement.temporal_detection_translation_m is None
+            else round(float(measurement.temporal_detection_translation_m), 6),
+            "marker_temporal_detection_rotation_deg": None
+            if measurement.temporal_detection_rotation_deg is None
+            else round(float(measurement.temporal_detection_rotation_deg), 6),
+            "marker_temporal_correction_translation_m": None
+            if measurement.temporal_correction_translation_m is None
+            else round(float(measurement.temporal_correction_translation_m), 6),
+            "marker_temporal_correction_rotation_deg": None
+            if measurement.temporal_correction_rotation_deg is None
+            else round(float(measurement.temporal_correction_rotation_deg), 6),
+            "marker_temporal_odom_match_dt": None
+            if measurement.temporal_odom_match_dt is None
+            else round(float(measurement.temporal_odom_match_dt), 6),
+            "marker_covariance_sigma_px": round(float(measurement.covariance_sigma_px), 4),
+            "marker_covariance_std_x_m": round(float(std[0]), 6),
+            "marker_covariance_std_y_m": round(float(std[1]), 6),
+            "marker_covariance_std_z_m": round(float(std[2]), 6),
+            "marker_covariance_std_roll_deg": round(math.degrees(float(std[3])), 6),
+            "marker_covariance_std_pitch_deg": round(math.degrees(float(std[4])), 6),
+            "marker_covariance_std_yaw_deg": round(math.degrees(float(std[5])), 6),
+            "marker_covariance_camera_std_x_m": round(float(cam_std[0]), 6),
+            "marker_covariance_camera_std_y_m": round(float(cam_std[1]), 6),
+            "marker_covariance_camera_std_z_m": round(float(cam_std[2]), 6),
+            "marker_covariance_camera_std_roll_deg": round(math.degrees(float(cam_std[3])), 6),
+            "marker_covariance_camera_std_pitch_deg": round(math.degrees(float(cam_std[4])), 6),
+            "marker_covariance_camera_std_yaw_deg": round(math.degrees(float(cam_std[5])), 6),
+        }
+
+    def publish_marker_quality(self, measurement: MarkerMeasurement, hard_gate_status: str) -> None:
+        event = {
+            "event_type": "marker_quality",
+            "stamp": round(float(measurement.stamp_sec), 9),
+            "frame_id": self.map_frame,
+        }
+        event.update(self.marker_quality_payload(measurement, hard_gate_status))
+        msg = String()
+        msg.data = json.dumps(event, separators=(",", ":"))
+        self.marker_quality_pub.publish(msg)
 
     def odom_cb(self, msg: Odometry) -> None:
         self.last_odom_msg = msg
@@ -1308,6 +1675,7 @@ class ArucoMarkerPoseNode(Node):
             marker_distance_m=measurement.distance_m,
             odom_match_dt=odom_match_dt,
             chi2=chi2,
+            marker_quality=self.marker_quality_payload(measurement, hard_gate_status="accepted"),
         )
 
     def publish_reanchor_event(
@@ -1324,6 +1692,7 @@ class ArucoMarkerPoseNode(Node):
         marker_distance_m: Optional[float] = None,
         odom_match_dt: Optional[float] = None,
         chi2: Optional[float] = None,
+        marker_quality: Optional[dict[str, Any]] = None,
     ) -> None:
         event_key = (correction_mode, reason, marker_id, correction_accepted)
         wall_now = self.now_sec()
@@ -1353,6 +1722,8 @@ class ArucoMarkerPoseNode(Node):
             "odom_match_dt": None if odom_match_dt is None else round(float(odom_match_dt), 6),
             "chi2": None if chi2 is None else round(float(chi2), 6),
         }
+        if marker_quality is not None:
+            event.update(marker_quality)
         msg = String()
         msg.data = json.dumps(event, separators=(",", ":"))
         self.reanchor_event_pub.publish(msg)
