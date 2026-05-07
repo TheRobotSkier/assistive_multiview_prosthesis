@@ -2,9 +2,21 @@
 # run_tests.sh — orchestrator for all smoke tests
 # Runs each test script and prints a summary table.
 # Exit code is non-zero if any test fails.
-set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source ROS workspace BEFORE set -euo pipefail — ROS setup scripts
+# reference unset variables (e.g. AMENT_TRACE_SETUP_FILES) that would
+# trigger the -u (nounset) guard.
+if [ -f /opt/ros/jazzy/setup.bash ]; then
+    source /opt/ros/jazzy/setup.bash
+fi
+if [ -f /prosthesis_ws/install/setup.bash ]; then
+    source /prosthesis_ws/install/setup.bash
+fi
+
+set -euo pipefail
+
 PASS=0
 FAIL=0
 RESULTS=()
@@ -33,18 +45,11 @@ echo "  Prosthesis Smoke Tests"
 echo "=========================================="
 echo ""
 
-# Source ROS workspace if available
-if [ -f /opt/ros/jazzy/setup.bash ]; then
-    source /opt/ros/jazzy/setup.bash
-fi
-if [ -f /prosthesis_ws/install/setup.bash ]; then
-    source /prosthesis_ws/install/setup.bash
-fi
-
 run_test "build"       "$SCRIPT_DIR/test_build.sh"
 run_test "launch"      "$SCRIPT_DIR/test_launch_syntax.sh"
 run_test "preshaping"  "$SCRIPT_DIR/test_preshaping_so.sh"
 run_test "nodes_start" "$SCRIPT_DIR/test_nodes_start.sh"
+run_test "twist_prop"  "$SCRIPT_DIR/test_twist_propagation.sh"
 
 echo ""
 echo "=========================================="

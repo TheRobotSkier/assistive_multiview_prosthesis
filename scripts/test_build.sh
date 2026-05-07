@@ -1,11 +1,18 @@
 #!/bin/bash
 # test_build.sh — verify colcon build succeeded
 # The Dockerfile already runs colcon build. This test verifies the artifacts.
-set -euo pipefail
 
+# Source ROS workspace BEFORE set -euo pipefail — ROS setup scripts
+# reference unset variables (e.g. AMENT_TRACE_SETUP_FILES) that would
+# trigger the -u (nounset) guard.
 if [ -f /opt/ros/jazzy/setup.bash ]; then
     source /opt/ros/jazzy/setup.bash
 fi
+if [ -f /prosthesis_ws/install/setup.bash ]; then
+    source /prosthesis_ws/install/setup.bash
+fi
+
+set -euo pipefail
 
 cd /prosthesis_ws
 

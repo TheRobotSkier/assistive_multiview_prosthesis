@@ -31,11 +31,12 @@ RUN pip install --no-cache-dir \
         -f https://download.pytorch.org/whl/torch_stable.html
 
 # Copy local MinkowskiEngine source and build
-COPY MinkowskiEngine/ /MinkowskiEngine-src/
+COPY MinkowskiEngine/ /MinkowskiEngine-src/MinkowskiEngine/
 COPY setup.minkowski.py /MinkowskiEngine-src/setup.py
 COPY src/ /MinkowskiEngine-src/src/
 COPY pybind/ /MinkowskiEngine-src/pybind/
 COPY MANIFEST.in /MinkowskiEngine-src/MANIFEST.in
+COPY README.md /MinkowskiEngine-src/README.md
 ENV MAX_JOBS=4
 RUN cd /MinkowskiEngine-src && \
     python setup.py install --blas=openblas --cpu_only && \

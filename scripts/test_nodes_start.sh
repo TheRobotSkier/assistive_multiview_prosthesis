@@ -1,13 +1,17 @@
 #!/bin/bash
 # test_nodes_start.sh — verify key ROS nodes can start and publish within a timeout
-set -euo pipefail
 
+# Source ROS workspace BEFORE set -euo pipefail — ROS setup scripts
+# reference unset variables (e.g. AMENT_TRACE_SETUP_FILES) that would
+# trigger the -u (nounset) guard.
 if [ -f /opt/ros/jazzy/setup.bash ]; then
     source /opt/ros/jazzy/setup.bash
 fi
 if [ -f /prosthesis_ws/install/setup.bash ]; then
     source /prosthesis_ws/install/setup.bash
 fi
+
+set -euo pipefail
 
 TIMEOUT=10  # seconds to wait for each node
 ERRORS=0
@@ -47,6 +51,7 @@ check_node() {
 # Test Python nodes that don't require hardware
 check_node "pipeline_manager" "pipeline_manager_node" "pipeline_manager"
 check_node "force_controller" "force_controller_node" "force_controller"
+check_node "twist_propagation" "twist_propagation_node" "twist_propagation"
 
 if [ "$ERRORS" -gt 0 ]; then
     echo "FAIL: $ERRORS node(s) failed to start"

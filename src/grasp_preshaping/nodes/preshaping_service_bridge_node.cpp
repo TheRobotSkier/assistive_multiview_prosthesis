@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "geometry_msgs/msg/pose.hpp"
-#include "geometry_msgs/msg/twist_with_covariance_stamped.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/twist_stamped.hpp"
 #include "grasp_preshaping/ffi_types.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -80,7 +80,7 @@ public:
     const std::string hand_twist_topic =
       declare_parameter<std::string>("hand_twist_topic", "/hand_twist");
     const std::string cloud_topic =
-      declare_parameter<std::string>("cloud_topic", "/segmented_object_cloud");
+      declare_parameter<std::string>("cloud_topic", "/segmentation/object_cloud");
     const std::string thumb_cmd_topic =
       declare_parameter<std::string>("thumb_cmd_topic", "/thumb_pos_ff_controller/commands");
     const std::string index_cmd_topic =
@@ -98,17 +98,17 @@ public:
     const std::string compute_service =
       declare_parameter<std::string>("compute_service", "/grasp_preshaping/compute_grasp");
 
-    hand_pose_sub_ = create_subscription<geometry_msgs::msg::Pose>(
+    hand_pose_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
       hand_pose_topic, 10,
-      [this](const geometry_msgs::msg::Pose::SharedPtr msg) {
+      [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(input_mutex_);
         latest_pose_ = *msg;
         has_pose_ = true;
       });
 
-    hand_twist_sub_ = create_subscription<geometry_msgs::msg::TwistWithCovarianceStamped>(
+    hand_twist_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
       hand_twist_topic, 10,
-      [this](const geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr msg) {
+      [this](const geometry_msgs::msg::TwistStamped::SharedPtr msg) {
         std::lock_guard<std::mutex> lock(input_mutex_);
         latest_twist_ = *msg;
         has_twist_ = true;
@@ -234,8 +234,8 @@ private:
 
   bool try_handle_direct_request(std::shared_ptr<std_srvs::srv::Trigger::Response> response)
   {
-    geometry_msgs::msg::Pose pose;
-    geometry_msgs::msg::TwistWithCovarianceStamped twist;
+    geometry_msgs::msg::PoseStamped pose;
+    geometry_msgs::msg::TwistStamped twist;
     sensor_msgs::msg::PointCloud2 cloud;
     {
       std::lock_guard<std::mutex> lock(input_mutex_);
@@ -261,21 +261,20 @@ private:
     }
 
     GraspComputeRequestFFI request{};
-    request.pose.px = pose.position.x;
-    request.pose.py = pose.position.y;
-    request.pose.pz = pose.position.z;
-    request.pose.qx = pose.orientation.x;
-    request.pose.qy = pose.orientation.y;
-    request.pose.qz = pose.orientation.z;
-    request.pose.qw = pose.orientation.w;
+    request.pose.px = pose.pose.position.x;
+    request.pose.py = pose.pose.position.y;
+    request.pose.pz = pose.pose.position.z;
+    request.pose.qx = pose.pose.orientation.x;
+    request.pose.qy = pose.pose.orientation.y;
+    request.pose.qz = pose.pose.orientation.z;
+    request.pose.qw = pose.pose.orientation.w;
 
-    request.twist.lx = twist.twist.twist.linear.x;
-    request.twist.ly = twist.twist.twist.linear.y;
-    request.twist.lz = twist.twist.twist.linear.z;
-    request.twist.ax = twist.twist.twist.angular.x;
-    request.twist.ay = twist.twist.twist.angular.y;
-    request.twist.az = twist.twist.twist.angular.z;
-    // Covariance is intentionally ignored — fixed values are used on the Rust side.
+    request.twist.lx = twist.twist.linear.x;
+    request.twist.ly = twist.twist.linear.y;
+    request.twist.lz = twist.twist.linear.z;
+    request.twist.ax = twist.twist.angular.x;
+    request.twist.ay = twist.twist.angular.y;
+    request.twist.az = twist.twist.angular.z;
 
     request.cloud.width = cloud.width;
     request.cloud.height = cloud.height;
@@ -323,8 +322,8 @@ private:
         get_logger(),
         "No camera TF resolved, estimating camera from hand pose");
       // Estimate: camera_position = hand_position + hand_rotation * (-0.08, -0.46, 0.10)
-      const auto & p = pose.position;
-      const auto & q = pose.orientation;
+      const auto & p = pose.pose.position;
+      const auto & q = pose.pose.orientation;
       // Rotate offset by hand orientation (simplified quaternion rotation)
       double ox = -0.08, oy = -0.46, oz = 0.10;
       // q * v + q_conj * v  (inline quaternion-vector multiply)
@@ -483,8 +482,8 @@ private:
   }
 
   std::mutex input_mutex_;
-  geometry_msgs::msg::Pose latest_pose_;
-  geometry_msgs::msg::TwistWithCovarianceStamped latest_twist_;
+  geometry_msgs::msg::PoseStamped latest_pose_;
+  geometry_msgs::msg::TwistStamped latest_twist_;
   sensor_msgs::msg::PointCloud2 latest_cloud_;
   bool has_pose_;
   bool has_twist_;
@@ -500,8 +499,8 @@ private:
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::vector<std::string> camera_frames_;
 
-  rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr hand_pose_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr hand_twist_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr hand_pose_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr hand_twist_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
 
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr thumb_cmd_pub_;

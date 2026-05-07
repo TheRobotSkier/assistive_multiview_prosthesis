@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-pip \
         usbutils \
         ros-jazzy-cyclonedds \
+        ros-jazzy-rmw-cyclonedds-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Python dependencies ──────────────────────────────────────────────────────
@@ -62,4 +63,4 @@ USER prosthesis
 RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/prosthesis/.bashrc \
     && echo "source /prosthesis_ws/install/setup.bash" >> /home/prosthesis/.bashrc
 
-ENTRYPOINT ["/bin/bash"]
+CMD ["/bin/bash"]

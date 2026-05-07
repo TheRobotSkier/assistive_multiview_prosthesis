@@ -14,9 +14,9 @@ python3 -c "
 import ctypes, sys
 so = ctypes.CDLL('$SO_PATH')
 
-# Check that grasp_preshaping_version exists and returns a value
+# Check that grasp_preshaping_api_version exists and returns a value
 try:
-    version_fn = so.grasp_preshaping_version
+    version_fn = so.grasp_preshaping_api_version
     version_fn.restype = ctypes.c_int
     v = version_fn()
     print(f'  API version: {v}')
@@ -24,15 +24,15 @@ try:
         print('FAIL: API version < 1')
         sys.exit(1)
 except Exception as e:
-    print(f'FAIL: could not call grasp_preshaping_version: {e}')
+    print(f'FAIL: could not call grasp_preshaping_api_version: {e}')
     sys.exit(1)
 
 # Check that the runtime config loaded (by checking a known function exists)
 try:
-    init_fn = so.grasp_preshaping_init
-    print('  grasp_preshaping_init: found')
+    init_fn = so.grasp_preshaping_compute
+    print('  grasp_preshaping_compute: found')
 except:
-    print('  grasp_preshaping_init: not found (may be optional)')
+    print('  grasp_preshaping_compute: not found (may be optional)')
 
 print('  .so loaded and API version check passed')
 "

@@ -11,6 +11,7 @@
   <depend>emg_bridge</depend>
   <depend>segmentation_bridge</depend>
   <depend>grasp_preshaping</depend>
+  <depend>twist_propagation</depend>
   <depend>force_controller</depend>
   <depend>rviz2</depend>
   <export>

@@ -1,13 +1,17 @@
 #!/bin/bash
 # test_launch_syntax.sh — verify all launch files parse without errors
-set -euo pipefail
 
+# Source ROS workspace BEFORE set -euo pipefail — ROS setup scripts
+# reference unset variables (e.g. AMENT_TRACE_SETUP_FILES) that would
+# trigger the -u (nounset) guard.
 if [ -f /opt/ros/jazzy/setup.bash ]; then
     source /opt/ros/jazzy/setup.bash
 fi
 if [ -f /prosthesis_ws/install/setup.bash ]; then
     source /prosthesis_ws/install/setup.bash
 fi
+
+set -euo pipefail
 
 LAUNCH_DIR="/prosthesis_ws/src/prosthesis_launch/launch"
 ERRORS=0

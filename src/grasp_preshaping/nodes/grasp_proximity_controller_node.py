@@ -52,7 +52,7 @@ class GraspProximityControllerNode(Node):
         self._buf_hand_frame: Pose | None = None
 
         # Current hand pose
-        self._current_hand_pose: Pose | None = None
+        self._current_hand_pose: PoseStamped | None = None
 
         # Hysteresis state: True = currently in "near" mode
         self._is_near: bool = False
@@ -89,7 +89,7 @@ class GraspProximityControllerNode(Node):
 
         # Existing topic providing the current hand pose in world frame.
         self.create_subscription(
-            Pose,
+            PoseStamped,
             '/hand_pose',
             self._on_current_hand_pose,
             10,
@@ -134,7 +134,7 @@ class GraspProximityControllerNode(Node):
         self._buf_hand_frame = msg.pose
         self._try_commit_plan()
 
-    def _on_current_hand_pose(self, msg: Pose) -> None:
+    def _on_current_hand_pose(self, msg: PoseStamped) -> None:
         self._current_hand_pose = msg
 
     def _try_commit_plan(self) -> None:
@@ -198,10 +198,10 @@ class GraspProximityControllerNode(Node):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _euclidean_distance(a: Pose, b: Pose) -> float:
-        dx = a.position.x - b.position.x
-        dy = a.position.y - b.position.y
-        dz = a.position.z - b.position.z
+    def _euclidean_distance(a: PoseStamped, b: Pose) -> float:
+        dx = a.pose.position.x - b.position.x
+        dy = a.pose.position.y - b.position.y
+        dz = a.pose.position.z - b.position.z
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
     def _floor_closure(self, planned: float) -> float:

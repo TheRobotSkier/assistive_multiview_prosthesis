@@ -68,6 +68,14 @@ def generate_launch_description():
         output="screen",
     )
 
+    # Twist Propagation Target Selector
+    twist_propagation = Node(
+        package="twist_propagation",
+        executable="twist_propagation_node",
+        name="twist_propagation",
+        output="screen",
+    )
+
     # Grasp Proximity Controller
     proximity_controller = Node(
         package="grasp_preshaping",
@@ -101,7 +109,9 @@ def generate_launch_description():
     return LaunchDescription(
         [
             config_arg,
+            mock_cloud,
             mock_emg,
+            twist_propagation,
             preshaping_service,
             proximity_controller,
             force_controller,

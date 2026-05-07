@@ -53,15 +53,9 @@ services:
       - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
     network_mode: host
 
-  # ── Test runner: builds image, runs smoke tests, exits ──────────────────
+  # ── Test runner: reuses prosthesis image, runs smoke tests, exits ────────
   test:
-    image: prosthesis-test:latest
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-      args:
-        USER_UID: ${USER_UID:-1000}
-        USER_GID: ${USER_GID:-1000}
+    image: prosthesis:latest
     user: "0:0"
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp

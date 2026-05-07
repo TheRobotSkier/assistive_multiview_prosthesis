@@ -50,7 +50,7 @@ Visualization Manager:
       Enabled: true
       Value: true
       Topic:
-        Value: /segmented_object_cloud
+        Value: /segmentation/object_cloud
       Size (Pixels): 3
       Style: Points
       Color Transformer: Intensity
