@@ -1,51 +1,35 @@
-"""Launch cameras + static TF + pointcloud fusion node + charuco TF node."""
+"""Launch the full multiview pipeline: dual cameras with static TF alignment.
+
+Simply delegates to two_d435_launch.py (which handles the serial_no YAML quoting
+workaround and publishes individual pointcloud streams + static TF).
+
+Configurable via environment variables (passed through to two_d435_launch.py):
+    CAM1_SERIAL       Serial for camera 1 (default: 829212072207)
+    CAM2_SERIAL       Serial for camera 2 (default: 827112072033)
+    CAM2_OFFSET_X     X-offset from cam1 to cam2 depth frame (default: 0.5)
+"""
+
+
 import os
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, TimerAction
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.actions import Node
+from launch.actions import IncludeLaunchDescription, LogInfo
+from launch.launch_description_sources import AnyLaunchDescriptionSource
+from ament_index_python.packages import get_package_share_directory
 
-_HERE = os.path.dirname(os.path.abspath(__file__))
+
+LAUNCH_FILE = os.path.join(
+    os.path.dirname(__file__),
+    'two_d435_launch.py',
+)
 
 
 def generate_launch_description():
-    cameras = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(_HERE, 'two_d435_launch.py')))
-
-    # Static TF: cam2 optical frame relative to cam1 optical frame.
-    # Replace translation+rotation with values from CharUco calibration
-    # (multiview/intrinsics/). Identity used until calibrated.
-    static_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=[
-            '0', '0', '0',          # x y z (meters) — update after calibration
-            '0', '0', '0', '1',     # qx qy qz qw — identity
-            'd435_1_color_optical_frame',
-            'd435_2_color_optical_frame',
-        ],
-        name='cam2_to_cam1_tf',
-        output='screen',
-    )
-
-    # ChArUco board detector and TF publisher.
-    # Uses the CHARUCO_NODE_NAME env var (default charuco_tf_node) for unique naming.
-    charuco = Node(
-        executable='python3',
-        arguments=['/ros_ws/nodes/charuco_tf_node.py'],
-        name='charuco_tf_node',
-        output='screen',
-    )
-
-    # Start fusion node after cameras and TF are ready
-    fusion = TimerAction(period=8.0, actions=[
-        Node(
-            executable='python3',
-            arguments=['/ros_ws/nodes/pointcloud_fusion_node.py'],
-            name='pointcloud_fusion',
-            output='screen',
-        )
+    # Pass through environment variables needed by two_d435_launch.py.
+    # The launched file reads os.environ directly, so no explicit
+    # launch_arguments are needed.
+    return LaunchDescription([
+        LogInfo(msg=f'Starting multiview full pipeline'),
+        IncludeLaunchDescription(
+            AnyLaunchDescriptionSource(LAUNCH_FILE),
+        ),
     ])
-
-    return LaunchDescription([cameras, static_tf, charuco, fusion])

@@ -60,7 +60,8 @@ public:
     rust_compute_fn_(nullptr),
     rust_api_version_fn_(nullptr),
     min_closure_amount_(declare_parameter<double>("min_closure_amount", 0.1)),
-    preshaping_closure_fraction_(declare_parameter<double>("preshaping_closure_fraction", 1.0))
+    preshaping_closure_fraction_(declare_parameter<double>("preshaping_closure_fraction", 0.3)),
+    publish_initial_commands_(declare_parameter<bool>("publish_initial_commands", true))
   {
     // TF2 buffer and listener for camera pose lookups
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
@@ -406,22 +407,24 @@ private:
     const double full_mrl   = ffi_response.mrl_closure;
 
     // ── Reduced (preshape) closure sent immediately to controllers ───────
+    // -- Reduced (preshape) closure sent immediately to controllers --
     const double preshape_thumb = std::max(full_thumb * preshaping_closure_fraction_, min_closure_amount_);
     const double preshape_index = std::max(full_index * preshaping_closure_fraction_, min_closure_amount_);
     const double preshape_mrl   = std::max(full_mrl   * preshaping_closure_fraction_, min_closure_amount_);
-    publish_joint_commands(preshape_thumb, preshape_index, preshape_mrl);
-
+    if (publish_initial_commands_) {
+      publish_joint_commands(preshape_thumb, preshape_index, preshape_mrl);
+    }
     // ── Publish wrist rotation in degrees (immediate) ───────────────────
-    {
+    // -- Publish wrist rotation in degrees (immediate, if enabled) --
+    if (publish_initial_commands_) {
       std_msgs::msg::Float64 wrist_msg;
       wrist_msg.data = ffi_response.wrist_rotation_deg;
       wrist_pose_pub_->publish(wrist_msg);
     }
 
-    // ── Publish planner topics for downstream trajectory node ────────────
+    // -- Publish planner topics for downstream trajectory node --
     // Target hand pose: best grasp position + planned wrist orientation.
     {
-      geometry_msgs::msg::Pose target_pose;
       target_pose.position.x = ffi_response.target_px;
       target_pose.position.y = ffi_response.target_py;
       target_pose.position.z = ffi_response.target_pz;
@@ -474,6 +477,7 @@ private:
   GraspApiVersionFn rust_api_version_fn_;
   const double min_closure_amount_;
   const double preshaping_closure_fraction_;
+  const bool publish_initial_commands_;
 
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;

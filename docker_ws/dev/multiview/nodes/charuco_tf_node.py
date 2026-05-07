@@ -31,25 +31,23 @@
 # depth / point cloud data into the charuco_board frame.
 # ============================================================
 
-import os
 import math
-import numpy as np
-import cv2
 
+import cv2
+import numpy as np
 import rclpy
+from cv_bridge import CvBridge
+from geometry_msgs.msg import TransformStamped
+from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
-from rclpy.duration import Duration
-
-from sensor_msgs.msg import Image, CameraInfo
-from geometry_msgs.msg import TransformStamped
-from tf2_ros import TransformBroadcaster, Buffer, TransformListener
-from cv_bridge import CvBridge
-
+from sensor_msgs.msg import CameraInfo, Image
+from tf2_ros import Buffer, TransformBroadcaster, TransformListener
 
 # ============================================================
 # Helper functions for transform math
 # ============================================================
+
 
 def rvec_tvec_to_matrix(rvec, tvec):
     """
@@ -114,11 +112,14 @@ def quaternion_to_rotation_matrix(x, y, z, w):
     wy = w * y
     wz = w * z
 
-    R = np.array([
-        [1.0 - 2.0 * (yy + zz), 2.0 * (xy - wz),       2.0 * (xz + wy)],
-        [2.0 * (xy + wz),       1.0 - 2.0 * (xx + zz), 2.0 * (yz - wx)],
-        [2.0 * (xz - wy),       2.0 * (yz + wx),       1.0 - 2.0 * (xx + yy)],
-    ], dtype=np.float64)
+    R = np.array(
+        [
+            [1.0 - 2.0 * (yy + zz), 2.0 * (xy - wz), 2.0 * (xz + wy)],
+            [2.0 * (xy + wz), 1.0 - 2.0 * (xx + zz), 2.0 * (yz - wx)],
+            [2.0 * (xz - wy), 2.0 * (yz + wx), 1.0 - 2.0 * (xx + yy)],
+        ],
+        dtype=np.float64,
+    )
     return R
 
 
@@ -176,9 +177,11 @@ def rotation_matrix_to_quaternion(R):
 
     return q[0], q[1], q[2], q[3]
 
+
 # ============================================================
 # Per-camera state
 # ============================================================
+
 
 class CameraState:
     """
@@ -186,6 +189,7 @@ class CameraState:
 
     This avoids duplicating the same variables for cam1 and cam2.
     """
+
     def __init__(self):
         # Intrinsic calibration matrix from CameraInfo or fallback
         self.camera_matrix = None
@@ -205,27 +209,21 @@ class CameraState:
         # Used to avoid printing the same warning repeatedly
         self.fallback_warned = False
         self.tf_warned = False
-        self.tf_warn_time = None   # wall-clock time of last TF warning (for periodic re-warn)
-
-        # Detection diagnostic counters (reset each time a transform is published)
-        self.diag_no_markers = 0
-        self.diag_few_corners = 0
-        self.diag_pose_failed = 0
 
         # Cache the existing RealSense transform:
         # color_optical <- link
         # so we don't look it up every frame
         self.cached_T_color_link = None
 
+
 # ============================================================
 # Main ROS 2 node
 # ============================================================
 
+
 class CharucoTfNode(Node):
     def __init__(self):
-        # Allow node name override via env var to prevent duplicate name conflicts
-        node_name = os.environ.get('CHARUCO_NODE_NAME', 'charuco_tf_node')
-        super().__init__(node_name)
+        super().__init__("charuco_tf_node")
 
         # cv_bridge converts ROS Image messages to OpenCV images
         self.bridge = CvBridge()
@@ -242,14 +240,18 @@ class CharucoTfNode(Node):
         # ChArUco board configuration
         # These values must match the printed board exactly
         # ------------------------------------------------------------
-        self.declare_parameter('board_frame', 'charuco_board')
-        self.declare_parameter('squares_x', 5)
-        self.declare_parameter('squares_y', 7)
-        self.declare_parameter('square_length', 0.035) # in meters, e.g. 0.035 for 35 mm
-        self.declare_parameter('marker_length', 0.026) # in meters, e.g. 0.026 for 26 mm
-        self.declare_parameter('aruco_dictionary', 'DICT_4X4_50')
-        self.declare_parameter('min_charuco_corners', 4)
-        self.declare_parameter('publish_debug_optical_frames', True)
+        self.declare_parameter("board_frame", "charuco_board")
+        self.declare_parameter("squares_x", 5)
+        self.declare_parameter("squares_y", 7)
+        self.declare_parameter(
+            "square_length", 0.035
+        )  # in meters, e.g. 0.035 for 35 mm
+        self.declare_parameter(
+            "marker_length", 0.026
+        )  # in meters, e.g. 0.026 for 26 mm
+        self.declare_parameter("aruco_dictionary", "DICT_4X4_50")
+        self.declare_parameter("min_charuco_corners", 4)
+        self.declare_parameter("publish_debug_optical_frames", True)
 
         # ------------------------------------------------------------
         # Startup behavior
@@ -265,9 +267,9 @@ class CharucoTfNode(Node):
         # tf_lookup_timeout_sec:
         #   How long to wait during each tf2 lookup.
         # ------------------------------------------------------------
-        self.declare_parameter('startup_grace_sec', 5.0)
-        self.declare_parameter('fallback_after_sec', 5.0)
-        self.declare_parameter('tf_lookup_timeout_sec', 1.0)
+        self.declare_parameter("startup_grace_sec", 5.0)
+        self.declare_parameter("fallback_after_sec", 5.0)
+        self.declare_parameter("tf_lookup_timeout_sec", 0.5)
 
         # ------------------------------------------------------------
         # Fallback intrinsics
@@ -275,41 +277,65 @@ class CharucoTfNode(Node):
         # These are used only if camera_info does not arrive in time.
         # In normal operation, live CameraInfo is preferred.
         # ------------------------------------------------------------
-        self.declare_parameter('use_fallback_intrinsics', True)
+        self.declare_parameter("use_fallback_intrinsics", True)
 
-        self.declare_parameter('cam1_k', [
-            615.3892211914062, 0.0, 324.1833190917969,
-            0.0, 615.7371215820312, 242.41490173339844,
-            0.0, 0.0, 1.0
-        ])
-        self.declare_parameter('cam1_d', [0.0, 0.0, 0.0, 0.0, 0.0])
-        self.declare_parameter('cam1_frame_id', 'd435_1_color_optical_frame')
-        self.declare_parameter('cam1_link_frame', 'd435_1_link')
+        self.declare_parameter(
+            "cam1_k",
+            [
+                615.3892211914062,
+                0.0,
+                324.1833190917969,
+                0.0,
+                615.7371215820312,
+                242.41490173339844,
+                0.0,
+                0.0,
+                1.0,
+            ],
+        )
+        self.declare_parameter("cam1_d", [0.0, 0.0, 0.0, 0.0, 0.0])
+        self.declare_parameter("cam1_frame_id", "d435_1_color_optical_frame")
+        self.declare_parameter("cam1_link_frame", "d435_1_link")
 
-        self.declare_parameter('cam2_k', [
-            615.4778442382812, 0.0, 316.2964782714844,
-            0.0, 615.7003784179688, 244.2735137939453,
-            0.0, 0.0, 1.0
-        ])
-        self.declare_parameter('cam2_d', [0.0, 0.0, 0.0, 0.0, 0.0])
-        self.declare_parameter('cam2_frame_id', 'd435_2_color_optical_frame')
-        self.declare_parameter('cam2_link_frame', 'd435_2_link')
+        self.declare_parameter(
+            "cam2_k",
+            [
+                615.4778442382812,
+                0.0,
+                316.2964782714844,
+                0.0,
+                615.7003784179688,
+                244.2735137939453,
+                0.0,
+                0.0,
+                1.0,
+            ],
+        )
+        self.declare_parameter("cam2_d", [0.0, 0.0, 0.0, 0.0, 0.0])
+        self.declare_parameter("cam2_frame_id", "d435_2_color_optical_frame")
+        self.declare_parameter("cam2_link_frame", "d435_2_link")
 
         # Read parameter values into normal variables
-        self.board_frame = self.get_parameter('board_frame').value
-        squares_x = self.get_parameter('squares_x').value
-        squares_y = self.get_parameter('squares_y').value
-        square_length = self.get_parameter('square_length').value
-        marker_length = self.get_parameter('marker_length').value
-        dict_name = self.get_parameter('aruco_dictionary').value
-        self.min_charuco_corners = self.get_parameter('min_charuco_corners').value
-        self.publish_debug_optical_frames = self.get_parameter('publish_debug_optical_frames').value
+        self.board_frame = self.get_parameter("board_frame").value
+        squares_x = self.get_parameter("squares_x").value
+        squares_y = self.get_parameter("squares_y").value
+        square_length = self.get_parameter("square_length").value
+        marker_length = self.get_parameter("marker_length").value
+        dict_name = self.get_parameter("aruco_dictionary").value
+        self.min_charuco_corners = self.get_parameter("min_charuco_corners").value
+        self.publish_debug_optical_frames = self.get_parameter(
+            "publish_debug_optical_frames"
+        ).value
 
-        self.startup_grace_sec = float(self.get_parameter('startup_grace_sec').value)
-        self.fallback_after_sec = float(self.get_parameter('fallback_after_sec').value)
-        self.tf_lookup_timeout_sec = float(self.get_parameter('tf_lookup_timeout_sec').value)
+        self.startup_grace_sec = float(self.get_parameter("startup_grace_sec").value)
+        self.fallback_after_sec = float(self.get_parameter("fallback_after_sec").value)
+        self.tf_lookup_timeout_sec = float(
+            self.get_parameter("tf_lookup_timeout_sec").value
+        )
 
-        self.use_fallback_intrinsics = self.get_parameter('use_fallback_intrinsics').value
+        self.use_fallback_intrinsics = self.get_parameter(
+            "use_fallback_intrinsics"
+        ).value
 
         # ------------------------------------------------------------
         # Create the OpenCV ArUco dictionary and ChArUco board object
@@ -337,12 +363,20 @@ class CharucoTfNode(Node):
         #   - CameraInfo for intrinsics
         #   - color image for ChArUco detection
         # ------------------------------------------------------------
-        self.create_subscription(CameraInfo, '/cam1/d435_1/camera/color/camera_info', self.cam1_info_cb, 10)
-        self.create_subscription(CameraInfo, '/cam2/d435_2/camera/color/camera_info', self.cam2_info_cb, 10)
-        self.create_subscription(Image, '/cam1/d435_1/camera/color/image_raw', self.cam1_image_cb, 10)
-        self.create_subscription(Image, '/cam2/d435_2/camera/color/image_raw', self.cam2_image_cb, 10)
+        self.create_subscription(
+            CameraInfo, "/cam1/d435_1/color/camera_info", self.cam1_info_cb, 10
+        )
+        self.create_subscription(
+            CameraInfo, "/cam2/d435_2/color/camera_info", self.cam2_info_cb, 10
+        )
+        self.create_subscription(
+            Image, "/cam1/d435_1/color/image_raw", self.cam1_image_cb, 10
+        )
+        self.create_subscription(
+            Image, "/cam2/d435_2/color/image_raw", self.cam2_image_cb, 10
+        )
 
-        self.get_logger().info('charuco_tf_node started')
+        self.get_logger().info("charuco_tf_node started")
 
     def seconds_since_start(self):
         """
@@ -356,11 +390,11 @@ class CharucoTfNode(Node):
 
     def cam1_info_cb(self, msg: CameraInfo):
         """CameraInfo callback for camera 1."""
-        self._camera_info_to_state(msg, self.cam1, 'cam1')
+        self._camera_info_to_state(msg, self.cam1, "cam1")
 
     def cam2_info_cb(self, msg: CameraInfo):
         """CameraInfo callback for camera 2."""
-        self._camera_info_to_state(msg, self.cam2, 'cam2')
+        self._camera_info_to_state(msg, self.cam2, "cam2")
 
     def _camera_info_to_state(self, msg: CameraInfo, state: CameraState, cam_name: str):
         """
@@ -379,10 +413,10 @@ class CharucoTfNode(Node):
         state.dist_coeffs = np.array(msg.d, dtype=np.float64)
         state.frame_id = msg.header.frame_id
 
-        if state.frame_id.endswith('_color_optical_frame'):
-            state.link_frame = state.frame_id.replace('_color_optical_frame', '_link')
+        if state.frame_id.endswith("_color_optical_frame"):
+            state.link_frame = state.frame_id.replace("_color_optical_frame", "_link")
         else:
-            state.link_frame = self.get_parameter(f'{cam_name}_link_frame').value
+            state.link_frame = self.get_parameter(f"{cam_name}_link_frame").value
 
         state.have_camera_info = True
 
@@ -399,16 +433,16 @@ class CharucoTfNode(Node):
         if self.seconds_since_start() < self.fallback_after_sec:
             return False
 
-        if cam_name == 'cam1':
-            k = self.get_parameter('cam1_k').value
-            d = self.get_parameter('cam1_d').value
-            frame_id = self.get_parameter('cam1_frame_id').value
-            link_frame = self.get_parameter('cam1_link_frame').value
-        elif cam_name == 'cam2':
-            k = self.get_parameter('cam2_k').value
-            d = self.get_parameter('cam2_d').value
-            frame_id = self.get_parameter('cam2_frame_id').value
-            link_frame = self.get_parameter('cam2_link_frame').value
+        if cam_name == "cam1":
+            k = self.get_parameter("cam1_k").value
+            d = self.get_parameter("cam1_d").value
+            frame_id = self.get_parameter("cam1_frame_id").value
+            link_frame = self.get_parameter("cam1_link_frame").value
+        elif cam_name == "cam2":
+            k = self.get_parameter("cam2_k").value
+            d = self.get_parameter("cam2_d").value
+            frame_id = self.get_parameter("cam2_frame_id").value
+            link_frame = self.get_parameter("cam2_link_frame").value
         else:
             return False
 
@@ -420,8 +454,8 @@ class CharucoTfNode(Node):
         # Warn only once per camera
         if not state.fallback_warned:
             self.get_logger().warn(
-                f'{cam_name}: using fallback intrinsics because camera_info did not arrive within '
-                f'{self.fallback_after_sec:.1f} s'
+                f"{cam_name}: using fallback intrinsics because camera_info did not arrive within "
+                f"{self.fallback_after_sec:.1f} s"
             )
             state.fallback_warned = True
 
@@ -449,42 +483,32 @@ class CharucoTfNode(Node):
 
         try:
             tf_color_link = self.tf_buffer.lookup_transform(
-                state.frame_id,         # target frame
-                state.link_frame,       # source frame
+                state.frame_id,  # target frame
+                state.link_frame,  # source frame
                 Time(),
-                timeout=Duration(seconds=self.tf_lookup_timeout_sec)
+                timeout=Duration(seconds=self.tf_lookup_timeout_sec),
             )
             state.cached_T_color_link = transform_msg_to_matrix(tf_color_link)
-            # Reset warning state on success
-            state.tf_warned = False
-            state.tf_warn_time = None
             return state.cached_T_color_link
         except Exception as e:
             # Suppress startup warning spam during grace period
-            now = self.get_clock().now().nanoseconds / 1e9
-            if self.seconds_since_start() >= self.startup_grace_sec:
-                # Re-warn periodically (every 30 s) rather than just once
-                if not state.tf_warned:
-                    self.get_logger().warn(
-                        f'{cam_name}: could not look up existing TF {state.frame_id} <- {state.link_frame}: {e}'
-                    )
-                    state.tf_warned = True
-                    state.tf_warn_time = now
-                elif state.tf_warn_time is not None and (now - state.tf_warn_time) > 30.0:
-                    self.get_logger().warn(
-                        f'{cam_name}: still cannot look up TF {state.frame_id} <- {state.link_frame} '
-                        f'(last warned {now - state.tf_warn_time:.0f}s ago): {e}'
-                    )
-                    state.tf_warn_time = now
+            if (
+                self.seconds_since_start() >= self.startup_grace_sec
+                and not state.tf_warned
+            ):
+                self.get_logger().warn(
+                    f"{cam_name}: could not look up existing TF {state.frame_id} <- {state.link_frame}: {e}"
+                )
+                state.tf_warned = True
             return None
 
     def cam1_image_cb(self, msg: Image):
         """Image callback for camera 1."""
-        self.process_image(msg, self.cam1, 'cam1')
+        self.process_image(msg, self.cam1, "cam1")
 
     def cam2_image_cb(self, msg: Image):
         """Image callback for camera 2."""
-        self.process_image(msg, self.cam2, 'cam2')
+        self.process_image(msg, self.cam2, "cam2")
 
     def process_image(self, msg: Image, state: CameraState, cam_name: str):
         """
@@ -501,9 +525,14 @@ class CharucoTfNode(Node):
         8. Compose with existing TF to get board -> link
         9. Publish TF
         """
-        
+
         # Ensure we have intrinsics, using fallback if needed
-        if state.camera_matrix is None or state.dist_coeffs is None or state.frame_id is None or state.link_frame is None:
+        if (
+            state.camera_matrix is None
+            or state.dist_coeffs is None
+            or state.frame_id is None
+            or state.link_frame is None
+        ):
             ok = self.apply_fallback_intrinsics(state, cam_name)
             if not ok:
                 return
@@ -515,9 +544,9 @@ class CharucoTfNode(Node):
 
         # Convert ROS Image -> OpenCV BGR image
         try:
-            image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         except Exception as e:
-            self.get_logger().warn(f'{cam_name}: cv_bridge failed: {e}')
+            self.get_logger().warn(f"{cam_name}: cv_bridge failed: {e}")
             return
 
         # ChArUco / ArUco detection typically works on grayscale images
@@ -534,12 +563,6 @@ class CharucoTfNode(Node):
 
         # If no markers are found, no board pose can be estimated
         if marker_ids is None or len(marker_ids) == 0:
-            state.diag_no_markers += 1
-            if state.diag_no_markers == 1 or state.diag_no_markers % 30 == 0:
-                self.get_logger().warn(
-                    f'{cam_name}: no ArUco markers detected in frame '
-                    f'(seen {state.diag_no_markers} frames without markers)'
-                )
             return
 
         # ------------------------------------------------------------
@@ -554,18 +577,15 @@ class CharucoTfNode(Node):
             gray,
             self.board,
             cameraMatrix=state.camera_matrix,
-            distCoeffs=state.dist_coeffs
+            distCoeffs=state.dist_coeffs,
         )
 
         # Require a minimum number of detected ChArUco corners
-        found = 0 if (charuco_ids is None or charuco_corners is None) else int(num)
-        if found < self.min_charuco_corners:
-            state.diag_few_corners += 1
-            if state.diag_few_corners == 1 or state.diag_few_corners % 30 == 0:
-                self.get_logger().warn(
-                    f'{cam_name}: insufficient ChArUco corners ({found} < {self.min_charuco_corners}) '
-                    f'(seen {state.diag_few_corners} frames with too few corners)'
-                )
+        if (
+            charuco_ids is None
+            or charuco_corners is None
+            or int(num) < self.min_charuco_corners
+        ):
             return
 
         # ------------------------------------------------------------
@@ -581,16 +601,10 @@ class CharucoTfNode(Node):
             state.camera_matrix,
             state.dist_coeffs,
             None,
-            None
+            None,
         )
 
         if not ok:
-            state.diag_pose_failed += 1
-            if state.diag_pose_failed == 1 or state.diag_pose_failed % 30 == 0:
-                self.get_logger().warn(
-                    f'{cam_name}: estimatePoseCharucoBoard failed '
-                    f'(seen {state.diag_pose_failed} pose failures)'
-                )
             return
 
         # Convert OpenCV pose output into 4x4 matrix form
@@ -607,12 +621,12 @@ class CharucoTfNode(Node):
         # without touching the original RealSense TF tree.
         # ------------------------------------------------------------
         if self.publish_debug_optical_frames:
-            debug_child = f'{state.frame_id}_from_charuco'
+            debug_child = f"{state.frame_id}_from_charuco"
             self.publish_tf(
                 stamp=msg.header.stamp,
                 parent_frame=self.board_frame,
                 child_frame=debug_child,
-                T=T_board_color
+                T=T_board_color,
             )
 
         # ------------------------------------------------------------
@@ -630,50 +644,14 @@ class CharucoTfNode(Node):
         # ------------------------------------------------------------
         T_board_link = T_board_color @ T_color_link
 
-        # Validate the composed transform before publishing
-        if not self._validate_transform(T_board_link, cam_name):
-            return
-
-        # Reset diagnostic counters on successful publish
-        state.diag_no_markers = 0
-        state.diag_few_corners = 0
-        state.diag_pose_failed = 0
-
         # Publish the final useful TF:
         #   charuco_board -> d435_X_link
         self.publish_tf(
             stamp=msg.header.stamp,
             parent_frame=self.board_frame,
             child_frame=state.link_frame,
-            T=T_board_link
+            T=T_board_link,
         )
-
-
-    def _validate_transform(self, T: np.ndarray, cam_name: str) -> bool:
-        """
-        Validate a 4x4 homogeneous transform before publishing.
-
-        Checks:
-        - No NaN or Inf values
-        - Rotation part is non-zero (not a degenerate estimate)
-
-        Returns True if the transform is valid.
-        """
-        if not np.all(np.isfinite(T)):
-            self.get_logger().error(
-                f'{cam_name}: computed transform contains NaN or Inf — skipping publish'
-            )
-            return False
-
-        # Check that the rotation part is not near-zero (would indicate degenerate pose)
-        R_norm = np.linalg.norm(T[:3, :3])
-        if R_norm < 1e-6:
-            self.get_logger().error(
-                f'{cam_name}: computed transform has near-zero rotation (norm={R_norm:.2e}) — skipping publish'
-            )
-            return False
-
-        return True
 
     def publish_tf(self, stamp, parent_frame: str, child_frame: str, T: np.ndarray):
         """
@@ -717,5 +695,5 @@ def main(args=None):
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

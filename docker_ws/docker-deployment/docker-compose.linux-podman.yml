@@ -247,43 +247,89 @@ services:
       - ../dev/mindrove_cpp:/src:ro
       - ../dev/mindrove/mindroveSDK/mindrovesdk-5.3.0-linux-x64:/sdk:ro
 
-  # ── Multiview cameras — ROS Humble (dual D435 + pointcloud fusion) ────────
-  # Runs ROS Humble realsense camera nodes and fuses their pointclouds.
-  # Publishes /fused_pointcloud (sensor_msgs/PointCloud2) via DDS to all
-  # other containers (Humble → Jazzy cross-distro confirmed working).
+  # ── Multiview cameras — ROS Humble (RealSense camera access) ──────────────
+  # Runs the official realsense2_camera launch in ROS Humble.
+  # Device passthrough uses only /dev/bus/usb (librealsense enumerates via USB
+  # descriptors; explicit /dev/videoN mappings become stale on reconnect).
+  #
+  # Single camera (default):
+  #   docker compose --profile standalone up multiview_cameras
+  #
+  # Dual cameras (set CAM2_SERIAL):
+  #   CAM1_SERIAL=829212072207 CAM2_SERIAL=827112072033 \
+  #     docker compose --profile standalone up multiview_cameras
+  #
+  # The probe script auto-detects dual mode when CAM2_SERIAL is set.
   multiview_cameras:
     build:
       context: ../dev/multiview
       dockerfile: Dockerfile.humble_cameras
     container_name: multiview_cameras
     network_mode: "host"
+    ipc: host
     privileged: true
     tty: true
     stdin_open: true
-    profiles: [full_system]
+    profiles: [standalone, full_system]
     devices:
       - /dev/bus/usb:/dev/bus/usb
     environment:
-      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
-    command: ["ros2", "launch", "/ros_ws/launch/one_d435_launch.py"]
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      CAM1_SERIAL: ${CAM1_SERIAL:-829212072207}
+      CAM2_SERIAL: ${CAM2_SERIAL:-}
+    command: ["/ros_ws/scripts/realsense_ros_probe.sh"]
 
-  # Variant: cameras + fusion pipeline
+  # ── RViz2 pointcloud viewer — ROS Humble ──────────────────────────────────
+  # Displays the RealSense depth pointcloud(s) (cam1 and cam2 individually,
+  # plus /fused_pointcloud if fusion is enabled) in RViz2.
+  # Requires X11 forwarding to the host display.
+  # Start with cameras:
+  #   docker compose --profile standalone up multiview_cameras multiview_rviz2
+  multiview_rviz2:
+    build:
+      context: ../dev/multiview
+      dockerfile: Dockerfile.rviz2
+    container_name: multiview_rviz2
+    network_mode: "host"
+    ipc: host
+    tty: true
+    stdin_open: true
+    profiles: [standalone, full_system]
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ${XAUTHORITY}:/tmp/.Xauthority:ro,z
+    environment:
+      DISPLAY: $DISPLAY
+      XAUTHORITY: /tmp/.Xauthority
+      QT_X11_NO_MITSHM: 1
+      HOME: /tmp
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+    userns_mode: "keep-id"
+
+  # Variant: dual cameras with multiview_full_launch.py (includes static TF
+  # alignment). Provides individual pointclouds on:
+  #   /cam1/d435_1/depth/color/points
+  #   /cam2/d435_2/depth/color/points
+  # Configure both camera serials and an X-offset for alignment.
   multiview_full:
     build:
       context: ../dev/multiview
       dockerfile: Dockerfile.humble_cameras
     container_name: multiview_full
     network_mode: "host"
+    ipc: host
     privileged: true
     tty: true
     stdin_open: true
-    profiles: [full_system]
+    profiles: [standalone, full_system]
     devices:
       - /dev/bus/usb:/dev/bus/usb
     environment:
-      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      CAM1_SERIAL: ${CAM1_SERIAL:-829212072207}
+      CAM2_SERIAL: ${CAM2_SERIAL:-827112072033}
+      CAM2_OFFSET_X: ${CAM2_OFFSET_X:-0.5}
+      REALSENSE_ENABLE_COLOR: ${REALSENSE_ENABLE_COLOR:-true}
     command: ["ros2", "launch", "/ros_ws/launch/multiview_full_launch.py"]
 
   naviflame:
@@ -379,9 +425,10 @@ services:
       - rust_cargo_cache:/usr/local/cargo/registry
 
   # ── Full system test — main Jazzy orchestration ───────────────────────────
-  # Starts: MuJoCo mirror + haptic controller + segmentation node + RViz.
-  # Start this AFTER: miahand_driver, haptic_band, multiview_full, mindrove_emg_ros.
-  # For one-command launch of the whole system: docker compose --profile full_system up
+  # Starts: MuJoCo mirror + haptic controller + segmentation + RViz.
+  # Camera access is expected from the `multiview_cameras` service (single or dual).
+  # Individual pointcloud topics: /cam1/d435_1/depth/color/points
+  #                               /cam2/d435_2/depth/color/points
   full_system_test:
     build:
       context: .
@@ -400,8 +447,7 @@ services:
       DISPLAY: $DISPLAY
       XAUTHORITY: /tmp/.Xauthority
       QT_X11_NO_MITSHM: 1
-      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
     command: >
       bash -c "
         source /opt/ros/jazzy/setup.bash &&
@@ -471,6 +517,7 @@ services:
       "
 
   # ── Segmentation: interactive demo (RViz2 + cloud publisher + click relay) ─
+  # -- Segmentation: interactive demo (RViz2 + cloud publisher + click relay) --
   # Publishes D435_img_1.ply, opens RViz2, relays clicks to the segmentation node.
   # Requires X11 forwarding and segmentation_ros2 running.
   # In the terminal that opens: p=positive mode, n=negative mode, r=reset, q=quit
@@ -489,6 +536,48 @@ services:
         rviz2 -d /miahand_ws/src/dev/pc_segmentation/demo_config.rviz &
         python3 /miahand_ws/src/dev/pc_segmentation/nodes/demo_click_relay_node.py;
         wait
+      "
+
+  # -- Digital Twin: real cameras + simulated Mia Hand ------------------------
+  # Visualizes real camera pointclouds, runs segmentation, computes grasps, and
+  # drives a simulated Mia Hand as a digital twin.
+  #
+  # Prerequisites:
+  #   1. rust_build   (one-shot) -- ensures libgrasp_preshaping.so exists.
+  #   2. segmentation_inference (standalone or full_system) -- HTTP server on :5678.
+  #   3. multiview_cameras (standalone or full_system) -- publishes individual
+  #      depth pointclouds from one or two real D435 cameras under
+  #      /cam{1,2}/d435_{1,2}/depth/color/points and /fused_pointcloud.
+  #
+  # Individual pointcloud topics:
+  #   /cam1/d435_1/depth/color/points
+  #   /cam2/d435_2/depth/color/points
+  #
+  # Usage:
+  #   docker compose --profile standalone up digital_twin
+  #
+  # After RViz opens:
+  #   - Click "Publish Point" tool, click on the object in the pointcloud.
+  #   - Call the grasp service:
+  #       ros2 service call /grasp_preshaping/compute_grasp std_srvs/srv/Trigger
+  #   - Watch the simulated hand preshape (far) and close (near).
+  digital_twin:
+    extends: miahand_ros2
+    container_name: miahand_digital_twin
+    profiles: [standalone]
+    environment:
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - USE_TRAJECTORY=${USE_TRAJECTORY:-false}
+      - INFERENCE_URL=${INFERENCE_URL:-http://127.0.0.1:5678}
+      - SEGMENTATION_CUBEEDGE=${SEGMENTATION_CUBEEDGE:-0.05}
+    command: >
+      bash -c "
+        source install/setup.bash &&
+        ros2 launch /miahand_ws/src/dev/mujoco/launch/digital_twin_launch.py
+          use_trajectory:=${USE_TRAJECTORY:-false}
+          inference_url:=${INFERENCE_URL:-http://127.0.0.1:5678}
+          segmentation_cubeedge:=${SEGMENTATION_CUBEEDGE:-0.05};
+        /bin/bash
       "
 
 volumes:
