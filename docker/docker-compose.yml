@@ -53,6 +53,23 @@ services:
       - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
     network_mode: host
 
+  # ── Grasp test: runs grasp test launch file with camera & GUI ──────────────
+  grasp_test:
+    image: prosthesis:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ros2 launch prosthesis_launch grasp_test.launch.py camera:=true gui:=true
+    environment:
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+    network_mode: host
+    depends_on:
+      - segmentation
+    profiles:
+      - grasp_test
+    stdin_open: true
+    tty: true
+
   # ── Test runner: reuses prosthesis image, runs smoke tests, exits ────────
   test:
     image: prosthesis:latest

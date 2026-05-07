@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw test shell clean logs
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test test shell clean logs
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -34,6 +34,16 @@ up:
 
 up-hw:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile hardware up -d
+
+# ── Grasp Test ──────────────────────────────────────────────────────────────
+up-grasp-test:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up -d grasp_test
+
+down-grasp-test:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test down
+
+logs-grasp-test:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test logs -f
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:

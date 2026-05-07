@@ -27,6 +27,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from std_msgs.msg import Int32, String, Float32
+from sensor_msgs.msg import PointCloud2
 from std_srvs.srv import Trigger
 
 
@@ -90,6 +91,8 @@ class PipelineManagerNode(Node):
             Float32, '/emg/confidence', self._on_emg_confidence, 10)  # noqa: F821
         self.create_subscription(
             Int32, '/grasp_preshaping/grasp_type', self._on_grasp_type, 10)
+        self.create_subscription(
+            PointCloud2, '/segmentation/object_cloud', self._on_object_cloud, 10)
 
         # ── Service clients ───────────────────────────────────────────────
         self._compute_client = self.create_client(
@@ -161,8 +164,17 @@ class PipelineManagerNode(Node):
 
     def _on_grasp_type(self, msg: Int32):
         self._grasp_type = msg.data
-        if self._state == State.SEGMENTING:
-            self._transition(State.PLANNING, 'Segmentation complete, planning')
+
+    def _on_object_cloud(self, msg: PointCloud2):
+        if self._state != State.SEGMENTING:
+            return
+        if msg.width * msg.height == 0:
+            return
+        if self._grasp_type == 0:
+            self.get_logger().warn(
+                'Object cloud received but no grasp type set — staying in SEGMENTING')
+            return
+        self._transition(State.PLANNING, 'Segmentation complete: object cloud received')
 
     def _request_preshaping(self):
         """Call the grasp preshaping compute service."""

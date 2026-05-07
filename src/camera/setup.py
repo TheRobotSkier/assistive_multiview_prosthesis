@@ -12,6 +12,7 @@ setup(
     entry_points={
         "console_scripts": [
             "charuco_tf_node = camera.charuco_tf_node:main",
+            "hand_pose_publisher = camera.hand_pose_publisher:main",
         ],
     },
     data_files=[
