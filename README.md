@@ -1,447 +1,252 @@
-To set up docker:
+# Multiview Prosthesis
 
-FIRST:
-Check the docker-compose.yml, and comment out lines that have comments "#added LINUX" if you are not on a linux system. For reference, the compose should for Arch linux x86-64 with Wayland. I'm not sure if there are differences with ubuntu. The changes made are related to wayland/x11 functionality, so ubuntu Wayland should work the same, but no clue if WSL even includes x11/wayland.
+A ROS 2 Jazzy system for EMG-controlled robotic hand grasping with real-time point cloud segmentation and grasp preshaping.
 
-From the main directory (docker_miniproject):
-THEN RUN:
-
-```bash
-echo -e "USER_UID=$(id -u $USER)\nUSER_GID=$(id -g $USER)" > docker_ws/docker-deployment/.env
-```
-
-For Linux Wayland, also run:
-
-```bash
-echo "XAUTHORITY=${XAUTHORITY:-$HOME/.Xauthority}" >> docker_ws/docker-deployment/.env
-```
-
-If you are using Podman Desktop on WSL/WSLg, also run:
-
-```bash
-echo "X11_SOCKET_DIR=/mnt/wslg/.X11-unix" >> docker_ws/docker-deployment/.env
-```
-
-Linux note: if not using bash shell, use
-
-```bash
-bash -c 'COMMAND'
-```
-
-# Select your compose file (system specific)
-
-`compose.yaml` auto-discovers the correct platform compose file via the
-`PLATFORM_COMPOSE` variable in `.env`. The default is `docker-compose.linux-podman.yml`.
-For Windows/WSL, set:
-
-```bash
-echo "PLATFORM_COMPOSE=docker-compose.windows.yml" >> docker_ws/docker-deployment/.env
-```
-
-THEN cd to the docker-deployment directory:
-
-```bash
-cd docker_ws/docker-deployment
-```
-
-### Build the Rust grasp-preshaping library (once, or on Rust source change)
-
-Before starting the simulation for the first time, build the Rust `.so`:
-
-```bash
-docker compose run --rm rust_build
-```
-
-This compiles `libgrasp_preshaping.so` and places it in
-`docker_ws/dev/grasp_preshaping/target/release/` on the host. Re-run this step
-whenever you change files under `docker_ws/dev/grasp_preshaping/src/`.
-
-### For the interactive simulation (recommended):
-
-Run
-
-```bash
-docker compose run --build --rm mujoco_interactive
-```
-
-#### Environment Variables
-
-| Variable | Values | Default | Description |
-|---|---|---|---|
-| `MUJOCO_OBJECT` | `sphere`, `cylinder` | `sphere` | Target object type. Selects the scene XML and point-cloud target geom. |
-| `MUJOCO_PC_MODE` | `object`, `full` | `object` | Point cloud mode. `object` publishes only points from the target geom; `full` publishes the full scene. |
-
-**Examples:**
-```bash
-MUJOCO_OBJECT=cylinder MUJOCO_PC_MODE=full docker compose run --rm mujoco_interactive
-```
-
-This launches an interactive MuJoCo simulation based on the upstream MuJoCo `simulate` viewer. It includes:
-- A full MuJoCo GUI with physics controls, rendering options, and joint/actuator sliders
-- A **Grasp Planner** panel for triggering the grasping pipeline and selecting grasp modes
-- A **Scene Control** panel for instantly repositioning the hand base, object (sphere), and depth camera by typing position/orientation values; changes are also available via ROS topics (`/mujoco/set_hand_pose`, `/mujoco/set_object_pose`, `/mujoco/set_camera_pose`)
-- A **Motion Control** panel for smoothly interpolating the hand, object, or camera to a target pose over a set duration (in seconds); each entity has its own target position/RPY fields and a *Move* button — also available via ROS topics (see below)
-- The built-in **Rendering** panel (left sidebar) contains a *Camera* dropdown listing all cameras in the scene — select the depth camera entry to switch the viewport to the depth camera's point of view
-- A realistic **Intel RealSense D435** mesh is shown as the camera body (decimated to ~180 k faces for MuJoCo compatibility)
-
-Logs for the grasp planner can be found under `docker_ws/dev/mujoco/log/`
-
-#### ROS topics for scripted motion control
-
-The simulation exposes the following ROS2 topics for external control from Python scripts or the terminal.
-
-**Instant teleport** (`geometry_msgs/Pose`, orientation as quaternion xyzw):
-- `/mujoco/set_hand_pose` — immediately move the hand base to the given pose
-- `/mujoco/set_object_pose` — immediately move the object (sphere)
-- `/mujoco/set_camera_pose` — immediately move the depth camera body
-
-**Smooth interpolated motion** (`geometry_msgs/PoseStamped`, orientation as quaternion xyzw):
-- `/mujoco/move_hand` — smoothly move the hand to the given pose
-- `/mujoco/move_object` — smoothly move the object
-- `/mujoco/move_camera` — smoothly move the camera
-
-For the motion topics the **duration in seconds** is encoded in `header.stamp` (i.e. `stamp.sec + stamp.nanosec / 1e9`). If the stamp is zero, a default of 1.0 s is used.
-
-**Current poses** are published at ~10 Hz on:
-- `/mujoco/hand_pose`, `/mujoco/object_pose`, `/mujoco/camera_pose`
-
-**Simulation time** (`std_msgs/Float64`, ~10 Hz):
-- `/mujoco/sim_time` — MuJoCo simulation time in seconds. Use this with the pose topics to compute velocities (`Δpos / Δt`).
-
-**IMU — front camera** (`depth_cam_body`, clean/noiseless):
-- `/mujoco/front_cam/imu` (`sensor_msgs/Imu`, ~100 Hz) — angular velocity, linear acceleration, and orientation in front camera frame. Linear acceleration includes gravity correction (at rest reads ≈ +9.81 m/s² upward in camera frame).
-- `/mujoco/front_cam/imu/magnetic_field` (`sensor_msgs/MagneticField`, ~100 Hz) — simulated magnetometer. World X+ projected into front camera frame (arbitrary "north").
-
-**IMU — wrist camera** (`wrist_cam_body`, fixed to back of hand, clean/noiseless):
-- `/mujoco/wrist_cam/imu` (`sensor_msgs/Imu`, ~100 Hz) — same convention as front camera IMU, but in wrist camera frame.
-- `/mujoco/wrist_cam/imu/magnetic_field` (`sensor_msgs/MagneticField`, ~100 Hz) — magnetometer in wrist camera frame.
-
-**Point cloud / depth** (published by the depth pipeline, not ros2_control):
-- `/mujoco/depth/image` — raw depth image
-- `/mujoco/depth/camera_info` — camera intrinsics
-- `/segmented_object_cloud` — segmented object point cloud (`sensor_msgs/PointCloud2`)
-
-All topics use `frame_id = "mujoco_front_depth_cam"` for front camera data and `frame_id = "mujoco_camera_wrist_cam"` for wrist camera data.
-
-**Terminal example** — read the current front camera IMU data once:
-
-```bash
-ros2 topic echo --once /mujoco/front_cam/imu
-```
-
-**Python example** — read sim_time and hand pose to compute hand velocity:
-
-```python
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import Pose
-from std_msgs.msg import Float64
-
-class VelocityEstimator(Node):
-    def __init__(self):
-        super().__init__('vel_estimator')
-        self.last_pos  = None
-        self.last_time = None
-        self.create_subscription(Pose,    '/mujoco/hand_pose', self.on_pose, 10)
-        self.create_subscription(Float64, '/mujoco/sim_time',  self.on_time, 10)
-
-    def on_time(self, msg):
-        self.last_time = msg.data
-
-    def on_pose(self, msg):
-        pos = (msg.position.x, msg.position.y, msg.position.z)
-        if self.last_pos and self.last_time:
-            dt = self.last_time - getattr(self, '_prev_t', self.last_time)
-            if dt > 0:
-                vel = tuple((pos[i] - self.last_pos[i]) / dt for i in range(3))
-                self.get_logger().info(f'hand velocity: {vel}')
-        self._prev_t  = self.last_time
-        self.last_pos = pos
-
-rclpy.init()
-node = VelocityEstimator()
-rclpy.spin(node)
-```
-
-### ASGER: I have not actually tested these examples! I did not have time. But, the motion control UI is tested and works perfectly.
-
-**Terminal example** — move the hand to (x=0.0, y=0.1, z=0.3) over 2 seconds:
-
-```bash
-ros2 topic pub --once /mujoco/move_hand geometry_msgs/msg/PoseStamped \
-  "{header: {stamp: {sec: 2, nanosec: 0}}, pose: {position: {x: 0.0, y: 0.1, z: 0.3}, orientation: {w: 1.0, x: 0.0, y: 0.0, z: 0.0}}}"
-```
-
-**Python example** — move the hand along a short trajectory:
-
-```python
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
-import time
-
-rclpy.init()
-node = Node('motion_sender')
-pub = node.create_publisher(PoseStamped, '/mujoco/move_hand', 10)
-
-waypoints = [
-    (0.0,  0.0, 0.2),
-    (0.0,  0.1, 0.3),
-    (0.05, 0.0, 0.25),
-]
-
-for x, y, z in waypoints:
-    msg = PoseStamped()
-    msg.header.stamp.sec = 2      # 2-second move duration
-    msg.pose.position.x = x
-    msg.pose.position.y = y
-    msg.pose.position.z = z
-    msg.pose.orientation.w = 1.0  # identity rotation
-    pub.publish(msg)
-    time.sleep(2.5)               # wait for motion to complete before next waypoint
-
-node.destroy_node()
-rclpy.shutdown()
-```
-
-A cylinder variant of the dynamic scene is available at
-`docker_ws/dev/mujoco/scenes/scene_right_cylinder.xml`. It is identical
-to the dynamic scene except the target object is a red upright cylinder
-(radius 0.03 m, height 0.12 m) rather than a sphere.
-
-### For the dynamic simulation:
-
-Run
-
-```bash
-docker compose run --build --rm mujoco_dynamic
-```
-
-This will launch the dynamic simulation, and you should have a GUI for selecting the grasp planning parameters (and executing the grasp planning). Logs for the grasp planner can be found under docker_ws/dev/mujoco/log/
-
-### For the old simulation:
-
-The legacy standalone CLI (`cargo run -- --mode ros`) has been removed. The grasp preshaping pipeline is now integrated as a ROS 2 service node that is launched automatically with the interactive or dynamic simulation. Use the interactive simulation (recommended) or the dynamic simulation described above.
-
-**Multiview** (RealSense D435 cameras):
-
-See the [RealSense Camera Setup](#intel-realsense-d435-camera-setup) section below for setup and launch instructions.
-
----
-
-## Classical EMG Gesture Classifier (MindRove armband)
-
-A three-step pipeline in `docker_ws/dev/mindrove/` that recognises 4 hand gestures + REST from the MindRove WiFi armband and outputs a proportional control value. All steps run inside Docker (connect to the armband's WiFi first, then run from `docker_ws/docker-deployment/`).
-
-### Step 1 — Record training data
-
-```bash
-docker compose run --rm mindrove_emg_collect
-```
-
-Guides you through recording each gesture interactively (default: 3 reps × 5 s each). Saves raw EMG to `docker_ws/dev/mindrove/data/`.
-
-### Step 2 — Train the classifier
-
-```bash
-docker compose run --rm mindrove_emg_train
-```
-
-Filters + windows the recordings, extracts features (MAV, RMS, WL, ZC, SSC, VAR × 8 channels), trains an LDA classifier with 5-fold cross-validation, and saves models to `docker_ws/dev/mindrove/models/`.
-
-### Step 3 — Run live inference
-
-```bash
-docker compose run --rm mindrove_emg_run
-```
-
-Streams from the armband at ~10 Hz and prints the recognised gesture, confidence, and proportional control value to the terminal.
-
-See `docker_ws/dev/mindrove/README.md` for the full pipeline overview, file layout, and tuning options.
-
----
-
-## Haptic Band (Vibro8 BT bridge)
-
-A ROS 2 Jazzy Bluetooth bridge for a **Vibro8** 8-motor haptic armband, running in its own Docker container.
-
-### Start the bridge
-
-```bash
-docker compose run --build --rm haptic_band
-```
-
-Connects to the Vibro8 over Bluetooth Classic (RFCOMM), sends a brief buzz-buzz on first connect, then listens on:
+## Architecture
 
 ```
-/haptic_band/motors   std_msgs/Float32MultiArray   [8 values, 0.0–100.0]
+                          ┌─────────────┐
+                          │  MindRove   │
+                          │  EMG Band   │
+                          └──────┬──────┘
+                                 │ gesture trigger
+                                 ▼
+┌──────────┐    cloud     ┌──────────────┐    segmented     ┌──────────────────┐
+│  Camera  │─────────────▶│ Segmentation │────────────────▶ │ Grasp Preshaping │
+│  (D435)  │              │  (Minkowski) │                  │  (Rust pipeline) │
+└──────────┘              └──────────────┘                  └────────┬─────────┘
+                                                                     │ preshape + wrist + hand pose
+                                                                     ▼
+                                                          ┌──────────────────┐
+                                                          │ Pipeline Manager │
+                                                          │  (state machine) │
+                                                          └────────┬─────────┘
+                                                                   │
+                                              ┌────────────────────┼────────────────────┐
+                                              ▼                    ▼                    ▼
+                                      ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+                                      │ Wrist Driver │   │  Mia Hand    │   │   Force      │
+                                      │ (Dynamixel)  │   │  Driver      │   │  Controller  │
+                                      └──────────────┘   └──────────────┘   └──────────────┘
 ```
 
-Publish a message to that topic from any other ROS 2 node or container to drive the 8 motors.
+**Pipeline flow:**
+1. User activates a grasp pattern via MindRove EMG band
+2. Point cloud segmentation isolates the grasping objective
+3. Grasp preshaping pipeline computes preshape, wrist pose, and hand grasp position
+4. Pipeline manager orchestrates approach → grasp → hold states
+5. Force controller regulates contact force during grasp
+6. User releases via EMG gesture
 
-### Run the motor sweep test
-
-```bash
-docker compose run --rm haptic_band_test
-```
-
-Activates each of the 8 motors one at a time, ramping 0 → 100 % in 10 % steps (~1 s), then turns off before moving to the next motor.
-
-See `docker_ws/dev/haptic_band/README.md` for the full protocol details, address configuration, and file layout.
-
----
-
-## Pointcloud Segmentation (InterObject3D)
-
-Interactive 3D object segmentation using the [InterObject3D](https://github.com/theodorakontogianni/InterObject3D) network. Click on an object in RViz2 to segment it from the scene. Runs in two separate containers: a Python 3.8 inference server (MinkowskiEngine) + a ROS 2 Jazzy bridge node.
-
-### Quick start
-
-From `docker_ws/docker-deployment/`:
-
-```bash
-# Build images (once, or after code changes):
-docker compose build segmentation_inference
-docker compose build miahand_ros2
-
-# Start inference server + ROS2 node:
-./run_segmentation.sh
-```
-
-Press `Ctrl+C` to stop both containers.
-
-### Interactive demo (with RViz2)
-
-In a second terminal while segmentation is running:
-
-```bash
-docker compose run --rm segmentation_demo
-```
-
-In the terminal that opens: `p` = positive mode | `n` = negative mode | `r` = reset | `q` = quit.
-Use the **Publish Point** tool in RViz2 to click on an object — segmented points appear as `/segmentation/object_cloud`.
-
-### One-shot inference test (no ROS)
-
-```bash
-docker compose run --rm segmentation_direct
-```
-
-Downloads weights on first run, then runs a single inference to verify the MinkowskiEngine image.
-
-### Topics
-
-| Topic | Type | Description |
-|-------|------|-------------|
-| `/segmentation/input_cloud` | `PointCloud2` | Input scene cloud |
-| `/segmentation/click_positive` | `PointStamped` | Positive (foreground) click |
-| `/segmentation/click_negative` | `PointStamped` | Negative (background) click |
-| `/segmentation/reset` | `Empty` | Clear all clicks and output |
-| `/segmentation/object_cloud` | `PointCloud2` | Segmented foreground points |
-
----
-
-## Intel RealSense D435 Camera Setup
-
-Two Intel RealSense D435 cameras are supported, publishing RGB pointclouds via ROS Humble. The pipeline runs inside a single Docker container (no host ROS installation needed).
+## Quick Start
 
 ### Prerequisites
 
-Ensure both cameras are plugged into USB 3 ports. Check they are visible:
+- Docker + Docker Compose
+- X11 display (Linux or WSL2 with WSLg)
+
+### Setup
 
 ```bash
-lsusb | grep -i intel
-v4l2-ctl --list-devices 2>/dev/null | grep -A1 D435 || echo "(v4l2-ctl not available — that's OK, librealsense uses USB directly)"
+# Clone and configure
+git clone <repo-url>
+cd multiview_prosthesis
+
+# Set user IDs for Docker
+echo -e "USER_UID=$(id -u)\nUSER_GID=$(id -g)" > docker/.env
 ```
 
-You only need `podman` (not Docker) and the project's `compose.yaml`.
-
-### Build the camera images (once)
+### Build
 
 ```bash
-cd docker_ws/dev/multiview
-podman build --no-cache -t localhost/multiview-humble-realsense:latest -f Dockerfile.humble_cameras .
-podman build -t localhost/multiview-rviz2:latest -f Dockerfile.rviz2 .
-cd ../../docker-deployment
+# Build the main ROS image
+docker compose build prosthesis
+
+# Build the segmentation image (separate, Python 3.8 + MinkowskiEngine)
+docker compose build segmentation
 ```
 
-### Single camera
+### Run
 
 ```bash
-# Terminal 1 — start the camera:
-podman run --rm --privileged --network host --ipc host \
-  --device /dev/bus/usb:/dev/bus/usb \
-  -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
-  -e CAM1_SERIAL=829212072207 \
-  localhost/multiview-humble-realsense:latest
+# Mock mode (no hardware, publishes fake point clouds)
+docker compose up
 
-# Terminal 2 — launch RViz2:
-podman run -d --network host --ipc host \
-  -e DISPLAY=:0 -e QT_X11_NO_MITSHM=1 -e HOME=/tmp \
-  -v /tmp/.X11-unix:/tmp/.X11-unix \
-  -e XAUTHORITY=/tmp/.Xauthority -v ${XAUTHORITY}:/tmp/.Xauthority:ro,z \
-  --userns=keep-id \
-  localhost/multiview-rviz2:latest
+# Hardware mode (maps USB devices)
+docker compose --profile hardware up
+
+# Run segmentation alongside
+docker compose up segmentation
 ```
 
-In RViz, the panel at left should show `cam1/d435_1/depth/color/points` already added (loaded from the config file). If not, use **Add → PointCloud2** and set the topic.
-
-### Dual cameras
+### Inside the Container
 
 ```bash
-# Terminal 1:
-podman run --rm --privileged --network host --ipc host \
-  --device /dev/bus/usb:/dev/bus/usb \
-  -e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
-  -e CAM1_SERIAL=829212072207 \
-  -e CAM2_SERIAL=827112072033 \
-  -e CAM2_OFFSET_X=0.5 \
-  localhost/multiview-humble-realsense:latest
+# Launch the full pipeline
+ros2 launch prosthesis_launch pipeline.launch.py
 
-# Terminal 2 — same RViz command as above
+# Or launch with mock data (no camera/hardware needed)
+ros2 launch prosthesis_launch mock.launch.py
+
+# Open RViz manually
+rviz2 -d /prosthesis_ws/rviz/prosthesis.rviz
 ```
 
-RViz config already includes both `/cam1/d435_1/depth/color/points` and `/cam2/d435_2/depth/color/points`. Camera 2 is positioned at +0.5 m X-offset from camera 1 via a static TF transform.
+## Configuration
 
-### Via Docker Compose
+### Central Config
 
-From `docker_ws/docker-deployment/`:
+All parameters live in `config/prosthesis_config.yaml` — topic names, thresholds, state machine transitions, and force controller tuning. Edit this file and restart the container.
+
+### Grasp Preshaping Config
+
+The Rust grasp preshaping pipeline reads from `config/grasp_preshaping.yaml` at runtime. This file contains all TSDF, SMC, scoring, and superquadric parameters. You can tune these without rebuilding the `.so` — just edit the YAML and restart.
+
+Config resolution order:
+1. `GRASP_CONFIG_PATH` environment variable
+2. `config/grasp_preshaping.yaml` next to the workspace
+3. Compile-time defaults (in `src/grasp_preshaping/src/runtime_config.rs`)
+
+## Packages
+
+| Package | Language | Description |
+|---------|----------|-------------|
+| `mia_hand_description` | URDF/xacro | Hand model + meshes for RViz |
+| `mia_hand_driver` | C++ | Serial communication with Mia Hand hardware |
+| `mia_hand_msgs` | ROS msgs | Custom message/service/action definitions |
+| `mia_hand_ros2_control` | C++ | ros2-control hardware interface for Mia Hand |
+| `grasp_preshaping` | Rust/C++ | Grasp planning pipeline (TSDF + SMC optimization) |
+| `pipeline_manager` | Python | State machine: IDLE → SEGMENTING → APPROACHING → GRASPING → HOLDING → RELEASING |
+| `force_controller` | Python | Force regulation for stable grasping |
+| `segmentation_bridge` | Python | ROS node bridging to segmentation inference server |
+| `emg_bridge` | Python | MindRove EMG classifier + ROS bridge |
+| `haptic_band` | Python | Bluetooth haptic armband driver |
+| `wrist_driver` | Python | Dynamixel wrist motor driver |
+| `camera` | Python/launch | Minimal RealSense D435 launch |
+| `prosthesis_launch` | Python/launch | Top-level launch files |
+
+## Docker Services
+
+| Service | Image | Purpose |
+|---------|-------|---------|
+| `prosthesis` | `osrf/ros:jazzy-desktop` | Main ROS container (all nodes + RViz) |
+| `prosthesis-hw` | same | Hardware variant with USB device mapping |
+| `segmentation` | `python:3.8-slim` | MinkowskiEngine inference server (isolated) |
+| `test` | same as prosthesis | Runs smoke tests and exits |
+
+## Testing
+
+Automated smoke tests run inside Docker (no host ROS installation needed):
 
 ```bash
-# Single camera:
-docker compose --profile standalone up multiview_cameras
-
-# Single camera + RViz2:
-docker compose --profile standalone up multiview_cameras multiview_rviz2
-
-# Dual cameras + RViz2:
-CAM1_SERIAL=829212072207 CAM2_SERIAL=827112072033 \
-  docker compose --profile standalone up multiview_full multiview_rviz2
+docker compose run --rm test
 ```
 
-### Key design decisions
+This runs:
+- **Build check** — `colcon build` from scratch
+- **Launch syntax** — all `.launch.py` files parse without errors
+- **Preshaping .so** — library loads via ctypes, API version check
+- **Node startup** — key nodes start and register with ROS
 
-| Decision | Why |
-|----------|-----|
-| `rmw_fastrtps_cpp` | CycloneDDS SHM discovery fails inside containers; FastDDS discovers over `localhost` reliably. |
-| `--device /dev/bus/usb:/dev/bus/usb` only | Librealsense enumerates cameras via USB descriptors; explicit `/dev/videoN` mappings become stale on reconnect. |
-| `ExecuteProcess` instead of launch `Node` | The launch framework writes serial numbers unquoted in YAML — the realsense node rejects `serial_no=829212072207` as `{integer}`. `-p "serial_no:='SERIAL'"` forces string type. |
-| `pointcloud.stream_filter:=2` (color) | Forces pointcloud RGB texture from the color stream; without this the `rgb` field is missing. |
-| `enable_infra1:=false, enable_infra2:=false` | Disables the two IR streams to reduce USB isochronous bandwidth. Two D435s at 640×480×15 with infra overflow without this. |
-| `enable_sync:=true` (in probe script) | Hardware frame sync between depth + color so the pointcloud has valid RGB data. |
-| Depth/color at 640×480×6 FPS | 6 fps keeps USB bandwidth well within limits (≈9 MB/s per camera vs ≈32 MB/s at 15 fps). |
+## Rebuilding the Rust Library
 
----
-
-## Full System Test
-
-Launch the complete system (EMG + haptics + cameras + segmentation + MuJoCo mirror) with Docker profiles:
+The grasp preshaping `.so` is pre-built and committed to `src/grasp_preshaping/lib/`. If you modify the Rust source:
 
 ```bash
-# From docker_ws/docker-deployment/
-docker compose --profile full_system up
+cd src/grasp_preshaping
+cargo build --release --lib
+cp target/release/libgrasp_preshaping.so lib/
 ```
 
-This starts: `mindrove_emg_ros`, `multiview_cameras`, `segmentation_inference`, `segmentation_ros2`, and `full_system_test` (RViz + MuJoCo mirror + haptic controller). Hardware must be connected (Mia Hand on USB, haptic band via BT, D435 cameras on USB). Camera pointcloud topics are `/cam1/d435_1/depth/color/points` and `/cam2/d435_2/depth/color/points`. See `docker_ws/dev/mujoco/launch/full_system_test_launch.py` for the full launch configuration.
+## Project Structure
 
----
+```
+multiview_prosthesis/
+├── config/
+│   ├── prosthesis_config.yaml       # Central config (topics, thresholds)
+│   └── grasp_preshaping.yaml        # Rust pipeline parameters
+├── docker/
+│   ├── Dockerfile                    # Main ROS Jazzy image
+│   ├── Dockerfile.segmentation       # Python 3.8 + MinkowskiEngine
+│   ├── docker-compose.yml            # All services
+│   └── .env.example                  # User-local overrides
+├── scripts/
+│   ├── run_tests.sh                  # Test orchestrator
+│   ├── test_build.sh
+│   ├── test_launch_syntax.sh
+│   ├── test_preshaping_so.sh
+│   └── test_nodes_start.sh
+├── rviz/
+│   └── prosthesis.rviz               # RViz visualization config
+├── src/
+│   ├── camera/                       # RealSense D435 launch
+│   ├── emg_bridge/                   # MindRove EMG classifier
+│   ├── force_controller/             # Force regulation
+│   ├── grasp_preshaping/             # Rust pipeline + C++ bridge
+│   ├── haptic_band/                  # BT haptic armband
+│   ├── mia_hand_description/         # URDF + meshes
+│   ├── mia_hand_driver/              # Hardware driver
+│   ├── mia_hand_msgs/                # ROS message definitions
+│   ├── mia_hand_ros2_control/        # ros2-control interface
+│   ├── pipeline_manager/             # State machine orchestrator
+│   ├── prosthesis_launch/            # Top-level launch files
+│   ├── segmentation/                 # Segmentation + MinkowskiEngine
+│   └── wrist_driver/                 # Dynamixel wrist driver
+└── plans/                            # Architecture and planning docs
+```
+
+## Troubleshooting
+
+**Docker build fails on `rosdep install`:**
+Make sure all `package.xml` files have correct dependencies. Check `scripts/test_build.sh` output for the specific package that failed.
+
+**RViz shows nothing:**
+- Check that the container has X11 access: `echo $DISPLAY` inside the container should show `:0`
+- On WSL2, ensure WSLg is enabled
+- Try `xhost +local:docker` on the host
+
+**Mia Hand driver can't find serial port:**
+- Check the device exists: `ls /dev/ttyUSB*`
+- Verify the device mapping in `docker/.env` matches your system
+- Ensure the user is in the `dialout` group
+
+**Segmentation inference server won't start:**
+- Build the segmentation image separately: `docker compose build segmentation`
+- First run downloads model weights (~200 MB)
+
+**Grasp preshaping crashes with "finger_contact_lut.npz not found":**
+- The file should be at `src/grasp_preshaping/data/finger_contact_lut.npz`
+- If missing, regenerate from `src/grasp_preshaping/scripts/model.py`
+
+## Development
+
+### Adding a New Node
+
+1. Create a package under `src/your_package/`
+2. Add a `package.xml` and build system (`setup.py` for Python, `CMakeLists.txt` for C++)
+3. Rebuild: `docker compose build prosthesis`
+
+### Modifying Grasp Parameters
+
+Edit `config/grasp_preshaping.yaml` — no rebuild needed. The Rust library reads this file at runtime on first pipeline invocation.
+
+### Modifying Pipeline Parameters
+
+Edit `config/prosthesis_config.yaml` — topic names, thresholds, and state machine parameters. Restart the container to apply.
+
+## EMG Gesture Pipeline
+
+The MindRove EMG classifier supports 5 gestures: REST, POWER, PINCH, OPEN, POINT.
+
+```bash
+# Inside the container — record training data
+ros2 run emg_bridge collect_data
+
+# Train the classifier
+ros2 run emg_bridge train
+
+# Run live inference
+ros2 run emg_bridge run_classifier
+```
+
+Connect to the MindRove WiFi network first. The classifier publishes to `/emg/gesture_label`, `/emg/gesture_name`, `/emg/confidence`, and `/emg/proportional`.

@@ -1,0 +1,65 @@
+# Prosthesis — minimal Docker Compose
+# Usage:
+#   make up                        # mock hardware (default)
+#   make up-hw                     # real hardware (USB devices mapped)
+#   make test                      # run smoke tests
+#   make build                     # build all images
+#
+# Or directly:
+#   podman-compose build
+#   podman-compose up              # mock
+#   podman-compose --profile hardware up
+
+services:
+  # ── Main ROS 2 container ─────────────────────────────────────────────────
+  prosthesis:
+    image: prosthesis:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=0
+    network_mode: host
+    volumes:
+      # X11 forwarding (works on Linux and WSL2 with WSLg)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    profiles:
+      - mock
+    stdin_open: true
+    tty: true
+
+  # ── Hardware variant: same image with USB devices ────────────────────────
+  prosthesis-hw:
+    image: prosthesis:latest
+    extends: prosthesis
+    devices:
+      - ${MIA_SERIAL_PORT:-/dev/ttyUSB1}:/dev/ttyUSB1
+      - ${WRIST_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0
+    profiles:
+      - hardware
+
+  # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
+  segmentation:
+    image: segmentation:latest
+    build:
+      context: ../src/segmentation
+      dockerfile: ../../docker/Dockerfile.segmentation
+    environment:
+      - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
+    network_mode: host
+
+  # ── Test runner: reuses prosthesis image, runs smoke tests, exits ────────
+  test:
+    image: prosthesis:latest
+    user: "0:0"
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=0
+      - GRASP_CONFIG_PATH=/prosthesis_ws/config/grasp_preshaping.yaml
+    command: ["/bin/bash", "/prosthesis_ws/scripts/run_tests.sh"]
+    network_mode: host

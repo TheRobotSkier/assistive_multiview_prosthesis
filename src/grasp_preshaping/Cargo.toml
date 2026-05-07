@@ -1,0 +1,28 @@
+[package]
+name = "grasp_preshaping"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+npyz = { version = "0.8", features = ["npz"] }
+nalgebra = "0.32"
+rayon = "1.10"
+thiserror = "1.0"
+rand = "0.9"
+rand_distr = "0.5"
+serde = { version = "1", features = ["derive"] }
+serde_yml = "0.0.12"
+anyhow = { version = "1", features = ["backtrace"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 8
+panic = "abort"
+strip = "symbols"

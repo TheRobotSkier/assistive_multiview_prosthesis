@@ -1,0 +1,15 @@
+# Wrist driver parameters
+# Override via: ros2 run wrist_driver wrist_driver_node --ros-args --params-file <path>
+
+wrist_driver:
+  ros__parameters:
+    # Serial port for the Dynamixel servo
+    port: "/dev/ttyUSB0"
+    # Communication baudrate
+    baudrate: 57600
+    # Dynamixel motor ID
+    motor_id: 1
+    # Protocol version (2.0 for X-series)
+    protocol_version: 2.0
+    # State publish rate in Hz
+    publish_rate_hz: 20.0

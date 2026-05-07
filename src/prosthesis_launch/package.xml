@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>prosthesis_launch</name>
+  <version>0.1.0</version>
+  <description>Top-level launch files for the multiview prosthesis pipeline</description>
+  <maintainer email="dev@multiview-prosthesis.org">multiview_prosthesis</maintainer>
+  <license>MIT</license>
+  <depend>pipeline_manager</depend>
+  <depend>mia_hand_driver</depend>
+  <depend>emg_bridge</depend>
+  <depend>segmentation_bridge</depend>
+  <depend>grasp_preshaping</depend>
+  <depend>twist_propagation</depend>
+  <depend>force_controller</depend>
+  <depend>rviz2</depend>
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

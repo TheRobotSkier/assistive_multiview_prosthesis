@@ -54,3 +54,6 @@ AGENTS.md
 CLAUDE.md
 .claude/
 .agents/
+
+# Include preshaping binary
+!libgrasp_preshaping.so

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<robot xmlns:xacro="http://wiki.ros.org/xacro">
-
-  <xacro:include filename="$(find mia_hand_moveit_config)/srdf/mia_hand_macro.srdf.xacro"/>
-  <xacro:mia_hand_srdf/>
-
-</robot>
