@@ -21,8 +21,8 @@ WORKDIR /ros_ws
 COPY launch/ /ros_ws/launch/
 COPY nodes/  /ros_ws/nodes/
 
-ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-ENV ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+# ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST causes issues with FastDDS.
 
 ENTRYPOINT ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && exec \"$@\"", "--"]
 CMD ["ros2", "launch", "/ros_ws/launch/two_d435_launch.py"]

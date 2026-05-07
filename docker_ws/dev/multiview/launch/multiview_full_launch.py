@@ -22,8 +22,8 @@ def generate_launch_description():
         arguments=[
             '0', '0', '0',          # x y z (meters) — update after calibration
             '0', '0', '0', '1',     # qx qy qz qw — identity
-            'cam1_d435_1_color_optical_frame',
-            'cam2_d435_2_color_optical_frame',
+            'd435_1_color_optical_frame',
+            'd435_2_color_optical_frame',
         ],
         name='cam2_to_cam1_tf',
         output='screen',

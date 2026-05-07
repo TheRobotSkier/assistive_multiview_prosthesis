@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-CAM1_SERIAL="_829212072207"
-CAM2_SERIAL="_827112072033"
+CAM1_SERIAL="829212072207"
+CAM2_SERIAL="827112072033"
 RVIZ_CONFIG="/home/robotlab/Documents/multiview_prosthesis/jetson_folder/two_d435_test.rviz"
 
 TMPDIR="/tmp/two_d435_launch"
@@ -17,8 +17,13 @@ ros2 launch realsense2_camera rs_launch.py \
   serial_no:=${CAM1_SERIAL} \
   enable_sync:=true \
   align_depth.enable:=true \
-  depth_module.depth_profile:=640x480x15 \
-  rgb_camera.color_profile:=640x480x15
+  enable_color:=true \
+  enable_infra1:=false \
+  enable_infra2:=false \
+  depth_module.depth_profile:=640x480x6 \
+  rgb_camera.color_profile:=640x480x6 \
+  pointcloud.enable:=true \
+  pointcloud.stream_filter:=2
 exec bash
 EOF
 
@@ -31,17 +36,20 @@ ros2 launch realsense2_camera rs_launch.py \
   serial_no:=${CAM2_SERIAL} \
   enable_sync:=true \
   align_depth.enable:=true \
-  depth_module.depth_profile:=640x480x15 \
-  rgb_camera.color_profile:=640x480x15
+  enable_color:=true \
+  enable_infra1:=false \
+  enable_infra2:=false \
+  depth_module.depth_profile:=640x480x6 \
+  rgb_camera.color_profile:=640x480x6 \
+  pointcloud.enable:=true \
+  pointcloud.stream_filter:=2
 exec bash
 EOF
 
 cat > "$TMPDIR/params_rviz.sh" <<EOF
 #!/bin/bash
 source /opt/ros/humble/setup.bash
-sleep 6
-ros2 param set /cam1/d435_1 pointcloud__neon_.enable true
-ros2 param set /cam2/d435_2 pointcloud__neon_.enable true
+sleep 4
 rviz2 -d "$RVIZ_CONFIG"
 exec bash
 EOF
@@ -72,7 +80,7 @@ if [[ "${TERMINATOR_UUID:-}" != "" ]]; then
     open_new_term "D435 Cam2" "$TMPDIR/cam2.sh"
     sleep 1
 
-    # Reuse current terminal/tab for params + RViz
+    # Reuse current terminal/tab for RViz
     exec bash "$TMPDIR/params_rviz.sh"
 
 else
@@ -82,5 +90,5 @@ else
     sleep 1
     open_new_term "D435 Cam2" "$TMPDIR/cam2.sh"
     sleep 1
-    open_new_term "Params + RViz" "$TMPDIR/params_rviz.sh"
+    open_new_term "RViz" "$TMPDIR/params_rviz.sh"
 fi
