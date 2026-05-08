@@ -66,6 +66,9 @@ tmp/
 build/
 install/
 log/
+docker_ws/build_overlay/
+docker_ws/install_overlay/
+docker_ws/log_overlay/
 
 # ignore rust files
 target/

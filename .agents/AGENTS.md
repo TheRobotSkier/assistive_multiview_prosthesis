@@ -50,3 +50,8 @@ Marker pose frame conventions:
   `+X` forward, `+Y` left, `+Z` up.
 - `imu_pose` is the true calibrated IMU pose and should not be hacked for
   display.
+
+
+When you think performance would improve by starting a fresh Codex chat/agent, tell me explicitly and provide a ready-to-copy handoff prompt for the next agent.
+
+Tell the user when it is a good point to commit and push to GitHub. Include: which files should be committed, which files should not be committed, cleanup commands for generated artifacts, and a suggested commit message. Never stage, commit, push, stash, or clean broad file sets without user approval.

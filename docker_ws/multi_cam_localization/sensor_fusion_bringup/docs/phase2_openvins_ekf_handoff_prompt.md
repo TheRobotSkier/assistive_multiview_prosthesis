@@ -15,6 +15,44 @@ Please read:
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/marker_covariance_empirical_validation.md
 - docker_ws/bags/openvins_tests/head_marker_covariance/analysis_phase1_marker_covariance/analysis_report.md
 
+Also inspect the current Phase 1 marker integration:
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/aruco_marker_pose_node.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/marker_quality_monitor.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/analyze_marker_covariance_bags.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins.launch.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/launch/head_marker_pose.launch.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/head_aruco_map.yaml
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/estimator_config.yaml
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/kalibr_imucam_chain.yaml
+
+Inspect likely OpenVINS Phase 2 integration points:
+- docker_ws/src/open_vins/ov_msckf/src/run_subscribe_msckf.cpp
+- docker_ws/src/open_vins/ov_msckf/src/core/VioManager.h
+- docker_ws/src/open_vins/ov_msckf/src/core/VioManager.cpp
+- docker_ws/src/open_vins/ov_msckf/src/core/VioManagerHelper.cpp
+- docker_ws/src/open_vins/ov_msckf/src/core/VioManagerOptions.h
+- docker_ws/src/open_vins/ov_msckf/src/state/State.h
+- docker_ws/src/open_vins/ov_msckf/src/state/State.cpp
+- docker_ws/src/open_vins/ov_msckf/src/state/StateHelper.h
+- docker_ws/src/open_vins/ov_msckf/src/state/StateHelper.cpp
+- docker_ws/src/open_vins/ov_msckf/src/state/Propagator.h
+- docker_ws/src/open_vins/ov_msckf/src/state/Propagator.cpp
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterHelper.h
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterHelper.cpp
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMSCKF.h
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMSCKF.cpp
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterSLAM.h
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterSLAM.cpp
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterZeroVelocity.h
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterZeroVelocity.cpp
+- docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.h
+- docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.cpp
+- docker_ws/src/open_vins/ov_core/src/types/PoseJPL.h
+- docker_ws/src/open_vins/ov_core/src/types/IMU.h
+- docker_ws/src/open_vins/ov_core/src/utils/quat_ops.h
+- docker_ws/src/open_vins/ov_core/src/track/TrackAruco.h
+- docker_ws/src/open_vins/ov_core/src/track/TrackAruco.cpp
+
 Important Phase 1 result:
 - The external marker covariance model is conservative on stationary 100 mm
   marker repeatability.
@@ -35,6 +73,19 @@ estimator/state/update interfaces, propose how to construct marker measurement
 residuals and R_marker from the Phase 1 covariance model, define
 gating/rejection behavior, and explain how pose, velocity, and covariance
 should be handled without covariance hacking.
+
+Desired Phase 2 behavior:
+- Every accepted observation of a known fixed marker should be able to update
+  the OpenVINS EKF state, not merely an external corrected odom wrapper.
+- Marker ID 0 should define the common reference frame at initialization or
+  reanchor, so future head and arm D435i instances can share `marker_map`.
+- When VIO is healthy, valid marker updates should improve global pose
+  consistency and reduce/maintain appropriate state uncertainty.
+- When VIO has drifted, marker reacquisition should recover pose and handle
+  internal uncertainty/velocity consistently rather than producing repeated
+  external snaps.
+- The design should preserve the Phase 1 external baseline and avoid adding the
+  future arm-mounted marker ID 1 as a fixed map landmark.
 
 Important Phase 2 requirement:
 Do not assume a marker pose update alone is sufficient. Explicitly investigate

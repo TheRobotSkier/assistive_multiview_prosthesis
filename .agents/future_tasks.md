@@ -1,6 +1,6 @@
 # Future Tasks
 
-## Current Phase 1 / Phase 2 Gate
+## Current Phase 2 Status
 
 The 100 mm marker covariance bag analysis has been completed. The Phase 1
 external covariance model was conservative on stationary repeatability, and no
@@ -10,14 +10,19 @@ Live sanity checking confirmed the expected Phase 1 limit: external corrected
 odom can snap back to marker ID 0 after VIO drift, but OpenVINS internal
 uncertainty and velocity are not repaired by the external correction layer.
 
-Before starting Phase 2 OpenVINS-internal marker updates:
-- optionally record one short evidence bag of the Phase 1 drift/reacquire limit
-  if a comparison artifact is desired
-- commit and push the Phase 1 baseline
-- start Phase 2 from the handoff prompt below
+Phase 2 OpenVINS-internal marker update/reset code has been implemented locally
+and passed the low-memory Docker/Jazzy build plus launch/message smoke checks.
 
-The suggested new-chat prompt for Phase 2 is stored in
-`multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_ekf_handoff_prompt.md`.
+Use the current Phase 2 handoff note before continuing:
+`.agents/phase2_openvins_handoff_status.md`.
+
+Important next gate:
+- `docker_ws/src/open_vins` has been converted locally from the broken gitlink
+  into a lean vendored source tree so Phase 2 OpenVINS edits can be committed
+  with the parent repo
+- do not commit generated `build_overlay/`, `install_overlay/`, or
+  `log_overlay/` artifacts
+- continue to Phase 2 launch and bag behavior validation before final commit
 
 ## A. Arm D435i Setup From Calibration Output
 
@@ -50,6 +55,18 @@ existing launch files before deciding.
 Investigate modifying OpenVINS internals so marker updates can directly correct
 the EKF state, including pose, velocity, and covariance. Start this only after
 the Phase 1 baseline is committed/pushed.
+
+Phase 2 target behavior:
+- accepted observations of known fixed markers should become OpenVINS EKF
+  updates, not only an external corrected-odom wrapper
+- marker ID 0 should define the shared `marker_map` reference frame at startup
+  or reanchor, so later head and arm D435i instances can publish point clouds in
+  a common frame
+- when VIO is healthy, marker updates should improve global pose consistency and
+  keep state uncertainty appropriately bounded
+- after VIO drift, marker reacquisition should repair pose while handling
+  covariance and velocity consistently enough to avoid the repeated Phase 1
+  snap-back behavior
 
 Use `.agents/marker_pose_covariance_plan.md` as the starting point for marker
 measurement covariance, innovation gating, EKF update design, and velocity

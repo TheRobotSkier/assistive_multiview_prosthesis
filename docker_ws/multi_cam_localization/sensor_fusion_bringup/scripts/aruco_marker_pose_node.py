@@ -47,6 +47,7 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, TransformS
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from sensor_fusion_msgs.msg import MarkerPoseObservation
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Int32, String
 from std_srvs.srv import Trigger
@@ -594,6 +595,7 @@ class ArucoMarkerPoseNode(Node):
         super().__init__("aruco_marker_pose_node")
 
         self.declare_parameter("config_file", "")
+        self.declare_parameter("correction_enabled_override", "")
         config_file = self.get_parameter("config_file").value
         if not config_file:
             raise RuntimeError("Parameter config_file is required")
@@ -636,6 +638,9 @@ class ArucoMarkerPoseNode(Node):
 
         correction_cfg = self.config.get("correction", {})
         self.reanchor_enabled = bool(correction_cfg.get("enabled", True))
+        correction_enabled_override = str(self.get_parameter("correction_enabled_override").value).strip().lower()
+        if correction_enabled_override:
+            self.reanchor_enabled = correction_enabled_override in ("1", "true", "yes", "on")
         self.enable_periodic_marker_correction = bool(correction_cfg.get("enable_periodic_marker_correction", True))
         self.periodic_correction_interval_s = float(correction_cfg.get("periodic_correction_interval_s", 1.0))
         self.reanchor_cooldown_s = float(correction_cfg.get("reanchor_cooldown_s", 3.0))
@@ -744,6 +749,7 @@ class ArucoMarkerPoseNode(Node):
         self.camera_pose_raw_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_pose_raw", 10)
         self.camera_body_pose_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_body_pose", 10)
         self.imu_pose_pub = self.create_publisher(PoseWithCovarianceStamped, f"{self.output_prefix}/imu_pose", 10)
+        self.marker_observation_pub = self.create_publisher(MarkerPoseObservation, f"{self.output_prefix}/observation", 10)
         self.corrected_odom_pub = self.create_publisher(Odometry, f"{self.output_prefix}/ov_corrected_odom", 20)
         self.marker_quality_pub = self.create_publisher(String, f"{self.output_prefix}/marker_quality", 10)
         self.active_marker_pub = self.create_publisher(Int32, f"{self.output_prefix}/active_marker_id", 10)
@@ -1163,12 +1169,37 @@ class ArucoMarkerPoseNode(Node):
         fill_pose(imu_msg.pose.pose, measurement.T_map_imu)
         imu_msg.pose.covariance = covariance_from_diag(measurement.covariance_diag)
         self.imu_pose_pub.publish(imu_msg)
+        self.publish_marker_observation(measurement)
 
         self.publish_tf(measurement.stamp, self.map_frame, measurement.marker_frame, measurement.T_map_marker)
         self.publish_tf(measurement.stamp, measurement.marker_frame, f"{self.detected_camera_frame}_raw", measurement.T_marker_cam)
         self.publish_tf(measurement.stamp, self.map_frame, f"{self.detected_camera_frame}_from_marker", measurement.T_map_cam)
         self.publish_tf(measurement.stamp, self.map_frame, f"{self.detected_camera_frame}_body_display", T_map_body)
         self.publish_tf(measurement.stamp, self.map_frame, f"{self.imu_frame}_from_marker", measurement.T_map_imu)
+
+    def publish_marker_observation(self, measurement: MarkerMeasurement) -> None:
+        msg = MarkerPoseObservation()
+        msg.header.stamp = measurement.stamp
+        msg.header.frame_id = self.map_frame
+        msg.marker_id = int(measurement.marker_id)
+        msg.marker_frame = measurement.marker_frame
+        msg.target_frame = self.imu_frame
+        fill_pose(msg.pose.pose, measurement.T_map_imu)
+        msg.pose.covariance = covariance_from_diag(measurement.covariance_diag)
+        msg.hard_gate_passed = True
+        msg.hard_gate_status = "accepted"
+        msg.stable = bool(measurement.stable)
+        msg.stable_frames = int(measurement.stable_frames)
+        msg.stability_factor = float(measurement.stability_factor)
+        msg.reprojection_error_px = float(measurement.reprojection_error_px)
+        msg.distance_m = float(measurement.distance_m)
+        msg.view_angle_deg = float(measurement.view_angle_deg)
+        msg.area_px2 = float(measurement.area_px2)
+        msg.side_mean_px = float(measurement.side_mean_px)
+        msg.side_min_px = float(measurement.side_min_px)
+        msg.geometry_score = float(measurement.geometry_score)
+        msg.covariance_sigma_px = float(measurement.covariance_sigma_px)
+        self.marker_observation_pub.publish(msg)
 
     def marker_quality_payload(self, measurement: MarkerMeasurement, hard_gate_status: str) -> dict[str, Any]:
         std = measurement.covariance_std_diag
