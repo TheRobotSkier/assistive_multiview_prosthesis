@@ -78,3 +78,13 @@ jetson_folder/cable_length_stabilitytest/cpp_v2/logs/
 jetson_folder/cable_length_stabilitytest/logs/
 old_stuff/
 docker_ws/bags/
+
+# Vendored OpenVINS: keep build-critical packages/config tracked, but ignore
+# optional datasets, evaluation assets, docs, and upstream CI/docker extras.
+docker_ws/src/open_vins/ov_data/
+docker_ws/src/open_vins/ov_eval/
+docker_ws/src/open_vins/docs/
+docker_ws/src/open_vins/.github/
+docker_ws/src/open_vins/Dockerfile_ros*
+docker_ws/src/open_vins/Doxyfile*
+docker_ws/src/open_vins/run_*.sh
