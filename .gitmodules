@@ -1,0 +1,6 @@
+[submodule "src/open_vins"]
+	path = src/open_vins
+	url = https://github.com/rpng/open_vins.git
+[submodule "src/realsense-ros"]
+	path = src/realsense-ros
+	url = https://github.com/IntelRealSense/realsense-ros.git
