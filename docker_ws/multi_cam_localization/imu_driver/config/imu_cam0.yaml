@@ -1,0 +1,9 @@
+/**:
+  ros__parameters:
+    bus: 7
+    imu_i2c_address: 104
+    frame_id: "cam0_imu_link"
+    imu_rate_hz: 200.0
+    accel_range_g: 2
+    gyro_range_dps: 250
+    publish_temperature_in_imu_msg: true

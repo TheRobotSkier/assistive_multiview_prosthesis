@@ -1,0 +1,11 @@
+#Accelerometer
+accelerometer_noise_density: 0.0009278837334054291 
+accelerometer_random_walk: 2.8048259057595945e-05 
+
+#Gyroscope
+gyroscope_noise_density: 0.00019841370058405538 
+gyroscope_random_walk: 1.7544399415266354e-06 
+
+rostopic: '/head/d435i_head/imu' 
+update_rate: 200 
+
