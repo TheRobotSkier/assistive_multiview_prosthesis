@@ -5,7 +5,8 @@
 The 100 mm marker covariance bag analysis has been completed. Phase 2
 OpenVINS-internal marker update/reset code has been implemented locally and
 passed the low-memory Docker/Jazzy build, launch/message smoke checks, live
-head-camera testing, and a pre-init raw replay validation.
+head-camera testing, arm setup smoke checks, and pre-init raw replay validation
+for both head and arm D435i cameras.
 
 Validated Phase 2 head D435i replay bag:
 
@@ -17,6 +18,18 @@ Fresh replay of only raw image/camera-info/IMU topics initialized OpenVINS,
 published `poseimu`, `odomimu`, and `pathimu` in `marker_map`, produced `4`
 marker-map resets and `1212` accepted marker-0 EKF updates, and did not reproduce
 the live Propagator assertion.
+
+Validated Phase 2 arm D435i replay bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/arm_marker_phase2_100mm_preinit_20260510_142201
+```
+
+Fresh replay of only raw arm image/camera-info/IMU topics initialized OpenVINS,
+published `/ov_msckf_arm/poseimu`, `/ov_msckf_arm/odomimu`, and
+`/ov_msckf_arm/pathimu` in `marker_map`, produced `3` marker-map resets and
+`1664` accepted marker-0 EKF updates, and did not reproduce the live hard
+Propagator assertion.
 
 Use the current Phase 2 handoff note before continuing:
 `.agents/phase2_openvins_handoff_status.md`.
@@ -31,19 +44,19 @@ Commit gate:
   separate data-sharing decision is made
 
 Near-term next work:
-- set up and validate the arm D435i OpenVINS path from its generated calibration
-  data, mirroring the head D435i setup where appropriate
-- after arm validation, or sooner if crashes recur, add a defensive OpenVINS
-  timing/crash guard around the Propagator assertion observed once during live
-  testing
+- add a namespaced/per-instance OpenVINS TF frame fix so head and arm can both
+  publish TF for RViz drift inspection and later point-cloud fusion without
+  colliding on `imu` or `cam0`
+- add a defensive OpenVINS timing/crash guard around the Propagator assertion
+  observed once during live testing
 
 ## A. Arm D435i Setup From Calibration Output
 
 Calibration files are available at:
-`calibration/arm/d435i_310622071850/`
+`docker_ws/calibration/arm/d435i_310622071850/`
 
-Create the arm setup by mirroring the head D435i configuration, after
-inspecting the current launch/config patterns.
+Arm Phase 2 setup has been implemented by mirroring the head D435i
+configuration where appropriate.
 
 Planned values:
 - Namespace: `arm`
@@ -51,17 +64,21 @@ Planned values:
 - RealSense serial: `_310622071850`
 - Mount location: `prosthetic_arm`
 
-Likely deliverables:
+Implemented deliverables:
 - `multi_cam_localization/sensor_fusion_bringup/config/openvins/arm_d435i_310622071850/estimator_config.yaml`
 - `multi_cam_localization/sensor_fusion_bringup/config/openvins/arm_d435i_310622071850/kalibr_imucam_chain.yaml`
 - `multi_cam_localization/sensor_fusion_bringup/config/openvins/arm_d435i_310622071850/kalibr_imu_chain.yaml`
 - `multi_cam_localization/sensor_fusion_bringup/config/markers/arm_aruco_map.yaml`
-- `multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins.launch.py`
-- `multi_cam_localization/sensor_fusion_bringup/launch/arm_marker_pose.launch.py`
+- `multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py`
+- `multi_cam_localization/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py`
+- `multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_marker_validation.md`
+- `multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md`
 
-The arm OpenVINS node must not collide with the head OpenVINS node. Consider a
-distinct OpenVINS namespace or topic prefix such as `/ov_msckf_arm`, but inspect
-existing launch files before deciding.
+The arm OpenVINS node uses `/ov_msckf_arm` to avoid topic collisions with head
+OpenVINS. Arm OpenVINS calibration/global TF publishing is currently disabled
+because OpenVINS still publishes child frame `imu` and calibration frame `cam0`
+internally; simply enabling TF would collide with the head setup. Fix this with
+per-instance frame IDs or a safe TF prefix before two-camera point-cloud fusion.
 
 ## B. OpenVINS Internal Marker Update / EKF Reanchor
 
@@ -105,6 +122,13 @@ first, then potentially move into OpenVINS after the behavior is trusted.
 Use `marker_map` or another common reference frame to align head and arm D435i
 point clouds. Avoid fusing clouds directly in drifting raw OpenVINS `global`
 frames.
+
+Immediate prerequisite:
+- Add namespaced OpenVINS TF frame support for multiple live instances. The arm
+  trial showed that disabling arm OpenVINS TF prevents collisions but makes RViz
+  drift inspection difficult when marker ID 0 is out of view. The future TF tree
+  should expose distinct head and arm IMU/camera frames while preserving the
+  shared `marker_map`.
 
 Planned final marker layout:
 - Fixed world/common reference marker: 6x6 marker ID 0, 100 mm x 100 mm, in

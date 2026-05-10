@@ -66,6 +66,26 @@ published `poseimu`, `odomimu`, and `pathimu` in `marker_map`, produced `4`
 marker-map resets and `1212` accepted marker-0 EKF updates, and did not reproduce
 the live Propagator assertion.
 
+The arm D435i Phase 2 setup was then added from
+`docker_ws/calibration/arm/d435i_310622071850/` with OpenVINS output under
+`/ov_msckf_arm` and marker output under `/arm/marker_pose`. Arm OpenVINS TF
+publishing is disabled for now because OpenVINS still publishes non-namespaced
+`imu`/`cam0` frame IDs internally.
+
+Validated Phase 2 arm D435i replay bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/arm_marker_phase2_100mm_preinit_20260510_142201
+```
+
+Fresh replay of only raw arm image/camera-info/IMU topics initialized OpenVINS,
+published `/ov_msckf_arm/poseimu`, `/ov_msckf_arm/odomimu`, and
+`/ov_msckf_arm/pathimu` in `marker_map`, produced one first marker-map lock,
+`3` total marker-map resets, and `1664` accepted marker-0 EKF updates. The raw
+timestamp scan was monotonic for arm image, camera-info, IMU, marker, and
+OpenVINS output topics. Replay logged one missing-inertial-measurement
+Propagator warning, but no fatal error and no hard Propagator assertion.
+
 ## Implemented Pieces
 
 - New ROS 2 message package:
@@ -79,8 +99,13 @@ the live Propagator assertion.
 - Phase 2 launch files:
   - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py`
   - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py`
+  - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py`
+  - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py`
 - Phase 2 validation recipe:
   `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_marker_validation.md`
+- Arm Phase 2 validation recipes:
+  - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_marker_validation.md`
+  - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md`
 - OpenVINS marker update/reset code was added under:
   `docker_ws/src/open_vins/ov_msckf`
 
@@ -117,6 +142,10 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/aruco_marker_pose_node.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/arm_aruco_map.yaml`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins/arm_d435i_310622071850/`
 - `docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.h`
 - `docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.cpp`
 - `docker_ws/src/open_vins/ov_msckf/src/core/VioManager.h`
@@ -130,21 +159,23 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 
 ## Next Task
 
-Commit the Phase 2 head D435i OpenVINS marker EKF integration after ensuring:
+Commit the Phase 2 OpenVINS marker EKF integration and arm D435i bringup after
+ensuring:
 
 - generated `docker_ws/build_overlay/`, `docker_ws/install_overlay/`, and
   `docker_ws/log_overlay/` artifacts are absent from `git status`
 - ROS bags are not committed
-- the lean vendored `docker_ws/src/open_vins` source tree is included
+- the lean vendored `docker_ws/src/open_vins` source tree and new arm
+  bringup/config/docs are included
 
 Recommended commit message:
 
 ```text
-Integrate Phase 2 OpenVINS marker EKF path
+Add arm D435i Phase 2 OpenVINS bringup
 ```
 
-After the commit/push, the next feature task is to set up the arm D435i OpenVINS
-path from `calibration/arm/d435i_310622071850/`, mirroring the head D435i setup
-where appropriate and validating it with the same pre-init raw replay style. The
-defensive OpenVINS Propagator timing/crash guard can follow after arm validation,
-or sooner if the live assertion recurs.
+After the commit/push, the next feature task is to add per-instance OpenVINS TF
+frame IDs or a safe TF prefix so head and arm can publish TF simultaneously for
+RViz drift inspection and later point-cloud fusion. The defensive OpenVINS
+Propagator timing/crash guard can follow, or move earlier if the live assertion
+recurs.
