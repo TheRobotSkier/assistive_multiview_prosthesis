@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin test shell clean logs
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -53,6 +53,9 @@ up-digital-twin:
 
 down-digital-twin:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin down
+
+logs-digital-twin:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin logs -f
 
 test-digital-twin:
 	@echo "=== Pointcloud Health Test ==="
