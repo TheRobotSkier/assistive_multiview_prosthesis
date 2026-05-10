@@ -1,0 +1,11 @@
+<library path="mia_hand_ros2_control">
+  <class 
+    name="mia_hand_ros2_control/MiaHandSystemInterface"
+    type="mia_hand_ros2_control::MiaHandSystemInterface"
+    base_class_type="hardware_interface::SystemInterface">
+
+    <description>
+      Mia Hand system interface.
+    </description>
+  </class>
+</library>
