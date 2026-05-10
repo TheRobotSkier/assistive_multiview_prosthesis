@@ -1,4 +1,4 @@
-"""Digital Twin launch — full pipeline with cameras, segmentation, and hand model.
+"""Digital Twin launch — full pipeline with cameras, segmentation, hand model, and wrist.
 
 Launches all nodes needed for a complete digital twin test:
 
@@ -13,15 +13,14 @@ Launches all nodes needed for a complete digital twin test:
   9. Grasp proximity controller
   10. Pipeline manager         — state machine orchestrator
   11. Hand pose publisher      — reads TF, publishes /hand_pose
-  12. Static TF                — wrist_link -> d435_2_depth_optical_frame
-  13. Hand URDF                — robot_state_publisher (xacro)
-  14. Wrist Dynamixel driver   — starts even without hardware (logs warnings)
+  12. Static TF                — wrist_link -> d435_2_depth_optical_frame (hand-mount offset)
+  13. Hand URDF with wrist     — robot_state_publisher (wrist-inclusive xacro)
+  14. Wrist sim driver         — subscribes /wrist/set_position, drives wrist_rotation joint
   15. RViz                     — digital_twin.rviz config
-  16. Joint state publisher    — publishes default joint config (gui variant optional)
+  16. Joint state publisher    — publishes default joint config (gui variant for manual control)
 
 Usage:
   ros2 launch prosthesis_launch digital_twin.launch.py
-  ros2 launch prosthesis_launch digital_twin.launch.py camera:=true
   ros2 launch prosthesis_launch digital_twin.launch.py gui:=true
 """
 
@@ -207,14 +206,18 @@ def _launch_setup(context, *args, **kwargs):
     )
 
     # ── 12. Static TF: wrist_link -> d435_2_depth_optical_frame ─────────
+    # Camera 2 is mounted on the back of the Mia Hand, ~2cm behind the
+    # knuckles. The transform below positions it relative to wrist_link:
+    #   translation: (-0.04, -0.01, 0.20) — behind palm, centered, at palm height
+    #   rotation:    (1.57, 0.0, 1.57)    — points camera forward (+X in wrist_link)
     nodes.append(
         Node(
             package="tf2_ros",
             executable="static_transform_publisher",
             name="wrist_to_camera2_tf",
             arguments=[
-                "0.0", "0.0", "0.0",
-                "0.0", "0.0", "0.0", "1.0",
+                "-0.04", "-0.01", "0.20",
+                "1.57", "0.0", "1.57",
                 "wrist_link",
                 "d435_2_depth_optical_frame",
             ],
@@ -222,15 +225,17 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 13. Hand URDF via robot_state_publisher ──────────────────────────
+    # ── 13. Hand URDF with wrist via robot_state_publisher ───────────────
+    # Uses the wrist-inclusive URDF from mia_hand_ros2_control which adds a
+    # wrist_link and wrist_rotation revolute joint (Z-axis, ±90°).
     robot_description = ParameterValue(
         Command([
             FindExecutable(name="xacro"),
             " ",
             PathJoinSubstitution([
-                FindPackageShare("mia_hand_description"),
-                "urdf",
-                "mia_hand_description.urdf.xacro",
+                FindPackageShare("mia_hand_ros2_control"),
+                "description", "urdf",
+                "mia_hand_with_wrist_system_interface.urdf.xacro",
             ]),
             " laterality:=right",
             " prefix:=",
@@ -249,11 +254,13 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 14. Wrist Driver ─────────────────────────────────────────────────
+    # ── 14. Wrist Sim Driver (digital twin, no hardware) ─────────────────
+    # Subscribes /wrist/set_position, publishes wrist_rotation joint_states
+    # so the URDF wrist rotates in RViz. Also publishes simulated /wrist/state.
     nodes.append(
         Node(
             package="wrist_driver",
-            executable="wrist_driver_node",
+            executable="wrist_driver_sim_node",
             name="wrist_driver",
             output="screen",
         )
