@@ -19,6 +19,7 @@ setup(
     entry_points={
         'console_scripts': [
             'segmentation_ros2_node = segmentation_bridge.segmentation_ros2_node:main',
+            'demo_click_relay_node = segmentation_bridge.demo_click_relay_node:main',
         ],
     },
 )

@@ -8,12 +8,16 @@ Panels:
 Visualization Manager:
   Class: ""
   Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Value: true
     - Class: rviz_default_plugins/TF
       Name: TF
       Enabled: true
       Value: true
     - Class: rviz_default_plugins/RobotModel
-      Name: RobotModel
+      Name: MiaHand
       Enabled: true
       Value: true
       Description Topic:
@@ -21,6 +25,30 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /robot_description
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Cam1_Pointcloud
+      Enabled: true
+      Value: true
+      Topic:
+        Depth: 5
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /cam1/d435_1/depth/color/points
+      Color Transformer: RGB8
+      Size (m): 0.003
+      Style: Flat Squares
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Cam2_Pointcloud
+      Enabled: true
+      Value: true
+      Topic:
+        Depth: 5
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /cam2/d435_2/depth/color/points
+      Color Transformer: RGB8
+      Size (m): 0.003
+      Style: Flat Squares
     - Class: rviz_default_plugins/PointCloud2
       Name: FusedCloud
       Enabled: true

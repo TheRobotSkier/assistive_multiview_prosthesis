@@ -1,200 +1,322 @@
-"""Digital Twin launch file.
+"""Digital Twin launch — full pipeline with cameras, segmentation, and hand model.
 
-Orchestrates the full digital twin pipeline:
-  1. Mia Hand MuJoCo simulation (InteractiveSystemInterface) [optional, not yet ported]
-  2. Pointcloud relay (/fused_pointcloud -> /segmentation/input_cloud)
-  3. Segmentation ROS2 node
-  4. Click relay (RViz /clicked_point -> segmentation clicks)
-  5. Grasp preshaping service bridge
-  6. Grasp proximity controller
-  7. RViz (delayed start)
-  8. Optional hand trajectory test node
+Launches all nodes needed for a complete digital twin test:
 
-Prerequisites (must be running first):
-  - multiview_full       : publishes /fused_pointcloud from real D435s
-  - segmentation_inference: HTTP inference server on :5678
-  - rust_build           : one-shot, ensures libgrasp_preshaping.so exists
+  1. Dual RealSense D435 cameras (or mock cloud publisher)
+  2. Pointcloud fuser        — subscribes to both cameras, publishes /fused_pointcloud
+  3. Cloud snapshot node      — freezes segmented cloud for RViz
+  4. Pointcloud relay         — /fused_pointcloud -> /segmentation/input_cloud
+  5. Segmentation ROS bridge  — HTTP inference client
+  6. Click relay              — forwards RViz clicks to segmentation seeds
+  7. Twist propagation        — detects hand->object collision (active)
+  8. Grasp preshaping service — C++/Rust FFI bridge
+  9. Grasp proximity controller
+  10. Pipeline manager         — state machine orchestrator
+  11. Hand pose publisher      — reads TF, publishes /hand_pose
+  12. Static TF                — wrist_link -> d435_2_depth_optical_frame
+  13. Hand URDF                — robot_state_publisher (xacro)
+  14. Wrist Dynamixel driver   — starts even without hardware (logs warnings)
+  15. RViz                     — digital_twin.rviz config
+  16. Joint state publisher    — publishes default joint config (gui variant optional)
 
 Usage:
   ros2 launch prosthesis_launch digital_twin.launch.py
-  ros2 launch prosthesis_launch digital_twin.launch.py use_trajectory:=true
-  ros2 launch prosthesis_launch digital_twin.launch.py inference_url:=http://192.168.1.100:5678
+  ros2 launch prosthesis_launch digital_twin.launch.py camera:=true
+  ros2 launch prosthesis_launch digital_twin.launch.py gui:=true
 """
 
 import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
-    TimerAction,
+    OpaqueFunction,
 )
-from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import (
+    Command,
+    FindExecutable,
+    LaunchConfiguration,
+    PathJoinSubstitution,
+    TextSubstitution,
+)
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
-def generate_launch_description():
-    # -- Launch arguments --------------------------------------------------
-    use_trajectory_arg = DeclareLaunchArgument(
-        'use_trajectory',
-        default_value='false',
-        description='Include automated hand approach test node',
-    )
-    inference_url_arg = DeclareLaunchArgument(
-        'inference_url',
-        default_value='http://127.0.0.1:5678',
-        description='Segmentation inference server URL',
-    )
-    segmentation_cubeedge_arg = DeclareLaunchArgument(
-        'segmentation_cubeedge',
-        default_value='0.05',
-        description='Click cube half-width (m)',
-    )
-    publish_initial_commands_arg = DeclareLaunchArgument(
-        'publish_initial_commands',
-        default_value='false',
-        description='If true, preshaping bridge sends immediate joint commands on service call. '
-                    'Digital twin sets this to false so the proximity controller owns all commands.',
-    )
+def _launch_setup(context, *args, **kwargs):
+    camera_enabled = LaunchConfiguration("camera").perform(context).lower() == "true"
+    gui_enabled = LaunchConfiguration("gui").perform(context).lower() == "true"
+    config_file = LaunchConfiguration("config_file")
+    inference_url = LaunchConfiguration("inference_url")
 
-    use_trajectory = LaunchConfiguration('use_trajectory')
-    inference_url = LaunchConfiguration('inference_url')
-    segmentation_cubeedge = LaunchConfiguration('segmentation_cubeedge')
-    publish_initial_commands = LaunchConfiguration('publish_initial_commands')
+    if camera_enabled:
+        cloud_topic = "/cam1/d435_1/depth/color/points"
+    else:
+        cloud_topic = "/camera/depth/color/points"
 
-    # -- 1. Mia Hand MuJoCo simulation -------------------------------------
-    # NOTE: The mia_hand_mujoco package with the InteractiveSystemInterface
-    # has not been ported to the new src/ structure yet (14k+ lines of C++
-    # MuJoCo code). Once ported, uncomment the block below.
-    #
-    # mia_hand_sim_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource([
-    #         PathJoinSubstitution([
-    #             FindPackageShare('mia_hand_mujoco'), 'launch',
-    #             'mia_hand_system_interface_launch.py'
-    #         ])
-    #     ]),
-    #     launch_arguments={
-    #         'hardware_plugin': 'mia_hand_mujoco/InteractiveSystemInterface',
-    #         'enable_depth_publisher': 'false',
-    #         'enable_preshaping_service': 'false',
-    #         'scene': 'static',
-    #         'include_wrist': 'true',
-    #         'depth_publish_tf': 'false',
-    #     }.items()
-    # )
-    #
-    # For now, you can run the simulation manually:
-    #   ros2 run mia_hand_mujoco interactive_system_interface_node
+    nodes = []
 
-    # -- 2. Pointcloud relay -----------------------------------------------
-    pc_relay = TimerAction(period=2.0, actions=[
-        Node(
-            package='camera',
-            executable='pointcloud_relay_node',
-            name='pointcloud_relay',
-            output='screen',
+    # ── 1. Cloud source ────────────────────────────────────────────────────
+    if camera_enabled:
+        camera_launch_path = os.path.join(
+            get_package_share_directory("camera"),
+            "launch",
+            "two_d435.launch.py",
         )
-    ])
+        nodes.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(camera_launch_path),
+            )
+        )
+    else:
+        nodes.append(
+            Node(
+                package="pipeline_manager",
+                executable="mock_cloud_publisher",
+                name="mock_cloud_publisher",
+                output="screen",
+            )
+        )
 
-    # -- 3. Segmentation node ----------------------------------------------
-    segmentation = TimerAction(period=3.0, actions=[
+    # ── 2. Pointcloud fuser (combines both camera streams) ────────────────
+    if camera_enabled:
+        nodes.append(
+            Node(
+                package="camera",
+                executable="pointcloud_fuser_node",
+                name="pointcloud_fuser",
+                parameters=[{
+                    "cam1_topic": "/cam1/d435_1/depth/color/points",
+                    "cam2_topic": "/cam2/d435_2/depth/color/points",
+                    "output_topic": "/fused_pointcloud",
+                }],
+                output="screen",
+            )
+        )
+
+    # ── 3. Pointcloud relay (fused -> segmentation input) ─────────────────
+    nodes.append(
         Node(
-            package='segmentation_bridge',
-            executable='segmentation_ros2_node',
-            name='segmentation_node',
+            package="camera",
+            executable="pointcloud_relay_node",
+            name="pointcloud_relay",
+            output="screen",
+        )
+    )
+
+    # ── 4. Segmentation bridge ────────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="segmentation_bridge",
+            executable="segmentation_ros2_node",
+            name="segmentation_bridge",
+            parameters=[{"inference_url": inference_url}],
+            output="screen",
+        )
+    )
+
+    # ── 5. Click relay ────────────────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="segmentation_bridge",
+            executable="demo_click_relay_node",
+            name="click_relay",
+            output="screen",
+        )
+    )
+
+    # ── 6. Cloud snapshot node ────────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="camera",
+            executable="cloud_snapshot_node",
+            name="cloud_snapshot_node",
+            output="screen",
+        )
+    )
+
+    # ── 7. Twist propagation ──────────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="twist_propagation",
+            executable="twist_propagation_node",
+            name="twist_propagation",
+            parameters=[
+                {
+                    "active": False,
+                    "input_cloud_topic": cloud_topic,
+                }
+            ],
+            output="screen",
+        )
+    )
+
+    # ── 8. Grasp Preshaping Service ──────────────────────────────────────
+    nodes.append(
+        Node(
+            package="grasp_preshaping",
+            executable="preshaping_service_bridge_node",
+            name="preshaping_service",
             parameters=[{
-                'cubeedge': segmentation_cubeedge,
-                'inference_url': inference_url,
+                "camera_frames": [
+                    "cam1_d435_1_color_optical_frame",
+                    "cam2_d435_2_color_optical_frame",
+                ],
+                "preshaping_closure_fraction": 0.3,
+                "min_closure_amount": 0.1,
+                "publish_initial_commands": False,
             }],
-            output='screen',
+            output="screen",
         )
-    ])
+    )
 
-    # -- 4. Click relay ----------------------------------------------------
-    click_relay = TimerAction(period=3.0, actions=[
+    # ── 9. Grasp Proximity Controller ────────────────────────────────────
+    nodes.append(
         Node(
-            package='segmentation_bridge',
-            executable='demo_click_relay_node',
-            name='click_relay',
-            output='screen',
+            package="grasp_preshaping",
+            executable="grasp_proximity_controller_node.py",
+            name="proximity_controller",
+            parameters=[{"config_file": config_file}],
+            output="screen",
         )
-    ])
+    )
 
-    # -- 5. Grasp preshaping service bridge --------------------------------
-    preshaping_bridge = TimerAction(period=5.0, actions=[
+    # ── 10. Pipeline Manager ──────────────────────────────────────────────
+    nodes.append(
         Node(
-            package='grasp_preshaping',
-            executable='preshaping_service_bridge_node',
-            name='preshaping_service_bridge',
-            parameters=[{
-                'camera_frames': ['cam1_d435_1_color_optical_frame', 'cam2_d435_2_color_optical_frame'],
-                'preshaping_closure_fraction': 0.3,
-                'min_closure_amount': 0.1,
-                'publish_initial_commands': publish_initial_commands,
-            }],
-            output='screen',
+            package="pipeline_manager",
+            executable="pipeline_manager_node",
+            name="pipeline_manager",
+            parameters=[{"config_file": config_file}],
+            output="screen",
         )
-    ])
+    )
 
-    # -- 6. Grasp proximity controller -------------------------------------
-    proximity_controller = TimerAction(period=5.0, actions=[
+    # ── 11. Hand Pose Publisher ──────────────────────────────────────────
+    nodes.append(
         Node(
-            package='grasp_preshaping',
-            executable='grasp_proximity_controller_node.py',
-            name='grasp_proximity_controller',
-            parameters=[{
-                'proximity_enter_threshold_m': 0.08,
-                'proximity_exit_threshold_m': 0.10,
-                'partial_closure_factor': 0.3,
-                'min_closure_amount': 0.1,
-                'control_rate_hz': 10.0,
-            }],
-            output='screen',
+            package="camera",
+            executable="hand_pose_publisher",
+            name="hand_pose_publisher",
+            output="screen",
         )
-    ])
+    )
 
-    # -- 7. RViz -----------------------------------------------------------
+    # ── 12. Static TF: wrist_link -> d435_2_depth_optical_frame ─────────
+    nodes.append(
+        Node(
+            package="tf2_ros",
+            executable="static_transform_publisher",
+            name="wrist_to_camera2_tf",
+            arguments=[
+                "0.0", "0.0", "0.0",
+                "0.0", "0.0", "0.0", "1.0",
+                "wrist_link",
+                "d435_2_depth_optical_frame",
+            ],
+            output="screen",
+        )
+    )
+
+    # ── 13. Hand URDF via robot_state_publisher ──────────────────────────
+    robot_description = ParameterValue(
+        Command([
+            FindExecutable(name="xacro"),
+            " ",
+            PathJoinSubstitution([
+                FindPackageShare("mia_hand_description"),
+                "urdf",
+                "mia_hand_description.urdf.xacro",
+            ]),
+            " laterality:=right",
+            " prefix:=",
+            TextSubstitution(text=""),
+        ]),
+        value_type=str,
+    )
+
+    nodes.append(
+        Node(
+            package="robot_state_publisher",
+            executable="robot_state_publisher",
+            name="robot_state_publisher",
+            parameters=[{"robot_description": robot_description}],
+            output="screen",
+        )
+    )
+
+    # ── 14. Wrist Driver ─────────────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="wrist_driver",
+            executable="wrist_driver_node",
+            name="wrist_driver",
+            output="screen",
+        )
+    )
+
+    # ── 15. RViz with digital_twin.rviz ──────────────────────────────────
     rviz_config = os.path.join(
-        os.path.dirname(__file__), '..', '..', '..', '..', 'rviz', 'digital_twin.rviz'
+        os.path.dirname(__file__), "..", "..", "..", "..", "rviz", "digital_twin.rviz"
     )
-    rviz = TimerAction(period=8.0, actions=[
+    nodes.append(
         Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', rviz_config],
-            output='screen',
+            package="rviz2",
+            executable="rviz2",
+            name="rviz2",
+            arguments=["-d", rviz_config],
+            output="screen",
         )
-    ])
+    )
 
-    # -- 8. Optional hand trajectory test node -----------------------------
-    trajectory_test = TimerAction(period=15.0, actions=[
-        Node(
-            package='camera',
-            executable='pointcloud_relay_node',
-            name='hand_trajectory_test',
-            output='screen',
-            condition=IfCondition(use_trajectory),
+    # ── 16. Joint state publisher ────────────────────────────────────────
+    if gui_enabled:
+        nodes.append(
+            Node(
+                package="joint_state_publisher_gui",
+                executable="joint_state_publisher_gui",
+                name="joint_state_publisher_gui",
+                output="screen",
+            )
         )
-    ])
-    # NOTE: The original hand trajectory test node (mujoco_hand_trajectory_node.py)
-    # was part of the MuJoCo interactive simulator not yet ported. Replace the
-    # Node above with the actual trajectory node once ported.
+    else:
+        nodes.append(
+            Node(
+                package="joint_state_publisher",
+                executable="joint_state_publisher",
+                name="joint_state_publisher",
+                output="screen",
+            )
+        )
 
+    return nodes
+
+
+def generate_launch_description():
     return LaunchDescription([
-        use_trajectory_arg,
-        inference_url_arg,
-        segmentation_cubeedge_arg,
-        publish_initial_commands_arg,
-        # mia_hand_sim_launch,   # uncomment when mia_hand_mujoco is ported
-        pc_relay,
-        segmentation,
-        click_relay,
-        preshaping_bridge,
-        proximity_controller,
-        rviz,
-        trajectory_test,
+        DeclareLaunchArgument(
+            "camera",
+            default_value="true",
+            description="Use real RealSense D435 cameras (default: true for digital twin)",
+        ),
+        DeclareLaunchArgument(
+            "gui",
+            default_value="true",
+            description="Launch joint_state_publisher_gui for manual hand control",
+        ),
+        DeclareLaunchArgument(
+            "config_file",
+            default_value="",
+            description="Path to prosthesis_config.yaml (empty = package default)",
+        ),
+        DeclareLaunchArgument(
+            "inference_url",
+            default_value="http://127.0.0.1:5678",
+            description="Segmentation inference server URL",
+        ),
+        OpaqueFunction(function=_launch_setup),
     ])

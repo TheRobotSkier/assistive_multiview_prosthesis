@@ -37,7 +37,8 @@ up-hw:
 
 # ── Grasp Test ──────────────────────────────────────────────────────────────
 up-grasp-test:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up -d grasp_test
+	$(COMPOSE) rm -f grasp_test 2>/dev/null || true
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up grasp_test -d
 
 down-grasp-test:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test down
@@ -47,10 +48,17 @@ logs-grasp-test:
 
 # ── Digital Twin ────────────────────────────────────────────────────────────
 up-digital-twin:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin up -d digital_twin
+	$(COMPOSE) rm -f digital_twin 2>/dev/null || true
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin up digital_twin -d
 
 down-digital-twin:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin down
+
+test-digital-twin:
+	@echo "=== Pointcloud Health Test ==="
+	$(COMPOSE) exec digital_twin bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
+		$(COMPOSE) exec grasp_test bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
+		echo "No running container found — start one first with 'make up-digital-twin' or 'make up-grasp-test'"
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:

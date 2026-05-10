@@ -68,18 +68,21 @@ services:
       dockerfile: ../../docker/Dockerfile.segmentation
     environment:
       - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
     network_mode: host
     profiles:
       - segmentation
       - grasp_test
+      - digital_twin
+    privileged: true # LINUX ONLY
+    userns_mode: "keep-id" # LINUX_ONLY
 
   # ── Grasp test: runs grasp test launch file with camera & GUI ──────────────
   grasp_test:
     container_name: grasp_test
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    command: source install/setup.bash && ros2 launch prosthesis_launch grasp_test.launch.py camera:=true gui:=true
+    extends: prosthesis
+    command: ["/bin/bash", "-c", "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch grasp_test.launch.py camera:=true gui:=true"]
     environment:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - XAUTHORITY=/tmp/.Xauthority
@@ -93,16 +96,28 @@ services:
       - grasp_test
     stdin_open: true
     tty: true
+    privileged: true # LINUX ONLY
+    userns_mode: "keep-id" # LINUX_ONLY
 
-  # ── Digital twin: fused pointcloud -> segmentation -> preshaping -> proximity ──
+  # ── Digital twin: cameras -> pointcloud fuse -> segmentation -> preshaping -> proximity ──
   digital_twin:
     container_name: digital_twin
     extends: prosthesis
-    command: ros2 launch prosthesis_launch digital_twin.launch.py
+    command: ["/bin/bash", "-c", "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=true"]
+    environment:
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - XAUTHORITY=/tmp/.Xauthority
+    network_mode: host
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
     depends_on:
       - segmentation
     profiles:
       - digital_twin
+    stdin_open: true
+    tty: true
+    privileged: true
+    userns_mode: "keep-id"
 
   # ── Test runner: reuses prosthesis image, runs smoke tests, exits ────────
   test:

@@ -65,7 +65,7 @@ def _launch_setup(context, *args, **kwargs):
         camera_launch_path = os.path.join(
             get_package_share_directory("camera"),
             "launch",
-            "two_d435_launch.py",
+            "two_d435.launch.py",
         )
         nodes.append(
             IncludeLaunchDescription(

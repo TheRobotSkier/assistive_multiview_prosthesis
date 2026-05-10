@@ -12,7 +12,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from geometry_msgs.msg import PoseStamped
-from tf2_ros import Buffer, TransformListener
+from tf2_ros import Buffer, TransformListener, ConnectivityException
 import tf2_ros
 
 
@@ -43,7 +43,7 @@ class HandPosePublisher(Node):
                 "wrist_link",    # source frame
                 rclpy.time.Time(),  # latest available
             )
-        except tf2_ros.LookupException as e:
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException) as e:
             self.get_logger().warn(
                 f"world → wrist_link TF not available: {e}. "
                 f"Ensure robot_state_publisher is running."

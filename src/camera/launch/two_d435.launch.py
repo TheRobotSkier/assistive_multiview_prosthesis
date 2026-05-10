@@ -23,7 +23,7 @@ from launch.actions import ExecuteProcess, LogInfo
 import launch_ros.actions
 
 
-_REALSENSE_NODE = '/opt/ros/humble/lib/realsense2_camera/realsense2_camera_node'
+_REALSENSE_NODE = '/opt/ros/jazzy/lib/realsense2_camera/realsense2_camera_node'
 _DEPTH_PROFILE = '640x480x6'
 _COLOR_PROFILE = '640x480x6'
 

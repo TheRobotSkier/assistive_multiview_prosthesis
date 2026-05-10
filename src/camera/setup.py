@@ -14,6 +14,8 @@ setup(
             "charuco_tf_node = camera.charuco_tf_node:main",
             "hand_pose_publisher = camera.hand_pose_publisher:main",
             "pointcloud_relay_node = camera.pointcloud_relay_node:main",
+            "cloud_snapshot_node = camera.cloud_snapshot_node:main",
+            "pointcloud_fuser_node = camera.pointcloud_fuser_node:main",
         ],
     },
     data_files=[
