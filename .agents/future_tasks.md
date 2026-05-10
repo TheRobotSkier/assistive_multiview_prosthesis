@@ -2,27 +2,40 @@
 
 ## Current Phase 2 Status
 
-The 100 mm marker covariance bag analysis has been completed. The Phase 1
-external covariance model was conservative on stationary repeatability, and no
-covariance config tuning was applied.
+The 100 mm marker covariance bag analysis has been completed. Phase 2
+OpenVINS-internal marker update/reset code has been implemented locally and
+passed the low-memory Docker/Jazzy build, launch/message smoke checks, live
+head-camera testing, and a pre-init raw replay validation.
 
-Live sanity checking confirmed the expected Phase 1 limit: external corrected
-odom can snap back to marker ID 0 after VIO drift, but OpenVINS internal
-uncertainty and velocity are not repaired by the external correction layer.
+Validated Phase 2 head D435i replay bag:
 
-Phase 2 OpenVINS-internal marker update/reset code has been implemented locally
-and passed the low-memory Docker/Jazzy build plus launch/message smoke checks.
+```text
+docker_ws/bags/openvins_tests/phase2_live/head_marker_phase2_100mm_preinit_20260510_122723
+```
+
+Fresh replay of only raw image/camera-info/IMU topics initialized OpenVINS,
+published `poseimu`, `odomimu`, and `pathimu` in `marker_map`, produced `4`
+marker-map resets and `1212` accepted marker-0 EKF updates, and did not reproduce
+the live Propagator assertion.
 
 Use the current Phase 2 handoff note before continuing:
 `.agents/phase2_openvins_handoff_status.md`.
 
-Important next gate:
+Commit gate:
 - `docker_ws/src/open_vins` has been converted locally from the broken gitlink
   into a lean vendored source tree so Phase 2 OpenVINS edits can be committed
   with the parent repo
 - do not commit generated `build_overlay/`, `install_overlay/`, or
   `log_overlay/` artifacts
-- continue to Phase 2 launch and bag behavior validation before final commit
+- do not commit ROS bags; keep them as local validation artifacts unless a
+  separate data-sharing decision is made
+
+Near-term next work:
+- set up and validate the arm D435i OpenVINS path from its generated calibration
+  data, mirroring the head D435i setup where appropriate
+- after arm validation, or sooner if crashes recur, add a defensive OpenVINS
+  timing/crash guard around the Propagator assertion observed once during live
+  testing
 
 ## A. Arm D435i Setup From Calibration Output
 
@@ -52,9 +65,9 @@ existing launch files before deciding.
 
 ## B. OpenVINS Internal Marker Update / EKF Reanchor
 
-Investigate modifying OpenVINS internals so marker updates can directly correct
-the EKF state, including pose, velocity, and covariance. Start this only after
-the Phase 1 baseline is committed/pushed.
+Phase 2 head D435i internal marker update/reanchor is implemented and validated.
+Keep future edits here focused on behavior improvements found during head or arm
+validation.
 
 Phase 2 target behavior:
 - accepted observations of known fixed markers should become OpenVINS EKF
@@ -72,6 +85,14 @@ Use `.agents/marker_pose_covariance_plan.md` as the starting point for marker
 measurement covariance, innovation gating, EKF update design, and velocity
 handling. Do not assume a pose-only update is sufficient if the internal VIO
 velocity has already become inconsistent.
+
+Known robustness follow-up:
+- A live run once hit the OpenVINS `Propagator.cpp` assertion comparing requested
+  propagation duration against summed IMU dt. The new validation bag did not
+  reproduce it, and raw timestamps were monotonic, so this looks like a transient
+  live sensor/timing disruption rather than a marker EKF bug. Consider replacing
+  the hard assert with a logged guard/drop path after the arm setup is validated,
+  or sooner if the crash recurs.
 
 ## C. VIO Health Monitor And Reset/Reinitialize Behavior
 

@@ -4,6 +4,9 @@ This recipe is for validating the Phase 2 marker-enabled OpenVINS path on the
 Jetson. OpenVINS builds can exhaust memory on the Jetson if colcon/CMake builds
 in parallel, so keep the OpenVINS build sequential.
 
+For bench commands to try the Phase 2 path live and record a pre-init validation
+bag, see `phase2_openvins_live_trial_and_recording.md`.
+
 ## Low-Memory Build
 
 Close VS Code, RViz, browsers, and other large applications before building.
@@ -118,6 +121,42 @@ that would require changing `ROS2Visualizer` marker queue handling. The other
 three 100 mm bags validate marker publication/configuration, but they do not
 exercise the internal OpenVINS marker EKF path until the replay can produce a VIO
 initialization.
+
+## 2026-05-10 Pre-Init Live Bag Replay Result
+
+The first confirmed full replay-validation bag is:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/head_marker_phase2_100mm_preinit_20260510_122723
+```
+
+This bag was recorded with the final 100 mm marker config and starts before the
+OpenVINS initialization jerk. It includes multiple larger VIO drift/reacquire
+events from live testing where marker ID `0` recovered the correct pose.
+
+Fresh replay used only raw input topics:
+
+```text
+/head/d435i_head/color/image_raw
+/head/d435i_head/color/camera_info
+/head/d435i_head/imu
+```
+
+Replay passed the Phase 2 marker EKF behavior checks:
+
+- OpenVINS initialized once from the raw replay.
+- Marker node used `head_aruco_map.yaml`.
+- `/head/marker_pose/observation` published `879` marker ID `0` observations.
+- OpenVINS published `poseimu`, `odomimu`, and `pathimu` in `marker_map`.
+- Marker ID `0` produced `4` marker-map resets and `1212` accepted EKF updates.
+- `19` reset requests were held until the marker-map velocity fit was reliable.
+- No stale marker/timestamp drops were logged.
+- The live Propagator assertion did not reproduce; OpenVINS was still running
+  after playback.
+
+Raw timestamp scan found monotonic IMU, image, and camera-info streams. The IMU
+stream had `24768` messages at about 200 Hz with a maximum observed gap of about
+`15 ms`. The image stream had some frame gaps up to about `100 ms`.
 
 ## Commit Notes
 

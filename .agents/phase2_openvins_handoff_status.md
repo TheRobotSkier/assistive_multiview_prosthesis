@@ -52,6 +52,20 @@ VIO-good replay: OpenVINS logged seven non-fixed-marker rejections and zero
 marker-1 accepts or resets. No source patch to `ROS2Visualizer` marker queue
 handling was indicated by these runs.
 
+2026-05-10 live testing looked good: after larger VIO drift/reacquire events,
+marker ID `0` sometimes took a little time to pull the estimate back, but it did
+recover the correct pose and continue marker EKF updates. A new pre-init replay
+validation bag was recorded:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/head_marker_phase2_100mm_preinit_20260510_122723
+```
+
+Fresh replay of only raw image/camera-info/IMU topics initialized OpenVINS,
+published `poseimu`, `odomimu`, and `pathimu` in `marker_map`, produced `4`
+marker-map resets and `1212` accepted marker-0 EKF updates, and did not reproduce
+the live Propagator assertion.
+
 ## Implemented Pieces
 
 - New ROS 2 message package:
@@ -116,9 +130,21 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 
 ## Next Task
 
-Decide whether the strict commit gate requires all four requested bags to
-exercise the internal OpenVINS EKF path. If yes, capture or prepare
-initialization-compatible 100 mm replays for the stationary, gentle-motion, and
-VIO-drift cases. If the documented limitation is acceptable, prepare the Phase 2
-source/docs/message/vendor commit after ensuring generated overlay artifacts are
-absent from `git status`.
+Commit the Phase 2 head D435i OpenVINS marker EKF integration after ensuring:
+
+- generated `docker_ws/build_overlay/`, `docker_ws/install_overlay/`, and
+  `docker_ws/log_overlay/` artifacts are absent from `git status`
+- ROS bags are not committed
+- the lean vendored `docker_ws/src/open_vins` source tree is included
+
+Recommended commit message:
+
+```text
+Integrate Phase 2 OpenVINS marker EKF path
+```
+
+After the commit/push, the next feature task is to set up the arm D435i OpenVINS
+path from `calibration/arm/d435i_310622071850/`, mirroring the head D435i setup
+where appropriate and validating it with the same pre-init raw replay style. The
+defensive OpenVINS Propagator timing/crash guard can follow after arm validation,
+or sooner if the live assertion recurs.
