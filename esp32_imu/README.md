@@ -18,14 +18,14 @@ GPIO21 (SDA)   ──── SDA              ─── SDA
 GPIO22 (SCL)   ──── SCL              ─── SCL
 3.3V           ──── VCC              ─── VCC
 GND            ──── GND              ─── GND
-GPIO25         ──── (not connected)  ─── AD0
+GPIO19         ──── (not connected)  ─── SAO
 
 USB (UART0)    ──── Host computer
-```
 
-The AD0 pin of the **arm** IMU is connected to GPIO25. During boot,
-the ESP32 drives AD0 LOW (both IMUs at 0x68), configures them, then
-drives AD0 HIGH (arm IMU moves to 0x69).
+The SAO (Slave Address 0, same as AD0) pin of the **arm** IMU is
+connected to GPIO19. During boot, the ESP32 drives SAO LOW
+(both IMUs at 0x68), configures them, then drives SAO HIGH
+(arm IMU moves to 0x69).
 
 ## Quick Start
 

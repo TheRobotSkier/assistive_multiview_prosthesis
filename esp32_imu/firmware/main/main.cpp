@@ -31,7 +31,7 @@
 static const char *TAG = "main";
 
 // ── Pin assignments ─────────────────────────────────────────────────
-constexpr gpio_num_t AD0_PIN       = GPIO_NUM_25;  // arm IMU AD0
+constexpr gpio_num_t AD0_PIN       = GPIO_NUM_19;  // arm IMU SAO/AD0
 constexpr gpio_num_t I2C_SDA       = GPIO_NUM_21;
 constexpr gpio_num_t I2C_SCL       = GPIO_NUM_22;
 constexpr i2c_port_t I2C_PORT      = I2C_NUM_0;

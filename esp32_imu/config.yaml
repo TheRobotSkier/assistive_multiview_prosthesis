@@ -26,7 +26,7 @@ i2c:
 # LOW  = arm IMU at 0x68 (same as head)
 # HIGH = arm IMU at 0x69 (unique)
 address_select:
-  arm_ad0_pin: 25
+  arm_ad0_pin: 19
 
 # ── MPU9250 settings ──────────────────────────────────────────────────
 mpu9250:
