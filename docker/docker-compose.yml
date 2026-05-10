@@ -13,7 +13,7 @@
 services:
   # ── Main ROS 2 container ─────────────────────────────────────────────────
   prosthesis:
-    image: prosthesis:latest
+    container_name: prosthesis
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -28,15 +28,32 @@ services:
     volumes:
       # X11 forwarding (works on Linux and WSL2 with WSLg)
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    profiles:
-      - mock
+    #    profiles:
+    #      - mock, rviz, test
     stdin_open: true
     tty: true
+    privileged: true # LINUX ONLY
+    userns_mode: "keep-id" # LINUX_ONLY
+
+  interactive:
+    container_name: interactive
+    extends: prosthesis
+    stdin_open: true
+    tty: true
+    command: bash
+
+  # RVIZ test: just verifies that rviz gui can open in default prostehsis container
+  rviz:
+    container_name: rviz-test
+    extends: prosthesis
+    command: rviz
+    profiles:
+      - rviz
 
   # ── Hardware variant: same image with USB devices ────────────────────────
   prosthesis-hw:
-    image: prosthesis:latest
     extends: prosthesis
+    container_name: prosthesis-hw
     devices:
       - ${MIA_SERIAL_PORT:-/dev/ttyUSB1}:/dev/ttyUSB1
       - ${WRIST_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0
@@ -45,24 +62,31 @@ services:
 
   # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
   segmentation:
-    image: segmentation:latest
+    container_name: segmentation
     build:
       context: ../src/segmentation
       dockerfile: ../../docker/Dockerfile.segmentation
     environment:
       - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
     network_mode: host
+    profiles:
+      - segmentation
+      - grasp_test
 
   # ── Grasp test: runs grasp test launch file with camera & GUI ──────────────
   grasp_test:
-    image: prosthesis:latest
+    container_name: grasp_test
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    command: ros2 launch prosthesis_launch grasp_test.launch.py camera:=true gui:=true
+    command: source install/setup.bash && ros2 launch prosthesis_launch grasp_test.launch.py camera:=true gui:=true
     environment:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - XAUTHORITY=/tmp/.Xauthority
     network_mode: host
+    volumes:
+      # X11 forwarding (works on Linux and WSL2 with WSLg)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
     depends_on:
       - segmentation
     profiles:
@@ -72,7 +96,7 @@ services:
 
   # ── Digital twin: fused pointcloud -> segmentation -> preshaping -> proximity ──
   digital_twin:
-    image: prosthesis:latest
+    container_name: digital_twin
     extends: prosthesis
     command: ros2 launch prosthesis_launch digital_twin.launch.py
     depends_on:
@@ -82,11 +106,14 @@ services:
 
   # ── Test runner: reuses prosthesis image, runs smoke tests, exits ────────
   test:
-    image: prosthesis:latest
+    extends: prosthesis
+    container_name: test
     user: "0:0"
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
       - GRASP_CONFIG_PATH=/prosthesis_ws/config/grasp_preshaping.yaml
     command: ["/bin/bash", "/prosthesis_ws/scripts/run_tests.sh"]
+    profiles:
+      - test
     network_mode: host
