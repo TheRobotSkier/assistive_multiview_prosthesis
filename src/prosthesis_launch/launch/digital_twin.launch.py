@@ -32,6 +32,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     OpaqueFunction,
+    TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -296,11 +297,14 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 15. RViz with digital_twin.rviz ──────────────────────────────────
+    # ── 15. RViz with digital_twin.rviz (delayed for camera init) ────────
+    # Path from installed launch dir (share/.../launch/) to workspace root:
+    #   ../../../.. (5x) = /prosthesis_ws
     rviz_config = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..", "rviz", "digital_twin.rviz"
+        os.path.dirname(__file__), "..", "..", "..", "..", "..", "rviz", "digital_twin.rviz"
     )
-    nodes.append(
+    # Delay RViz so camera frames exist before it opens (otherwise falls to 'map')
+    rviz = TimerAction(period=8.0, actions=[
         Node(
             package="rviz2",
             executable="rviz2",
@@ -308,7 +312,8 @@ def _launch_setup(context, *args, **kwargs):
             arguments=["-d", rviz_config],
             output="screen",
         )
-    )
+    ])
+    nodes.append(rviz)
 
     # ── 16. Joint state publisher ────────────────────────────────────────
     if gui_enabled:

@@ -224,8 +224,10 @@ def _launch_setup(context, *args, **kwargs):
     )
 
     # ── RViz with grasp_test.rviz ──────────────────────────────────────
+    # Path from installed launch dir (share/.../launch/) to workspace root:
+    #   ../../../.. (5x) = /prosthesis_ws
     rviz_config = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..", "rviz", "grasp_test.rviz"
+        os.path.dirname(__file__), "..", "..", "..", "..", "..", "rviz", "grasp_test.rviz"
     )
     nodes.append(
         Node(
