@@ -43,6 +43,35 @@ services:
     profiles:
       - hardware
 
+  # ── OpenVINS: dual D435i visual-inertial odometry ───────────────────────
+  openvins:
+    image: prosthesis-openvins:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.openvins
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=0
+    network_mode: host
+    ipc: host
+    privileged: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    stdin_open: true
+    tty: true
+    command: >
+      bash -c "
+        source /prosthesis_ws/install/setup.bash &&
+        ros2 launch sensor_fusion_bringup dual_d435i_openvins.launch.py rviz_enable:=true verbosity:=INFO;
+        /bin/bash
+      "
+
   # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
   segmentation:
     image: segmentation:latest

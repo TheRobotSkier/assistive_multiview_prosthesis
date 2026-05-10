@@ -1,0 +1,47 @@
+%YAML:1.0
+
+imu0:
+  T_i_b:
+    - [1.0, 0.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+
+  # D435i IMU noise — using head camera values as baseline.
+  # Both cameras are D435i model, IMU characteristics should be similar.
+  # TODO: run Kalibr allan_variance_ros on arm camera for accurate values.
+  accelerometer_noise_density: 0.009278837334054291
+  accelerometer_random_walk: 0.0002804825905759594
+  gyroscope_noise_density: 0.0019841370058405537
+  gyroscope_random_walk: 1.7544399415266354e-05
+
+  rostopic: /arm/d435i_arm/imu
+  time_offset: 0.0
+  update_rate: 200
+
+  model: "kalibr"
+
+  Tw:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+
+  Ta:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+
+  R_IMUtoACC:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+
+  R_IMUtoGYRO:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+
+  Tg:
+    - [0.0, 0.0, 0.0]
+    - [0.0, 0.0, 0.0]
+    - [0.0, 0.0, 0.0]

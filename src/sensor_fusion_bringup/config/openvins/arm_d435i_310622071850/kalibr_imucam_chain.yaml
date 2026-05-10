@@ -1,0 +1,22 @@
+%YAML:1.0
+
+cam0:
+  # Camera-IMU extrinsics for D435i arm camera.
+  # Using identity + known mechanical offset as starting point.
+  # The D435i has a fixed mechanical transform between the RGB camera
+  # and the IMU. Using head camera's calibrated values as approximation.
+  # TODO: calibrate with Kalibr for accurate arm camera extrinsics.
+  T_cam_imu:
+    - [0.9998751189822058, 0.01520848157217229, 0.004295175035879208, 0.022526202656322367]
+    - [-0.015204711876424545, 0.9998839885401573, -0.0009089542242978067, -0.002130857267318128]
+    - [-0.004308500559923196, 0.0008435338142897932, 0.9999903625903749, -0.003866415075757594]
+    - [0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: []
+  camera_model: pinhole
+  # Default D435i RGB intrinsics (640x480). TODO: calibrate with Kalibr.
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+  distortion_model: radtan
+  intrinsics: [617.0, 617.0, 320.0, 240.0]
+  resolution: [640, 480]
+  rostopic: /arm/d435i_arm/color/image_raw
+  timeshift_cam_imu: 0.0

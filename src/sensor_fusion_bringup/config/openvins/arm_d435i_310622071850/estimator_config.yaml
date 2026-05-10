@@ -1,0 +1,112 @@
+%YAML:1.0 # need to specify the file type at the top!
+
+verbosity: "INFO" # ALL, DEBUG, INFO, WARNING, ERROR, SILENT
+
+use_fej: true
+integration: "rk4"
+use_stereo: false  # mono RGB D435i arm camera
+max_cameras: 1     # one RGB camera
+
+# Use offline Kalibr calibrations once available.
+# For now, we rely on default intrinsics and approximate extrinsics.
+calib_cam_extrinsics: false
+calib_cam_intrinsics: false
+calib_cam_timeoffset: false
+calib_imu_intrinsics: false
+calib_imu_g_sensitivity: false
+
+max_clones: 11
+max_slam: 50
+max_slam_in_update: 25
+max_msckf_in_update: 40
+dt_slam_delay: 1
+
+gravity_mag: 9.81
+
+feat_rep_msckf: "GLOBAL_3D"
+feat_rep_slam: "ANCHORED_MSCKF_INVERSE_DEPTH"
+feat_rep_aruco: "ANCHORED_MSCKF_INVERSE_DEPTH"
+
+# ZUPT disabled for arm camera (arm moves frequently)
+try_zupt: false
+zupt_chi2_multipler: 0
+zupt_max_velocity: 0.05
+zupt_noise_multiplier: 10.0
+zupt_max_disparity: 0.5
+zupt_only_at_beginning: false
+
+# ==================================================================
+# ==================================================================
+
+# Initialization — using head camera values as starting point.
+# Arm camera may need different thresholds due to different motion patterns.
+init_window_time: 2.0
+init_imu_thresh: 0.35   # same as head camera starting point
+init_max_disparity: 10.0
+init_max_features: 50
+
+init_dyn_use: false
+init_dyn_mle_opt_calib: false
+init_dyn_mle_max_iter: 50
+init_dyn_mle_max_time: 0.05
+init_dyn_mle_max_threads: 6
+init_dyn_num_pose: 6
+init_dyn_min_deg: 10.0
+
+init_dyn_inflation_ori: 10
+init_dyn_inflation_vel: 100
+init_dyn_inflation_bg: 10
+init_dyn_inflation_ba: 100
+init_dyn_min_rec_cond: 1e-12
+
+init_dyn_bias_g: [ 0.0, 0.0, 0.0 ]
+init_dyn_bias_a: [ 0.0, 0.0, 0.0 ]
+
+# ==================================================================
+# ==================================================================
+
+record_timing_information: false
+record_timing_filepath: "/tmp/traj_timing_arm.txt"
+
+save_total_state: false
+filepath_est: "/tmp/ov_estimate_arm.txt"
+filepath_std: "/tmp/ov_estimate_std_arm.txt"
+filepath_gt: "/tmp/ov_groundtruth_arm.txt"
+
+# ==================================================================
+# ==================================================================
+
+# Feature tracking — using head camera tuned values as baseline.
+# TODO: tune for arm camera specific scene (prosthetic arm viewpoint).
+use_klt: true
+num_pts: 300
+fast_threshold: 15
+grid_x: 5
+grid_y: 5
+min_px_dist: 10
+knn_ratio: 0.70
+track_frequency: 31.0
+downsample_cameras: false
+num_opencv_threads: 4
+histogram_method: "HISTOGRAM"
+
+# ArUco disabled for arm camera (markers seen by head camera only)
+use_aruco: false
+num_aruco: 1024
+downsize_aruco: false
+
+# ==================================================================
+# ==================================================================
+
+up_msckf_sigma_px: 1
+up_msckf_chi2_multipler: 1
+up_slam_sigma_px: 1
+up_slam_chi2_multipler: 1
+up_aruco_sigma_px: 1
+up_aruco_chi2_multipler: 1
+
+use_mask: false
+
+# IMU and camera spatio-temporal config
+relative_config_imu: "kalibr_imu_chain.yaml"
+relative_config_imucam: "kalibr_imucam_chain.yaml"
