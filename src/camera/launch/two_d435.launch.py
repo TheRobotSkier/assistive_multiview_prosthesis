@@ -32,7 +32,7 @@ _CAM2_SERIAL = os.environ.get('CAM2_SERIAL', '827112072033')
 _CAM2_OFFSET_X = os.environ.get('CAM2_OFFSET_X', '0.5')
 
 
-def _realsense_cmd(serial: str, namespace: str, node_name: str) -> list:
+def _realsense_cmd(serial: str, namespace: str, node_name: str, tf_prefix: str) -> list:
     """Build ExecuteProcess cmd for one realsense2_camera_node."""
     return [
         _REALSENSE_NODE,
@@ -41,6 +41,8 @@ def _realsense_cmd(serial: str, namespace: str, node_name: str) -> list:
         '-r', f'__ns:=/{namespace}',
         # YAML single quotes force string type (see design note above)
         '-p', f"serial_no:='{serial}'",
+        '-p', f"tf_prefix:='{tf_prefix}'",
+        '-p', f"camera_name:='{tf_prefix}'",
         '-p', 'enable_color:=true',
         '-p', f'depth_module.depth_profile:={_DEPTH_PROFILE}',
         '-p', f'rgb_camera.color_profile:={_COLOR_PROFILE}',
@@ -57,31 +59,16 @@ def generate_launch_description():
     return LaunchDescription([
         LogInfo(msg=f'Starting dual D435 cameras (cam1={_CAM1_SERIAL}, cam2={_CAM2_SERIAL})'),
 
-        # --- Camera 1 ---
+        # --- Camera 1 (base, unmoving) ---
         ExecuteProcess(
-            cmd=_realsense_cmd(_CAM1_SERIAL, 'cam1', 'd435_1'),
+            cmd=_realsense_cmd(_CAM1_SERIAL, 'cam1', 'd435_1', 'cam1'),
             output='screen',
             emulate_tty=True,
         ),
 
-        # --- Camera 2 ---
+        # --- Camera 2 (mounted on the hand) ---
         ExecuteProcess(
-            cmd=_realsense_cmd(_CAM2_SERIAL, 'cam2', 'd435_2'),
-            output='screen',
-            emulate_tty=True,
-        ),
-
-        # --- Static TF: cam2_depth frame relative to cam1_depth frame ---
-        launch_ros.actions.Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='cam2_to_cam1_tf',
-            arguments=[
-                _CAM2_OFFSET_X, '0.0', '0.0',   # translation
-                '0.0', '0.0', '0.0', '1.0',     # rotation (identity)
-                'd435_1_depth_optical_frame',    # parent
-                'd435_2_depth_optical_frame',    # child
-            ],
+            cmd=_realsense_cmd(_CAM2_SERIAL, 'cam2', 'd435_2', 'cam2'),
             output='screen',
             emulate_tty=True,
         ),

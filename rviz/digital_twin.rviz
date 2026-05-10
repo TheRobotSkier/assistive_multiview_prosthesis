@@ -16,6 +16,11 @@ Visualization Manager:
       Name: TF
       Enabled: true
       Value: true
+      Frame Timeout: 15
+      Marker Scale: 1
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
     - Class: rviz_default_plugins/RobotModel
       Name: MiaHand
       Enabled: true
@@ -83,7 +88,7 @@ Visualization Manager:
         Value: /segmentation/seed_markers
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: world
+    Fixed Frame: cam1camera_depth_optical_frame
     Frame Rate: 30
   Name: root
   Tools:
@@ -96,7 +101,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.0
+      Distance: 1.5
       Enable Stereo Rendering:
         Value: false
       Focal Point:
@@ -108,10 +113,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.4
+      Pitch: 0.6
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.14
+      Yaw: 2.0
 Window Geometry:
   Height: 900
   Width: 1400

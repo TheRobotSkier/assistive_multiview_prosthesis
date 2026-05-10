@@ -54,8 +54,14 @@ def _launch_setup(context, *args, **kwargs):
 
     if camera_enabled:
         cloud_topic = "/cam1/d435_1/depth/color/points"
+        cam1_frame = "cam1camera_depth_optical_frame"
+        cam2_link_frame = "cam2camera_link"
+        cam2_color_frame = "cam2camera_color_optical_frame"
     else:
         cloud_topic = "/camera/depth/color/points"
+        cam1_frame = "camera_depth_optical_frame"
+        cam2_link_frame = "camera_link"
+        cam2_color_frame = "camera_color_optical_frame"
 
     nodes = []
 
@@ -81,7 +87,27 @@ def _launch_setup(context, *args, **kwargs):
             )
         )
 
-    # ── 2. Pointcloud fuser (combines both camera streams) ────────────────
+    # ── 2. Static TF: camera 1 depth frame -> world (roots URDF in camera 1) ─
+    # Since camera 1 is the stationary reference, this connects the TF tree:
+    #   cam1camera_depth_optical_frame -> world -> wrist_link -> cam2camera_link
+    # RViz should use cam1camera_depth_optical_frame as fixed frame.
+    if camera_enabled:
+        nodes.append(
+            Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                name="cam1_to_world_tf",
+                arguments=[
+                    "0.0", "0.0", "0.0",
+                    "0.0", "0.0", "0.0", "1.0",
+                    cam1_frame,
+                    "world",
+                ],
+                output="screen",
+            )
+        )
+
+    # ── 3. Pointcloud fuser (combines both camera streams) ────────────────
     if camera_enabled:
         nodes.append(
             Node(
@@ -162,8 +188,8 @@ def _launch_setup(context, *args, **kwargs):
             name="preshaping_service",
             parameters=[{
                 "camera_frames": [
-                    "cam1_d435_1_color_optical_frame",
-                    "cam2_d435_2_color_optical_frame",
+                    "cam1camera_color_optical_frame",
+                    cam2_color_frame,
                 ],
                 "preshaping_closure_fraction": 0.3,
                 "min_closure_amount": 0.1,
@@ -205,25 +231,29 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 12. Static TF: wrist_link -> d435_2_depth_optical_frame ─────────
+    # ── 12. Static TF: wrist_link -> cam2camera_link (hand-mounted camera) ─
     # Camera 2 is mounted on the back of the Mia Hand, ~2cm behind the
-    # knuckles. The transform below positions it relative to wrist_link:
+    # knuckles, pointing forward (+X in wrist_link). The realsense driver
+    # publishes its own internal chain: cam2camera_link -> ... ->
+    # cam2camera_depth_optical_frame, so connecting wrist_link to
+    # cam2camera_link gives the full path to the pointcloud.
     #   translation: (-0.04, -0.01, 0.20) — behind palm, centered, at palm height
-    #   rotation:    (1.57, 0.0, 1.57)    — points camera forward (+X in wrist_link)
-    nodes.append(
-        Node(
-            package="tf2_ros",
-            executable="static_transform_publisher",
-            name="wrist_to_camera2_tf",
-            arguments=[
-                "-0.04", "-0.01", "0.20",
-                "1.57", "0.0", "1.57",
-                "wrist_link",
-                "d435_2_depth_optical_frame",
-            ],
-            output="screen",
+    #   rotation:    (1.57, 0.0, 1.57)    — camera Z (forward) aligns with wrist_link +X
+    if camera_enabled:
+        nodes.append(
+            Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                name="wrist_to_camera2_tf",
+                arguments=[
+                    "-0.04", "-0.01", "0.20",
+                    "1.57", "0.0", "1.57",
+                    "wrist_link",
+                    cam2_link_frame,
+                ],
+                output="screen",
+            )
         )
-    )
 
     # ── 13. Hand URDF with wrist via robot_state_publisher ───────────────
     # Uses the wrist-inclusive URDF from mia_hand_ros2_control which adds a
