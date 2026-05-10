@@ -43,6 +43,25 @@ services:
     profiles:
       - hardware
 
+  # ── IMU serial bridge: ESP32 → ROS2 ───────────────────────────────────
+  imu_bridge:
+    image: prosthesis-openvins:latest
+    network_mode: host
+    ipc: host
+    devices:
+      - ${IMU_SERIAL_PORT:-/dev/ttyUSB0}:/dev/imu_serial
+    environment:
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - ROS_DOMAIN_ID=0
+    command: >
+      bash -c "
+        source /prosthesis_ws/install/setup.bash &&
+        python3 /prosthesis_ws/src/esp32_imu/ros2_serial_bridge/imu_bridge_node.py
+        --ros-args -p serial_port:=/dev/imu_serial
+        -p config_file:=/prosthesis_ws/src/esp32_imu/config.yaml;
+        /bin/bash
+      "
+
   # ── OpenVINS: dual D435i visual-inertial odometry ───────────────────────
   openvins:
     image: prosthesis-openvins:latest

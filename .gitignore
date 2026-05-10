@@ -130,3 +130,4 @@ docker_ws/build_overlay/
 docker_ws/install_overlay/
 docker_ws/log_overlay/
 docker_ws/.venvs/
+esp32_imu/firmware/build/

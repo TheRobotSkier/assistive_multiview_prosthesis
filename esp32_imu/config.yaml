@@ -1,0 +1,56 @@
+# ESP32 Dual GY-91 IMU Configuration
+# =====================================
+# Two GY-91 (MPU9250 + BMP280) modules on shared I2C bus.
+# One GPIO controls the AD0 pin of the arm IMU to resolve address conflict.
+#
+# Boot sequence:
+#   1. AD0 pin LOW  → both IMUs at 0x68
+#   2. Configure both identically (range, DLPF) via address 0x68
+#   3. AD0 pin HIGH → arm IMU moves to 0x69
+#   4. Normal operation: head at 0x68, arm at 0x69
+#
+# Each IMU is rigidly mounted to a camera — offsets defined below.
+
+serial:
+  baud_rate: 921600
+  output_rate_hz: 200
+
+# ── I2C bus ───────────────────────────────────────────────────────────
+i2c:
+  sda_pin: 21
+  scl_pin: 22
+  clock_speed_hz: 400000
+
+# ── Address control ───────────────────────────────────────────────────
+# GPIO that drives the AD0 pin of the arm-camera IMU.
+# LOW  = arm IMU at 0x68 (same as head)
+# HIGH = arm IMU at 0x69 (unique)
+address_select:
+  arm_ad0_pin: 25
+
+# ── MPU9250 settings ──────────────────────────────────────────────────
+mpu9250:
+  head_address: 0x68
+  arm_address:  0x69   # After AD0 set HIGH
+
+  gyro_range_dps:  2000
+  accel_range_g:   16
+  dlpf_bandwidth_hz: 184
+
+# ── Fixed offsets from IMU to camera optical frame ────────────────────
+offsets:
+  head:
+    tx:  0.020
+    ty: -0.005
+    tz: -0.010
+    roll_deg:   0.0
+    pitch_deg:  0.0
+    yaw_deg:    0.0
+
+  arm:
+    tx:  0.020
+    ty: -0.005
+    tz: -0.010
+    roll_deg:   0.0
+    pitch_deg:  0.0
+    yaw_deg:    0.0

@@ -35,7 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
         dynamixel-sdk \
         requests \
-        pyyaml
+        pyyaml \
+        pyserial
 
 # ── User setup ───────────────────────────────────────────────────────────────
 ARG USER_UID=1000
@@ -55,6 +56,7 @@ WORKDIR /prosthesis_ws
 
 # Copy packages (open_vins and realsense-ros are git submodules)
 COPY src/ src/
+COPY esp32_imu/ esp32_imu/
 COPY config/ config/
 COPY rviz/ rviz/
 COPY scripts/ scripts/

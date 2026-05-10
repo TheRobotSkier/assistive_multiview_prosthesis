@@ -6,6 +6,6 @@ accelerometer_random_walk: 0.00028048259057595942
 gyroscope_noise_density: 0.0019841370058405537 
 gyroscope_random_walk: 1.7544399415266354e-05 
 
-rostopic: '/head/d435i_head/imu' 
+rostopic: '/head/imu' 
 update_rate: 200 
 
