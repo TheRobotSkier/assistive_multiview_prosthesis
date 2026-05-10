@@ -31,7 +31,8 @@ RUN if id -u ${USER_UID} >/dev/null 2>&1; then \
         groupadd -g ${USER_GID} prosthesis 2>/dev/null || true && \
         useradd -m -u ${USER_UID} -g ${USER_GID} -s /bin/bash prosthesis; \
     fi \
-    && usermod -aG dialout prosthesis 2>/dev/null || true
+    && usermod -aG dialout prosthesis 2>/dev/null || true \
+    && echo "prosthesis ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/prosthesis
 
 # ── Workspace ────────────────────────────────────────────────────────────────
 WORKDIR /prosthesis_ws
