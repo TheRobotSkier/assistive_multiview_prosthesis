@@ -1,0 +1,23 @@
+cameras:
+  head:
+    namespace: head
+    name: d435_head
+    serial_no: "823313022234"
+    mount_location: forehead
+  arm:
+    namespace: arm
+    name: d435_arm
+    serial_no: "830213023028"
+    mount_location: prosthetic_arm
+
+common:
+  pointcloud_enable: true
+  align_depth_enable: true
+  enable_gyro: false
+  enable_accel: false
+  unite_imu_method: 0
+  depth_profile: "640x480x15"
+  color_profile: "640x480x15"
+  pointcloud_neon_param: "pointcloud__neon_.enable"
+  pointcloud_neon_value: true
+  pointcloud_neon_delay_sec: 6.0

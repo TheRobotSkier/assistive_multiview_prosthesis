@@ -91,3 +91,8 @@ docker_ws/src/open_vins/.github/
 docker_ws/src/open_vins/Dockerfile_ros*
 docker_ws/src/open_vins/Doxyfile*
 docker_ws/src/open_vins/run_*.sh
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

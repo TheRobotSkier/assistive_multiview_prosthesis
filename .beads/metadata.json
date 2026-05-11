@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "jetson_docker",
+  "project_id": "02627f63-6668-4839-9268-d734a5905091"
+}
