@@ -26,6 +26,7 @@ services:
       - /run/udev:/run/udev:ro
     entrypoint: /ros_entrypoint.sh
     environment:
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       tty: true
       PYTHONPATH: "/opt/ros/jazzy/lib/python3.12/site-packages"
       QT_X11_NO_MITSHM: 1
