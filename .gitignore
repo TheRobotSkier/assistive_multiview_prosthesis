@@ -96,3 +96,10 @@ docker_ws/src/open_vins/run_*.sh
 .dolt/
 *.db
 .beads-credential-key
+
+# Calibration raw data (keep yaml configs, drop binary reports/images)
+docker_ws/calibration/**/*.pdf
+docker_ws/calibration/**/*.png
+
+# OpenVINS source stripped from Jetson image (P4.6)
+docker_ws/src/open_vins/

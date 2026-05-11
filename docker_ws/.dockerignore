@@ -1,0 +1,24 @@
+# Build artifacts (regenerate on Jetson)
+build_overlay/
+install_overlay/
+log_overlay/
+
+# x86-only packages (not needed on Jetson)
+mia_hand_mujoco/
+mia_hand_moveit_config/
+mia_hand_ros2_pkgs/
+
+# Calibration raw data (PDF reports, images — keep yaml configs)
+calibration/**/*.pdf
+calibration/**/*.png
+
+# OpenVINS source (stripped, not built on Jetson)
+src/open_vins/
+
+# Development / testing stuff not needed in container
+dev/
+
+# Git / Beads metadata
+.git/
+.beads/
+.dolt/
