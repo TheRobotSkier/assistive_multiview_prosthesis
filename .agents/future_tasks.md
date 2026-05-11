@@ -77,6 +77,26 @@ Near-term next work:
   The earlier RViz attempt,
   `dual_openvins_id2_calib_phase2_20260511_164627`, is shorter and should be
   treated as secondary/interrupted.
+- The dynamic marker ID2 observation and offline arm-marker calibration path is
+  now implemented locally but not yet committed. New validation recipe:
+  `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md`.
+  The implementation adds `DynamicMarkerObservation`, publishes head-visible ID2
+  only on `/head/marker_pose/dynamic_observation`, keeps fixed observations on
+  `/head/marker_pose/observation` and `/arm/marker_pose/observation` as ID0
+  only, and saves the first calibration to
+  `config/markers/arm_marker_extrinsics.yaml`. The known bag produced `230`
+  synchronized samples, `173` inliers, `57` outliers, p95 translation residual
+  `0.0273 m`, and p95 rotation residual `3.541 deg`. Online arm pose/state
+  updates are still intentionally not implemented.
+- A live dynamic-ID2 validation bag has now been recorded at
+  `docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_dynamic_phase2_20260511_194110`.
+  It confirms the runtime topic split: head dynamic observations are marker ID2
+  only, head/arm fixed observations are marker ID0 only, and OpenVINS head/arm
+  frames remain separated. It is not strong enough to replace the checked-in
+  calibration because only `72` synchronized calibration samples and `68`
+  inliers were available, below the first accepted-calibration gate of `100`
+  inliers. A lower-threshold characterization gave p95 translation residual
+  `0.0252 m` and p95 rotation residual `2.067 deg`.
 
 ## A. Arm D435i Setup From Calibration Output
 
@@ -170,9 +190,12 @@ frames.
 
 Immediate prerequisite:
 - The per-instance OpenVINS TF frame support has been live-smoke checked, a
-  no-RViz dual-camera validation bag has been recorded, and an ID2-visible
-  calibration bag is available. Before online two-camera fusion, implement and
-  validate the offline ID2-to-arm-D435i extrinsic calibration path.
+  no-RViz dual-camera validation bag has been recorded, an ID2-visible
+  calibration bag is available, and the offline ID2-to-arm-D435i calibration
+  path is implemented locally. Before online two-camera fusion, run the live
+  dynamic-ID2 validation recipe, record a fresh bag including
+  `/head/marker_pose/dynamic_observation`, and confirm the new bag calibrates
+  with stable residuals.
 
 Planned final marker layout:
 - Fixed world/common reference marker: 6x6 marker ID 0, 100 mm x 100 mm, in
@@ -201,9 +224,15 @@ Future multiview fusion concept:
 
 ## E. Arm Marker To Arm D435i Extrinsic Calibration
 
-Create a calibration script for the fixed transform between the arm-mounted
-marker and the arm D435i. The current candidate marker is ID 2, but keep the
-implementation configurable so ID 1 or another marker can be used later.
+The calibration script for the fixed transform between the arm-mounted marker
+and the arm D435i is implemented locally as:
+
+```text
+docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/calibrate_arm_marker_extrinsic.py
+```
+
+The current candidate marker is ID 2, and the implementation remains
+configurable so ID 1 or another marker can be used later.
 
 One possible calibration procedure:
 - Place fixed marker ID 0 where both cameras can observe it.
@@ -236,6 +265,36 @@ Raw-image ArUco check:
 - head ID 0: 468 frames
 - head ID 2: 1035 frames
 - arm ID 0: 1457 frames
+
+First offline calibration result from this bag:
+- synchronized samples: 230
+- inliers/outliers: 173 / 57
+- median translation residual: 0.0130 m
+- p95 translation residual: 0.0273 m
+- median rotation residual: 1.801 deg
+- p95 rotation residual: 3.541 deg
+- saved config: `docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/arm_marker_extrinsics.yaml`
+- validation recipe:
+  `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md`
+
+Latest live runtime validation bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_dynamic_phase2_20260511_194110
+```
+
+This 92.26 s bag validates that ID2 is published only on the dynamic topic and
+that fixed marker observations remain ID0-only. It should not replace the
+checked-in extrinsic config because arm ID0 visibility overlapped the head
+ID0+ID2 frames too rarely: `72` synchronized samples, `68` inliers with the
+lower `--min-inliers 50` characterization, and failure at the normal
+`--min-inliers 100` gate.
+
+Known calibration warnings:
+- Head Kalibr intrinsics differ from bag CameraInfo by about `5.094 px`.
+- Arm Kalibr intrinsics differ from bag CameraInfo by about `3.863 px`.
+- Treat these as expected warnings for the current known bag unless running the
+  script with `--strict-camera-info`.
 
 ## F. Arm D435i Trajectory Prediction With Uncertainty
 

@@ -21,6 +21,7 @@ topics:
   image: /head/d435i_head/color/image_raw
   openvins_odom: /ov_msckf/odomimu
   output_prefix: /head/marker_pose
+  dynamic_observation_topic_suffix: dynamic_observation
 
 timing:
   max_odom_match_dt: 0.05
@@ -120,3 +121,8 @@ markers:
       - [0.0, -1.0, 0.0, 0.0]
       - [0.0, 0.0, -1.0, 0.0]
       - [0.0, 0.0, 0.0, 1.0]
+
+dynamic_markers:
+  2:
+    frame_id: arm_marker_2
+    size_m: 0.100

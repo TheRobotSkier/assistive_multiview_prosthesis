@@ -47,7 +47,7 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, TransformS
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-from sensor_fusion_msgs.msg import MarkerPoseObservation
+from sensor_fusion_msgs.msg import DynamicMarkerObservation, MarkerPoseObservation
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Int32, String
 from std_srvs.srv import Trigger
@@ -401,6 +401,11 @@ class MarkerPoseHistoryEntry:
     T_meas_map_global: Optional[np.ndarray]
 
 
+@dataclass
+class DynamicMarkerPoseHistoryEntry:
+    T_cam_marker: np.ndarray
+
+
 def marker_quality_metrics(
     image_points: np.ndarray,
     T_cam_marker: np.ndarray,
@@ -598,6 +603,35 @@ class MarkerMeasurement:
     image_height: int
 
 
+@dataclass
+class DynamicMarkerMeasurement:
+    stamp: Any
+    stamp_sec: float
+    marker_id: int
+    marker_frame: str
+    camera_frame: str
+    T_cam_marker: np.ndarray
+    area_px2: float
+    sqrt_area_px: float
+    side_mean_px: float
+    side_min_px: float
+    distance_m: float
+    reprojection_error_px: float
+    view_angle_deg: float
+    view_penalty: float
+    covariance_diag: np.ndarray
+    covariance_std_diag: np.ndarray
+    covariance_sigma_px: float
+    stable_frames: int
+    stable: bool
+    stability_factor: float
+    temporal_detection_translation_m: Optional[float]
+    temporal_detection_rotation_deg: Optional[float]
+    geometry_score: float
+    image_width: int
+    image_height: int
+
+
 class ArucoMarkerPoseNode(Node):
     def __init__(self):
         super().__init__("aruco_marker_pose_node")
@@ -627,6 +661,8 @@ class ArucoMarkerPoseNode(Node):
         self.image_topic = topics_cfg.get("image", "/head/d435i_head/color/image_raw")
         self.odom_topic = topics_cfg.get("openvins_odom", "/ov_msckf/odomimu")
         self.output_prefix = topics_cfg.get("output_prefix", "/head/marker_pose").rstrip("/")
+        dynamic_suffix = topics_cfg.get("dynamic_observation_topic_suffix", "dynamic_observation").strip("/")
+        self.dynamic_observation_topic = f"{self.output_prefix}/{dynamic_suffix}"
 
         self.marker_detection_rate_hz = max(0.0, float(self.get_parameter("marker_detection_rate_hz").value))
 
@@ -731,6 +767,16 @@ class ArucoMarkerPoseNode(Node):
                 "T_map_marker": T_map_marker,
             }
 
+        self.dynamic_markers: dict[int, dict[str, Any]] = {}
+        for marker_id_str, marker_cfg in self.config.get("dynamic_markers", {}).items():
+            marker_id = int(marker_id_str)
+            size_m = float(marker_cfg.get("size_m", self.default_marker_size_m))
+            frame_id = marker_cfg.get("frame_id", f"dynamic_marker_{marker_id}")
+            self.dynamic_markers[marker_id] = {
+                "frame_id": frame_id,
+                "size_m": size_m,
+            }
+
         if not hasattr(cv2, "aruco"):
             raise RuntimeError("cv2.aruco is not available. Install OpenCV with aruco support.")
 
@@ -761,6 +807,11 @@ class ArucoMarkerPoseNode(Node):
         self.camera_body_pose_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_body_pose", 10)
         self.imu_pose_pub = self.create_publisher(PoseWithCovarianceStamped, f"{self.output_prefix}/imu_pose", 10)
         self.marker_observation_pub = self.create_publisher(MarkerPoseObservation, f"{self.output_prefix}/observation", 10)
+        self.dynamic_marker_observation_pub = self.create_publisher(
+            DynamicMarkerObservation,
+            self.dynamic_observation_topic,
+            10,
+        )
         self.corrected_odom_pub = self.create_publisher(Odometry, f"{self.output_prefix}/ov_corrected_odom", 20)
         self.marker_quality_pub = self.create_publisher(String, f"{self.output_prefix}/marker_quality", 10)
         self.active_marker_pub = self.create_publisher(Int32, f"{self.output_prefix}/active_marker_id", 10)
@@ -771,6 +822,7 @@ class ArucoMarkerPoseNode(Node):
 
         self.odom_buffer: deque[Odometry] = deque()
         self.marker_histories: dict[int, deque[MarkerPoseHistoryEntry]] = {}
+        self.dynamic_marker_histories: dict[int, deque[DynamicMarkerPoseHistoryEntry]] = {}
         self.last_marker_measurement: Optional[MarkerMeasurement] = None
         self.last_marker_valid = False
         self.last_vio_valid = False
@@ -798,7 +850,10 @@ class ArucoMarkerPoseNode(Node):
         self.get_logger().info(f"OpenVINS odom topic: {self.odom_topic}")
         self.get_logger().info(f"Output prefix: {self.output_prefix}")
         self.get_logger().info(f"Dictionary: {self.dictionary_name}")
-        self.get_logger().info(f"Known marker IDs: {sorted(self.markers.keys())}")
+        self.get_logger().info(f"Fixed marker IDs: {sorted(self.markers.keys())}")
+        self.get_logger().info(f"Dynamic marker IDs: {sorted(self.dynamic_markers.keys())}")
+        if self.dynamic_markers:
+            self.get_logger().info(f"Dynamic marker observation topic: {self.dynamic_observation_topic}")
         self.get_logger().info(f"Kalibr timeshift_cam_imu: {self.timeshift_cam_imu:.6f} s")
         if self.marker_detection_rate_hz > 0.0:
             self.get_logger().info(f"Marker detection rate limit: {self.marker_detection_rate_hz:.2f} Hz")
@@ -862,30 +917,48 @@ class ArucoMarkerPoseNode(Node):
 
         marker_ids = [int(marker_id_arr[0]) for marker_id_arr in ids]
         id_counts = Counter(marker_ids)
-        candidates = []
+        fixed_candidates = []
+        dynamic_measurements = []
         reject_reasons = []
 
         for idx, marker_id in enumerate(marker_ids):
-            if marker_id not in self.markers:
+            if marker_id not in self.markers and marker_id not in self.dynamic_markers:
                 reject_reasons.append(f"unknown_marker_id_{marker_id}")
                 continue
             if id_counts[marker_id] > 1:
                 reject_reasons.append(f"duplicate_marker_id_{marker_id}")
                 continue
 
-            measurement, reason = self.build_marker_measurement(
-                msg,
-                gray.shape[1],
-                gray.shape[0],
-                marker_id,
-                corners[idx].reshape(4, 2).astype(np.float32),
-            )
-            if measurement is None:
-                reject_reasons.append(reason)
-                continue
-            candidates.append(measurement)
+            image_points = corners[idx].reshape(4, 2).astype(np.float32)
+            if marker_id in self.markers:
+                measurement, reason = self.build_marker_measurement(
+                    msg,
+                    gray.shape[1],
+                    gray.shape[0],
+                    marker_id,
+                    image_points,
+                )
+                if measurement is None:
+                    reject_reasons.append(reason)
+                    continue
+                fixed_candidates.append(measurement)
+            else:
+                dynamic_measurement, reason = self.build_dynamic_marker_measurement(
+                    msg,
+                    gray.shape[1],
+                    gray.shape[0],
+                    marker_id,
+                    image_points,
+                )
+                if dynamic_measurement is None:
+                    reject_reasons.append(f"dynamic_{reason}")
+                    continue
+                dynamic_measurements.append(dynamic_measurement)
 
-        if not candidates:
+        for dynamic_measurement in sorted(dynamic_measurements, key=lambda m: (m.marker_id, m.reprojection_error_px)):
+            self.publish_dynamic_marker_observation(dynamic_measurement)
+
+        if not fixed_candidates:
             self.publish_marker_state(False, -1)
             if reject_reasons:
                 self.publish_reanchor_event(
@@ -898,14 +971,56 @@ class ArucoMarkerPoseNode(Node):
                 )
             return
 
-        candidates.sort(key=lambda m: (not m.stable, m.reprojection_error_px, -m.area_px2))
-        measurement = candidates[0]
+        fixed_candidates.sort(key=lambda m: (not m.stable, m.reprojection_error_px, -m.area_px2))
+        measurement = fixed_candidates[0]
         self.last_marker_measurement = measurement
 
         self.publish_marker_state(True, measurement.marker_id)
         self.publish_marker_poses(measurement)
         self.publish_marker_quality(measurement, hard_gate_status="accepted")
         self.try_apply_marker_correction(measurement, force_manual=False)
+
+    def solve_marker_pose(
+        self,
+        marker_cfg: dict[str, Any],
+        image_points: np.ndarray,
+    ) -> tuple[Optional[np.ndarray], Optional[MarkerQualityMetrics], str]:
+        size_m = marker_cfg["size_m"]
+        obj_points = marker_object_points(size_m)
+
+        ok, rvec, tvec = cv2.solvePnP(
+            obj_points,
+            image_points,
+            self.K,
+            self.D,
+            flags=cv2.SOLVEPNP_ITERATIVE,
+        )
+        if not ok:
+            return None, None, "solvepnp_failed"
+
+        R_cam_marker, _ = cv2.Rodrigues(rvec)
+        T_cam_marker = np.eye(4)
+        T_cam_marker[:3, :3] = R_cam_marker
+        T_cam_marker[:3, 3] = tvec.reshape(3)
+
+        if not is_finite_array(T_cam_marker):
+            return None, None, "non_finite_pose"
+
+        distance_m = float(np.linalg.norm(T_cam_marker[:3, 3]))
+        if distance_m > self.max_marker_distance_m:
+            return None, None, "marker_too_far"
+
+        reprojection_error_px = self.compute_reprojection_error(obj_points, image_points, rvec, tvec)
+        if reprojection_error_px > self.max_reprojection_error_px:
+            return None, None, "reprojection_error_too_high"
+
+        metrics = marker_quality_metrics(
+            image_points,
+            T_cam_marker,
+            reprojection_error_px,
+            area_px2=abs(float(cv2.contourArea(image_points))),
+        )
+        return T_cam_marker, metrics, ""
 
     def build_marker_measurement(
         self,
@@ -927,41 +1042,9 @@ class ArucoMarkerPoseNode(Node):
             return None, geometry_reason
 
         marker_cfg = self.markers[marker_id]
-        size_m = marker_cfg["size_m"]
-        obj_points = marker_object_points(size_m)
-
-        ok, rvec, tvec = cv2.solvePnP(
-            obj_points,
-            image_points,
-            self.K,
-            self.D,
-            flags=cv2.SOLVEPNP_ITERATIVE,
-        )
-        if not ok:
-            return None, "solvepnp_failed"
-
-        R_cam_marker, _ = cv2.Rodrigues(rvec)
-        T_cam_marker = np.eye(4)
-        T_cam_marker[:3, :3] = R_cam_marker
-        T_cam_marker[:3, 3] = tvec.reshape(3)
-
-        if not is_finite_array(T_cam_marker):
-            return None, "non_finite_pose"
-
-        distance_m = float(np.linalg.norm(T_cam_marker[:3, 3]))
-        if distance_m > self.max_marker_distance_m:
-            return None, "marker_too_far"
-
-        reprojection_error_px = self.compute_reprojection_error(obj_points, image_points, rvec, tvec)
-        if reprojection_error_px > self.max_reprojection_error_px:
-            return None, "reprojection_error_too_high"
-
-        metrics = marker_quality_metrics(
-            image_points,
-            T_cam_marker,
-            reprojection_error_px,
-            area_px2=area,
-        )
+        T_cam_marker, metrics, reason = self.solve_marker_pose(marker_cfg, image_points)
+        if T_cam_marker is None or metrics is None:
+            return None, reason
 
         T_map_marker = marker_cfg["T_map_marker"]
         T_map_cam, T_map_imu = compute_marker_map_poses(T_map_marker, T_cam_marker, self.T_cam_imu)
@@ -1016,6 +1099,70 @@ class ArucoMarkerPoseNode(Node):
                 temporal_correction_translation_m=temporal_stats.correction_translation_delta_m,
                 temporal_correction_rotation_deg=temporal_stats.correction_rotation_delta_deg,
                 temporal_odom_match_dt=temporal_stats.odom_match_dt,
+                geometry_score=geometry_score,
+                image_width=image_width,
+                image_height=image_height,
+            ),
+            "",
+        )
+
+    def build_dynamic_marker_measurement(
+        self,
+        msg: Image,
+        image_width: int,
+        image_height: int,
+        marker_id: int,
+        image_points: np.ndarray,
+    ) -> tuple[Optional[DynamicMarkerMeasurement], str]:
+        if not is_finite_array(image_points):
+            return None, "non_finite_corners"
+
+        area = abs(float(cv2.contourArea(image_points)))
+        if area < self.min_marker_area_px2:
+            return None, "marker_area_too_small"
+
+        geometry_ok, geometry_score, geometry_reason = self.check_corner_geometry(image_points, image_width, image_height)
+        if not geometry_ok:
+            return None, geometry_reason
+
+        marker_cfg = self.dynamic_markers[marker_id]
+        T_cam_marker, metrics, reason = self.solve_marker_pose(marker_cfg, image_points)
+        if T_cam_marker is None or metrics is None:
+            return None, reason
+
+        temporal_stats = self.record_dynamic_marker_history(marker_id, T_cam_marker)
+        covariance_estimate = self.estimate_marker_covariance(
+            metrics,
+            np.eye(4),
+            geometry_score,
+            temporal_stats,
+        )
+        covariance_diag = np.square(covariance_estimate.camera_std_diag)
+
+        return (
+            DynamicMarkerMeasurement(
+                stamp=msg.header.stamp,
+                stamp_sec=stamp_to_sec(msg.header.stamp),
+                marker_id=marker_id,
+                marker_frame=marker_cfg["frame_id"],
+                camera_frame=self.detected_camera_frame,
+                T_cam_marker=T_cam_marker,
+                area_px2=metrics.area_px2,
+                sqrt_area_px=metrics.sqrt_area_px,
+                side_mean_px=metrics.side_mean_px,
+                side_min_px=metrics.side_min_px,
+                distance_m=metrics.distance_m,
+                reprojection_error_px=metrics.reprojection_error_px,
+                view_angle_deg=metrics.view_angle_deg,
+                view_penalty=covariance_estimate.view_penalty,
+                covariance_diag=covariance_diag,
+                covariance_std_diag=covariance_estimate.camera_std_diag,
+                covariance_sigma_px=covariance_estimate.sigma_px,
+                stable_frames=temporal_stats.stable_frames,
+                stable=temporal_stats.stable,
+                stability_factor=temporal_stats.stability_factor,
+                temporal_detection_translation_m=temporal_stats.detection_translation_delta_m,
+                temporal_detection_rotation_deg=temporal_stats.detection_rotation_delta_deg,
                 geometry_score=geometry_score,
                 image_width=image_width,
                 image_height=image_height,
@@ -1137,6 +1284,39 @@ class ArucoMarkerPoseNode(Node):
             odom_match_dt=odom_match_dt,
         )
 
+    def record_dynamic_marker_history(
+        self,
+        marker_id: int,
+        T_cam_marker: np.ndarray,
+    ) -> MarkerTemporalStats:
+        if marker_id not in self.dynamic_marker_histories:
+            self.dynamic_marker_histories[marker_id] = deque(maxlen=max(self.stable_frames_required, 1))
+
+        history = self.dynamic_marker_histories[marker_id]
+        previous = history[-1] if history else None
+        detection_translation_delta_m = None
+        detection_rotation_delta_deg = None
+
+        if previous is not None:
+            detection_translation_delta_m = float(np.linalg.norm(T_cam_marker[:3, 3] - previous.T_cam_marker[:3, 3]))
+            detection_rotation_delta_deg = rotation_angle_deg(T_cam_marker[:3, :3] @ previous.T_cam_marker[:3, :3].T)
+
+        history.append(DynamicMarkerPoseHistoryEntry(T_cam_marker=T_cam_marker.copy()))
+        stable_frames = len(history)
+        stable = stable_frames >= self.stable_frames_required
+        stability_missing = max(0, self.stable_frames_required - stable_frames)
+        stability_factor = stability_missing / max(1, self.stable_frames_required)
+        return MarkerTemporalStats(
+            stable_frames=stable_frames,
+            stable=stable,
+            stability_factor=stability_factor,
+            detection_translation_delta_m=detection_translation_delta_m,
+            detection_rotation_delta_deg=detection_rotation_delta_deg,
+            correction_translation_delta_m=None,
+            correction_rotation_delta_deg=None,
+            odom_match_dt=None,
+        )
+
     def estimate_marker_covariance(
         self,
         metrics: MarkerQualityMetrics,
@@ -1221,6 +1401,30 @@ class ArucoMarkerPoseNode(Node):
         msg.geometry_score = float(measurement.geometry_score)
         msg.covariance_sigma_px = float(measurement.covariance_sigma_px)
         self.marker_observation_pub.publish(msg)
+
+    def publish_dynamic_marker_observation(self, measurement: DynamicMarkerMeasurement) -> None:
+        msg = DynamicMarkerObservation()
+        msg.header.stamp = measurement.stamp
+        msg.header.frame_id = measurement.camera_frame
+        msg.marker_id = int(measurement.marker_id)
+        msg.marker_frame = measurement.marker_frame
+        msg.camera_frame = measurement.camera_frame
+        fill_pose(msg.pose.pose, measurement.T_cam_marker)
+        msg.pose.covariance = covariance_from_diag(measurement.covariance_diag)
+        msg.hard_gate_passed = True
+        msg.hard_gate_status = "accepted"
+        msg.stable = bool(measurement.stable)
+        msg.stable_frames = int(measurement.stable_frames)
+        msg.stability_factor = float(measurement.stability_factor)
+        msg.reprojection_error_px = float(measurement.reprojection_error_px)
+        msg.distance_m = float(measurement.distance_m)
+        msg.view_angle_deg = float(measurement.view_angle_deg)
+        msg.area_px2 = float(measurement.area_px2)
+        msg.side_mean_px = float(measurement.side_mean_px)
+        msg.side_min_px = float(measurement.side_min_px)
+        msg.geometry_score = float(measurement.geometry_score)
+        msg.covariance_sigma_px = float(measurement.covariance_sigma_px)
+        self.dynamic_marker_observation_pub.publish(msg)
 
     def marker_quality_payload(self, measurement: MarkerMeasurement, hard_gate_status: str) -> dict[str, Any]:
         std = measurement.covariance_std_diag

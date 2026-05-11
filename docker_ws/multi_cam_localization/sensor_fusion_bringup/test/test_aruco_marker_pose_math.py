@@ -10,6 +10,7 @@ SCRIPT_DIR = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from aruco_marker_pose_node import (  # noqa: E402
+    DynamicMarkerMeasurement,
     MarkerCovarianceModelConfig,
     MarkerMeasurement,
     MarkerQualityMetrics,
@@ -24,6 +25,13 @@ from aruco_marker_pose_node import (  # noqa: E402
     should_process_marker_frame,
     T_cam_body_display,
     T_inv,
+)
+from calibrate_arm_marker_extrinsic import (  # noqa: E402
+    RESIDUAL_ORDER,
+    compute_armcam_marker_sample,
+    robust_se3_estimate,
+    se3_exp,
+    se3_residual,
 )
 from marker_quality_monitor import marker_summary_line, parse_marker_id_filter  # noqa: E402
 
@@ -169,6 +177,76 @@ def test_head_marker_configs_use_explicit_physical_marker_sizes():
         assert marker_map["aruco"]["default_marker_size_m"] == expected_size_m
         assert marker_map["markers"][0]["size_m"] == expected_size_m
         assert T_map_marker.shape == (4, 4)
+
+
+def test_dynamic_marker_id2_is_separate_from_fixed_marker_maps():
+    root = Path(__file__).resolve().parents[1]
+    config_dir = root / "config" / "markers"
+    head_map = yaml.safe_load((config_dir / "head_aruco_map.yaml").read_text())
+    arm_map = yaml.safe_load((config_dir / "arm_aruco_map.yaml").read_text())
+
+    assert sorted(int(marker_id) for marker_id in head_map["markers"].keys()) == [0]
+    assert sorted(int(marker_id) for marker_id in arm_map["markers"].keys()) == [0]
+    assert sorted(int(marker_id) for marker_id in head_map["dynamic_markers"].keys()) == [2]
+    assert "T_map_marker" not in head_map["dynamic_markers"][2]
+    assert "dynamic_markers" not in arm_map
+    assert head_map["topics"]["dynamic_observation_topic_suffix"] == "dynamic_observation"
+
+
+def test_dynamic_marker_publisher_uses_camera_frame_pose_not_marker_map_pose():
+    from builtin_interfaces.msg import Time
+
+    class CapturePublisher:
+        def __init__(self):
+            self.messages = []
+
+        def publish(self, msg):
+            self.messages.append(msg)
+
+    node = ArucoMarkerPoseNode.__new__(ArucoMarkerPoseNode)
+    node.dynamic_marker_observation_pub = CapturePublisher()
+
+    T_cam_marker = np.eye(4)
+    T_cam_marker[:3, 3] = [0.10, -0.02, 0.55]
+    measurement = DynamicMarkerMeasurement(
+        stamp=Time(sec=123, nanosec=456),
+        stamp_sec=123.000000456,
+        marker_id=2,
+        marker_frame="arm_marker_2",
+        camera_frame="head_d435i_head_color_optical_frame",
+        T_cam_marker=T_cam_marker,
+        area_px2=10000.0,
+        sqrt_area_px=100.0,
+        side_mean_px=100.0,
+        side_min_px=98.0,
+        distance_m=0.56,
+        reprojection_error_px=0.4,
+        view_angle_deg=12.0,
+        view_penalty=1.0,
+        covariance_diag=np.array([0.01, 0.01, 0.02, 0.001, 0.001, 0.002], dtype=float),
+        covariance_std_diag=np.sqrt(np.array([0.01, 0.01, 0.02, 0.001, 0.001, 0.002], dtype=float)),
+        covariance_sigma_px=0.4,
+        stable_frames=8,
+        stable=True,
+        stability_factor=0.0,
+        temporal_detection_translation_m=None,
+        temporal_detection_rotation_deg=None,
+        geometry_score=0.9,
+        image_width=640,
+        image_height=480,
+    )
+
+    ArucoMarkerPoseNode.publish_dynamic_marker_observation(node, measurement)
+
+    assert len(node.dynamic_marker_observation_pub.messages) == 1
+    msg = node.dynamic_marker_observation_pub.messages[0]
+    assert msg.header.frame_id == "head_d435i_head_color_optical_frame"
+    assert msg.camera_frame == "head_d435i_head_color_optical_frame"
+    assert msg.marker_frame == "arm_marker_2"
+    assert msg.marker_id == 2
+    assert msg.pose.pose.position.x == 0.10
+    assert msg.pose.pose.position.y == -0.02
+    assert msg.pose.pose.position.z == 0.55
 
 
 def test_marker_quality_monitor_marker_id_filter_and_summary_line():
@@ -405,3 +483,42 @@ def test_corner_geometry_still_rejects_bad_corners_before_covariance_weighting()
         "marker_degenerate_corner",
         "marker_near_border_poor_geometry",
     }
+
+
+def test_calibration_transform_composes_head_dynamic_marker_into_arm_camera():
+    T_map_headcam = se3_exp([0.2, -0.1, 0.5, 0.02, -0.03, 0.04])
+    T_headcam_marker = se3_exp([0.4, 0.1, 0.8, -0.01, 0.02, 0.03])
+    T_map_armcam = se3_exp([-0.3, 0.2, 0.4, 0.03, 0.01, -0.02])
+
+    expected = T_inv(T_map_armcam) @ T_map_headcam @ T_headcam_marker
+
+    np.testing.assert_allclose(
+        compute_armcam_marker_sample(T_map_headcam, T_headcam_marker, T_map_armcam),
+        expected,
+        atol=1e-12,
+    )
+
+
+def test_robust_se3_estimate_recovers_known_transform_with_outliers():
+    base = se3_exp([0.12, -0.04, 0.35, math.radians(2.0), math.radians(-1.0), math.radians(3.0)])
+    samples = [
+        base @ se3_exp([0.001 * i, -0.0005 * i, 0.0008 * i, 0.0002 * i, -0.0001 * i, 0.00015 * i])
+        for i in range(-5, 6)
+    ]
+    samples.extend(
+        [
+            base @ se3_exp([0.25, 0.10, -0.12, math.radians(25.0), 0.0, 0.0]),
+            base @ se3_exp([-0.20, -0.10, 0.15, 0.0, math.radians(-30.0), 0.0]),
+        ]
+    )
+
+    estimate = robust_se3_estimate(samples)
+    residual = se3_residual(base, estimate.T_estimate)
+
+    assert RESIDUAL_ORDER == ["x", "y", "z", "roll", "pitch", "yaw"]
+    assert len(estimate.inlier_indices) == 11
+    assert len(estimate.outlier_indices) == 2
+    assert estimate.residual_covariance.shape == (6, 6)
+    assert estimate.estimate_covariance.shape == (6, 6)
+    assert np.linalg.norm(residual[:3]) < 0.01
+    assert math.degrees(np.linalg.norm(residual[3:])) < 1.0

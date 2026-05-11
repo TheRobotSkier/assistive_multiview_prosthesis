@@ -140,6 +140,50 @@ streams still report marker ID 0, as expected. Marker ID 2 is present in the raw
 head images and should be consumed by the future dynamic-marker
 observation/calibration path, not by the fixed `marker_map` EKF update path.
 
+The dynamic marker ID2 observation and offline calibration path has now been
+implemented locally but is not yet committed. It adds
+`sensor_fusion_msgs/msg/DynamicMarkerObservation.msg`, publishes head-visible
+ID2 as `/head/marker_pose/dynamic_observation`, keeps ID2 off the fixed
+`/head/marker_pose/observation` topic, and adds
+`sensor_fusion_bringup/scripts/calibrate_arm_marker_extrinsic.py`. The first
+calibration from this bag is saved at:
+
+```text
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/arm_marker_extrinsics.yaml
+```
+
+Known offline result:
+- synchronized samples: `230`
+- inliers/outliers: `173 / 57`
+- p95 translation residual: `0.0273 m`
+- p95 rotation residual: `3.541 deg`
+- expected CameraInfo/Kalibr warnings: head `5.094 px`, arm `3.863 px`
+
+Latest live dynamic-ID2 validation bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_dynamic_phase2_20260511_194110
+```
+
+Read-only validation showed `92.26 s`, `4.3 GiB`, and `110360` messages. The
+dynamic path published `320` `/head/marker_pose/dynamic_observation` messages,
+all marker ID `2` in `head_d435i_head_color_optical_frame`. The fixed marker
+paths stayed ID0-only: `763` head fixed observations targeting `head_imu` and
+`367` arm fixed observations targeting `arm_imu`. OpenVINS odom child frames
+remained `head_imu` and `arm_imu`, and TF kept the expected head/arm frame
+split.
+
+This live bag is good runtime evidence but not a replacement calibration source.
+It had `72` synchronized calibration samples and `68` inliers, below the normal
+`--min-inliers 100` acceptance gate. A lower-threshold characterization produced
+p95 translation residual `0.0252 m` and p95 rotation residual `2.067 deg`.
+
+Validation recipe for live tests and bag recording:
+
+```text
+docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md
+```
+
 Earlier interrupted/secondary ID2 bag:
 
 ```text
@@ -169,8 +213,13 @@ Propagator warning, but no fatal error and no hard Propagator assertion.
   `docker_ws/multi_cam_localization/sensor_fusion_msgs`
 - Marker observation message:
   `sensor_fusion_msgs/msg/MarkerPoseObservation.msg`
+- Dynamic marker observation message:
+  `sensor_fusion_msgs/msg/DynamicMarkerObservation.msg`
 - Python Phase 1 marker node now publishes:
   `/head/marker_pose/observation`
+- Python marker node now also publishes dynamic head-visible arm marker
+  observations on:
+  `/head/marker_pose/dynamic_observation`
 - Phase 2-only marker OpenVINS executable:
   `run_subscribe_msckf_marker`
 - Phase 2 launch files:
@@ -183,6 +232,10 @@ Propagator warning, but no fatal error and no hard Propagator assertion.
 - Arm Phase 2 validation recipes:
   - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_marker_validation.md`
   - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md`
+- Dynamic ID2 validation recipe:
+  `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md`
+- Offline arm marker calibration script:
+  `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/calibrate_arm_marker_extrinsic.py`
 - OpenVINS marker update/reset code was added under:
   `docker_ws/src/open_vins/ov_msckf`
 
@@ -214,9 +267,11 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 - `.agents/AGENTS.md`
 - `.agents/phase2_openvins_handoff_status.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_marker_validation.md`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_ekf_handoff_prompt.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_msgs/`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/aruco_marker_pose_node.py`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/calibrate_arm_marker_extrinsic.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py`
@@ -236,12 +291,14 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 
 ## Next Task
 
-Proceed from the no-RViz dual-camera checkpoint toward the dynamic arm-mounted
-marker observation/calibration path. Before implementing online arm pose
-updates, keep marker ID 2 out of the fixed `marker_map` update path and design a
-separate dynamic-marker observation/calibration flow. The first calibration bag
-should include simultaneous observations where both cameras see fixed marker ID
-0 and the head camera also sees the arm-mounted marker ID 2.
+Plan the next feature on top of the validated dynamic-ID2 topic split: a
+head-derived arm D435i pose preview path that consumes
+`/head/marker_pose/dynamic_observation` plus
+`config/markers/arm_marker_extrinsics.yaml`, publishes a visualization/debug
+pose for the arm camera in `marker_map`, and does not feed OpenVINS or perform
+online arm state updates yet. If the goal is to refresh the extrinsic config
+before that, record a longer calibration bag with more overlap where the head
+sees ID0+ID2 and the arm sees ID0; require at least `100` inliers.
 
 The Propagator guard/drop experiment was rejected because it could leave the
 head node stuck dropping every camera update. Current direction is to keep
@@ -258,6 +315,7 @@ Read:
 - .agents/phase2_openvins_handoff_status.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_marker_validation.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dual_openvins_tf_validation.md
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_marker_validation.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py
@@ -265,15 +323,18 @@ Read:
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/aruco_marker_pose_node.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/calibrate_arm_marker_extrinsic.py
 - docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.cpp
 - docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.h
 - docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.*
 
-Plan a dynamic arm-mounted marker observation and calibration path for marker ID
-2. Preserve the validated per-instance TF support and marker throttle. Marker ID
-2 is mounted to the arm and must not be treated as a fixed marker_map landmark.
-The calibration flow should collect samples when both cameras see fixed marker
-ID 0 and the head camera also sees ID 2, estimate the fixed transform between ID
-2 and the arm D435i, report residuals/uncertainty, and save the result to a
-config file for later arm pose updates.
+Make a detailed implementation plan for the next dynamic-ID2 feature: a
+visualization/debug-only head-derived arm D435i pose preview. It should consume
+`/head/marker_pose/dynamic_observation`, the head OpenVINS pose in `marker_map`,
+and `config/markers/arm_marker_extrinsics.yaml` to compute a candidate
+`T_map_armcam` when the head sees arm-mounted marker ID2. Preserve the validated
+fixed-marker ID0 EKF path, do not add ID2 to `marker_fixed_ids`, and do not feed
+this result into OpenVINS or update the arm state yet. Include message/topic
+design, TF/RViz display options, covariance propagation, gating, validation on
+`dual_openvins_id2_dynamic_phase2_20260511_194110`, and rollback steps.
 ```

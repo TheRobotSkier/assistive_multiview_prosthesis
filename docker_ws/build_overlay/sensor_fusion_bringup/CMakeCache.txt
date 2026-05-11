@@ -23,6 +23,9 @@ AMENT_CMAKE_ENVIRONMENT_PACKAGE_GENERATION:BOOL=ON
 //Generate marker file containing the parent prefix path
 AMENT_CMAKE_ENVIRONMENT_PARENT_PREFIX_PATH_GENERATION:BOOL=ON
 
+//Generate coverage information for Python tests
+AMENT_CMAKE_PYTEST_WITH_COVERAGE:BOOL=OFF
+
 //Replace the CMake install command with a custom implementation
 // using symlinks instead of copying resources
 AMENT_CMAKE_SYMLINK_INSTALL:BOOL=1
@@ -276,6 +279,9 @@ ament_cmake_include_directories_DIR:PATH=/opt/ros/jazzy/share/ament_cmake_includ
 
 //The directory containing a CMake configuration file for ament_cmake_libraries.
 ament_cmake_libraries_DIR:PATH=/opt/ros/jazzy/share/ament_cmake_libraries/cmake
+
+//The directory containing a CMake configuration file for ament_cmake_pytest.
+ament_cmake_pytest_DIR:PATH=/opt/ros/jazzy/share/ament_cmake_pytest/cmake
 
 //The directory containing a CMake configuration file for ament_cmake_python.
 ament_cmake_python_DIR:PATH=/opt/ros/jazzy/share/ament_cmake_python/cmake

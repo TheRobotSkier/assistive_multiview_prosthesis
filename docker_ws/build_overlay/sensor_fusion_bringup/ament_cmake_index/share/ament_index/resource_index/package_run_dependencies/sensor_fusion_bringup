@@ -1,1 +1,1 @@
-launch;launch_ros;imu_driver;rclpy;sensor_msgs;geometry_msgs;nav_msgs;std_msgs;tf2_ros;cv_bridge
+launch;launch_ros;imu_driver;rclpy;sensor_msgs;geometry_msgs;nav_msgs;std_msgs;std_srvs;rosbag2_py;rosidl_runtime_py;sensor_fusion_msgs;tf2_ros;cv_bridge;ament_cmake_pytest
