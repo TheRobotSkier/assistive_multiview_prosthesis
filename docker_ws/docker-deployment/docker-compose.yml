@@ -20,7 +20,6 @@ services:
       - i2c
     volumes:
       - ../:/miahand_ws/src
-      - ./cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${XAUTHORITY}:/tmp/.Xauthority:ro,z
       - /dev:/dev
@@ -33,8 +32,6 @@ services:
       DISPLAY: $DISPLAY
       XAUTHORITY: /tmp/.Xauthority
       ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
-      RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
-      CYCLONEDDS_URI: file:///tmp/cyclonedds_peer.xml
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: graphics,display,compute,utility
     user: "${USER_UID}:${USER_GID}"
@@ -137,3 +134,11 @@ services:
       HOME: /root
     entrypoint: ["/bin/bash", "-lc"]
     command: "/miahand_ws/src/docker-deployment/start_realsense_camera.sh"
+
+  # FastRTPS discovery server for cross-network ROS communication
+  discovery:
+    extends: miahand_ros2
+    container_name: robotlab_discovery
+    command: bash -c 'source /opt/ros/jazzy/setup.bash && fast-discovery-server -i 0 -p 11811'
+    ports:
+      - "11811:11811/udp"
