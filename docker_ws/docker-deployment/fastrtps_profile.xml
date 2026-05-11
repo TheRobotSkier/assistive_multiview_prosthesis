@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<profiles>
+  <participant profile_name="unicast_peers" is_default_profile="true">
+    <rtps>
+      <builtin>
+        <initialPeersList>
+          <locator>
+            <udpv4>
+              <address>10.42.0.1</address>
+              <port>7400</port>
+            </udpv4>
+          </locator>
+          <locator>
+            <udpv4>
+              <address>10.42.0.2</address>
+              <port>7400</port>
+            </udpv4>
+          </locator>
+        </initialPeersList>
+      </builtin>
+    </rtps>
+  </participant>
+</profiles>
