@@ -81,7 +81,20 @@ clean:
 logs:
 	cd $(COMPOSE_DIR) && $(COMPOSE) logs -f
 
-# ── Robotlab RViz (view Jetson camera data on host) ───────────────────────
+# ── Robotlab RViz (view Jetson camera data on host via CycloneDDS) ──────
 rviz:
-	@echo "Launching RViz via SSH X forwarding from robotlab Docker container..."
-	@bash scripts/rviz_robotlab.sh
+	@echo "Launching RViz via CycloneDDS peer discovery from robotlab..."
+	@test -f rviz/robotlab_cameras.rviz || { echo "Missing rviz/robotlab_cameras.rviz"; exit 1; }
+	podman run --rm -d --name rviz-robotlab \
+		--network host \
+		--device /dev/dri \
+		-e DISPLAY=$(DISPLAY) \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=file:///tmp/cyclonedds_peer.xml \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		-v $(CURDIR)/rviz/robotlab_cameras.rviz:/rviz_config.rviz:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "RViz container started (rviz-robotlab). Kill with: podman kill rviz-robotlab"

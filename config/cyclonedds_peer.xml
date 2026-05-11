@@ -1,5 +1,9 @@
 <CycloneDDS>
   <Domain><Id>0</Id></Domain>
+  <General>
+    <NetworkInterfaceAddress>10.42.0.1</NetworkInterfaceAddress>
+    <AllowMulticast>false</AllowMulticast>
+  </General>
   <Discovery>
     <Peers>
       <Peer address="10.42.0.1"/>
