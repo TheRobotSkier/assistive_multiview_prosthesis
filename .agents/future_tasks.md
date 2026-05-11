@@ -48,10 +48,26 @@ Repository hygiene:
   decision is made
 
 Near-term next work:
-- validate the per-instance OpenVINS TF frame fix in live dual-camera operation
-  and with fresh head/arm raw replays
-- add a defensive OpenVINS timing/crash guard around the Propagator assertion
-  observed once during live testing
+- Per-instance OpenVINS TF frame support has been live-smoke checked: head and
+  arm publish separate `/ov_msckf` and `/ov_msckf_arm` topics, `poseimu` headers
+  remain in `marker_map`, odom child frames are `head_imu` and `arm_imu`, marker
+  observations target `head_imu` and `arm_imu`, and TF exposes the intended
+  `marker_map -> *_imu -> *_cam0` frames.
+- The Phase 2 marker-node 15 Hz throttle improved RViz responsiveness and VIO
+  feature quality, but did not fully prevent the OpenVINS `Propagator.cpp`
+  assertion when RViz and VS Code were open. MAXN SUPER power mode let the
+  system run longer before the failure, which supports a load/timing sensitivity
+  hypothesis but does not prove marker detection is the only bottleneck.
+- A no-RViz dual-camera validation bag has now been recorded at
+  `docker_ws/bags/openvins_tests/phase2_live/dual_openvins_tf_phase2_20260511_160757`.
+  A read-only `ros2 bag info` check confirmed 68.0 s of both head/arm raw inputs,
+  marker observations, OpenVINS outputs, `/tf`, `/tf_static`, and `/rosout`.
+  Replay sampling confirmed head/arm odom child frames, pose headers, marker
+  target frames, marker ID 0 observations, and non-colliding head/arm TF child
+  frames.
+  This bag did not include the head camera seeing arm-mounted marker ID 2, so it
+  validates the dual stack/recording workflow but is not sufficient for the ID 2
+  extrinsic calibration.
 
 ## A. Arm D435i Setup From Calibration Output
 
@@ -106,12 +122,25 @@ handling. Do not assume a pose-only update is sufficient if the internal VIO
 velocity has already become inconsistent.
 
 Known robustness follow-up:
-- A live run once hit the OpenVINS `Propagator.cpp` assertion comparing requested
-  propagation duration against summed IMU dt. The new validation bag did not
-  reproduce it, and raw timestamps were monotonic, so this looks like a transient
-  live sensor/timing disruption rather than a marker EKF bug. Consider replacing
-  the hard assert with a logged guard/drop path after the arm setup is validated,
-  or sooner if the crash recurs.
+- Repeated dual live runs hit the OpenVINS `Propagator.cpp` assertion comparing
+  requested propagation duration against summed IMU dt. A defensive guard/drop
+  experiment prevented the abort but could leave OpenVINS stuck dropping every
+  camera update, so it was rejected. Current performance direction is to keep
+  RealSense/OpenVINS at 30 fps and throttle only the Python marker detector to
+  15 Hz with image queue depth 1. If the original Propagator assertion still
+  appears under the lower marker load, treat that as a separate OpenVINS
+  recovery problem.
+- After marker throttling, failures still occurred under heavy desktop load
+  with RViz and VS Code open; the same setup ran longer in MAXN SUPER mode. The
+  next OpenVINS robustness fix should not reintroduce the rejected guard. Better
+  candidates are camera-frame queue/backlog control before propagation,
+  newest-frame processing when the estimator is behind, and a deliberate
+  recovery path that skips stale camera updates without freezing the state time.
+- A stable no-RViz dual-camera bag has been recorded, so planning the
+  arm-mounted marker ID 2 observation/calibration path is reasonable. Still avoid
+  implementing online arm state updates until an ID2-visible calibration bag has
+  been collected and the dynamic-marker path is separated from fixed-marker EKF
+  updates.
 
 ## C. VIO Health Monitor And Reset/Reinitialize Behavior
 
@@ -126,45 +155,62 @@ point clouds. Avoid fusing clouds directly in drifting raw OpenVINS `global`
 frames.
 
 Immediate prerequisite:
-- Validate the new per-instance OpenVINS TF frame support for multiple live
-  instances. The intended TF tree exposes distinct head and arm IMU/camera
-  frames while preserving the shared `marker_map`.
+- The per-instance OpenVINS TF frame support has been live-smoke checked, and a
+  no-RViz dual-camera validation bag has been recorded. Before online
+  two-camera fusion, collect an ID2-visible calibration bag where both cameras
+  see fixed marker ID 0 and the head camera also sees the arm-mounted marker.
 
 Planned final marker layout:
 - Fixed world/common reference marker: 6x6 marker ID 0, 100 mm x 100 mm, in
   front of the user and visible to the head D435i.
-- Arm-mounted marker: 6x6 marker ID 1, 100 mm x 100 mm, rigidly attached to
-  the prosthetic arm with a fixed transform to the arm D435i.
-- Optional extra marker: 6x6 marker ID 2, 100 mm x 100 mm, for calibration or
+- Arm-mounted marker: 6x6 marker ID 1 or ID 2, 100 mm x 100 mm, rigidly
+  attached to the prosthetic arm with a fixed transform to the arm D435i. The
+  current live-test candidate is ID 2.
+- Optional extra marker: another 6x6 marker, 100 mm x 100 mm, for calibration or
   redundancy experiments.
 
 Important modeling boundary:
-- Do not add the arm-mounted marker ID 1 as a fixed `marker_map` landmark in
-  the current Phase 1 marker node. The current marker map assumes listed
-  markers are stationary in the map. ID 1 moves with the arm and needs a
-  separate dynamic-marker/multiview fusion path.
+- Do not add the arm-mounted marker ID 1/ID 2 as a fixed `marker_map` landmark
+  in the current fixed-marker update path. The current marker map assumes listed
+  markers are stationary in the map. Arm-mounted markers move with the arm and
+  need a separate dynamic-marker/multiview fusion path that can publish raw
+  dynamic-marker observations without applying them as fixed world updates.
 
 Future multiview fusion concept:
 - Head D435i updates its pose from VIO and fixed marker ID 0.
 - Arm D435i updates its pose from VIO and fixed marker ID 0 when visible.
-- When the head D435i sees arm marker ID 1, use the head pose uncertainty,
-  marker detection uncertainty, and calibrated `T_arm_camera_marker_1` to
-  update or constrain the arm D435i pose.
+- When the head D435i sees the arm-mounted marker, use the head pose
+  uncertainty, marker detection uncertainty, and calibrated
+  `T_arm_camera_marker` to update or constrain the arm D435i pose. This should
+  account for the arm OpenVINS uncertainty instead of treating the head-derived
+  pose as ground truth.
 
 ## E. Arm Marker To Arm D435i Extrinsic Calibration
 
-Create a calibration script for the fixed transform between arm-mounted marker
-ID 1 and the arm D435i.
+Create a calibration script for the fixed transform between the arm-mounted
+marker and the arm D435i. The current candidate marker is ID 2, but keep the
+implementation configurable so ID 1 or another marker can be used later.
 
 One possible calibration procedure:
 - Place fixed marker ID 0 where both cameras can observe it.
+- Mount marker ID 2 rigidly on the arm D435i/arm assembly and keep it visible to
+  the head D435i during calibration samples.
 - Move the prosthetic arm through multiple poses.
-- Save frames when the head D435i sees marker ID 0 and marker ID 1, and the
-  arm D435i sees marker ID 0.
-- Estimate the rigid transform between marker ID 1 and the arm D435i from
-  repeated simultaneous observations.
+- Save frames when the head D435i sees marker ID 0 and the arm-mounted marker,
+  and the arm D435i sees marker ID 0.
+- Estimate the rigid transform between the arm-mounted marker and the arm D435i
+  from repeated simultaneous observations.
 - Report residuals and uncertainty so the transform can be used in later
   multiview fusion.
+
+Useful calibration relationship:
+- If fixed marker ID 0 gives `T_map_headcam` and `T_map_armcam`, and the head
+  camera detects the arm-mounted marker as `T_headcam_marker`, then compute each
+  sample as `T_armcam_marker = inv(T_map_armcam) * T_map_headcam *
+  T_headcam_marker`.
+- Collect time-synchronized samples, reject outliers, compute a robust
+  mean/median SE(3) transform, and save residual statistics/covariance with the
+  extrinsic config.
 
 ## F. Arm D435i Trajectory Prediction With Uncertainty
 

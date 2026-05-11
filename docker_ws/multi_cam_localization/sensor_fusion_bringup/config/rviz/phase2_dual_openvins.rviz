@@ -7,7 +7,7 @@ Panels:
         - /Global Options1
         - /TF1
       Splitter Ratio: 0.5
-    Tree Height: 500
+    Tree Height: 385
   - Class: rviz_common/Views
     Expanded:
       - /Current View1
@@ -52,15 +52,55 @@ Visualization Manager:
           Value: true
         arm_d435i_arm_color_optical_frame_from_marker:
           Value: true
+        arm_d435i_arm_color_optical_frame_raw:
+          Value: true
         arm_imu:
           Value: true
         arm_imu_from_marker:
+          Value: true
+        d435i_arm_accel_frame:
+          Value: true
+        d435i_arm_accel_optical_frame:
+          Value: true
+        d435i_arm_color_frame:
+          Value: true
+        d435i_arm_color_optical_frame:
+          Value: true
+        d435i_arm_gyro_frame:
+          Value: true
+        d435i_arm_gyro_optical_frame:
+          Value: true
+        d435i_arm_imu_frame:
+          Value: true
+        d435i_arm_imu_optical_frame:
+          Value: true
+        d435i_arm_link:
+          Value: true
+        d435i_head_accel_frame:
+          Value: true
+        d435i_head_accel_optical_frame:
+          Value: true
+        d435i_head_color_frame:
+          Value: true
+        d435i_head_color_optical_frame:
+          Value: true
+        d435i_head_gyro_frame:
+          Value: true
+        d435i_head_gyro_optical_frame:
+          Value: true
+        d435i_head_imu_frame:
+          Value: true
+        d435i_head_imu_optical_frame:
+          Value: true
+        d435i_head_link:
           Value: true
         head_cam0:
           Value: true
         head_d435i_head_color_optical_frame_body_display:
           Value: true
         head_d435i_head_color_optical_frame_from_marker:
+          Value: true
+        head_d435i_head_color_optical_frame_raw:
           Value: true
         head_imu:
           Value: true
@@ -96,7 +136,10 @@ Visualization Manager:
           head_imu_from_marker:
             {}
           marker_0:
-            {}
+            arm_d435i_arm_color_optical_frame_raw:
+              {}
+            head_d435i_head_color_optical_frame_raw:
+              {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -172,7 +215,7 @@ Visualization Manager:
           Scale: 1
           Value: true
         Value: true
-      Enabled: true
+      Enabled: false
       Keep: 100
       Name: Head OpenVINS Odom
       Position Tolerance: 0.10000000149011612
@@ -193,7 +236,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /ov_msckf/odomimu
-      Value: true
+      Value: false
     - Angle Tolerance: 0.10000000149011612
       Class: rviz_default_plugins/Odometry
       Covariance:
@@ -211,7 +254,7 @@ Visualization Manager:
           Scale: 1
           Value: true
         Value: true
-      Enabled: true
+      Enabled: false
       Keep: 100
       Name: Arm OpenVINS Odom
       Position Tolerance: 0.10000000149011612
@@ -232,13 +275,13 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /ov_msckf_arm/odomimu
-      Value: true
+      Value: false
     - Alpha: 1
       Axes Length: 0.5
       Axes Radius: 0.05000000074505806
       Class: rviz_default_plugins/Pose
       Color: 255; 255; 0
-      Enabled: true
+      Enabled: false
       Head Length: 0.15000000596046448
       Head Radius: 0.05000000074505806
       Name: Head Marker Body Pose
@@ -252,13 +295,13 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /head/marker_pose/camera_body_pose
-      Value: true
+      Value: false
     - Alpha: 1
       Axes Length: 0.5
       Axes Radius: 0.05000000074505806
       Class: rviz_default_plugins/Pose
       Color: 255; 170; 0
-      Enabled: true
+      Enabled: false
       Head Length: 0.15000000596046448
       Head Radius: 0.05000000074505806
       Name: Arm Marker Body Pose
@@ -272,6 +315,34 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /arm/marker_pose/camera_body_pose
+      Value: false
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf_arm/trackhist
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/trackhist
       Value: true
   Enabled: true
   Global Options:
@@ -294,7 +365,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 5.5
+      Distance: 3.748095989227295
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -309,15 +380,24 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4
+      Pitch: 0.4199998378753662
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.5
+      Yaw: 0.2518143355846405
     Saved: ~
 Window Geometry:
-  Height: 1000
+  Displays:
+    collapsed: false
+  Height: 1016
   Hide Left Dock: false
   Hide Right Dock: false
-  Width: 1800
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000003000000000000019b00000365fc0200000002fb0000000a0049006d006100670065010000003b000001550000001600fffffffb000000100044006900730070006c00610079007301000001960000020a000000c700ffffff000000010000019f00000365fc0200000002fb0000000a0049006d006100670065010000003b000001630000001600fffffffb0000000a0056006900650077007301000001a4000001fc000000a000ffffff000000030000073a00000037fc0100000001fb0000000800540069006d006501000000000000073a0000025300ffffff000003f40000036500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Time:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 1850
   X: 70
   Y: 27

@@ -67,6 +67,14 @@ def stamp_to_sec(stamp) -> float:
     return float(stamp.sec) + float(stamp.nanosec) * 1e-9
 
 
+def should_process_marker_frame(stamp_sec: float, last_processed_stamp_sec: Optional[float], rate_hz: float) -> bool:
+    if rate_hz <= 0.0 or last_processed_stamp_sec is None:
+        return True
+    if stamp_sec <= last_processed_stamp_sec:
+        return True
+    return stamp_sec - last_processed_stamp_sec + 1e-9 >= 1.0 / rate_hz
+
+
 def is_finite_array(values: np.ndarray) -> bool:
     return bool(np.all(np.isfinite(values)))
 
@@ -596,6 +604,7 @@ class ArucoMarkerPoseNode(Node):
 
         self.declare_parameter("config_file", "")
         self.declare_parameter("correction_enabled_override", "")
+        self.declare_parameter("marker_detection_rate_hz", 0.0)
         config_file = self.get_parameter("config_file").value
         if not config_file:
             raise RuntimeError("Parameter config_file is required")
@@ -618,6 +627,8 @@ class ArucoMarkerPoseNode(Node):
         self.image_topic = topics_cfg.get("image", "/head/d435i_head/color/image_raw")
         self.odom_topic = topics_cfg.get("openvins_odom", "/ov_msckf/odomimu")
         self.output_prefix = topics_cfg.get("output_prefix", "/head/marker_pose").rstrip("/")
+
+        self.marker_detection_rate_hz = max(0.0, float(self.get_parameter("marker_detection_rate_hz").value))
 
         timing_cfg = self.config.get("timing", {})
         self.max_odom_match_dt = float(timing_cfg.get("max_odom_match_dt", 0.05))
@@ -735,7 +746,7 @@ class ArucoMarkerPoseNode(Node):
         sensor_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
-            depth=5,
+            depth=1,
         )
         odom_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -768,6 +779,7 @@ class ArucoMarkerPoseNode(Node):
         self.vio_forced_invalid_reason = ""
         self.last_odom_msg: Optional[Odometry] = None
         self.last_odom_wall_time_sec: Optional[float] = None
+        self.last_marker_detection_stamp_sec: Optional[float] = None
 
         self.T_map_global: Optional[np.ndarray] = None
         self.P_correction_diag = self.default_pose_cov_diag.copy()
@@ -788,6 +800,10 @@ class ArucoMarkerPoseNode(Node):
         self.get_logger().info(f"Dictionary: {self.dictionary_name}")
         self.get_logger().info(f"Known marker IDs: {sorted(self.markers.keys())}")
         self.get_logger().info(f"Kalibr timeshift_cam_imu: {self.timeshift_cam_imu:.6f} s")
+        if self.marker_detection_rate_hz > 0.0:
+            self.get_logger().info(f"Marker detection rate limit: {self.marker_detection_rate_hz:.2f} Hz")
+        else:
+            self.get_logger().info("Marker detection rate limit: disabled")
 
     def now_sec(self) -> float:
         return self.get_clock().now().nanoseconds * 1e-9
@@ -823,6 +839,11 @@ class ArucoMarkerPoseNode(Node):
         return None
 
     def image_cb(self, msg: Image) -> None:
+        stamp_sec = stamp_to_sec(msg.header.stamp)
+        if not should_process_marker_frame(stamp_sec, self.last_marker_detection_stamp_sec, self.marker_detection_rate_hz):
+            return
+        self.last_marker_detection_stamp_sec = stamp_sec
+
         gray = self.image_msg_to_gray(msg)
         if gray is None:
             self.publish_marker_state(False, -1)

@@ -85,6 +85,32 @@ marker_map -> head_imu -> head_cam0
 marker_map -> arm_imu  -> arm_cam0
 ```
 
+2026-05-11 no-RViz dual-camera validation recording:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dual_openvins_tf_phase2_20260511_160757
+```
+
+The bag was recorded from the full dual-camera Phase 2 stack without RViz. A
+read-only `ros2 bag info` check showed a 68.0 s, 3.4 GiB MCAP bag with both
+head/arm raw image, camera-info, and IMU streams; both head/arm marker
+observation streams; both `/ov_msckf` and `/ov_msckf_arm` pose/odom/path output
+groups; `/tf`; `/tf_static`; and `/rosout`. This is the current best
+no-RViz/no-GUI-load checkpoint for the dual-camera TF and marker-throttle
+workflow. It was not an arm-mounted marker calibration bag: the head camera did
+not see marker ID 2 during the recording.
+
+Replay sampling of recorded outputs confirmed:
+- `/ov_msckf/odomimu.child_frame_id == head_imu`
+- `/ov_msckf_arm/odomimu.child_frame_id == arm_imu`
+- `/ov_msckf/poseimu.header.frame_id == marker_map`
+- `/ov_msckf_arm/poseimu.header.frame_id == marker_map`
+- `/head/marker_pose/observation.target_frame == head_imu`
+- `/arm/marker_pose/observation.target_frame == arm_imu`
+- sampled marker observations were marker ID 0 for both head and arm
+- sampled `/tf` contained `head_imu`, `head_cam0`, `arm_imu`, and `arm_cam0`
+  and no generic OpenVINS `imu` or `cam0` child frames
+
 Validated Phase 2 arm D435i replay bag:
 
 ```text
@@ -172,12 +198,18 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 
 ## Next Task
 
-Validate the per-instance OpenVINS TF frame update with a low-memory Docker/Jazzy
-build, launch smoke checks, fresh head and arm raw replays, and a simultaneous
-head+arm live/RViz check using
-`docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dual_openvins_tf_validation.md`.
-The defensive OpenVINS Propagator timing/crash guard can follow, or move earlier
-if the live assertion recurs.
+Proceed from the no-RViz dual-camera checkpoint toward the dynamic arm-mounted
+marker observation/calibration path. Before implementing online arm pose
+updates, keep marker ID 2 out of the fixed `marker_map` update path and design a
+separate dynamic-marker observation/calibration flow. The first calibration bag
+should include simultaneous observations where both cameras see fixed marker ID
+0 and the head camera also sees the arm-mounted marker ID 2.
+
+The Propagator guard/drop experiment was rejected because it could leave the
+head node stuck dropping every camera update. Current direction is to keep
+RealSense/OpenVINS at `640x480x30`, reduce only the Python ArUco marker load
+with `marker_detection_rate_hz:=15.0` and marker image queue depth 1, and avoid
+long RViz/VS Code live runs when recording validation data.
 
 Recommended next-chat prompt:
 
@@ -192,15 +224,18 @@ Read:
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/aruco_marker_pose_node.py
 - docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.cpp
 - docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.h
 - docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.*
 
-Validate the implemented per-instance OpenVINS TF/frame support for Phase 2.
-Confirm the low-memory Docker/Jazzy build, launch smoke checks, fresh head and
-arm raw replays, and the simultaneous head+arm live/RViz workflow. Expected TF:
-marker_map -> head_imu -> head_cam0 and marker_map -> arm_imu -> arm_cam0.
-Keep /ov_msckf and /ov_msckf_arm topics separate, keep marker_map shared, and
-leave the Propagator timing/crash guard for the next follow-up unless validation
-shows TF work requires it.
+Plan a dynamic arm-mounted marker observation and calibration path for marker ID
+2. Preserve the validated per-instance TF support and marker throttle. Marker ID
+2 is mounted to the arm and must not be treated as a fixed marker_map landmark.
+The calibration flow should collect samples when both cameras see fixed marker
+ID 0 and the head camera also sees ID 2, estimate the fixed transform between ID
+2 and the arm D435i, report residuals/uncertainty, and save the result to a
+config file for later arm pose updates.
 ```

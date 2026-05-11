@@ -21,6 +21,7 @@ from aruco_marker_pose_node import (  # noqa: E402
     marker_quality_metrics,
     marker_view_angle_deg,
     rotvec_to_R,
+    should_process_marker_frame,
     T_cam_body_display,
     T_inv,
 )
@@ -67,6 +68,19 @@ def covariance_estimate(
         geometry_score=1.0,
         cfg=MarkerCovarianceModelConfig.from_mapping({}) if cfg is None else cfg,
     )
+
+
+def test_marker_frame_throttle_disabled_processes_every_frame():
+    assert should_process_marker_frame(10.0, None, 0.0)
+    assert should_process_marker_frame(10.01, 10.0, 0.0)
+    assert should_process_marker_frame(10.01, 10.0, -1.0)
+
+
+def test_marker_frame_throttle_uses_image_timestamps():
+    assert should_process_marker_frame(10.0, None, 15.0)
+    assert not should_process_marker_frame(10.03, 10.0, 15.0)
+    assert should_process_marker_frame(10.067, 10.0, 15.0)
+    assert should_process_marker_frame(9.5, 10.0, 15.0)
 
 
 def test_solvepnp_pose_direction_uses_inverse_for_camera_pose():
