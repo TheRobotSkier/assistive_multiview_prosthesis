@@ -24,13 +24,15 @@ services:
       - ${XAUTHORITY}:/tmp/.Xauthority:ro,z
       - /dev:/dev
       - /run/udev:/run/udev:ro
+      - ./cyclonedds_robotlab.xml:/tmp/cyclonedds_peer.xml:ro
     entrypoint: /ros_entrypoint.sh
     environment:
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       tty: true
       PYTHONPATH: "/opt/ros/jazzy/lib/python3.12/site-packages"
       QT_X11_NO_MITSHM: 1
       DISPLAY: $DISPLAY
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      CYCLONEDDS_URI: file:///tmp/cyclonedds_peer.xml
       XAUTHORITY: /tmp/.Xauthority
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: graphics,display,compute,utility

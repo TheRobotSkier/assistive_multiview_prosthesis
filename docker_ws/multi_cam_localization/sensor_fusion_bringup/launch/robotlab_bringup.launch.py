@@ -1,183 +1,95 @@
-"""Unified bringup for Robotlab Jetson Orin Nano: both D435 cameras + both ICM-20948 IMUs + EKF odometry.
+"""Unified bringup for Robotlab Jetson Orin Nano.
 
-Launches in a single file:
-  - head/d435_head  (serial 827112072033) via ExecuteProcess
-  - arm/d435_arm    (serial 829212072207) via ExecuteProcess
-  - Two ICM-20948 IMUs + robot_localization EKF via IncludeLaunchDescription
-  - Jetson NEON pointcloud fix (delayed param set for both cameras)
-
-ExecuteProcess is used for realsense2_camera_node (not Node) to avoid YAML
-integer coercion of serial numbers -- serial_no is passed via --ros-args -p with
-YAML single quotes to force string type.
-
-Usage:
-  ros2 launch sensor_fusion_bringup robotlab_bringup.launch.py
+Launches both D435 cameras via IncludeLaunchDescription + rs_launch.py
+(for proper pointcloud support), both ICM-20948 IMUs, and EKF odometry.
 """
 
 from pathlib import Path
-import yaml
-
 from launch import LaunchDescription
-from launch.actions import (
-    DeclareLaunchArgument,
-    ExecuteProcess,
-    IncludeLaunchDescription,
-    LogInfo,
-    OpaqueFunction,
-    TimerAction,
-)
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, OpaqueFunction, TimerAction, ExecuteProcess
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-_REALSENSE_NODE = "/opt/ros/jazzy/lib/realsense2_camera/realsense2_camera_node"
-_DEPTH_PROFILE = "640x480x15"
-_COLOR_PROFILE = "640x480x15"
 
-# IMU config paths (absolute -- Docker mounts source at /miahand_ws/src)
-_IMU_CONFIG_CAM0 = "/miahand_ws/src/multi_cam_localization/imu_driver/config/imu_cam0.yaml"
-_IMU_CONFIG_CAM1 = "/miahand_ws/src/multi_cam_localization/imu_driver/config/imu_cam1.yaml"
+_CAMERA_CONFIG = {
+    "head": {"serial": "827112072033", "namespace": "head", "name": "d435_head"},
+    "arm":  {"serial": "829212072207", "namespace": "arm",  "name": "d435_arm"},
+}
 
-
-def _bool_str(value) -> str:
-    return "true" if bool(value) else "false"
+_IMU_CONFIGS = {
+    "cam0": "/miahand_ws/src/multi_cam_localization/imu_driver/config/imu_cam0.yaml",
+    "cam1": "/miahand_ws/src/multi_cam_localization/imu_driver/config/imu_cam1.yaml",
+}
 
 
-# =========================================================================
-# Camera helpers (from dual_d435_native.launch.py)
-# =========================================================================
+def _bool_str(val):
+    return "true" if val else "false"
 
-def _realsense_cmd(serial: str, namespace: str, node_name: str, tf_prefix: str) -> list:
-    return [
-        _REALSENSE_NODE,
-        "--ros-args",
-        "--log-level", "info",
-        "-r", f"__node:={node_name}",
-        "-r", f"__ns:=/{namespace}",
-        "-p", f"serial_no:='{serial}'",
-        "-p", f"tf_prefix:={tf_prefix}",
-        "-p", "camera_name:=camera",
-        "-p", "enable_color:=true",
-        "-p", f"depth_module.depth_profile:={_DEPTH_PROFILE}",
-        "-p", f"rgb_camera.color_profile:={_COLOR_PROFILE}",
-        "-p", "pointcloud.enable:=true",
-        "-p", "pointcloud.stream_filter:=2",
-        "-p", "align_depth.enable:=true",
-        "-p", "enable_infra1:=false",
-        "-p", "enable_infra2:=false",
-        "-p", "enable_gyro:=false",
-        "-p", "enable_accel:=false",
-        "-p", "unite_imu_method:=0",
-        "-p", "initial_reset:=false",
-    ]
-
-
-def _neon_fix_cmd(namespace: str, node_name: str) -> list:
-    return [
-        "ros2", "param", "set",
-        f"/{namespace}/{node_name}",
-        "pointcloud__neon_.enable",
-        "true",
-    ]
-
-
-# =========================================================================
-# Configuration loading
-# =========================================================================
-
-def _load_config(context):
-    package_dir = Path(FindPackageShare("sensor_fusion_bringup").perform(context))
-    config_path = package_dir / "config" / "d435_cameras.yaml"
-    with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-# =========================================================================
-# Main launch setup
-# =========================================================================
-
-def _setup_launch(context, *args, **kwargs):
-    data = _load_config(context)
-    common = data["common"]
-    head_cam = data["cameras"]["head"]
-    arm_cam = data["cameras"]["arm"]
-
-    neon_delay = float(common.get("pointcloud_neon_delay_sec", 6.0))
-    apply_neon_fix = IfCondition(LaunchConfiguration("enable_pointcloud_neon_fix"))
-
-    actions = []
-
-    # ---- Cameras (ExecuteProcess for serial safety) ----
-
-    # Head camera
-    actions.append(ExecuteProcess(
-        cmd=_realsense_cmd(
-            head_cam["serial_no"],
-            head_cam["namespace"],
-            head_cam["name"],
-            head_cam["namespace"],
-        ),
-        output="screen",
-        emulate_tty=True,
-    ))
-    actions.append(TimerAction(
-        period=neon_delay,
-        actions=[ExecuteProcess(
-            cmd=_neon_fix_cmd(head_cam["namespace"], head_cam["name"]),
-            output="screen",
-            condition=apply_neon_fix,
-        )],
-    ))
-
-    # Arm camera
-    actions.append(ExecuteProcess(
-        cmd=_realsense_cmd(
-            arm_cam["serial_no"],
-            arm_cam["namespace"],
-            arm_cam["name"],
-            arm_cam["namespace"],
-        ),
-        output="screen",
-        emulate_tty=True,
-    ))
-    actions.append(TimerAction(
-        period=neon_delay,
-        actions=[ExecuteProcess(
-            cmd=_neon_fix_cmd(arm_cam["namespace"], arm_cam["name"]),
-            output="screen",
-            condition=apply_neon_fix,
-        )],
-    ))
-
-    # ---- IMUs + EKF (via IncludeLaunchDescription) ----
-    ekf_launch_path = str(
-        Path(FindPackageShare("sensor_fusion_bringup").perform(context))
-        / "launch"
-        / "two_imus_ekf.launch.py"
-    )
-    actions.append(IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(ekf_launch_path),
-    ))
-
-    return actions
-
-
-# =========================================================================
-# generate_launch_description
-# =========================================================================
 
 def generate_launch_description():
+    actions = []
+    rs_launch_path = PathJoinSubstitution([
+        FindPackageShare("realsense2_camera"), "launch", "rs_launch.py",
+    ])
+
+    # ---- Cameras via rs_launch.py (proper YAML param handling for pointclouds) ----
+    for label, cam in _CAMERA_CONFIG.items():
+        actions.append(LogInfo(msg=f"Starting {label} camera: {cam['serial']}"))
+        actions.append(IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(rs_launch_path),
+            launch_arguments={
+                "camera_namespace": cam["namespace"],
+                "camera_name":      cam["name"],
+                "serial_no":        f"'{cam['serial']}'",
+                "pointcloud.enable":          "true",
+                "pointcloud.stream_filter":   "2",
+                "align_depth.enable":         "true",
+                "enable_color":               "true",
+                "enable_gyro":                "false",
+                "enable_accel":               "false",
+                "unite_imu_method":           "0",
+                "enable_infra1":              "false",
+                "enable_infra2":              "false",
+                "initial_reset":              "false",
+                "depth_module.depth_profile": "640x480x15",
+                "rgb_camera.color_profile":   "640x480x15",
+            }.items(),
+        ))
+
+    # Jetson NEON pointcloud fix (delayed, after cameras init)
+    apply_fix = LaunchConfiguration("enable_pointcloud_neon_fix")
+    for label, cam in _CAMERA_CONFIG.items():
+        param_path = f"/{cam['namespace']}/{cam['name']}"
+        actions.append(TimerAction(
+            period=8.0,
+            actions=[ExecuteProcess(
+                cmd=["ros2", "param", "set", param_path, "pointcloud__neon_.enable", "true"],
+                output="screen",
+                condition=IfCondition(apply_fix),
+            )],
+        ))
+
+    # ---- IMU drivers ----
+    for ns, cfg_path in _IMU_CONFIGS.items():
+        actions.append(Node(
+            package="imu_driver", executable="imu_node", name="imu_node",
+            namespace=ns, output="screen", parameters=[cfg_path],
+        ))
+
+    # ---- EKF ----
+    ekf_path = PathJoinSubstitution([
+        FindPackageShare("sensor_fusion_bringup"), "launch", "two_imus_ekf.launch.py",
+    ])
+    actions.append(IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(ekf_path),
+    ))
+
     return LaunchDescription([
+        DeclareLaunchArgument("enable_pointcloud_neon_fix", default_value="true",
+            description="Apply Jetson pointcloud__neon_.enable fix after startup."),
         LogInfo(msg="=== Robotlab bringup: cameras + IMUs + EKF ==="),
-        DeclareLaunchArgument(
-            "enable_pointcloud_neon_fix",
-            default_value="true",
-            description="Apply Jetson pointcloud__neon_.enable fix after startup.",
-        ),
-        OpaqueFunction(function=_setup_launch),
+        *actions,
     ])
