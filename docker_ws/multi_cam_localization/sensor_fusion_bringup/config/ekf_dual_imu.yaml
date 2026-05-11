@@ -1,0 +1,86 @@
+# Dual-IMU EKF configuration for robot_localization
+# Uses calibration values from P3.1 for improved fusion
+#
+# IMU noise characteristics (from P3.1 calibration):
+#   gyro_noise_std:  0.00096 rps
+#   accel_noise_std: 0.0162 m/s²
+#   gyro_bias_rw:    4.07e-06
+#   accel_bias_rw:   1.05e-04
+#
+# Accel calibration (from P3.1):
+#   bias:  [0.060705097, -0.080021347, 0.136866529] m/s²
+#   scale: [0.995836574,  0.996978119, 1.006539360]
+
+ekf_filter_node:
+  ros__parameters:
+    frequency: 100.0
+    sensor_timeout: 0.5
+    two_d_mode: false
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: cam0_base_link
+    world_frame: odom
+
+    # ---- IMU 0: Head camera IMU (bus 7, cam0_imu_link) ----
+    imu0: /cam0/data_raw
+    imu0_config:
+      [false, false, false,   # x, y, z position
+       true,  true,  true,    # roll, pitch, yaw orientation
+       false, false, false,   # vx, vy, vz linear velocity
+       true,  true,  true,    # vroll, vpitch, vyaw angular velocity
+       false, false, false]   # ax, ay, az linear acceleration
+    imu0_differential: false
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true
+    imu0_queue_size: 10
+
+    # ---- IMU 1: Arm camera IMU (bus 1, cam1_imu_link) ----
+    imu1: /cam1/data_raw
+    imu1_config:
+      [false, false, false,   # x, y, z position
+       true,  true,  true,    # roll, pitch, yaw orientation
+       false, false, false,   # vx, vy, vz linear velocity
+       true,  true,  true,    # vroll, vpitch, vyaw angular velocity
+       false, false, false]   # ax, ay, az linear acceleration
+    imu1_differential: false
+    imu1_relative: false
+    imu1_remove_gravitational_acceleration: true
+    imu1_queue_size: 10
+
+    # Process noise covariance (15x15, tuned with calibration values)
+    # Diagonal reflects: pos, ori, vel, ang_vel, accel
+    process_noise_covariance:
+      [1.0e-6, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    1.0e-6, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    1.0e-6, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    1.0e-4, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    1.0e-4, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-4, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-6, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-6, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-6, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    9.2e-7, 0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    9.2e-7, 0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    9.2e-7, 0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    2.6e-4, 0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    2.6e-4, 0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    2.6e-4]
+
+    # Initial estimate covariance (starting uncertainty)
+    initial_estimate_covariance:
+      [1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,    0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9, 0.0,
+       0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    0.0,    1.0e-9]
