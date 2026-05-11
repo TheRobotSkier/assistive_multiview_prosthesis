@@ -142,11 +142,14 @@ extern "C" void app_main() {
     }
 
     // ── Step 2: Configure both IMUs at 0x68 ────────────────────────
+    bool head_ok = false, arm_ok = false;
+
     GY91 head_imu(I2C_PORT, HEAD_ADDR);
-    if (!head_imu.init(GyroRange::DPS_2000, AccelRange::G_16,
-                       DlpfBandwidth::BW_184HZ)) {
-        ESP_LOGE(TAG, "IMU init at 0x68 failed (both-address phase)");
-        vTaskSuspend(nullptr);
+    if (head_imu.init(GyroRange::DPS_2000, AccelRange::G_16,
+                      DlpfBandwidth::BW_184HZ)) {
+        head_ok = true;
+    } else {
+        ESP_LOGW(TAG, "Head IMU at 0x68 not found — will send zeros");
     }
 
     // ── Step 3: AD0 HIGH, arm IMU moves to 0x69 ───────────────────
@@ -163,15 +166,23 @@ extern "C" void app_main() {
             I2C_PORT, ARM_ADDR, &reg, 1, &whoami, 1, pdMS_TO_TICKS(10));
         if (err != ESP_OK) {
             ESP_LOGW(TAG,
-                     "Arm IMU at 0x69 not responding — "
-                     "check AD0 wiring. Continuing with head only.");
+                     "Arm IMU at 0x69 not responding — check SAO wiring. "
+                     "Will send zeros for arm.");
         } else {
+            arm_ok = true;
             ESP_LOGI(TAG, "Arm IMU confirmed at 0x69 (WHO_AM_I=0x%02X)",
                      whoami);
         }
     }
 
-    ESP_LOGI(TAG, "Dual IMU streaming at %d Hz", OUTPUT_RATE_HZ);
+    if (!head_ok && !arm_ok) {
+        ESP_LOGW(TAG, "No IMUs detected — streaming zeros until connected");
+    }
+
+    ESP_LOGI(TAG, "Dual IMU streaming at %d Hz (head=%s arm=%s)",
+             OUTPUT_RATE_HZ,
+             head_ok ? "OK" : "MISSING",
+             arm_ok  ? "OK" : "MISSING");
 
     // ── Step 4: Main loop ──────────────────────────────────────────
     uint16_t seq = 0;
@@ -185,27 +196,38 @@ extern "C" void app_main() {
         pkt.timestamp_us = (uint32_t)esp_timer_get_time();
 
         // Read head IMU
-        IMUReading raw;
-        if (head_imu.read_all(raw)) {
-            pkt.head_accel[0] = raw.accel_x;
-            pkt.head_accel[1] = raw.accel_y;
-            pkt.head_accel[2] = raw.accel_z;
-            pkt.head_gyro[0]  = raw.gyro_x;
-            pkt.head_gyro[1]  = raw.gyro_y;
-            pkt.head_gyro[2]  = raw.gyro_z;
+        if (head_ok) {
+            IMUReading raw;
+            if (head_imu.read_all(raw)) {
+                pkt.head_accel[0] = raw.accel_x;
+                pkt.head_accel[1] = raw.accel_y;
+                pkt.head_accel[2] = raw.accel_z;
+                pkt.head_gyro[0]  = raw.gyro_x;
+                pkt.head_gyro[1]  = raw.gyro_y;
+                pkt.head_gyro[2]  = raw.gyro_z;
+            } else {
+                memset(pkt.head_accel, 0, 6);
+                memset(pkt.head_gyro,  0, 6);
+            }
         } else {
             memset(pkt.head_accel, 0, 6);
             memset(pkt.head_gyro,  0, 6);
         }
 
         // Read arm IMU
-        if (arm_imu.read_all(raw)) {
-            pkt.arm_accel[0] = raw.accel_x;
-            pkt.arm_accel[1] = raw.accel_y;
-            pkt.arm_accel[2] = raw.accel_z;
-            pkt.arm_gyro[0]  = raw.gyro_x;
-            pkt.arm_gyro[1]  = raw.gyro_y;
-            pkt.arm_gyro[2]  = raw.gyro_z;
+        if (arm_ok) {
+            IMUReading raw;
+            if (arm_imu.read_all(raw)) {
+                pkt.arm_accel[0] = raw.accel_x;
+                pkt.arm_accel[1] = raw.accel_y;
+                pkt.arm_accel[2] = raw.accel_z;
+                pkt.arm_gyro[0]  = raw.gyro_x;
+                pkt.arm_gyro[1]  = raw.gyro_y;
+                pkt.arm_gyro[2]  = raw.gyro_z;
+            } else {
+                memset(pkt.arm_accel, 0, 6);
+                memset(pkt.arm_gyro,  0, 6);
+            }
         } else {
             memset(pkt.arm_accel, 0, 6);
             memset(pkt.arm_gyro,  0, 6);

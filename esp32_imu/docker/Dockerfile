@@ -6,5 +6,5 @@
 FROM docker.io/espressif/idf:release-v5.4
 
 WORKDIR /project
-ENTRYPOINT ["/opt/esp/idf_entrypoint.sh"]
+ENTRYPOINT ["/opt/esp/entrypoint.sh"]
 CMD ["idf.py", "build"]
