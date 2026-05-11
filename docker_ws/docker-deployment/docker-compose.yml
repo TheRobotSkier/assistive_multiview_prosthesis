@@ -33,6 +33,7 @@ services:
       XAUTHORITY: /tmp/.Xauthority
       ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
+      CYCLONEDDS_URI: file:///tmp/cyclonedds_peer.xml
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: graphics,display,compute,utility
     user: "${USER_UID}:${USER_GID}"
