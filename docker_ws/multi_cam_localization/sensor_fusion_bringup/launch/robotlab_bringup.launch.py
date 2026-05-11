@@ -58,7 +58,7 @@ def _realsense_cmd(serial: str, namespace: str, node_name: str, tf_prefix: str) 
         "--log-level", "info",
         "-r", f"__node:={node_name}",
         "-r", f"__ns:=/{namespace}",
-        "-p", f"serial_no:={serial}",
+        "-p", f"serial_no:='{serial}'",
         "-p", f"tf_prefix:={tf_prefix}",
         "-p", "camera_name:=camera",
         "-p", "enable_color:=true",
