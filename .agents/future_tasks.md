@@ -2,6 +2,13 @@
 
 ## Current Phase 2 Status
 
+As of 2026-05-11, the Phase 2 head marker EKF path and arm D435i Phase 2
+bringup have been committed and pushed. Latest local commit seen by Codex:
+
+```text
+374216c Add arm D435i Phase 2 OpenVINS bringup
+```
+
 The 100 mm marker covariance bag analysis has been completed. Phase 2
 OpenVINS-internal marker update/reset code has been implemented locally and
 passed the low-memory Docker/Jazzy build, launch/message smoke checks, live
@@ -34,14 +41,11 @@ Propagator assertion.
 Use the current Phase 2 handoff note before continuing:
 `.agents/phase2_openvins_handoff_status.md`.
 
-Commit gate:
-- `docker_ws/src/open_vins` has been converted locally from the broken gitlink
-  into a lean vendored source tree so Phase 2 OpenVINS edits can be committed
-  with the parent repo
-- do not commit generated `build_overlay/`, `install_overlay/`, or
-  `log_overlay/` artifacts
-- do not commit ROS bags; keep them as local validation artifacts unless a
-  separate data-sharing decision is made
+Repository hygiene:
+- generated `build_overlay/`, `install_overlay/`, and `log_overlay/` artifacts
+  should stay out of commits
+- ROS bags should stay local validation artifacts unless a separate data-sharing
+  decision is made
 
 Near-term next work:
 - add a namespaced/per-instance OpenVINS TF frame fix so head and arm can both

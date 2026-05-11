@@ -5,6 +5,13 @@ implementation work.
 
 ## Current Status
 
+As of 2026-05-11, the Phase 2 head marker EKF path and the arm D435i Phase 2
+bringup have been committed and pushed. Latest local commit seen by Codex:
+
+```text
+374216c Add arm D435i Phase 2 OpenVINS bringup
+```
+
 Phase 2 marker-enabled OpenVINS implementation has been added locally and the
 low-memory Jazzy/Docker build completed successfully on the Jetson.
 
@@ -159,23 +166,40 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 
 ## Next Task
 
-Commit the Phase 2 OpenVINS marker EKF integration and arm D435i bringup after
-ensuring:
+Plan, then implement, per-instance OpenVINS TF frame IDs or a safe TF prefix so
+head and arm can publish TF simultaneously for RViz drift inspection and later
+point-cloud fusion. The defensive OpenVINS Propagator timing/crash guard can
+follow, or move earlier if the live assertion recurs.
 
-- generated `docker_ws/build_overlay/`, `docker_ws/install_overlay/`, and
-  `docker_ws/log_overlay/` artifacts are absent from `git status`
-- ROS bags are not committed
-- the lean vendored `docker_ws/src/open_vins` source tree and new arm
-  bringup/config/docs are included
-
-Recommended commit message:
+Recommended next-chat prompt:
 
 ```text
-Add arm D435i Phase 2 OpenVINS bringup
-```
+Read:
+- .agents/AGENTS.md
+- .agents/future_tasks.md
+- .agents/phase2_openvins_handoff_status.md
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_marker_validation.md
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_marker_validation.md
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py
+- docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.cpp
+- docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.h
+- docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.*
 
-After the commit/push, the next feature task is to add per-instance OpenVINS TF
-frame IDs or a safe TF prefix so head and arm can publish TF simultaneously for
-RViz drift inspection and later point-cloud fusion. The defensive OpenVINS
-Propagator timing/crash guard can follow, or move earlier if the live assertion
-recurs.
+Make a detailed plan, but do not implement yet, for adding per-instance OpenVINS
+TF/frame support so head and arm D435i Phase 2 OpenVINS nodes can run
+simultaneously without TF collisions.
+
+Goals:
+- head and arm OpenVINS publish unique TF child frames
+- RViz can show head and arm drift even when marker ID 0 is out of view
+- marker updates still work for both cameras
+- /ov_msckf and /ov_msckf_arm topics remain separate
+- shared map frame remains marker_map
+- plan required updates to launch files, marker configs, docs, RViz, and
+  validation steps
+- avoid breaking already validated head and arm replay behavior
+- leave the Propagator timing/crash guard as a later follow-up unless the plan
+  finds TF work requires touching that code
+```
