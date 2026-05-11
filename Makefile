@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs rviz rviz-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -80,3 +80,24 @@ clean:
 
 logs:
 	cd $(COMPOSE_DIR) && $(COMPOSE) logs -f
+
+# ── Robotlab RViz (view Jetson camera data on host) ───────────────────────
+rviz:
+	@test -f rviz/robotlab_cameras.rviz || { echo "Missing rviz/robotlab_cameras.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	podman run --rm -d --name rviz-robotlab \
+		--network host \
+		-e DISPLAY=$(DISPLAY) \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=file:///tmp/cyclonedds_peer.xml \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		-v $(CURDIR)/rviz/robotlab_cameras.rviz:/rviz_config.rviz:ro \
+		docker.io/osrf/ros:jazzy-desktop \
+		bash -c 'apt-get update -qq && apt-get install -y -qq ros-jazzy-rmw-cyclonedds-cpp >/dev/null 2>&1; source /opt/ros/jazzy/setup.bash; echo "RViz ready — displaying robotlab topics"; rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "RViz container started (rviz-robotlab). Kill with: make rviz-kill"
+
+rviz-kill:
+	podman kill rviz-robotlab 2>/dev/null || true
+	podman rm rviz-robotlab 2>/dev/null || true
