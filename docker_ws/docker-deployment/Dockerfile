@@ -115,7 +115,7 @@ RUN sudo chown -R $USERNAME:$USERNAME /miahand_ws \
     && sudo apt-get clean \
     && sudo rm -rf /var/lib/apt/lists/* \
     && . "/opt/ros/${ROS_DISTRO}/setup.sh" \
-    && MAKEFLAGS="-j1" CMAKE_BUILD_PARALLEL_LEVEL=1 colcon build --executor sequential \
+    && MAKEFLAGS="-j1" CMAKE_BUILD_PARALLEL_LEVEL=1 colcon build --executor sequential --packages-select imu_driver sensor_fusion_bringup sensor_fusion_msgs \
     && echo "source install/setup.bash" >> /home/$USERNAME/.bashrc
 
 COPY ./docker-deployment/ros_entrypoint.sh /ros_entrypoint.sh
