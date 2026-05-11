@@ -134,6 +134,28 @@ Config resolution order:
 | `segmentation` | `python:3.8-slim` | MinkowskiEngine inference server (isolated) |
 | `test` | same as prosthesis | Runs smoke tests and exits |
 
+## Network Setup (Jetson Orin Nano)
+
+The robotlab Jetson connects to a dedicated WiFi hotspot (`robotlab-wifi`) with a static IP
+of `10.42.0.2`. Run the appropriate script for your OS to create the hotspot:
+
+| OS | Script | How to run |
+|----|--------|------------|
+| **Linux** (native) | `scripts/setup_robotlab_wifi_linux.sh` | `sudo ./scripts/setup_robotlab_wifi_linux.sh <wifi_iface>` |
+| **Windows** (native, any WiFi adapter) | `scripts/setup_robotlab_wifi.ps1` | `powershell -ExecutionPolicy Bypass -File setup_robotlab_wifi.ps1` (as Admin) |
+
+**Common settings:**
+- SSID: `robotlab-wifi`
+- Password: `labrobot123`
+- Hotspot IP: `10.42.0.1/24`
+- Robotlab IP: `10.42.0.2/24` (static)
+- Internet sharing via NAT (robotlab reaches internet through your machine)
+
+Once the hotspot is active, SSH into robotlab:
+```bash
+ssh robotlab@10.42.0.2
+```
+
 ## Testing
 
 Automated smoke tests run inside Docker (no host ROS installation needed):
