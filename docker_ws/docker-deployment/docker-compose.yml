@@ -17,6 +17,7 @@ services:
       - video
       - plugdev
       - dialout
+      - i2c
     volumes:
       - ../:/miahand_ws/src
       - /tmp/.X11-unix:/tmp/.X11-unix
