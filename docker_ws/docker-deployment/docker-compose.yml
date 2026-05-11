@@ -137,4 +137,3 @@ services:
       HOME: /root
     entrypoint: ["/bin/bash", "-lc"]
     command: "/miahand_ws/src/docker-deployment/start_realsense_camera.sh"
-      - ./cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
