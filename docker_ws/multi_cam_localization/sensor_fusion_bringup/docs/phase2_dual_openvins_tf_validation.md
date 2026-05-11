@@ -43,6 +43,38 @@ sampled TF child frames: head_imu, head_cam0, arm_imu, arm_cam0
 generic OpenVINS TF child frames imu/cam0: none seen in replay sample
 ```
 
+Latest arm-mounted ID2 calibration checkpoint:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_calib_phase2_20260511_164816
+```
+
+This bag was recorded without RViz after an earlier RViz run hit the live
+OpenVINS timing failure. A read-only `ros2 bag info` check showed 53.5 s and
+2.7 GiB with both head/arm raw inputs, marker streams, OpenVINS outputs, `/tf`,
+`/tf_static`, and `/rosout`. Replay sampling confirmed the expected head/arm
+frame IDs and no generic `imu`/`cam0` OpenVINS TF child frames.
+
+Offline ArUco detection on raw images confirmed the required calibration
+visibility:
+
+```text
+head marker ID 0 frames: 468
+head marker ID 2 frames: 1035
+arm marker ID 0 frames: 1457
+```
+
+The recorded marker observation topics still report marker ID `0`, which is
+expected. Marker ID `2` is present in the raw head images and is intended for the
+future dynamic-marker observation/calibration path, not the fixed marker-map EKF
+update path.
+
+Earlier interrupted/secondary ID2 bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_calib_phase2_20260511_164627
+```
+
 ## 0. Before Starting
 
 Use Docker/Jazzy, not host ROS. Close heavy apps before live dual-camera testing
@@ -352,6 +384,19 @@ Recorded groups: raw head/arm inputs, marker observations, OpenVINS outputs,
 Replay sample: head_imu/arm_imu odom children, marker_map pose headers,
 head_imu/arm_imu marker targets, no generic imu/cam0 TF child frames
 Limitation: head camera did not see arm-mounted marker ID 2
+```
+
+Known good ID2 calibration metadata checkpoint:
+
+```text
+Bag: docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_calib_phase2_20260511_164816
+Duration: 53.5 s
+Size: 2.7 GiB
+Recorded groups: raw head/arm inputs, marker observations, OpenVINS outputs,
+/tf, /tf_static, /rosout
+Replay sample: head_imu/arm_imu odom children, marker_map pose headers,
+head_imu/arm_imu marker targets, no generic imu/cam0 TF child frames
+Raw ArUco visibility: head ID0, head ID2, arm ID0
 ```
 
 ## 7. Future Raw Replay Test From The Dual Bag

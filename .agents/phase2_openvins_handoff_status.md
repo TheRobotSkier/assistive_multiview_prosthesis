@@ -111,6 +111,44 @@ Replay sampling of recorded outputs confirmed:
 - sampled `/tf` contained `head_imu`, `head_cam0`, `arm_imu`, and `arm_cam0`
   and no generic OpenVINS `imu` or `cam0` child frames
 
+2026-05-11 arm-mounted marker ID2 calibration recording:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_calib_phase2_20260511_164816
+```
+
+This is the current best calibration-source bag. It was recorded without RViz
+after an earlier RViz attempt triggered the live OpenVINS timing failure. A
+read-only `ros2 bag info` check showed a 53.5 s, 2.7 GiB MCAP bag with both
+head/arm raw image, camera-info, and IMU streams; both head/arm marker streams;
+both `/ov_msckf` and `/ov_msckf_arm` output groups; `/tf`; `/tf_static`; and
+`/rosout`.
+
+Replay sampling confirmed the same validated TF/topic frame behavior:
+`head_imu` and `arm_imu` odom child frames, `marker_map` pose headers,
+`head_imu` and `arm_imu` marker targets, and no generic OpenVINS `imu` or
+`cam0` TF child frames in the sampled replay stream.
+
+Offline ArUco detection on the recorded raw images using the same
+`DICT_6X6_1000` dictionary confirmed:
+- head raw images: marker ID 0 detected in 468 frames
+- head raw images: arm-mounted marker ID 2 detected in 1035 frames
+- arm raw images: marker ID 0 detected in 1457 frames
+
+The recorded `/head/marker_pose/observation` and `/arm/marker_pose/observation`
+streams still report marker ID 0, as expected. Marker ID 2 is present in the raw
+head images and should be consumed by the future dynamic-marker
+observation/calibration path, not by the fixed `marker_map` EKF update path.
+
+Earlier interrupted/secondary ID2 bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_calib_phase2_20260511_164627
+```
+
+This 22.8 s bag was recorded during the RViz attempt and should not be the
+primary calibration source.
+
 Validated Phase 2 arm D435i replay bag:
 
 ```text

@@ -68,6 +68,15 @@ Near-term next work:
   This bag did not include the head camera seeing arm-mounted marker ID 2, so it
   validates the dual stack/recording workflow but is not sufficient for the ID 2
   extrinsic calibration.
+- A no-RViz arm-mounted ID2 calibration bag has now been recorded at
+  `docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_calib_phase2_20260511_164816`.
+  Metadata and replay sampling show the expected dual-stack topics and frames.
+  Offline ArUco detection on raw images confirmed head marker ID 0, head
+  arm-mounted marker ID 2, and arm marker ID 0 visibility. Use this as the
+  primary source bag for the first dynamic-marker calibration implementation.
+  The earlier RViz attempt,
+  `dual_openvins_id2_calib_phase2_20260511_164627`, is shorter and should be
+  treated as secondary/interrupted.
 
 ## A. Arm D435i Setup From Calibration Output
 
@@ -141,6 +150,11 @@ Known robustness follow-up:
   implementing online arm state updates until an ID2-visible calibration bag has
   been collected and the dynamic-marker path is separated from fixed-marker EKF
   updates.
+- The ID2-visible calibration bag is now available, so the next implementation
+  can start with an offline calibration pipeline and raw dynamic-marker
+  observation path. Online arm-state updates should still wait until the
+  calibration script reports a stable `T_armcam_marker2` estimate with residuals
+  and uncertainty.
 
 ## C. VIO Health Monitor And Reset/Reinitialize Behavior
 
@@ -155,10 +169,10 @@ point clouds. Avoid fusing clouds directly in drifting raw OpenVINS `global`
 frames.
 
 Immediate prerequisite:
-- The per-instance OpenVINS TF frame support has been live-smoke checked, and a
-  no-RViz dual-camera validation bag has been recorded. Before online
-  two-camera fusion, collect an ID2-visible calibration bag where both cameras
-  see fixed marker ID 0 and the head camera also sees the arm-mounted marker.
+- The per-instance OpenVINS TF frame support has been live-smoke checked, a
+  no-RViz dual-camera validation bag has been recorded, and an ID2-visible
+  calibration bag is available. Before online two-camera fusion, implement and
+  validate the offline ID2-to-arm-D435i extrinsic calibration path.
 
 Planned final marker layout:
 - Fixed world/common reference marker: 6x6 marker ID 0, 100 mm x 100 mm, in
@@ -211,6 +225,17 @@ Useful calibration relationship:
 - Collect time-synchronized samples, reject outliers, compute a robust
   mean/median SE(3) transform, and save residual statistics/covariance with the
   extrinsic config.
+
+Primary calibration-source bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dual_openvins_id2_calib_phase2_20260511_164816
+```
+
+Raw-image ArUco check:
+- head ID 0: 468 frames
+- head ID 2: 1035 frames
+- arm ID 0: 1457 frames
 
 ## F. Arm D435i Trajectory Prediction With Uncertainty
 
