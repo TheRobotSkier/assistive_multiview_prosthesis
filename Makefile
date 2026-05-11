@@ -10,11 +10,7 @@ build:
 	cd $(CURDIR) && $(SUDO) docker compose -f $(COMPOSE) build miahand_ros2
 
 up:
-	cd $(CURDIR) && $(SUDO) docker compose -f $(COMPOSE) run --rm miahand_ros2 bash -c '\
-		source /miahand_ws/install/setup.bash 2>/dev/null || true; \
-		cd /miahand_ws && colcon build --packages-select sensor_fusion_bringup 2>&1; \
-		source install/setup.bash; \
-		ros2 launch sensor_fusion_bringup robotlab_bringup.launch.py'
+	cd $(CURDIR) && $(SUDO) docker compose -f $(COMPOSE) run -T --rm miahand_ros2 bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null || true; cd /miahand_ws && colcon build --packages-select sensor_fusion_bringup 2>&1; source install/setup.bash; ros2 launch sensor_fusion_bringup robotlab_bringup.launch.py'
 
 shell:
 	cd $(CURDIR) && $(SUDO) docker compose -f $(COMPOSE) run --rm miahand_ros2 bash
