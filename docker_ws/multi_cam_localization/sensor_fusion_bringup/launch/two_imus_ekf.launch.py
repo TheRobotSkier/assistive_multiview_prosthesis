@@ -1,26 +1,51 @@
-"""Launch dual-IMU EKF node using robot_localization.
+"""Launch both ICM-20948 IMUs and the robot_localization EKF filter.
 
-Maps two Realsense IMU streams into a single ekf_node instance:
-  - /cam0/data_raw -> imu0 (head camera, bus 7, cam0_imu_link)
-  - /cam1/data_raw -> imu1 (arm camera,  bus 1, cam1_imu_link)
-
-Config: config/ekf_dual_imu.yaml (calibration values from P3.1)
+Produces /odometry/filtered by fusing /cam0/data_raw and /cam1/data_raw.
 """
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    ekf_dual_imu = Node(
+    # ---- IMU drivers ----
+
+    cam0_imu = Node(
+        package="imu_driver",
+        executable="imu_node",
+        name="imu_node",
+        namespace="cam0",
+        output="screen",
+        parameters=[
+            "/miahand_ws/src/multi_cam_localization/imu_driver/config/imu_cam0.yaml"
+        ],
+    )
+
+    cam1_imu = Node(
+        package="imu_driver",
+        executable="imu_node",
+        name="imu_node",
+        namespace="cam1",
+        output="screen",
+        parameters=[
+            "/miahand_ws/src/multi_cam_localization/imu_driver/config/imu_cam1.yaml"
+        ],
+    )
+
+    # ---- EKF filter (robot_localization) ----
+
+    ekf_node = Node(
         package="robot_localization",
         executable="ekf_node",
         name="ekf_filter_node",
         output="screen",
         parameters=[
-            [FindPackageShare("sensor_fusion_bringup"), "/config/ekf_dual_imu.yaml"]
+            "/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup/config/ekf_dual_imu.yaml"
         ],
     )
 
-    return LaunchDescription([ekf_dual_imu])
+    return LaunchDescription([
+        cam0_imu,
+        cam1_imu,
+        ekf_node,
+    ])
