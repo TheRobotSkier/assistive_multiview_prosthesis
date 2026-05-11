@@ -61,7 +61,6 @@ services:
     extends: miahand_ros2
     container_name: miahand_ros2_moveit
     environment:
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       - USE_MUJOCO_SIM=${USE_MUJOCO_SIM:-true}
       - USE_MOCK_HARDWARE=${USE_MOCK_HARDWARE:-true}
     command: >
@@ -75,7 +74,6 @@ services:
     extends: miahand_ros2
     container_name: miahand_ros2_mujoco
     environment:
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       - MUJOCO_SCENE=${MUJOCO_SCENE:-custom}
       - ENABLE_DEPTH_PUBLISHER=${ENABLE_DEPTH_PUBLISHER:-true}
     command: >
@@ -89,7 +87,6 @@ services:
     extends: miahand_ros2
     container_name: miahand_ros2_mujoco_dynamic
     environment:
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       - MUJOCO_HARDWARE_PLUGIN=${MUJOCO_HARDWARE_PLUGIN:-mia_hand_mujoco/PlannerGuiSystemInterface}
     command: >
       bash -c "
@@ -105,7 +102,6 @@ services:
     extends: miahand_ros2
     container_name: miahand_ros2_mujoco_interactive
     environment:
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       - MUJOCO_OBJECT=${MUJOCO_OBJECT:-sphere}
       - MUJOCO_PC_MODE=${MUJOCO_PC_MODE:-object}
     command: >
@@ -122,7 +118,6 @@ services:
     extends: miahand_ros2
     container_name: miahand_ros2_control
     environment:
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       - USE_MOCK_HARDWARE=${USE_MOCK_HARDWARE:-true}
     command: >
       bash -c "
@@ -136,7 +131,6 @@ services:
     container_name: miahand_realsense_camera
     user: "0:0"
     environment:
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
       HOME: /root
     entrypoint: ["/bin/bash", "-lc"]
     command: "/miahand_ws/src/docker-deployment/start_realsense_camera.sh"
