@@ -42,7 +42,7 @@ def _realsense_cmd(serial: str, namespace: str, node_name: str, tf_prefix: str) 
         # YAML single quotes force string type (see design note above)
         '-p', f"serial_no:='{serial}'",
         '-p', f"tf_prefix:='{tf_prefix}'",
-        '-p', f"camera_name:='{tf_prefix}'",
+        '-p', "camera_name:='camera'",
         '-p', 'enable_color:=true',
         '-p', f'depth_module.depth_profile:={_DEPTH_PROFILE}',
         '-p', f'rgb_camera.color_profile:={_COLOR_PROFILE}',

@@ -59,8 +59,8 @@ logs-digital-twin:
 
 test-digital-twin:
 	@echo "=== Pointcloud Health Test ==="
-	$(COMPOSE) exec digital_twin bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
-		$(COMPOSE) exec grasp_test bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
+	podman exec digital_twin bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
+		podman exec grasp_test bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
 		echo "No running container found — start one first with 'make up-digital-twin' or 'make up-grasp-test'"
 
 # ── Test ───────────────────────────────────────────────────────────────────

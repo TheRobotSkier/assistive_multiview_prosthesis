@@ -1,23 +1,24 @@
-"""Digital Twin launch — full pipeline with cameras, segmentation, hand model, and wrist.
+"""Digital Twin launch — full pipeline with cameras, segmentation, hand model, and ChArUco tracking.
 
 Launches all nodes needed for a complete digital twin test:
 
-  1. Dual RealSense D435 cameras (or mock cloud publisher)
-  2. Pointcloud fuser        — subscribes to both cameras, publishes /fused_pointcloud
-  3. Cloud snapshot node      — freezes segmented cloud for RViz
-  4. Pointcloud relay         — /fused_pointcloud -> /segmentation/input_cloud
-  5. Segmentation ROS bridge  — HTTP inference client
-  6. Click relay              — forwards RViz clicks to segmentation seeds
-  7. Twist propagation        — detects hand->object collision (active)
-  8. Grasp preshaping service — C++/Rust FFI bridge
-  9. Grasp proximity controller
-  10. Pipeline manager         — state machine orchestrator
-  11. Hand pose publisher      — reads TF, publishes /hand_pose
-  12. Static TF                — wrist_link -> d435_2_depth_optical_frame (hand-mount offset)
-  13. Hand URDF with wrist     — robot_state_publisher (wrist-inclusive xacro)
-  14. Wrist sim driver         — subscribes /wrist/set_position, drives wrist_rotation joint
-  15. RViz                     — digital_twin.rviz config
-  16. Joint state publisher    — publishes default joint config (gui variant for manual control)
+ 1. Dual RealSense D435 cameras (or mock cloud publisher)
+ 2. Static TF: cam1camera_depth_optical_frame -> world (root)
+ 3. Pointcloud merger       — TF-transforms both clouds into cam1 frame, fuses to /fused_pointcloud
+ 4. Pointcloud relay         — /fused_pointcloud -> /segmentation/input_cloud
+ 5. Segmentation ROS bridge  — HTTP inference client
+ 6. Click relay              — forwards RViz clicks to segmentation seeds
+ 7. ChArUco TF node          — detects board, publishes charuco_board→cam*_link transforms
+ 8. Cam2 hand tracker        — composes ChArUco TFs → publishes world→wrist_link dynamically
+ 9. Cloud snapshot node      — freezes segmented cloud for RViz
+10. Twist propagation        — detects hand->object collision (active)
+11. Grasp preshaping service — C++/Rust FFI bridge
+12. Grasp proximity controller
+13. Pipeline manager         — state machine orchestrator
+14. Hand pose publisher      — reads TF, publishes /hand_pose
+15. Hand URDF (digital twin) — robot_state_publisher (wrist_link root, no wrist joint)
+16. RViz                     — digital_twin.rviz config
+17. Joint state publisher    — publishes default joint config (gui variant for manual control)
 
 Usage:
   ros2 launch prosthesis_launch digital_twin.launch.py
@@ -56,11 +57,15 @@ def _launch_setup(context, *args, **kwargs):
     if camera_enabled:
         cloud_topic = "/cam1/d435_1/depth/color/points"
         cam1_frame = "cam1camera_depth_optical_frame"
+        cam1_link = "cam1camera_link"
+        cam1_color_frame = "cam1camera_color_optical_frame"
         cam2_link_frame = "cam2camera_link"
         cam2_color_frame = "cam2camera_color_optical_frame"
     else:
         cloud_topic = "/camera/depth/color/points"
         cam1_frame = "camera_depth_optical_frame"
+        cam1_link = "camera_link"
+        cam1_color_frame = "camera_color_optical_frame"
         cam2_link_frame = "camera_link"
         cam2_color_frame = "camera_color_optical_frame"
 
@@ -88,10 +93,10 @@ def _launch_setup(context, *args, **kwargs):
             )
         )
 
-    # ── 2. Static TF: camera 1 depth frame -> world (roots URDF in camera 1) ─
-    # Since camera 1 is the stationary reference, this connects the TF tree:
-    #   cam1camera_depth_optical_frame -> world -> wrist_link -> cam2camera_link
-    # RViz should use cam1camera_depth_optical_frame as fixed frame.
+    # ── 2. Static TF: cam1 depth frame -> world (roots URDF in camera 1) ───
+    # Since camera 1 is the stationary reference, this connects the TF tree.
+    # cam2's position comes from ChArUco tracking → cam2_hand_tracker.
+    # RViz uses cam1camera_depth_optical_frame as fixed frame.
     if camera_enabled:
         nodes.append(
             Node(
@@ -107,24 +112,44 @@ def _launch_setup(context, *args, **kwargs):
                 output="screen",
             )
         )
+        # Static identity world→wrist_link — keeps the TF chain connected
+        # at all timestamps so RViz can render cam2 pointclouds even without
+        # the ChArUco board. When ChArUco tracking is active, cam2_hand_tracker
+        # publishes dynamic TFs with newer timestamps that take precedence.
+        nodes.append(
+            Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                name="world_to_wrist_fallback_tf",
+                arguments=[
+                    "0.0", "0.0", "0.0",
+                    "0.0", "0.0", "0.0", "1.0",
+                    "world",
+                    "wrist_link",
+                ],
+                output="screen",
+            )
+        )
 
-    # ── 3. Pointcloud fuser (combines both camera streams) ────────────────
+    # ── 3. Pointcloud merger — TF-transforms cam2 into cam1 frame, merges ──
+    # Replaces the old fuser which just relayed whichever fired last.
     if camera_enabled:
         nodes.append(
             Node(
                 package="camera",
-                executable="pointcloud_fuser_node",
-                name="pointcloud_fuser",
+                executable="pointcloud_merger_node",
+                name="pointcloud_merger",
                 parameters=[{
                     "cam1_topic": "/cam1/d435_1/depth/color/points",
                     "cam2_topic": "/cam2/d435_2/depth/color/points",
                     "output_topic": "/fused_pointcloud",
+                    "target_frame": cam1_frame,
                 }],
                 output="screen",
             )
         )
 
-    # ── 3. Pointcloud relay (fused -> segmentation input) ─────────────────
+    # ── 4. Pointcloud relay (fused -> segmentation input) ─────────────────
     nodes.append(
         Node(
             package="camera",
@@ -134,7 +159,7 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 4. Segmentation bridge ────────────────────────────────────────────
+    # ── 5. Segmentation bridge ────────────────────────────────────────────
     nodes.append(
         Node(
             package="segmentation_bridge",
@@ -145,7 +170,7 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 5. Click relay ────────────────────────────────────────────────────
+    # ── 6. Click relay ────────────────────────────────────────────────────
     nodes.append(
         Node(
             package="segmentation_bridge",
@@ -155,91 +180,61 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 6. Cloud snapshot node ────────────────────────────────────────────
-    nodes.append(
-        Node(
-            package="camera",
-            executable="cloud_snapshot_node",
-            name="cloud_snapshot_node",
-            output="screen",
+    # ── 7. ChArUco TF node — detects board, publishes charuco_board→cam*_link ─
+    # This is the foundation for cam2 tracking: gives us the board pose
+    # relative to each camera so the cam2_hand_tracker can compose world→cam2.
+    if camera_enabled:
+        nodes.append(
+            Node(
+                package="camera",
+                executable="charuco_tf_node",
+                name="charuco_tf_node",
+                parameters=[{
+                    "board_frame": "charuco_board",
+                    # Override defaults to match our tf_prefix + camera_name setup
+                    "cam1_frame_id": cam1_color_frame,
+                    "cam1_link_frame": cam1_link,
+                    "cam2_frame_id": cam2_color_frame,
+                    "cam2_link_frame": cam2_link_frame,
+                }],
+                output="screen",
+            )
         )
-    )
 
-    # ── 7. Twist propagation ──────────────────────────────────────────────
-    nodes.append(
-        Node(
-            package="twist_propagation",
-            executable="twist_propagation_node",
-            name="twist_propagation",
-            parameters=[
-                {
-                    "active": False,
-                    "input_cloud_topic": cloud_topic,
-                }
-            ],
-            output="screen",
+    # ── 8. Cam2 Hand Tracker — world→wrist_link from ChArUco tracking ─────
+    # Composes: cam1→world (static) + cam1→board (ChArUco) + board→cam2 (ChArUco)
+    # → world→cam2 → apply wrist offset → world→wrist_link TF.
+    if camera_enabled:
+        nodes.append(
+            Node(
+                package="camera",
+                executable="cam2_hand_tracker_node",
+                name="cam2_hand_tracker",
+                parameters=[{
+                    "board_frame": "charuco_board",
+                    "cam1_link": cam1_link,
+                    "cam1_depth_frame": cam1_frame,
+                    "cam2_link": cam2_link_frame,
+                    "world_frame": "world",
+                    # wrist→cam2 mounting offset (same as static TF below)
+                    "wrist_cam2_tx": -0.04,
+                    "wrist_cam2_ty": -0.01,
+                    "wrist_cam2_tz": 0.20,
+                    "wrist_cam2_roll": 1.57,
+                    "wrist_cam2_pitch": 0.0,
+                    "wrist_cam2_yaw": 1.57,
+                    "publish_rate": 15.0,
+                }],
+                output="screen",
+            )
         )
-    )
 
-    # ── 8. Grasp Preshaping Service ──────────────────────────────────────
-    nodes.append(
-        Node(
-            package="grasp_preshaping",
-            executable="preshaping_service_bridge_node",
-            name="preshaping_service",
-            parameters=[{
-                "camera_frames": [
-                    "cam1camera_color_optical_frame",
-                    cam2_color_frame,
-                ],
-                "preshaping_closure_fraction": 0.3,
-                "min_closure_amount": 0.1,
-                "publish_initial_commands": False,
-            }],
-            output="screen",
-        )
-    )
-
-    # ── 9. Grasp Proximity Controller ────────────────────────────────────
-    nodes.append(
-        Node(
-            package="grasp_preshaping",
-            executable="grasp_proximity_controller_node.py",
-            name="proximity_controller",
-            parameters=[{"config_file": config_file}],
-            output="screen",
-        )
-    )
-
-    # ── 10. Pipeline Manager ──────────────────────────────────────────────
-    nodes.append(
-        Node(
-            package="pipeline_manager",
-            executable="pipeline_manager_node",
-            name="pipeline_manager",
-            parameters=[{"config_file": config_file}],
-            output="screen",
-        )
-    )
-
-    # ── 11. Hand Pose Publisher ──────────────────────────────────────────
-    nodes.append(
-        Node(
-            package="camera",
-            executable="hand_pose_publisher",
-            name="hand_pose_publisher",
-            output="screen",
-        )
-    )
-
-    # ── 12. Static TF: wrist_link -> cam2camera_link (hand-mounted camera) ─
-    # Camera 2 is mounted on the back of the Mia Hand, ~2cm behind the
-    # knuckles, pointing forward (+X in wrist_link). The realsense driver
-    # publishes its own internal chain: cam2camera_link -> ... ->
-    # cam2camera_depth_optical_frame, so connecting wrist_link to
-    # cam2camera_link gives the full path to the pointcloud.
-    #   translation: (-0.04, -0.01, 0.20) — behind palm, centered, at palm height
-    #   rotation:    (1.57, 0.0, 1.57)    — camera Z (forward) aligns with wrist_link +X
+    # ── 8b. Static TF: wrist_link → cam2camera_link (hand-mounted camera) ─
+    # Needed for the pointcloud merger's TF chain: cam2cloud → cam2link →
+    # wrist_link → world → cam1frame.  Also used by RViz to display cam2's
+    # pointcloud in the hand frame.
+    #   translation: (-0.04, -0.01, 0.20) — camera behind palm
+    #   rotation:    (1.57, 0.0, 1.57)    — aligns camera Z forward with wrist +X
     if camera_enabled:
         nodes.append(
             Node(
@@ -256,9 +251,87 @@ def _launch_setup(context, *args, **kwargs):
             )
         )
 
-    # ── 13. Hand URDF with wrist via robot_state_publisher ───────────────
-    # Uses the wrist-inclusive URDF from mia_hand_ros2_control which adds a
-    # wrist_link and wrist_rotation revolute joint (Z-axis, ±90°).
+    # ── 9. Cloud snapshot node ────────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="camera",
+            executable="cloud_snapshot_node",
+            name="cloud_snapshot_node",
+            output="screen",
+        )
+    )
+
+    # ── 10. Twist propagation ──────────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="twist_propagation",
+            executable="twist_propagation_node",
+            name="twist_propagation",
+            parameters=[
+                {
+                    "active": False,
+                    "input_cloud_topic": cloud_topic,
+                }
+            ],
+            output="screen",
+        )
+    )
+
+    # ── 11. Grasp Preshaping Service ──────────────────────────────────────
+    nodes.append(
+        Node(
+            package="grasp_preshaping",
+            executable="preshaping_service_bridge_node",
+            name="preshaping_service",
+            parameters=[{
+                "camera_frames": [
+                    cam1_color_frame,
+                    cam2_color_frame,
+                ],
+                "preshaping_closure_fraction": 0.3,
+                "min_closure_amount": 0.1,
+                "publish_initial_commands": False,
+            }],
+            output="screen",
+        )
+    )
+
+    # ── 12. Grasp Proximity Controller ────────────────────────────────────
+    nodes.append(
+        Node(
+            package="grasp_preshaping",
+            executable="grasp_proximity_controller_node.py",
+            name="proximity_controller",
+            parameters=[{"config_file": config_file}],
+            output="screen",
+        )
+    )
+
+    # ── 13. Pipeline Manager ──────────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="pipeline_manager",
+            executable="pipeline_manager_node",
+            name="pipeline_manager",
+            parameters=[{"config_file": config_file}],
+            output="screen",
+        )
+    )
+
+    # ── 14. Hand Pose Publisher ──────────────────────────────────────────
+    nodes.append(
+        Node(
+            package="camera",
+            executable="hand_pose_publisher",
+            name="hand_pose_publisher",
+            output="screen",
+        )
+    )
+
+    # ── 15. Hand URDF (digital twin) via robot_state_publisher ────────────
+    # Uses mia_hand_digital_twin.urdf.xacro: wrist_link as root, NO world link
+    # and NO wrist_rotation joint. world→wrist_link is provided dynamically
+    # by cam2_hand_tracker_node from ChArUco board tracking.
     robot_description = ParameterValue(
         Command([
             FindExecutable(name="xacro"),
@@ -266,7 +339,7 @@ def _launch_setup(context, *args, **kwargs):
             PathJoinSubstitution([
                 FindPackageShare("mia_hand_ros2_control"),
                 "description", "urdf",
-                "mia_hand_with_wrist_system_interface.urdf.xacro",
+                "mia_hand_digital_twin.urdf.xacro",
             ]),
             " laterality:=right",
             " prefix:=",
@@ -285,24 +358,10 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 14. Wrist Sim Driver (digital twin, no hardware) ─────────────────
-    # Subscribes /wrist/set_position, publishes wrist_rotation joint_states
-    # so the URDF wrist rotates in RViz. Also publishes simulated /wrist/state.
-    nodes.append(
-        Node(
-            package="wrist_driver",
-            executable="wrist_driver_sim_node",
-            name="wrist_driver",
-            output="screen",
-        )
-    )
-
-    # ── 15. RViz with digital_twin.rviz (delayed for camera init) ────────
-    # Path from installed launch dir (share/.../launch/) to workspace root:
-    #   ../../../.. (5x) = /prosthesis_ws
-    rviz_config = os.path.join(
+    # ── 16. RViz with digital_twin.rviz (delayed for camera init) ─────────
+    rviz_config = os.path.abspath(os.path.join(
         os.path.dirname(__file__), "..", "..", "..", "..", "..", "rviz", "digital_twin.rviz"
-    )
+    ))
     # Delay RViz so camera frames exist before it opens (otherwise falls to 'map')
     rviz = TimerAction(period=8.0, actions=[
         Node(
@@ -315,7 +374,7 @@ def _launch_setup(context, *args, **kwargs):
     ])
     nodes.append(rviz)
 
-    # ── 16. Joint state publisher ────────────────────────────────────────
+    # ── 17. Joint state publisher ────────────────────────────────────────
     if gui_enabled:
         nodes.append(
             Node(

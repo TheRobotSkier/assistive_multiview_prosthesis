@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!-- mia_hand_digital_twin.urdf.xacro  —  hand URDF for digital twin
+     The hand root is wrist_link with NO world→wrist joint — the
+     cam2_hand_tracker node publishes world→wrist_link TF dynamically
+     based on ChArUco board tracking of camera 2.
+
+     Usage: ros2 launch prosthesis_launch digital_twin.launch.py
+ -->
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="mia_hand_digital_twin">
+
+  <xacro:arg name="laterality" default="right"/>
+  <xacro:arg name="joint_limits_config_file" default="joint_limits_default.yaml"/>
+  <xacro:arg name="prefix" default=""/>
+
+  <!-- Import mia hand description (visuals, collisions, joints) -->
+  <xacro:include filename="$(find mia_hand_description)/urdf/mia_hand.urdf.xacro"/>
+
+  <!-- Root link: positioned by cam2_hand_tracker's dynamic world→wrist_link TF -->
+  <link name="wrist_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="0.05"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Mia Hand: attaches palm to wrist_link -->
+  <!-- The origin (0, 0, 0.2) places palm 20 cm ahead of wrist_link's +Z -->
+  <xacro:mia_hand
+    laterality="$(arg laterality)"
+    joint_limits_config_file="$(arg joint_limits_config_file)"
+    parent="wrist_link"
+    prefix="$(arg prefix)">
+    <origin xyz="0 0 0.2" rpy="1.57 0 0"/>
+  </xacro:mia_hand>
+
+  <!-- NOTE: no world link, no wrist_rotation joint.
+       world→wrist_link is provided by cam2_hand_tracker_node at runtime. -->
+</robot>

@@ -16,6 +16,8 @@ setup(
             "pointcloud_relay_node = camera.pointcloud_relay_node:main",
             "cloud_snapshot_node = camera.cloud_snapshot_node:main",
             "pointcloud_fuser_node = camera.pointcloud_fuser_node:main",
+            "pointcloud_merger_node = camera.pointcloud_merger_node:main",
+            "cam2_hand_tracker_node = camera.cam2_hand_tracker_node:main",
         ],
     },
     data_files=[
