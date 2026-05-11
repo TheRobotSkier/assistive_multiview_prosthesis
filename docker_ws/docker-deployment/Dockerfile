@@ -31,6 +31,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -f video \
+    && groupadd -f i2c \
     && groupadd -f plugdev \
     && groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
