@@ -1,0 +1,28 @@
+# Host-side RViz: view robotlab camera data via podman
+# Usage: make rviz
+# Connects to robotlab ROS network at 10.42.0.2 via CycloneDDS peer discovery
+
+.PHONY: rviz rviz-kill
+
+RVIZ_CONFIG := $(CURDIR)/rviz/robotlab_cameras.rviz
+DDS_CONFIG := $(CURDIR)/config/cyclonedds_peer.xml
+
+rviz:
+	@echo "Launching RViz for robotlab..."
+	@test -f $(RVIZ_CONFIG) || { echo "Missing $(RVIZ_CONFIG)"; exit 1; }
+	podman run --rm -d --name rviz-robotlab \
+		--network host \
+		-e DISPLAY=$(DISPLAY) \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=file:///tmp/cyclonedds_peer.xml \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(DDS_CONFIG):/tmp/cyclonedds_peer.xml:ro \
+		-v $(RVIZ_CONFIG):/rviz_config.rviz:ro \
+		docker.io/osrf/ros:jazzy-desktop \
+		bash -c 'apt-get update -qq && apt-get install -y -qq ros-jazzy-rmw-cyclonedds-cpp >/dev/null 2>&1; source /opt/ros/jazzy/setup.bash; echo "RViz ready — display topics from robotlab"; rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "RViz container started. Kill with: make rviz-kill"
+
+rviz-kill:
+	podman kill rviz-robotlab 2>/dev/null || true
+	podman rm rviz-robotlab 2>/dev/null || true
