@@ -2,7 +2,7 @@ cameras:
   head:
     namespace: head
     name: d435_head
-    serial_no: "827112072207"
+    serial_no: "827112072033"
     mount_location: forehead
   arm:
     namespace: arm
