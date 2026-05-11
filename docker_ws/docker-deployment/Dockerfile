@@ -59,6 +59,7 @@ RUN sudo apt-get update \
         ros-${ROS_DISTRO}-librealsense2 \
         ros-${ROS_DISTRO}-realsense2-camera \
         ros-${ROS_DISTRO}-realsense2-description \
+        ros-${ROS_DISTRO}-robot-localization \
         libopencv-dev \
         ros-${ROS_DISTRO}-cv-bridge \
         ros-${ROS_DISTRO}-image-transport \
