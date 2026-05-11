@@ -1,8 +1,8 @@
 """Unified bringup for Robotlab Jetson Orin Nano: both D435 cameras + both ICM-20948 IMUs.
 
 Launches in a single file:
-  - head/d435_head  (serial 823313022234) via ExecuteProcess
-  - arm/d435_arm    (serial 830213023028) via ExecuteProcess
+  - head/d435_head  (serial 827112072207) via ExecuteProcess
+  - arm/d435_arm    (serial 829212072207) via ExecuteProcess
   - cam0/imu_node   (ICM-20948 on bus 7, addr 0x68) via Node
   - cam1/imu_node   (ICM-20948 on bus 1, addr 0x68) via Node
   - Jetson NEON pointcloud fix (delayed param set for both cameras)
