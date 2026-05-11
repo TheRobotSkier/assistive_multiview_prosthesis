@@ -75,9 +75,15 @@ the live Propagator assertion.
 
 The arm D435i Phase 2 setup was then added from
 `docker_ws/calibration/arm/d435i_310622071850/` with OpenVINS output under
-`/ov_msckf_arm` and marker output under `/arm/marker_pose`. Arm OpenVINS TF
-publishing is disabled for now because OpenVINS still publishes non-namespaced
-`imu`/`cam0` frame IDs internally.
+`/ov_msckf_arm` and marker output under `/arm/marker_pose`.
+
+Per-instance OpenVINS ROS 2 frame parameters have now been implemented for Phase
+2 so head and arm OpenVINS can publish TF simultaneously:
+
+```text
+marker_map -> head_imu -> head_cam0
+marker_map -> arm_imu  -> arm_cam0
+```
 
 Validated Phase 2 arm D435i replay bag:
 
@@ -166,10 +172,12 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 
 ## Next Task
 
-Plan, then implement, per-instance OpenVINS TF frame IDs or a safe TF prefix so
-head and arm can publish TF simultaneously for RViz drift inspection and later
-point-cloud fusion. The defensive OpenVINS Propagator timing/crash guard can
-follow, or move earlier if the live assertion recurs.
+Validate the per-instance OpenVINS TF frame update with a low-memory Docker/Jazzy
+build, launch smoke checks, fresh head and arm raw replays, and a simultaneous
+head+arm live/RViz check using
+`docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dual_openvins_tf_validation.md`.
+The defensive OpenVINS Propagator timing/crash guard can follow, or move earlier
+if the live assertion recurs.
 
 Recommended next-chat prompt:
 
@@ -179,6 +187,7 @@ Read:
 - .agents/future_tasks.md
 - .agents/phase2_openvins_handoff_status.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_marker_validation.md
+- docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dual_openvins_tf_validation.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_marker_validation.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md
 - docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py
@@ -187,19 +196,11 @@ Read:
 - docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.h
 - docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.*
 
-Make a detailed plan, but do not implement yet, for adding per-instance OpenVINS
-TF/frame support so head and arm D435i Phase 2 OpenVINS nodes can run
-simultaneously without TF collisions.
-
-Goals:
-- head and arm OpenVINS publish unique TF child frames
-- RViz can show head and arm drift even when marker ID 0 is out of view
-- marker updates still work for both cameras
-- /ov_msckf and /ov_msckf_arm topics remain separate
-- shared map frame remains marker_map
-- plan required updates to launch files, marker configs, docs, RViz, and
-  validation steps
-- avoid breaking already validated head and arm replay behavior
-- leave the Propagator timing/crash guard as a later follow-up unless the plan
-  finds TF work requires touching that code
+Validate the implemented per-instance OpenVINS TF/frame support for Phase 2.
+Confirm the low-memory Docker/Jazzy build, launch smoke checks, fresh head and
+arm raw replays, and the simultaneous head+arm live/RViz workflow. Expected TF:
+marker_map -> head_imu -> head_cam0 and marker_map -> arm_imu -> arm_cam0.
+Keep /ov_msckf and /ov_msckf_arm topics separate, keep marker_map shared, and
+leave the Propagator timing/crash guard for the next follow-up unless validation
+shows TF work requires it.
 ```

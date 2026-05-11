@@ -105,16 +105,25 @@ docker compose run --rm realsense_camera \
   'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && \
    ros2 topic echo --once /ov_msckf_arm/poseimu --field header && \
    ros2 topic echo --once /ov_msckf_arm/odomimu --field header && \
+   ros2 topic echo --once /ov_msckf_arm/odomimu --field child_frame_id && \
    ros2 topic echo --once /ov_msckf_arm/pathimu --field header'
 ```
 
-The frame ID should be `marker_map`.
+The frame ID should be `marker_map`. `/ov_msckf_arm/odomimu.child_frame_id`
+should be `arm_imu`.
 
 ## 4. Optional RViz2
 
-Use `marker_map` as the RViz fixed frame. The existing head RViz config is a
-reasonable starting point, but its saved displays point at head topics. For the
-arm trial, add or retarget displays to:
+Use `marker_map` as the RViz fixed frame. For simultaneous head and arm trials,
+open the dual Phase 2 config:
+
+```bash
+rviz2 -d /miahand_ws/src/multi_cam_localization/sensor_fusion_bringup/config/rviz/phase2_dual_openvins.rviz
+```
+
+For an arm-only trial, the existing head RViz config is still a reasonable
+starting point, but its saved displays point at head topics. Add or retarget
+displays to:
 
 ```text
 /ov_msckf_arm/pathimu
@@ -124,17 +133,11 @@ arm trial, add or retarget displays to:
 /arm/marker_pose/camera_pose_raw
 ```
 
-Arm OpenVINS calibration/global TF publishing is intentionally disabled to avoid
-duplicate `imu` and `cam0` TF frames when the head setup is also running. The
-arm marker node still publishes marker-derived visualization frames such as
-`arm_imu_from_marker`.
-
-This makes RViz less useful for judging drift while marker ID `0` is out of
-view. Future work should add per-instance OpenVINS TF frame IDs or a safe TF
-prefix so the arm can publish an arm-specific TF tree without colliding with the
-head OpenVINS tree. The recorded `/ov_msckf_arm/odomimu` messages currently
-still use `child_frame_id: imu`, so do not simply re-enable arm OpenVINS TF for
-two-camera runs.
+Arm OpenVINS now publishes `marker_map -> arm_imu -> arm_cam0`, which is safe
+to run beside the head tree `marker_map -> head_imu -> head_cam0`. The marker
+node still publishes marker-derived visualization frames such as
+`arm_imu_from_marker`, which is useful for comparing marker-only pose against
+the drifting OpenVINS pose when marker ID `0` returns.
 
 ## 5. What To Try Live
 

@@ -1,5 +1,6 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
@@ -23,6 +24,7 @@ def generate_launch_description():
 
     head_camera = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(rs_launch),
+        condition=IfCondition(LaunchConfiguration("start_camera")),
         launch_arguments={
             "camera_namespace": "head",
             "camera_name": "d435i_head",
@@ -47,15 +49,20 @@ def generate_launch_description():
         name="run_subscribe_msckf_marker",
         output="screen",
         parameters=[
+            {"use_sim_time": LaunchConfiguration("use_sim_time")},
             {"verbosity": LaunchConfiguration("verbosity")},
             {"use_stereo": False},
             {"max_cameras": 1},
             {"config_path": ov_config},
             {"global_frame_id": "marker_map"},
+            {"imu_frame_id": "head_imu"},
+            {"camera_frame_prefix": "head_cam"},
+            {"publish_global_to_imu_tf": True},
+            {"publish_calibration_tf": True},
             {"use_marker_pose_updates": True},
             {"marker_pose_topic": "/head/marker_pose/observation"},
             {"marker_global_frame_id": "marker_map"},
-            {"marker_target_frame": "imu"},
+            {"marker_target_frame": "head_imu"},
             {"marker_fixed_ids": "0"},
             {"marker_time_tolerance_s": 0.05},
             {"marker_chi2_gate": 16.81},
@@ -76,6 +83,16 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument("verbosity", default_value="INFO"),
+        DeclareLaunchArgument(
+            "start_camera",
+            default_value="true",
+            description="Start the live head RealSense camera. Set false for raw bag replay.",
+        ),
+        DeclareLaunchArgument(
+            "use_sim_time",
+            default_value="false",
+            description="Use /clock, typically true during rosbag replay.",
+        ),
         head_camera,
         TimerAction(period=5.0, actions=[openvins_phase2]),
     ])

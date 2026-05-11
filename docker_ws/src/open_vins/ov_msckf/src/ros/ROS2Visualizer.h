@@ -243,6 +243,9 @@ protected:
   bool publish_calibration_tf = true;
   bool marker_path_has_locked = false;
   std::string global_frame_id = "global";
+  std::string imu_frame_id = "imu";
+  std::string camera_frame_prefix = "cam";
+  std::string truth_frame_id = "truth";
 
   // Files and if we should save total state
   bool save_total_state = false;

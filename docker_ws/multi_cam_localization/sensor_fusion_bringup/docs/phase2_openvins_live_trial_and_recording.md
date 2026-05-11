@@ -92,7 +92,7 @@ Check that the observation says:
 
 - `marker_id: 0`
 - `header.frame_id: marker_map`
-- `target_frame: imu`
+- `target_frame: head_imu`
 - `hard_gate_passed: true`
 - `stable: true`
 
@@ -105,14 +105,16 @@ docker compose run --rm realsense_camera \
   'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && \
    ros2 topic echo --once /ov_msckf/poseimu --field header && \
    ros2 topic echo --once /ov_msckf/odomimu --field header && \
+   ros2 topic echo --once /ov_msckf/odomimu --field child_frame_id && \
    ros2 topic echo --once /ov_msckf/pathimu --field header'
 ```
 
-The frame ID should be `marker_map`.
+The frame ID should be `marker_map`, and `/ov_msckf/odomimu.child_frame_id`
+should be `head_imu`.
 
 ## 4. Open RViz2
 
-Use the existing saved config first:
+Use the head saved config for a head-only trial:
 
 ```bash
 cd ~/Documents/assistive_multiview_prosthesis/docker_ws/docker-deployment
@@ -128,12 +130,20 @@ the important OpenVINS and marker-pose displays. For Phase 2, ignore or disable
 the old `/head/marker_pose/ov_corrected_odom` display; that was the Phase 1
 external correction output, and Phase 2 is now correcting inside OpenVINS.
 
+For simultaneous head and arm trials, use:
+
+```bash
+rviz2 -d /miahand_ws/src/multi_cam_localization/sensor_fusion_bringup/config/rviz/phase2_dual_openvins.rviz
+```
+
 Watch these frames:
 
 - `marker_map`: RViz fixed frame.
 - `marker_0`: fixed 100 mm marker map frame.
-- `imu`: OpenVINS IMU frame after initialization and marker-map locking.
-- `imu_from_marker`: marker-only IMU pose estimate from the Python marker node.
+- `head_imu`: OpenVINS IMU frame after initialization and marker-map locking.
+- `head_cam0`: OpenVINS camera calibration frame under `head_imu`.
+- `head_imu_from_marker`: marker-only IMU pose estimate from the Python marker
+  node.
 - `head_d435i_head_color_optical_frame_body_display`: intuitive camera body
   display frame, where red `+X` points forward through the lens.
 
@@ -235,10 +245,12 @@ Recommended recording sequence:
 9. Optionally induce a larger VIO drift/reacquire case.
 10. Stop recording with `Ctrl+C` so the bag closes cleanly.
 
-For replay validation, replay only raw input topics:
+For replay validation, launch OpenVINS with `start_camera:=false
+use_sim_time:=true`, launch the marker node with `use_sim_time:=true`, then
+replay only raw input topics:
 
 ```bash
-ros2 bag play <bag_path> --topics \
+ros2 bag play <bag_path> --clock --topics \
   /head/d435i_head/color/image_raw \
   /head/d435i_head/color/camera_info \
   /head/d435i_head/imu

@@ -6,6 +6,8 @@ in parallel, so keep the OpenVINS build sequential.
 
 For bench commands to try the Phase 2 path live and record a pre-init validation
 bag, see `phase2_openvins_live_trial_and_recording.md`.
+For simultaneous head and arm TF validation, see
+`phase2_dual_openvins_tf_validation.md`.
 
 ## Low-Memory Build
 
@@ -61,6 +63,12 @@ docker compose run --rm realsense_camera \
    ros2 launch sensor_fusion_bringup head_marker_pose_phase2.launch.py --show-args"
 ```
 
+Expected:
+
+- The head OpenVINS launch exposes `verbosity`, `start_camera`, and
+  `use_sim_time`.
+- The head marker launch exposes `config_file` and `use_sim_time`.
+
 ## Behavior Validation
 
 Run Phase 1 and Phase 2 as separate sessions. Do not run the original OpenVINS
@@ -71,6 +79,11 @@ Expected checks:
 - Original Phase 1 launches still start unchanged.
 - `/head/marker_pose/observation` is published by the Python marker node.
 - Phase 2 OpenVINS publishes pose/odom/path in `marker_map`.
+- `/ov_msckf/odomimu.child_frame_id` is `head_imu`.
+- `/head/marker_pose/observation.target_frame` is `head_imu`.
+- OpenVINS TF publishes `marker_map -> head_imu -> head_cam0`.
+- Any custom Phase 2 marker config keeps `frames.imu_frame` equal to the
+  OpenVINS launch `marker_target_frame`.
 - Marker ID 0 is accepted as the fixed map marker.
 - Marker ID 1 is not accepted as a fixed map landmark.
 - Healthy VIO receives bounded marker EKF corrections.
@@ -157,6 +170,12 @@ Replay passed the Phase 2 marker EKF behavior checks:
 Raw timestamp scan found monotonic IMU, image, and camera-info streams. The IMU
 stream had `24768` messages at about 200 Hz with a maximum observed gap of about
 `15 ms`. The image stream had some frame gaps up to about `100 ms`.
+
+After the per-instance TF update, rerun this replay with
+`head_d435i_openvins_phase2.launch.py start_camera:=false use_sim_time:=true`
+and check that regenerated marker observations use `target_frame: head_imu`,
+OpenVINS odometry uses `child_frame_id: head_imu`, and TF contains
+`marker_map -> head_imu -> head_cam0`.
 
 ## Commit Notes
 

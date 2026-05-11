@@ -9,6 +9,7 @@ frames:
   map_frame: marker_map
   camera_frame: arm_d435i_arm_color_optical_frame
   detected_camera_frame: arm_d435i_arm_color_optical_frame
+  # Must match the Phase 2 OpenVINS launch marker_target_frame / imu_frame_id.
   imu_frame: arm_imu
 
 # OpenVINS/Kalibr camera-IMU calibration.
@@ -119,4 +120,3 @@ markers:
       - [0.0, -1.0, 0.0, 0.0]
       - [0.0, 0.0, -1.0, 0.0]
       - [0.0, 0.0, 0.0, 1.0]
-

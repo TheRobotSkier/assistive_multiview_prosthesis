@@ -71,6 +71,15 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   if (node->has_parameter("global_frame_id")) {
     node->get_parameter<std::string>("global_frame_id", global_frame_id);
   }
+  if (node->has_parameter("imu_frame_id")) {
+    node->get_parameter<std::string>("imu_frame_id", imu_frame_id);
+  }
+  if (node->has_parameter("camera_frame_prefix")) {
+    node->get_parameter<std::string>("camera_frame_prefix", camera_frame_prefix);
+  }
+  if (node->has_parameter("truth_frame_id")) {
+    node->get_parameter<std::string>("truth_frame_id", truth_frame_id);
+  }
 
   // Create image transport
   image_transport::ImageTransport it(node);
@@ -369,7 +378,7 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
     odomIinM.pose.pose.position.z = state_plus(6);
 
     // The TWIST component (angular and linear velocities)
-    odomIinM.child_frame_id = "imu";
+    odomIinM.child_frame_id = imu_frame_id;
     odomIinM.twist.twist.linear.x = state_plus(7);   // vel in local frame
     odomIinM.twist.twist.linear.y = state_plus(8);   // vel in local frame
     odomIinM.twist.twist.linear.z = state_plus(9);   // vel in local frame
@@ -404,7 +413,7 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
   geometry_msgs::msg::TransformStamped trans = ROSVisualizerHelper::get_stamped_transform_from_pose(_node, odom_pose, false);
   trans.header.stamp = _node->now();
   trans.header.frame_id = global_frame_id;
-  trans.child_frame_id = "imu";
+  trans.child_frame_id = imu_frame_id;
   if (publish_global2imu_tf) {
     mTfBr->sendTransform(trans);
   }
@@ -413,8 +422,8 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
   for (const auto &calib : state->_calib_IMUtoCAM) {
     geometry_msgs::msg::TransformStamped trans_calib = ROSVisualizerHelper::get_stamped_transform_from_pose(_node, calib.second, true);
     trans_calib.header.stamp = _node->now();
-    trans_calib.header.frame_id = "imu";
-    trans_calib.child_frame_id = "cam" + std::to_string(calib.first);
+    trans_calib.header.frame_id = imu_frame_id;
+    trans_calib.child_frame_id = camera_frame_prefix + std::to_string(calib.first);
     if (publish_calibration_tf) {
       mTfBr->sendTransform(trans_calib);
     }
@@ -821,7 +830,7 @@ void ROS2Visualizer::publish_images() {
   // Create our message
   std_msgs::msg::Header header;
   header.stamp = _node->now();
-  header.frame_id = "cam0";
+  header.frame_id = camera_frame_prefix + "0";
   sensor_msgs::msg::Image::SharedPtr exl_msg = cv_bridge::CvImage(header, "bgr8", img_history).toImageMsg();
 
   // Publish
@@ -921,7 +930,7 @@ void ROS2Visualizer::publish_groundtruth() {
   geometry_msgs::msg::TransformStamped trans;
   trans.header.stamp = _node->now();
   trans.header.frame_id = global_frame_id;
-  trans.child_frame_id = "truth";
+  trans.child_frame_id = truth_frame_id;
   trans.transform.rotation.x = state_gt(1, 0);
   trans.transform.rotation.y = state_gt(2, 0);
   trans.transform.rotation.z = state_gt(3, 0);
@@ -1036,7 +1045,7 @@ void ROS2Visualizer::publish_loopclosure_information() {
     Eigen::Vector3d p_CinI = -_app->get_state()->_calib_IMUtoCAM.at(0)->Rot().transpose() * _app->get_state()->_calib_IMUtoCAM.at(0)->pos();
     nav_msgs::msg::Odometry odometry_calib;
     odometry_calib.header = header;
-    odometry_calib.header.frame_id = "imu";
+    odometry_calib.header.frame_id = imu_frame_id;
     odometry_calib.pose.pose.position.x = p_CinI(0);
     odometry_calib.pose.pose.position.y = p_CinI(1);
     odometry_calib.pose.pose.position.z = p_CinI(2);
@@ -1050,7 +1059,7 @@ void ROS2Visualizer::publish_loopclosure_information() {
     bool is_fisheye = (std::dynamic_pointer_cast<ov_core::CamEqui>(_app->get_params().camera_intrinsics.at(0)) != nullptr);
     sensor_msgs::msg::CameraInfo cameraparams;
     cameraparams.header = header;
-    cameraparams.header.frame_id = "cam0";
+    cameraparams.header.frame_id = camera_frame_prefix + "0";
     cameraparams.distortion_model = is_fisheye ? "equidistant" : "plumb_bob";
     Eigen::VectorXd cparams = _app->get_state()->_cam_intrinsics.at(0)->value();
     cameraparams.d = {cparams(4), cparams(5), cparams(6), cparams(7)};
@@ -1148,12 +1157,12 @@ void ROS2Visualizer::publish_loopclosure_information() {
     }
 
     // Create our messages
-    header.frame_id = "cam0";
+    header.frame_id = camera_frame_prefix + "0";
     sensor_msgs::msg::Image::SharedPtr exl_msg1 =
         cv_bridge::CvImage(header, sensor_msgs::image_encodings::TYPE_16UC1, depthmap).toImageMsg();
     it_pub_loop_img_depth.publish(exl_msg1);
     header.stamp = _node->now();
-    header.frame_id = "cam0";
+    header.frame_id = camera_frame_prefix + "0";
     sensor_msgs::msg::Image::SharedPtr exl_msg2 = cv_bridge::CvImage(header, "bgr8", depthmap_viz).toImageMsg();
     it_pub_loop_img_depth_color.publish(exl_msg2);
   }

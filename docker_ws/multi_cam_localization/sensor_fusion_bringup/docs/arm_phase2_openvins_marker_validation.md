@@ -13,6 +13,9 @@ OpenVINS:    /ov_msckf_arm/...
 Map frame:   marker_map
 ```
 
+For simultaneous head and arm TF validation, see
+`phase2_dual_openvins_tf_validation.md`.
+
 The arm calibration source is:
 
 ```text
@@ -93,10 +96,17 @@ header.frame_id: marker_map
 target_frame: arm_imu
 ```
 
-The arm OpenVINS launch disables `publish_global_to_imu_tf` and
-`publish_calibration_tf` to avoid duplicate `imu` and `cam0` TF frames when head
-OpenVINS is also running. Use `/ov_msckf_arm/*` topics as the authoritative arm
-OpenVINS outputs.
+Any custom Phase 2 marker config must keep `frames.imu_frame` equal to the
+OpenVINS launch `marker_target_frame`.
+
+The arm OpenVINS launch publishes per-instance TF frames:
+
+```text
+marker_map -> arm_imu -> arm_cam0
+```
+
+These frames are safe to run at the same time as the head Phase 2 TF tree
+`marker_map -> head_imu -> head_cam0`.
 
 ## Fresh Raw Replay Validation
 
@@ -150,6 +160,7 @@ docker compose run --rm realsense_camera \
    ros2 topic echo --once /arm/marker_pose/observation && \
    ros2 topic echo --once /ov_msckf_arm/poseimu --field header && \
    ros2 topic echo --once /ov_msckf_arm/odomimu --field header && \
+   ros2 topic echo --once /ov_msckf_arm/odomimu --field child_frame_id && \
    ros2 topic echo --once /ov_msckf_arm/pathimu --field header'
 ```
 
@@ -161,6 +172,8 @@ Replay passes when:
 - `/arm/marker_pose/observation` publishes marker ID `0` observations.
 - `/ov_msckf_arm/poseimu`, `/ov_msckf_arm/odomimu`, and
   `/ov_msckf_arm/pathimu` publish with `header.frame_id: marker_map`.
+- `/ov_msckf_arm/odomimu.child_frame_id` is `arm_imu`.
+- TF contains `marker_map -> arm_imu -> arm_cam0`.
 - Logs show marker-map first lock or relock from marker ID `0`.
 - Logs show accepted marker ID `0` EKF updates after lock.
 - Stale marker/timestamp drops are not the dominant behavior.
@@ -225,8 +238,6 @@ earlier on the head setup.
   `marker_target_frame` is also `arm_imu`.
 - If the marker node reports no OpenVINS odom, check that
   `arm_aruco_map.yaml` uses `/ov_msckf_arm/odomimu`.
-- If head and arm are both running, avoid relying on OpenVINS TF for the arm;
-  validate arm OpenVINS through `/ov_msckf_arm/*` topics.
-- OpenVINS still publishes `odomimu.child_frame_id: imu` internally. Arm TF is
-  disabled until OpenVINS supports per-instance frame IDs or a safe TF prefix;
-  otherwise head and arm TF trees would collide.
+- If head and arm are both running, verify the arm uses `arm_imu`/`arm_cam0`
+  and the head uses `head_imu`/`head_cam0`; do not reintroduce generic `imu` or
+  `cam0` frames in Phase 2 launch overrides.

@@ -48,9 +48,8 @@ Repository hygiene:
   decision is made
 
 Near-term next work:
-- add a namespaced/per-instance OpenVINS TF frame fix so head and arm can both
-  publish TF for RViz drift inspection and later point-cloud fusion without
-  colliding on `imu` or `cam0`
+- validate the per-instance OpenVINS TF frame fix in live dual-camera operation
+  and with fresh head/arm raw replays
 - add a defensive OpenVINS timing/crash guard around the Propagator assertion
   observed once during live testing
 
@@ -79,10 +78,9 @@ Implemented deliverables:
 - `multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md`
 
 The arm OpenVINS node uses `/ov_msckf_arm` to avoid topic collisions with head
-OpenVINS. Arm OpenVINS calibration/global TF publishing is currently disabled
-because OpenVINS still publishes child frame `imu` and calibration frame `cam0`
-internally; simply enabling TF would collide with the head setup. Fix this with
-per-instance frame IDs or a safe TF prefix before two-camera point-cloud fusion.
+OpenVINS. The Phase 2 launch now uses per-instance OpenVINS frames so arm TF can
+run beside head TF: `marker_map -> head_imu -> head_cam0` and
+`marker_map -> arm_imu -> arm_cam0`.
 
 ## B. OpenVINS Internal Marker Update / EKF Reanchor
 
@@ -128,11 +126,9 @@ point clouds. Avoid fusing clouds directly in drifting raw OpenVINS `global`
 frames.
 
 Immediate prerequisite:
-- Add namespaced OpenVINS TF frame support for multiple live instances. The arm
-  trial showed that disabling arm OpenVINS TF prevents collisions but makes RViz
-  drift inspection difficult when marker ID 0 is out of view. The future TF tree
-  should expose distinct head and arm IMU/camera frames while preserving the
-  shared `marker_map`.
+- Validate the new per-instance OpenVINS TF frame support for multiple live
+  instances. The intended TF tree exposes distinct head and arm IMU/camera
+  frames while preserving the shared `marker_map`.
 
 Planned final marker layout:
 - Fixed world/common reference marker: 6x6 marker ID 0, 100 mm x 100 mm, in

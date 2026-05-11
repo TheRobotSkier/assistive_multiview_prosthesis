@@ -9,7 +9,8 @@ frames:
   map_frame: marker_map
   camera_frame: head_d435i_head_color_optical_frame
   detected_camera_frame: head_d435i_head_color_optical_frame
-  imu_frame: imu
+  # Must match the Phase 2 OpenVINS launch marker_target_frame / imu_frame_id.
+  imu_frame: head_imu
 
 # OpenVINS/Kalibr camera-IMU calibration.
 # This gives the node camera intrinsics, distortion, and T_cam_imu.
