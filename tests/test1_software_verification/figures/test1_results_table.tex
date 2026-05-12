@@ -1,0 +1,47 @@
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l r r r r}
+\toprule
+\textbf{Object} & \textbf{Mean (ms)} & \textbf{P95 (ms)} & \textbf{P99 (ms)} & \textbf{Result} \\
+\midrule
+banana & 106.9 & 117.6 & 118.7 & \textcolor{green!60!black}{\checkmark} \\
+cylinder\_tilted & 91.3 & 94.5 & 94.9 & \textcolor{green!60!black}{\checkmark} \\
+cylinder\_upright & 102.2 & 116.5 & 120.1 & \textcolor{green!60!black}{\checkmark} \\
+ellipsoid & 105.3 & 123.5 & 127.1 & \textcolor{green!60!black}{\checkmark} \\
+l\_block & 105.5 & 115.5 & 119.1 & \textcolor{green!60!black}{\checkmark} \\
+mug & 88.6 & 91.6 & 92.7 & \textcolor{green!60!black}{\checkmark} \\
+power\_drill & 81.3 & 85.1 & 85.8 & \textcolor{green!60!black}{\checkmark} \\
+small\_cube & 105.5 & 110.0 & 110.0 & \textcolor{green!60!black}{\checkmark} \\
+tapered\_bottle & 85.7 & 91.3 & 93.5 & \textcolor{green!60!black}{\checkmark} \\
+thin\_plate & 29.5 & 148.6 & 156.9 & \textcolor{green!60!black}{\checkmark} \\
+\bottomrule
+\end{tabular}
+\caption{Test 1a: Pipeline latency results per object. MAR $\leq 400$\,ms.}
+\label{tab:test1_latency}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l r r r}
+\toprule
+\textbf{Object} & \textbf{SV (\%)} & \textbf{MV (\%)} & \textbf{$\Delta$ (\%)} \\
+\midrule
+banana & 0.0 & 0.0 & +0.0 \\
+cylinder\_tilted & 0.0 & 0.0 & +0.0 \\
+cylinder\_upright & 0.0 & 0.0 & +0.0 \\
+ellipsoid & 0.0 & 10.0 & +10.0 \\
+l\_block & 0.0 & 0.0 & +0.0 \\
+mug & 0.0 & 0.0 & +0.0 \\
+power\_drill & 0.0 & 0.0 & +0.0 \\
+small\_cube & 0.0 & 0.0 & +0.0 \\
+tapered\_bottle & 0.0 & 0.0 & +0.0 \\
+thin\_plate & 0.0 & 0.0 & +0.0 \\
+\midrule
+\textbf{Mean} & & & +1.0 \\
+\bottomrule
+\end{tabular}
+\caption{Test 1b: Intent precision $\Delta$ (multi-view $-$ single-view). MAR $> 0$\,\%, IDE $\geq 10$\,\%.}
+\label{tab:test1_delta}
+\end{table}
