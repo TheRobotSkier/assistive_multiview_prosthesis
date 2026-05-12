@@ -89,12 +89,22 @@ logs-cameras:
 rviz:
 	@echo "Launching RViz on host (connects to robotlab via Ethernet ROS network)"
 	@test -f rviz/robotlab_cameras.rviz || { echo "Missing rviz/robotlab_cameras.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	xhost +
 	podman run --rm -d --name rviz-robotlab \
 		--network host \
+		--ipc host \
 		--device /dev/dri \
+		--userns=keep-id \
 		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/robotlab_cameras.rviz:/rviz_config.rviz:ro \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
 		localhost/rviz-robotlab \
 		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
 	@sleep 3

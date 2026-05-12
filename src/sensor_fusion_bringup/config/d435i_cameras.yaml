@@ -20,4 +20,4 @@ common:
   color_profile: "640x480x15"
   pointcloud_neon_param: "pointcloud__neon_.enable"
   pointcloud_neon_value: true
-  pointcloud_neon_delay_sec: 6.0
+  pointcloud_neon_delay_sec: 15.0
