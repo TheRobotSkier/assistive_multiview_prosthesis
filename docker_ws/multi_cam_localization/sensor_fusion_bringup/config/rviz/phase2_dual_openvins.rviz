@@ -106,7 +106,7 @@ Visualization Manager:
           Value: true
         head_imu_from_marker:
           Value: true
-        marker_1:
+        marker_0:
           Value: true
         marker_map:
           Value: true
@@ -135,7 +135,7 @@ Visualization Manager:
               {}
           head_imu_from_marker:
             {}
-          marker_1:
+          marker_0:
             arm_d435i_arm_color_optical_frame_raw:
               {}
             head_d435i_head_color_optical_frame_raw:

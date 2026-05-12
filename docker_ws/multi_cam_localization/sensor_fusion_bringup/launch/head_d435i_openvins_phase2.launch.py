@@ -63,7 +63,7 @@ def generate_launch_description():
             {"marker_pose_topic": "/head/marker_pose/observation"},
             {"marker_global_frame_id": "marker_map"},
             {"marker_target_frame": "head_imu"},
-            {"marker_fixed_ids": "1"},
+            {"marker_fixed_ids": "0"},
             {"marker_time_tolerance_s": 0.05},
             {"marker_chi2_gate": 16.81},
             {"marker_noise_multiplier": 1.0},
