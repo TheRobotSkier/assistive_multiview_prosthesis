@@ -12,6 +12,7 @@ cameras:
 
 common:
   pointcloud_enable: true
+  pointcloud_stream_filter: 2  # 2=color (XYZRGB), 0=depth (greyscale)
   align_depth_enable: true
   enable_gyro: true
   enable_accel: true

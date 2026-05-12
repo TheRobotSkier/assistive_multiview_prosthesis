@@ -12,5 +12,5 @@ cam0:
   distortion_model: radtan
   intrinsics: [599.1739928442613, 599.2682460042912, 324.9719463276537, 250.51904788461366]
   resolution: [640, 480]
-  rostopic: /head/d435i_head/color/image_raw
+  rostopic: /head/d435i_head/grey/image_raw
   timeshift_cam_imu: 0.01334857234167497

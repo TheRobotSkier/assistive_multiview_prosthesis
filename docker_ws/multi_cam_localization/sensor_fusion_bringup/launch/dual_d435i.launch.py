@@ -40,6 +40,7 @@ def _camera_actions(cam, common):
             "unite_imu_method": str(common["unite_imu_method"]),
             "depth_module.depth_profile": common["depth_profile"],
             "rgb_camera.color_profile": common["color_profile"],
+            "pointcloud.stream_filter": str(common["pointcloud_stream_filter"]),
         }.items(),
     )
 

@@ -42,6 +42,18 @@ def generate_launch_description():
         }.items(),
     )
 
+
+    grey_converter = Node(
+        package="image_proc",
+        executable="convert",
+        namespace="arm/d435i_arm",
+        name="color_to_grey",
+        remappings=[
+            ("image", "/arm/d435i_arm/color/image_raw"),
+            ("image_mono", "/arm/d435i_arm/grey/image_raw"),
+        ],
+    )
+
     openvins_phase2 = Node(
         package="ov_msckf",
         executable="run_subscribe_msckf_marker",
@@ -94,5 +106,6 @@ def generate_launch_description():
             description="Use /clock, typically true during rosbag replay.",
         ),
         arm_camera,
+        grey_converter,
         TimerAction(period=5.0, actions=[openvins_phase2]),
     ])
