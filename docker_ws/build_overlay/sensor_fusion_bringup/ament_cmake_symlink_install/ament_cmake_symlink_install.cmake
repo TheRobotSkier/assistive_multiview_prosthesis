@@ -324,8 +324,8 @@ ament_cmake_symlink_install_directory("/miahand_ws/src/multi_cam_localization/se
 # install(DIRECTORY "docs/" "DESTINATION" "share/sensor_fusion_bringup/docs")
 ament_cmake_symlink_install_directory("/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup" DIRECTORY "docs/" "DESTINATION" "share/sensor_fusion_bringup/docs")
 
-# install(PROGRAMS "scripts/analyze_marker_covariance_bags.py" "scripts/aruco_marker_pose_node.py" "scripts/calibrate_arm_marker_extrinsic.py" "scripts/marker_quality_monitor.py" "DESTINATION" "lib/sensor_fusion_bringup")
-ament_cmake_symlink_install_programs("/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup" PROGRAMS "scripts/analyze_marker_covariance_bags.py" "scripts/aruco_marker_pose_node.py" "scripts/calibrate_arm_marker_extrinsic.py" "scripts/marker_quality_monitor.py" "DESTINATION" "lib/sensor_fusion_bringup")
+# install(PROGRAMS "scripts/analyze_marker_covariance_bags.py" "scripts/aruco_marker_pose_node.py" "scripts/calibrate_arm_marker_extrinsic.py" "scripts/dynamic_arm_pose_measurement_node.py" "scripts/head_derived_arm_pose_preview_node.py" "scripts/marker_quality_monitor.py" "DESTINATION" "lib/sensor_fusion_bringup")
+ament_cmake_symlink_install_programs("/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup" PROGRAMS "scripts/analyze_marker_covariance_bags.py" "scripts/aruco_marker_pose_node.py" "scripts/calibrate_arm_marker_extrinsic.py" "scripts/dynamic_arm_pose_measurement_node.py" "scripts/head_derived_arm_pose_preview_node.py" "scripts/marker_quality_monitor.py" "DESTINATION" "lib/sensor_fusion_bringup")
 
 # install(FILES "/miahand_ws/src/build_overlay/sensor_fusion_bringup/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/sensor_fusion_bringup" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")
 ament_cmake_symlink_install_files("/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup" FILES "/miahand_ws/src/build_overlay/sensor_fusion_bringup/ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/sensor_fusion_bringup" "DESTINATION" "share/ament_index/resource_index/package_run_dependencies")

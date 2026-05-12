@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "state/StateOptions.h"
+#include "update/UpdaterDynamicArmPose.h"
 #include "update/UpdaterMarkerPose.h"
 #include "update/UpdaterOptions.h"
 #include "utils/NoiseManager.h"
@@ -105,6 +106,9 @@ struct VioManagerOptions {
   /// Phase 2 external marker-pose update/reset options
   MarkerPoseUpdaterOptions marker_pose_options;
 
+  /// Conservative dynamic arm pose update options
+  DynamicArmPoseUpdaterOptions dynamic_arm_pose_options;
+
   static std::vector<int> parse_marker_ids(const std::string &ids_string) {
     std::string normalized = ids_string;
     std::replace(normalized.begin(), normalized.end(), ',', ' ');
@@ -157,6 +161,23 @@ struct VioManagerOptions {
       parser->parse_config("marker_reset_min_velocity_std_mps", marker_pose_options.reset_min_velocity_std_mps, false);
       parser->parse_config("marker_reset_bias_gyro_std", marker_pose_options.reset_bias_gyro_std, false);
       parser->parse_config("marker_reset_bias_accel_std", marker_pose_options.reset_bias_accel_std, false);
+
+      parser->parse_config("use_dynamic_arm_pose_updates", dynamic_arm_pose_options.enabled, false);
+      parser->parse_config("dynamic_arm_measurement_only", dynamic_arm_pose_options.measurement_only, false);
+      parser->parse_config("dynamic_arm_pose_topic", dynamic_arm_pose_options.topic, false);
+      parser->parse_config("dynamic_arm_status_topic", dynamic_arm_pose_options.status_topic, false);
+      parser->parse_config("dynamic_arm_global_frame_id", dynamic_arm_pose_options.global_frame_id, false);
+      parser->parse_config("dynamic_arm_target_frame", dynamic_arm_pose_options.target_frame, false);
+      parser->parse_config("dynamic_arm_source_camera_frame", dynamic_arm_pose_options.source_camera_frame, false);
+      parser->parse_config("dynamic_arm_marker_frame", dynamic_arm_pose_options.marker_frame, false);
+      parser->parse_config("dynamic_arm_marker_id", dynamic_arm_pose_options.marker_id, false);
+      parser->parse_config("dynamic_arm_time_tolerance_s", dynamic_arm_pose_options.time_tolerance_s, false);
+      parser->parse_config("dynamic_arm_chi2_gate", dynamic_arm_pose_options.chi2_gate, false);
+      parser->parse_config("dynamic_arm_noise_multiplier", dynamic_arm_pose_options.noise_multiplier, false);
+      parser->parse_config("dynamic_arm_max_update_translation_m", dynamic_arm_pose_options.max_update_translation_m, false);
+      parser->parse_config("dynamic_arm_max_update_rotation_deg", dynamic_arm_pose_options.max_update_rotation_deg, false);
+      parser->parse_config("dynamic_arm_min_update_interval_s", dynamic_arm_pose_options.min_update_interval_s, false);
+      parser->parse_config("dynamic_arm_skip_after_fixed_marker_s", dynamic_arm_pose_options.skip_after_fixed_marker_s, false);
     }
     PRINT_DEBUG("  - dt_slam_delay: %.1f\n", dt_slam_delay);
     PRINT_DEBUG("  - zero_velocity_update: %d\n", try_zupt);
@@ -188,6 +209,21 @@ struct VioManagerOptions {
     PRINT_DEBUG("  - marker reset velocity fit: %d samples over %.3f s (min dt %.3f s, max %.3f m/s)\n",
                 marker_pose_options.reset_min_samples, marker_pose_options.reset_window_s, marker_pose_options.reset_min_sample_dt_s,
                 marker_pose_options.reset_max_velocity_mps);
+    PRINT_DEBUG("  - dynamic arm pose updates?: %d\n", (int)dynamic_arm_pose_options.enabled);
+    PRINT_DEBUG("  - dynamic arm measurement-only?: %d\n", (int)dynamic_arm_pose_options.measurement_only);
+    PRINT_DEBUG("  - dynamic arm topic: %s\n", dynamic_arm_pose_options.topic.c_str());
+    PRINT_DEBUG("  - dynamic arm status topic: %s\n", dynamic_arm_pose_options.status_topic.c_str());
+    PRINT_DEBUG("  - dynamic arm frames: global=%s target=%s source=%s marker=%s\n", dynamic_arm_pose_options.global_frame_id.c_str(),
+                dynamic_arm_pose_options.target_frame.c_str(), dynamic_arm_pose_options.source_camera_frame.c_str(),
+                dynamic_arm_pose_options.marker_frame.c_str());
+    PRINT_DEBUG("  - dynamic arm marker id: %d\n", dynamic_arm_pose_options.marker_id);
+    PRINT_DEBUG("  - dynamic arm time tolerance: %.3f\n", dynamic_arm_pose_options.time_tolerance_s);
+    PRINT_DEBUG("  - dynamic arm chi2/noise: %.3f / %.3f\n", dynamic_arm_pose_options.chi2_gate,
+                dynamic_arm_pose_options.noise_multiplier);
+    PRINT_DEBUG("  - dynamic arm max update dp/dtheta: %.3f m / %.2f deg\n", dynamic_arm_pose_options.max_update_translation_m,
+                dynamic_arm_pose_options.max_update_rotation_deg);
+    PRINT_DEBUG("  - dynamic arm min interval / ID0 skip: %.3f / %.3f s\n", dynamic_arm_pose_options.min_update_interval_s,
+                dynamic_arm_pose_options.skip_after_fixed_marker_s);
   }
 
   // NOISE / CHI2 ============================

@@ -178,10 +178,83 @@ It had `72` synchronized calibration samples and `68` inliers, below the normal
 `--min-inliers 100` acceptance gate. A lower-threshold characterization produced
 p95 translation residual `0.0252 m` and p95 rotation residual `2.067 deg`.
 
+The debug-only head-derived arm D435i pose preview is now implemented locally
+but not yet committed. It consumes `/head/marker_pose/dynamic_observation`,
+the head OpenVINS pose `/ov_msckf/poseimu`, and
+`config/markers/arm_marker_extrinsics.yaml`, then publishes only:
+
+```text
+/arm/marker_pose/head_derived/arm_camera_pose
+/arm/marker_pose/head_derived/arm_camera_body_pose
+/arm/marker_pose/head_derived/arm_marker_pose
+/arm/marker_pose/head_derived/path
+/arm/marker_pose/head_derived/status
+```
+
+It also publishes `_head_preview` TF frames for RViz. It does not publish
+`/arm/marker_pose/observation`, does not modify `marker_fixed_ids`, and does
+not feed OpenVINS.
+
+Live preview validation bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/head_derived_arm_preview_20260512_073918
+```
+
+Read-only validation showed `67.12 s`, `56.0 MiB`, and `37943` messages. The
+bag contains `162` dynamic ID2 observations, `48` accepted preview camera poses
+in `marker_map`, finite preview covariance, `991` head pose samples, `1184` arm
+pose samples, and the expected `_head_preview` TF frames. Dynamic marker quality
+was good: median reprojection `0.252 px`, p95 reprojection `0.535 px`, median
+distance `0.582 m`, and p95 view angle `16.95 deg`.
+
+Comparison against arm OpenVINS converted from `arm_imu` to the arm camera frame
+found `42` matched preview samples with median translation residual `0.0646 m`,
+p95 translation residual `0.1978 m`, median rotation residual `2.06 deg`, and
+p95 rotation residual `3.69 deg`. This validates the debug preview path and
+supports planning a gated dynamic-ID2 arm update. It is not a complete raw
+replay source because it did not record raw camera/IMU streams or fixed marker
+observation topics.
+
+Complete raw dynamic-ID2 update planning bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dynamic_id2_arm_update_full_raw_20260512_090704
+```
+
+Read-only validation showed `62.39 s`, `2.9 GiB`, and `71417` messages. It
+contains both head/arm raw color image, camera-info, and IMU streams; fixed
+marker observations with ID0 only (`525` head targeting `head_imu`, `302` arm
+targeting `arm_imu`); `111` dynamic ID2 observations; `18` accepted preview
+poses in `marker_map`; head/arm OpenVINS outputs with odom child frames
+`head_imu` and `arm_imu`; `/tf`; and `/tf_static`. Raw image and IMU stamps
+were monotonic in the validation scan.
+
+Dynamic marker quality in this bag was good: stable observations `104 / 111`,
+median reprojection `0.274 px`, p95 reprojection `0.604 px`, median distance
+`0.528 m`, and p95 view angle `22.00 deg`. Offline raw-image calibration
+characterization found head ID0 `1578`, head ID2 `373`, head ID0+ID2 `373`, arm
+ID0 `822`, `159` synchronized samples, `154` inliers, p95 translation residual
+`0.0120 m`, and p95 rotation residual `3.839 deg`.
+
+Preview-vs-current-arm-OpenVINS camera comparison on this bag had only `17`
+matched accepted preview samples and large translation disagreement: median
+`1.023 m`, p95 `22.11 m`; rotation residual median `2.97 deg`, p95 `5.59 deg`.
+This likely reflects the current arm state disagreement/drift that the dynamic
+ID2 update is intended to constrain. Do not use the current arm OpenVINS path in
+this bag as ground truth. This is the preferred local full raw replay bag for
+planning and validating the future dynamic-ID2 arm update.
+
 Validation recipe for live tests and bag recording:
 
 ```text
 docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md
+```
+
+Preview validation recipe:
+
+```text
+docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/head_derived_arm_pose_preview_validation.md
 ```
 
 Earlier interrupted/secondary ID2 bag:
@@ -234,8 +307,12 @@ Propagator warning, but no fatal error and no hard Propagator assertion.
   - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md`
 - Dynamic ID2 validation recipe:
   `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md`
+- Head-derived arm pose preview validation recipe:
+  `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/head_derived_arm_pose_preview_validation.md`
 - Offline arm marker calibration script:
   `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/calibrate_arm_marker_extrinsic.py`
+- Debug-only head-derived arm pose preview node:
+  `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/head_derived_arm_pose_preview_node.py`
 - OpenVINS marker update/reset code was added under:
   `docker_ws/src/open_vins/ov_msckf`
 
@@ -268,15 +345,19 @@ metadata. Large optional OpenVINS data/evaluation/docs assets are ignored.
 - `.agents/phase2_openvins_handoff_status.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_marker_validation.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/head_derived_arm_pose_preview_validation.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/phase2_openvins_ekf_handoff_prompt.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_msgs/`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/aruco_marker_pose_node.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/calibrate_arm_marker_extrinsic.py`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/head_derived_arm_pose_preview_node.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_derived_arm_pose_preview.launch.py`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/arm_aruco_map.yaml`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/arm_marker_extrinsics.yaml`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins/arm_d435i_310622071850/`
 - `docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.h`
 - `docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.cpp`

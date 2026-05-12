@@ -65,6 +65,7 @@ list(APPEND LIBRARY_SOURCES
         src/core/VioManager.cpp
         src/core/VioManagerHelper.cpp
         src/update/UpdaterHelper.cpp
+        src/update/UpdaterDynamicArmPose.cpp
         src/update/UpdaterMSCKF.cpp
         src/update/UpdaterMarkerPose.cpp
         src/update/UpdaterSLAM.cpp
@@ -116,6 +117,12 @@ add_executable(test_sim_repeat src/test_sim_repeat.cpp)
 ament_target_dependencies(test_sim_repeat ${ament_libraries})
 target_link_libraries(test_sim_repeat ov_msckf_lib ${thirdparty_libraries})
 install(TARGETS test_sim_repeat DESTINATION lib/${PROJECT_NAME})
+
+add_executable(test_dynamic_arm_pose_updater src/test_dynamic_arm_pose_updater.cpp)
+ament_target_dependencies(test_dynamic_arm_pose_updater ${ament_libraries})
+target_link_libraries(test_dynamic_arm_pose_updater ov_msckf_lib ${thirdparty_libraries})
+add_test(NAME test_dynamic_arm_pose_updater COMMAND test_dynamic_arm_pose_updater)
+install(TARGETS test_dynamic_arm_pose_updater DESTINATION lib/${PROJECT_NAME})
 
 # Install launch and config directories
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)

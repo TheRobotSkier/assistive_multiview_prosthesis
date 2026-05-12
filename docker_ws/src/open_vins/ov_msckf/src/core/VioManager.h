@@ -33,6 +33,7 @@
 #include <string>
 
 #include "VioManagerOptions.h"
+#include "update/UpdaterDynamicArmPose.h"
 #include "update/UpdaterMarkerPose.h"
 
 namespace ov_core {
@@ -98,6 +99,12 @@ public:
   void feed_measurement_marker(const MarkerPoseMeasurement &message);
 
   /**
+   * @brief Feed function for a head-derived dynamic arm pose measurement.
+   * @param message Contains timestamped marker_map-to-arm_imu pose and covariance
+   */
+  DynamicArmPoseUpdateResult feed_measurement_dynamic_arm_pose(const DynamicArmPoseMeasurement &message);
+
+  /**
    * @brief Given a state, this will initialize our IMU state.
    * @param imustate State in the MSCKF ordering: [time(sec),q_GtoI,p_IinG,v_IinG,b_gyro,b_accel]
    */
@@ -111,6 +118,9 @@ public:
 
   /// If the Phase 2 marker path has explicitly locked the global gauge to marker_map
   bool marker_global_initialized() { return is_marker_global_initialized; }
+
+  /// Last accepted fixed marker timestamp, used for dynamic ID2 double-counting status
+  double last_fixed_marker_update_time() { return last_fixed_marker_update_timestamp; }
 
   /// Accessor for current system parameters
   VioManagerOptions get_params() { return params; }
@@ -236,6 +246,9 @@ protected:
   /// Phase 2 external marker pose updater
   std::shared_ptr<UpdaterMarkerPose> updaterMarkerPose;
 
+  /// Dynamic arm pose updater
+  std::shared_ptr<UpdaterDynamicArmPose> updaterDynamicArmPose;
+
   /// Recent marker observations used only for the explicit reset velocity fit
   std::deque<MarkerPoseMeasurement, Eigen::aligned_allocator<MarkerPoseMeasurement>> recent_marker_measurements;
 
@@ -244,6 +257,15 @@ protected:
 
   /// Last marker timestamp accepted for processing, used for duplicate/stale rejection
   double last_marker_timestamp = -1;
+
+  /// Last accepted fixed marker timestamp, used to skip dynamic updates right after ID0 updates
+  double last_fixed_marker_update_timestamp = -1;
+
+  /// Last dynamic arm measurement timestamp accepted for processing
+  double last_dynamic_arm_timestamp = -1;
+
+  /// Last dynamic arm update timestamp accepted by gates
+  double last_dynamic_arm_update_timestamp = -1;
 
   /// This is the queue of measurement times that have come in since we starting doing initialization
   /// After we initialize, we will want to prop & update to the latest timestamp quickly

@@ -45,8 +45,10 @@
 #include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
+#include <sensor_fusion_msgs/msg/dynamic_arm_pose_observation.hpp>
 #include <sensor_fusion_msgs/msg/marker_pose_observation.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/transform_datatypes.h>
 
@@ -74,6 +76,7 @@
 #include <cv_bridge/cv_bridge.h>
 #endif
 
+#include "update/UpdaterDynamicArmPose.h"
 #include "update/UpdaterMarkerPose.h"
 
 namespace ov_core {
@@ -148,6 +151,9 @@ public:
   /// Callback for Phase 2 external marker pose observations
   void callback_marker_pose(const sensor_fusion_msgs::msg::MarkerPoseObservation::SharedPtr msg);
 
+  /// Callback for head-derived dynamic arm pose observations
+  void callback_dynamic_arm_pose(const sensor_fusion_msgs::msg::DynamicArmPoseObservation::SharedPtr msg);
+
 protected:
   /// Publish the current state
   void publish_state();
@@ -167,6 +173,13 @@ protected:
   /// Feed marker observations whose timestamps are aligned with the current OpenVINS state
   void process_marker_queue();
 
+  /// Feed dynamic arm observations whose timestamps are aligned with the current OpenVINS state
+  void process_dynamic_arm_queue();
+
+  /// Publish dynamic arm update status
+  void publish_dynamic_arm_status(const DynamicArmPoseMeasurement &measurement, const DynamicArmPoseUpdateResult &result,
+                                  const std::string &queue_reason = "");
+
   /// Global node handler
   std::shared_ptr<rclcpp::Node> _node;
 
@@ -185,11 +198,13 @@ protected:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_loop_pose, pub_loop_extrinsic;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr pub_loop_point;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr pub_loop_intrinsics;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_dynamic_arm_status;
   std::shared_ptr<tf2_ros::TransformBroadcaster> mTfBr;
 
   // Our subscribers and camera synchronizers
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr sub_imu;
   rclcpp::Subscription<sensor_fusion_msgs::msg::MarkerPoseObservation>::SharedPtr sub_marker_pose;
+  rclcpp::Subscription<sensor_fusion_msgs::msg::DynamicArmPoseObservation>::SharedPtr sub_dynamic_arm_pose;
   std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> subs_cam;
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image> sync_pol;
   std::vector<std::shared_ptr<message_filters::Synchronizer<sync_pol>>> sync_cam;
@@ -226,6 +241,10 @@ protected:
   /// Marker observation queue, sorted by timestamp and processed on the update thread
   std::deque<MarkerPoseMeasurement, Eigen::aligned_allocator<MarkerPoseMeasurement>> marker_queue;
   std::mutex marker_queue_mtx;
+
+  /// Dynamic arm observation queue, sorted by timestamp and processed on the update thread
+  std::deque<DynamicArmPoseMeasurement, Eigen::aligned_allocator<DynamicArmPoseMeasurement>> dynamic_arm_queue;
+  std::mutex dynamic_arm_queue_mtx;
 
   // Last camera message timestamps we have received (mapped by cam id)
   std::map<int, double> camera_last_timestamp;

@@ -23,6 +23,8 @@ install(
     scripts/analyze_marker_covariance_bags.py
     scripts/aruco_marker_pose_node.py
     scripts/calibrate_arm_marker_extrinsic.py
+    scripts/dynamic_arm_pose_measurement_node.py
+    scripts/head_derived_arm_pose_preview_node.py
     scripts/marker_quality_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )

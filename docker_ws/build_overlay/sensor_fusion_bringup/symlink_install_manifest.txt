@@ -1,8 +1,10 @@
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/dual_d435i.launch.py
+/miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/dynamic_arm_pose_measurement.launch.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/head_d435i_openvins.launch.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py
+/miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/head_derived_arm_pose_preview.launch.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/launch/head_marker_pose.launch.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/single_d435i.launch.py
@@ -30,8 +32,10 @@
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/kalibr_imucam_chain.yaml
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/rviz/head_openvins.rviz
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/rviz/phase2_dual_openvins.rviz
+/miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/config/rviz/phase2_dual_openvins_head_preview.rviz
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/docs/arm_phase2_openvins_live_trial_and_recording.md
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/docs/arm_phase2_openvins_marker_validation.md
+/miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/docs/head_derived_arm_pose_preview_validation.md
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/docs/head_openvins_marker_bag_replay_validation.md
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/docs/marker_correction_validation.md
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/sensor_fusion_bringup/docs/marker_covariance_bag_analysis.md
@@ -44,6 +48,8 @@
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/lib/sensor_fusion_bringup/analyze_marker_covariance_bags.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/lib/sensor_fusion_bringup/aruco_marker_pose_node.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/lib/sensor_fusion_bringup/calibrate_arm_marker_extrinsic.py
+/miahand_ws/src/install_overlay/sensor_fusion_bringup/lib/sensor_fusion_bringup/dynamic_arm_pose_measurement_node.py
+/miahand_ws/src/install_overlay/sensor_fusion_bringup/lib/sensor_fusion_bringup/head_derived_arm_pose_preview_node.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/lib/sensor_fusion_bringup/marker_quality_monitor.py
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/ament_index/resource_index/package_run_dependencies/sensor_fusion_bringup
 /miahand_ws/src/install_overlay/sensor_fusion_bringup/share/ament_index/resource_index/parent_prefix_path/sensor_fusion_bringup

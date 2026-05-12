@@ -40,6 +40,7 @@
 #include "state/Propagator.h"
 #include "state/State.h"
 #include "state/StateHelper.h"
+#include "update/UpdaterDynamicArmPose.h"
 #include "update/UpdaterMSCKF.h"
 #include "update/UpdaterMarkerPose.h"
 #include "update/UpdaterSLAM.h"
@@ -171,6 +172,9 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
   if (params.marker_pose_options.enabled) {
     updaterMarkerPose = std::make_shared<UpdaterMarkerPose>(params.marker_pose_options);
   }
+  if (params.dynamic_arm_pose_options.enabled) {
+    updaterDynamicArmPose = std::make_shared<UpdaterDynamicArmPose>(params.dynamic_arm_pose_options);
+  }
 }
 
 void VioManager::feed_measurement_imu(const ov_core::ImuData &message) {
@@ -237,6 +241,7 @@ void VioManager::feed_measurement_marker(const MarkerPoseMeasurement &message) {
     }
     if (reset_to_marker_map(message, velocity, velocity_covariance,
                             is_marker_global_initialized ? innovation.reason : "first_marker_map_lock")) {
+      last_fixed_marker_update_timestamp = message.timestamp;
       return;
     }
   }
@@ -246,7 +251,75 @@ void VioManager::feed_measurement_marker(const MarkerPoseMeasurement &message) {
     return;
   }
 
-  updaterMarkerPose->try_update(state, message);
+  MarkerPoseUpdateResult update_result = updaterMarkerPose->try_update(state, message);
+  if (update_result.accepted) {
+    last_fixed_marker_update_timestamp = message.timestamp;
+  }
+}
+
+DynamicArmPoseUpdateResult VioManager::feed_measurement_dynamic_arm_pose(const DynamicArmPoseMeasurement &message) {
+
+  DynamicArmPoseUpdateResult result;
+  if (updaterDynamicArmPose == nullptr || !params.dynamic_arm_pose_options.enabled) {
+    result.reason = "disabled";
+    return result;
+  }
+  if (!is_initialized_vio || state->_timestamp < 0.0) {
+    result.reason = "not_initialized";
+    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: dropping before VIO initialization\n" RESET);
+    return result;
+  }
+  if (!is_marker_global_initialized) {
+    result.reason = "marker_map_not_locked";
+    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: waiting for fixed marker_map lock before dynamic updates\n" RESET);
+    return result;
+  }
+  if (last_dynamic_arm_timestamp >= 0.0 && message.timestamp <= last_dynamic_arm_timestamp + 1e-9) {
+    result.reason = "stale_or_duplicate";
+    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: rejecting stale/duplicate %.6f <= %.6f\n" RESET, message.timestamp, last_dynamic_arm_timestamp);
+    return result;
+  }
+
+  const double dt = message.timestamp - state->_timestamp;
+  if (std::abs(dt) > params.dynamic_arm_pose_options.time_tolerance_s) {
+    result.reason = "time_tolerance_exceeded";
+    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: rejecting timestamp %.6f, state %.6f, dt %.3f s\n" RESET, message.timestamp,
+                state->_timestamp, dt);
+    return result;
+  }
+
+  last_dynamic_arm_timestamp = message.timestamp;
+
+  if (last_fixed_marker_update_timestamp >= 0.0 &&
+      message.timestamp - last_fixed_marker_update_timestamp < params.dynamic_arm_pose_options.skip_after_fixed_marker_s) {
+    result.reason = "skipped_recent_fixed_marker_update";
+    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: skipping after recent fixed marker update, dt %.3f s\n" RESET,
+                message.timestamp - last_fixed_marker_update_timestamp);
+    return result;
+  }
+
+  if (last_dynamic_arm_update_timestamp >= 0.0 &&
+      message.timestamp - last_dynamic_arm_update_timestamp < params.dynamic_arm_pose_options.min_update_interval_s) {
+    result.reason = "skipped_min_update_interval";
+    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: skipping min update interval, dt %.3f s\n" RESET,
+                message.timestamp - last_dynamic_arm_update_timestamp);
+    return result;
+  }
+
+  result = updaterDynamicArmPose->try_update(state, message);
+  if (result.accepted) {
+    last_dynamic_arm_update_timestamp = message.timestamp;
+  }
+  std::vector<std::shared_ptr<Type>> check_order;
+  check_order.push_back(state->_imu);
+  Eigen::MatrixXd imu_covariance = StateHelper::get_marginal_covariance(state, check_order);
+  if (!state->_imu->value().allFinite() || !imu_covariance.allFinite()) {
+    PRINT_ERROR(RED "[DYNAMIC_ARM]: non-finite state/covariance after dynamic update\n" RESET);
+    result.accepted = false;
+    result.state_updated = false;
+    result.reason = "nonfinite_state_after_update";
+  }
+  return result;
 }
 
 void VioManager::record_marker_measurement(const MarkerPoseMeasurement &measurement) {

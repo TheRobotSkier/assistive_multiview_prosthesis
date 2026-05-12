@@ -97,6 +97,43 @@ Near-term next work:
   inliers were available, below the first accepted-calibration gate of `100`
   inliers. A lower-threshold characterization gave p95 translation residual
   `0.0252 m` and p95 rotation residual `2.067 deg`.
+- A debug-only head-derived arm D435i pose preview has now been implemented
+  locally but not yet committed. It consumes
+  `/head/marker_pose/dynamic_observation`, `/ov_msckf/poseimu`, and
+  `config/markers/arm_marker_extrinsics.yaml`, then publishes only
+  `/arm/marker_pose/head_derived/*` topics and `_head_preview` TF frames. It
+  does not publish `/arm/marker_pose/observation`, does not change
+  `marker_fixed_ids`, and does not feed OpenVINS. Validation recipe:
+  `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/head_derived_arm_pose_preview_validation.md`.
+- The first live preview validation bag has been recorded at
+  `docker_ws/bags/openvins_tests/phase2_live/head_derived_arm_preview_20260512_073918`.
+  Read-only analysis showed `67.12 s`, `56.0 MiB`, `37943` messages,
+  `162` dynamic ID2 observations, `48` accepted preview poses in `marker_map`,
+  finite preview covariance, and `_head_preview` TF frames. Dynamic marker
+  quality was good: median reprojection `0.252 px`, p95 reprojection
+  `0.535 px`, median distance `0.582 m`, and p95 view angle `16.95 deg`.
+  Compared with arm OpenVINS converted from `arm_imu` to the arm camera frame,
+  `42` matched samples had median translation residual `0.0646 m`, p95
+  translation residual `0.1978 m`, median rotation residual `2.06 deg`, and p95
+  rotation residual `3.69 deg`. This validates the debug preview path but is
+  not a complete raw replay source because it did not record raw camera/IMU
+  streams or fixed marker observation topics.
+- A complete raw dynamic-ID2 update planning bag has now been recorded at
+  `docker_ws/bags/openvins_tests/phase2_live/dynamic_id2_arm_update_full_raw_20260512_090704`.
+  Read-only validation showed `62.39 s`, `2.9 GiB`, `71417` messages, both
+  head/arm raw color image, camera-info, and IMU streams, fixed observations
+  with ID0 only (`525` head targeting `head_imu`, `302` arm targeting
+  `arm_imu`), `111` dynamic ID2 observations, `18` accepted preview poses in
+  `marker_map`, separated OpenVINS outputs with odom children `head_imu` and
+  `arm_imu`, and expected head/arm plus `_head_preview` TF frames. Raw-image
+  calibration characterization was strong: head ID0 `1578`, head ID2 `373`,
+  head ID0+ID2 `373`, arm ID0 `822`, `159` synchronized samples, `154` inliers,
+  p95 translation residual `0.0120 m`, and p95 rotation residual `3.839 deg`.
+  Preview-vs-current-arm-OpenVINS camera comparison had only `17` matched
+  accepted preview samples and large translation disagreement
+  (median `1.023 m`, p95 `22.11 m`), so do not treat the arm OpenVINS path in
+  this bag as ground truth. This is now the preferred local source bag for
+  planning/replay-testing a future dynamic-ID2 arm update.
 
 ## A. Arm D435i Setup From Calibration Output
 
@@ -221,6 +258,17 @@ Future multiview fusion concept:
   `T_arm_camera_marker` to update or constrain the arm D435i pose. This should
   account for the arm OpenVINS uncertainty instead of treating the head-derived
   pose as ground truth.
+
+Next planning target:
+- Plan the dynamic ID2 arm OpenVINS update path before coding. The update should
+  consume a head-derived arm pose measurement as an arm-camera or arm-IMU pose
+  constraint, transform it into the arm OpenVINS state frame, propagate head,
+  dynamic-marker, and extrinsic covariance, apply timing and innovation gates,
+  and remain separate from the fixed marker-map landmark path. The preview bag
+  above is useful characterization evidence; use
+  `dynamic_id2_arm_update_full_raw_20260512_090704` as the main local full raw
+  replay-style validation bag, with `dual_openvins_id2_dynamic_phase2_20260511_194110`
+  as an older runtime comparison.
 
 ## E. Arm Marker To Arm D435i Extrinsic Calibration
 

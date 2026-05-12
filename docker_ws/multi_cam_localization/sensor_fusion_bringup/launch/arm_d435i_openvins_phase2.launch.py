@@ -4,6 +4,7 @@ from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -78,6 +79,62 @@ def generate_launch_description():
             {"marker_reset_min_velocity_std_mps": 0.05},
             {"marker_reset_bias_gyro_std": 0.02},
             {"marker_reset_bias_accel_std": 0.20},
+            {
+                "use_dynamic_arm_pose_updates": ParameterValue(
+                    LaunchConfiguration("use_dynamic_arm_pose_updates"),
+                    value_type=bool,
+                )
+            },
+            {
+                "dynamic_arm_measurement_only": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_measurement_only"),
+                    value_type=bool,
+                )
+            },
+            {"dynamic_arm_pose_topic": LaunchConfiguration("dynamic_arm_pose_topic")},
+            {"dynamic_arm_status_topic": LaunchConfiguration("dynamic_arm_status_topic")},
+            {"dynamic_arm_global_frame_id": "marker_map"},
+            {"dynamic_arm_target_frame": "arm_imu"},
+            {"dynamic_arm_source_camera_frame": "head_d435i_head_color_optical_frame"},
+            {"dynamic_arm_marker_frame": "arm_marker_2"},
+            {"dynamic_arm_marker_id": ParameterValue(LaunchConfiguration("dynamic_arm_marker_id"), value_type=int)},
+            {
+                "dynamic_arm_time_tolerance_s": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_time_tolerance_s"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_noise_multiplier": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_noise_multiplier"),
+                    value_type=float,
+                )
+            },
+            {"dynamic_arm_chi2_gate": ParameterValue(LaunchConfiguration("dynamic_arm_chi2_gate"), value_type=float)},
+            {
+                "dynamic_arm_max_update_translation_m": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_max_update_translation_m"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_max_update_rotation_deg": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_max_update_rotation_deg"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_min_update_interval_s": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_min_update_interval_s"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_skip_after_fixed_marker_s": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_skip_after_fixed_marker_s"),
+                    value_type=float,
+                )
+            },
         ],
     )
 
@@ -93,6 +150,34 @@ def generate_launch_description():
             default_value="false",
             description="Use /clock, typically true during rosbag replay.",
         ),
+        DeclareLaunchArgument(
+            "use_dynamic_arm_pose_updates",
+            default_value="false",
+            description="Enable conservative dynamic ID2 arm pose update consumption in arm OpenVINS.",
+        ),
+        DeclareLaunchArgument(
+            "dynamic_arm_measurement_only",
+            default_value="true",
+            description="Log and gate dynamic arm measurements without mutating the OpenVINS state.",
+        ),
+        DeclareLaunchArgument(
+            "dynamic_arm_pose_topic",
+            default_value="/arm/marker_pose/dynamic_arm_pose_observation",
+            description="OpenVINS-facing dynamic arm pose observation topic.",
+        ),
+        DeclareLaunchArgument(
+            "dynamic_arm_status_topic",
+            default_value="/ov_msckf_arm/dynamic_arm_update/status",
+            description="Status topic for dynamic arm pose update decisions.",
+        ),
+        DeclareLaunchArgument("dynamic_arm_marker_id", default_value="2"),
+        DeclareLaunchArgument("dynamic_arm_time_tolerance_s", default_value="0.05"),
+        DeclareLaunchArgument("dynamic_arm_noise_multiplier", default_value="4.0"),
+        DeclareLaunchArgument("dynamic_arm_chi2_gate", default_value="16.81"),
+        DeclareLaunchArgument("dynamic_arm_max_update_translation_m", default_value="0.35"),
+        DeclareLaunchArgument("dynamic_arm_max_update_rotation_deg", default_value="15.0"),
+        DeclareLaunchArgument("dynamic_arm_min_update_interval_s", default_value="0.10"),
+        DeclareLaunchArgument("dynamic_arm_skip_after_fixed_marker_s", default_value="0.50"),
         arm_camera,
         TimerAction(period=5.0, actions=[openvins_phase2]),
     ])

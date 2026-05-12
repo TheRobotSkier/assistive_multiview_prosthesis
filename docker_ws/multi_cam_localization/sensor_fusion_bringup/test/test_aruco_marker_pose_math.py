@@ -33,6 +33,20 @@ from calibrate_arm_marker_extrinsic import (  # noqa: E402
     se3_exp,
     se3_residual,
 )
+from head_derived_arm_pose_preview_node import (  # noqa: E402
+    HeadPoseSample,
+    compose_head_derived_arm_pose,
+    load_arm_marker_extrinsic,
+    match_head_pose,
+    propagate_candidate_covariance,
+)
+from dynamic_arm_pose_measurement_node import (  # noqa: E402
+    DynamicArmPoseMeasurementNode,
+    HeadPoseMeasurementSample,
+    compose_dynamic_arm_imu_pose,
+    match_head_pose_measurement,
+    propagate_dynamic_arm_imu_covariance,
+)
 from marker_quality_monitor import marker_summary_line, parse_marker_id_filter  # noqa: E402
 
 
@@ -497,6 +511,235 @@ def test_calibration_transform_composes_head_dynamic_marker_into_arm_camera():
         expected,
         atol=1e-12,
     )
+
+
+def test_head_derived_preview_composes_head_pose_dynamic_marker_and_extrinsic():
+    T_map_headimu = se3_exp([0.2, -0.1, 0.5, 0.02, -0.03, 0.04])
+    T_headcam_headimu = se3_exp([0.01, 0.02, -0.03, -0.01, 0.02, 0.0])
+    T_headcam_marker = se3_exp([0.4, 0.1, 0.8, -0.01, 0.02, 0.03])
+    T_armcam_marker = se3_exp([-0.05, 0.02, -0.09, 0.03, -0.01, 0.02])
+
+    T_map_headcam, T_map_marker, T_map_armcam = compose_head_derived_arm_pose(
+        T_map_headimu,
+        T_headcam_headimu,
+        T_headcam_marker,
+        T_armcam_marker,
+    )
+
+    expected_headcam = T_map_headimu @ T_inv(T_headcam_headimu)
+    expected_marker = expected_headcam @ T_headcam_marker
+    expected_armcam = expected_marker @ T_inv(T_armcam_marker)
+    np.testing.assert_allclose(T_map_headcam, expected_headcam, atol=1e-12)
+    np.testing.assert_allclose(T_map_marker, expected_marker, atol=1e-12)
+    np.testing.assert_allclose(T_map_armcam, expected_armcam, atol=1e-12)
+
+
+def test_head_derived_preview_covariance_is_finite_and_scales_with_inputs():
+    T_map_headimu = se3_exp([0.2, -0.1, 0.5, 0.02, -0.03, 0.04])
+    T_headcam_headimu = se3_exp([0.01, 0.02, -0.03, -0.01, 0.02, 0.0])
+    T_headcam_marker = se3_exp([0.4, 0.1, 0.8, -0.01, 0.02, 0.03])
+    T_armcam_marker = se3_exp([-0.05, 0.02, -0.09, 0.03, -0.01, 0.02])
+    min_diag = np.array([1e-8, 1e-8, 1e-8, 1e-10, 1e-10, 1e-10], dtype=float)
+    P_head = np.diag([0.01, 0.01, 0.01, 0.001, 0.001, 0.001])
+    P_dynamic = np.diag([0.002, 0.002, 0.004, 0.0005, 0.0005, 0.0008])
+    P_extrinsic = np.diag([0.0004, 0.0004, 0.0009, 0.0002, 0.0002, 0.0003])
+
+    baseline = propagate_candidate_covariance(
+        T_map_headimu,
+        P_head,
+        T_headcam_headimu,
+        T_headcam_marker,
+        P_dynamic,
+        T_armcam_marker,
+        P_extrinsic,
+        min_diag,
+    )
+    larger = propagate_candidate_covariance(
+        T_map_headimu,
+        4.0 * P_head,
+        T_headcam_headimu,
+        T_headcam_marker,
+        4.0 * P_dynamic,
+        T_armcam_marker,
+        4.0 * P_extrinsic,
+        min_diag,
+    )
+
+    assert baseline.shape == (6, 6)
+    assert np.all(np.isfinite(baseline))
+    assert np.all(np.diag(baseline) > 0.0)
+    assert np.all(np.diag(baseline)[3:] > min_diag[3:])
+    assert np.trace(larger) > np.trace(baseline)
+
+
+def test_head_derived_preview_loads_id2_extrinsic_with_robust_covariance():
+    root = Path(__file__).resolve().parents[1]
+    fallback = np.array([0.01, 0.01, 0.01, 0.001, 0.001, 0.001], dtype=float)
+
+    extrinsic = load_arm_marker_extrinsic(
+        root / "config" / "markers" / "arm_marker_extrinsics.yaml",
+        marker_id=2,
+        covariance_source="robust_diag_covariance_se3",
+        fallback_covariance_diag=fallback,
+    )
+
+    assert extrinsic.marker_id == 2
+    assert extrinsic.marker_frame == "arm_marker_2"
+    assert extrinsic.parent_camera_frame == "arm_d435i_arm_color_optical_frame"
+    assert extrinsic.covariance_source == "robust_diag_covariance_se3"
+    assert extrinsic.T_armcam_marker.shape == (4, 4)
+    assert extrinsic.covariance.shape == (6, 6)
+    assert np.all(np.diag(extrinsic.covariance) > 0.0)
+
+
+def test_head_derived_preview_interpolates_or_rejects_head_pose_matches():
+    samples = [
+        HeadPoseSample(stamp=None, stamp_sec=10.0, T_map_headimu=np.eye(4), covariance=np.eye(6)),
+        HeadPoseSample(
+            stamp=None,
+            stamp_sec=10.1,
+            T_map_headimu=se3_exp([0.1, 0.0, 0.0, 0.0, 0.0, 0.1]),
+            covariance=2.0 * np.eye(6),
+        ),
+    ]
+
+    matched = match_head_pose(samples, 10.05, max_dt_s=0.06)
+    assert matched is not None
+    assert matched.mode == "interpolated"
+    np.testing.assert_allclose(matched.T_map_headimu[:3, 3], [0.05, 0.0, 0.0], atol=1e-12)
+
+    assert match_head_pose(samples, 10.3, max_dt_s=0.06) is None
+
+
+def test_dynamic_arm_measurement_composes_arm_imu_pose():
+    T_map_headimu = se3_exp([0.2, -0.1, 0.5, 0.02, -0.03, 0.04])
+    T_headcam_headimu = se3_exp([0.01, 0.02, -0.03, -0.01, 0.02, 0.0])
+    T_headcam_marker = se3_exp([0.4, 0.1, 0.8, -0.01, 0.02, 0.03])
+    T_armcam_marker = se3_exp([-0.05, 0.02, -0.09, 0.03, -0.01, 0.02])
+    T_armcam_armimu = se3_exp([0.02, 0.0, -0.01, 0.01, 0.02, -0.01])
+
+    T_map_headcam, T_map_marker, T_map_armcam, T_map_armimu = compose_dynamic_arm_imu_pose(
+        T_map_headimu,
+        T_headcam_headimu,
+        T_headcam_marker,
+        T_armcam_marker,
+        T_armcam_armimu,
+    )
+
+    expected_headcam = T_map_headimu @ T_inv(T_headcam_headimu)
+    expected_marker = expected_headcam @ T_headcam_marker
+    expected_armcam = expected_marker @ T_inv(T_armcam_marker)
+    expected_armimu = expected_armcam @ T_armcam_armimu
+    np.testing.assert_allclose(T_map_headcam, expected_headcam, atol=1e-12)
+    np.testing.assert_allclose(T_map_marker, expected_marker, atol=1e-12)
+    np.testing.assert_allclose(T_map_armcam, expected_armcam, atol=1e-12)
+    np.testing.assert_allclose(T_map_armimu, expected_armimu, atol=1e-12)
+
+
+def test_dynamic_arm_measurement_covariance_is_finite_and_scales_with_inputs():
+    T_map_headimu = se3_exp([0.2, -0.1, 0.5, 0.02, -0.03, 0.04])
+    T_headcam_headimu = se3_exp([0.01, 0.02, -0.03, -0.01, 0.02, 0.0])
+    T_headcam_marker = se3_exp([0.4, 0.1, 0.8, -0.01, 0.02, 0.03])
+    T_armcam_marker = se3_exp([-0.05, 0.02, -0.09, 0.03, -0.01, 0.02])
+    T_armcam_armimu = se3_exp([0.02, 0.0, -0.01, 0.01, 0.02, -0.01])
+    min_diag = np.array([1e-8, 1e-8, 1e-8, 1e-10, 1e-10, 1e-10], dtype=float)
+    P_head = np.diag([0.01, 0.01, 0.01, 0.001, 0.001, 0.001])
+    P_dynamic = np.diag([0.002, 0.002, 0.004, 0.0005, 0.0005, 0.0008])
+    P_marker = np.diag([0.0004, 0.0004, 0.0009, 0.0002, 0.0002, 0.0003])
+    P_armcamimu = np.diag([0.0001, 0.0001, 0.0001, 0.00002, 0.00002, 0.00002])
+
+    baseline = propagate_dynamic_arm_imu_covariance(
+        T_map_headimu,
+        P_head,
+        T_headcam_headimu,
+        T_headcam_marker,
+        P_dynamic,
+        T_armcam_marker,
+        P_marker,
+        T_armcam_armimu,
+        P_armcamimu,
+        min_diag,
+    )
+    larger = propagate_dynamic_arm_imu_covariance(
+        T_map_headimu,
+        4.0 * P_head,
+        T_headcam_headimu,
+        T_headcam_marker,
+        4.0 * P_dynamic,
+        T_armcam_marker,
+        4.0 * P_marker,
+        T_armcam_armimu,
+        4.0 * P_armcamimu,
+        min_diag,
+    )
+
+    assert baseline.shape == (6, 6)
+    assert np.all(np.isfinite(baseline))
+    assert np.all(np.diag(baseline) > 0.0)
+    assert np.trace(larger) > np.trace(baseline)
+
+
+def test_dynamic_arm_measurement_head_sync_modes_and_fallback_flags():
+    samples = [
+        HeadPoseMeasurementSample(
+            stamp=None,
+            stamp_sec=10.0,
+            T_map_headimu=np.eye(4),
+            covariance=np.eye(6),
+            covariance_fallback=False,
+        ),
+        HeadPoseMeasurementSample(
+            stamp=None,
+            stamp_sec=10.1,
+            T_map_headimu=se3_exp([0.1, 0.0, 0.0, 0.0, 0.0, 0.1]),
+            covariance=2.0 * np.eye(6),
+            covariance_fallback=True,
+        ),
+    ]
+
+    matched = match_head_pose_measurement(samples, 10.05, max_dt_s=0.06)
+    assert matched is not None
+    assert matched.mode == "interpolated"
+    assert matched.covariance_fallback is True
+    np.testing.assert_allclose(matched.T_map_headimu[:3, 3], [0.05, 0.0, 0.0], atol=1e-12)
+
+    nearest = match_head_pose_measurement(samples, 10.0, max_dt_s=0.01)
+    assert nearest is not None
+    assert nearest.mode in {"nearest", "interpolated"}
+
+    assert match_head_pose_measurement(samples, 10.3, max_dt_s=0.06) is None
+
+
+def test_dynamic_arm_measurement_gate_reports_bad_id2_quality():
+    class FakeMsg:
+        pass
+
+    node = DynamicArmPoseMeasurementNode.__new__(DynamicArmPoseMeasurementNode)
+    node.marker_id = 2
+    node.head_camera_frame = "head_d435i_head_color_optical_frame"
+    node.extrinsic = type("Extrinsic", (), {"marker_frame": "arm_marker_2"})()
+    node.require_stable_dynamic_marker = True
+    node.max_reprojection_error_px = 3.0
+    node.max_marker_distance_m = 2.0
+    node.max_view_angle_deg = 75.0
+    node.min_marker_area_px2 = 800.0
+    node.min_geometry_score = 0.35
+
+    msg = FakeMsg()
+    msg.marker_id = 2
+    msg.header = type("Header", (), {"frame_id": "head_d435i_head_color_optical_frame"})()
+    msg.camera_frame = "head_d435i_head_color_optical_frame"
+    msg.marker_frame = "arm_marker_2"
+    msg.hard_gate_passed = True
+    msg.hard_gate_status = "accepted"
+    msg.stable = True
+    msg.reprojection_error_px = 3.5
+    msg.distance_m = 0.5
+    msg.view_angle_deg = 12.0
+    msg.area_px2 = 10000.0
+    msg.geometry_score = 0.9
+
+    assert DynamicArmPoseMeasurementNode.dynamic_gate_reason(node, msg) == "dynamic_reprojection_error_too_high"
 
 
 def test_robust_se3_estimate_recovers_known_transform_with_outliers():

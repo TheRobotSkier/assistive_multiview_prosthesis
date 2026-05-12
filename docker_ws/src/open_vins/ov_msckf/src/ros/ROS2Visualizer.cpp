@@ -31,7 +31,11 @@
 #include "utils/print.h"
 #include "utils/sensor_data.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <iomanip>
+#include <sstream>
 
 using namespace ov_core;
 using namespace ov_type;
@@ -55,6 +59,24 @@ Eigen::Matrix3d quat_xyzw_to_rot(const geometry_msgs::msg::Quaternion &quat_msg)
       2.0 * (x * y + w * z), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - w * x),
       2.0 * (x * z - w * y), 2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y);
   return R;
+}
+
+std::string json_escape(const std::string &value) {
+  std::ostringstream out;
+  for (char ch : value) {
+    if (ch == '"' || ch == '\\') {
+      out << '\\' << ch;
+    } else if (ch == '\n') {
+      out << "\\n";
+    } else {
+      out << ch;
+    }
+  }
+  return out.str();
+}
+
+double covariance_std(const Eigen::Matrix<double, 6, 6> &covariance, int index) {
+  return std::sqrt(std::max(covariance(index, index), 0.0));
 }
 
 } // namespace
@@ -119,6 +141,11 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   pub_loop_intrinsics = node->create_publisher<sensor_msgs::msg::CameraInfo>("loop_intrinsics", 2);
   it_pub_loop_img_depth = it.advertise("loop_depth", 2);
   it_pub_loop_img_depth_color = it.advertise("loop_depth_colored", 2);
+  if (_app->get_params().dynamic_arm_pose_options.enabled) {
+    pub_dynamic_arm_status =
+        node->create_publisher<std_msgs::msg::String>(_app->get_params().dynamic_arm_pose_options.status_topic, 10);
+    PRINT_DEBUG("Publishing: %s\n", pub_dynamic_arm_status->get_topic_name());
+  }
 
   // option to enable publishing of global to IMU transformation
   if (node->has_parameter("publish_global_to_imu_tf")) {
@@ -221,9 +248,11 @@ ROS2Visualizer::~ROS2Visualizer() {
   pub_loop_extrinsic.reset();
   pub_loop_point.reset();
   pub_loop_intrinsics.reset();
+  pub_dynamic_arm_status.reset();
   mTfBr.reset();
   sub_imu.reset();
   sub_marker_pose.reset();
+  sub_dynamic_arm_pose.reset();
   for (auto &sub : subs_cam)
     sub.reset();
   for (auto &sync : sync_cam)
@@ -253,6 +282,12 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
     sub_marker_pose = _node->create_subscription<sensor_fusion_msgs::msg::MarkerPoseObservation>(
         marker_topic, rclcpp::QoS(10), std::bind(&ROS2Visualizer::callback_marker_pose, this, std::placeholders::_1));
     PRINT_INFO("subscribing to marker observations: %s\n", marker_topic.c_str());
+  }
+  if (_app->get_params().dynamic_arm_pose_options.enabled) {
+    const std::string dynamic_arm_topic = _app->get_params().dynamic_arm_pose_options.topic;
+    sub_dynamic_arm_pose = _node->create_subscription<sensor_fusion_msgs::msg::DynamicArmPoseObservation>(
+        dynamic_arm_topic, rclcpp::QoS(10), std::bind(&ROS2Visualizer::callback_dynamic_arm_pose, this, std::placeholders::_1));
+    PRINT_INFO("subscribing to dynamic arm observations: %s\n", dynamic_arm_topic.c_str());
   }
 
   // Logic for sync stereo subscriber
@@ -558,6 +593,7 @@ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr ms
         double update_dt = 100.0 * (timestamp_imu_inC - camera_queue.at(0).timestamp);
         _app->feed_measurement_camera(camera_queue.at(0));
         process_marker_queue();
+        process_dynamic_arm_queue();
         visualize();
         camera_queue.pop_front();
         auto rT0_2 = boost::posix_time::microsec_clock::local_time();
@@ -718,6 +754,51 @@ void ROS2Visualizer::callback_marker_pose(const sensor_fusion_msgs::msg::MarkerP
   });
 }
 
+void ROS2Visualizer::callback_dynamic_arm_pose(const sensor_fusion_msgs::msg::DynamicArmPoseObservation::SharedPtr msg) {
+
+  DynamicArmPoseMeasurement measurement;
+  measurement.timestamp = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+  measurement.marker_id = msg->marker_id;
+  measurement.frame_id = msg->header.frame_id;
+  measurement.source_camera_frame = msg->source_camera_frame;
+  measurement.marker_frame = msg->marker_frame;
+  measurement.target_frame = msg->target_frame;
+  measurement.p_IinG << msg->pose.pose.position.x, msg->pose.pose.position.y, msg->pose.pose.position.z;
+
+  const Eigen::Matrix3d R_GtoI_pose = quat_xyzw_to_rot(msg->pose.pose.orientation);
+  measurement.R_GtoI = R_GtoI_pose.transpose();
+
+  std::array<double, 36> covariance_ros{};
+  for (int i = 0; i < 36; i++) {
+    covariance_ros.at(i) = msg->pose.covariance[i];
+  }
+  measurement.covariance = UpdaterDynamicArmPose::ros_covariance_to_update_order(covariance_ros);
+
+  measurement.hard_gate_passed = msg->hard_gate_passed;
+  measurement.hard_gate_status = msg->hard_gate_status;
+  measurement.stable = msg->stable;
+  measurement.stable_frames = msg->stable_frames;
+  measurement.stability_factor = msg->stability_factor;
+  measurement.reprojection_error_px = msg->reprojection_error_px;
+  measurement.distance_m = msg->distance_m;
+  measurement.view_angle_deg = msg->view_angle_deg;
+  measurement.area_px2 = msg->area_px2;
+  measurement.side_mean_px = msg->side_mean_px;
+  measurement.side_min_px = msg->side_min_px;
+  measurement.geometry_score = msg->geometry_score;
+  measurement.covariance_sigma_px = msg->covariance_sigma_px;
+  measurement.head_pose_match_dt_s = msg->head_pose_match_dt_s;
+  measurement.head_pose_match_mode = msg->head_pose_match_mode;
+  measurement.dynamic_covariance_fallback = msg->dynamic_covariance_fallback;
+  measurement.head_covariance_fallback = msg->head_covariance_fallback;
+  measurement.extrinsic_covariance_source = msg->extrinsic_covariance_source;
+
+  std::lock_guard<std::mutex> lck(dynamic_arm_queue_mtx);
+  dynamic_arm_queue.push_back(measurement);
+  std::sort(dynamic_arm_queue.begin(), dynamic_arm_queue.end(),
+            [](const DynamicArmPoseMeasurement &a, const DynamicArmPoseMeasurement &b) { return a.timestamp < b.timestamp; });
+}
+
 void ROS2Visualizer::process_marker_queue() {
 
   if (!_app->get_params().marker_pose_options.enabled) {
@@ -748,6 +829,98 @@ void ROS2Visualizer::process_marker_queue() {
     marker_queue.pop_front();
     _app->feed_measurement_marker(measurement);
   }
+}
+
+void ROS2Visualizer::process_dynamic_arm_queue() {
+
+  if (!_app->get_params().dynamic_arm_pose_options.enabled) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lck(dynamic_arm_queue_mtx);
+  if (!_app->initialized()) {
+    const double newest_to_keep = _node->now().seconds() - 2.0;
+    while (!dynamic_arm_queue.empty() && dynamic_arm_queue.front().timestamp < newest_to_keep) {
+      DynamicArmPoseUpdateResult result;
+      result.reason = "not_initialized_queue_drop";
+      publish_dynamic_arm_status(dynamic_arm_queue.front(), result, "not_initialized_queue_drop");
+      dynamic_arm_queue.pop_front();
+    }
+    return;
+  }
+
+  const double state_timestamp = _app->get_state()->_timestamp;
+  const double tolerance = _app->get_params().dynamic_arm_pose_options.time_tolerance_s;
+  while (!dynamic_arm_queue.empty()) {
+    const DynamicArmPoseMeasurement measurement = dynamic_arm_queue.front();
+    if (measurement.timestamp < state_timestamp - tolerance) {
+      DynamicArmPoseUpdateResult result;
+      result.reason = "visualizer_stale";
+      publish_dynamic_arm_status(measurement, result, "visualizer_stale");
+      PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: visualizer dropping stale measurement %.6f for state %.6f\n" RESET, measurement.timestamp,
+                  state_timestamp);
+      dynamic_arm_queue.pop_front();
+      continue;
+    }
+    if (measurement.timestamp > state_timestamp + tolerance) {
+      break;
+    }
+    dynamic_arm_queue.pop_front();
+    DynamicArmPoseUpdateResult result = _app->feed_measurement_dynamic_arm_pose(measurement);
+    publish_dynamic_arm_status(measurement, result);
+  }
+}
+
+void ROS2Visualizer::publish_dynamic_arm_status(const DynamicArmPoseMeasurement &measurement,
+                                                const DynamicArmPoseUpdateResult &result,
+                                                const std::string &queue_reason) {
+  if (pub_dynamic_arm_status == nullptr) {
+    return;
+  }
+  const auto options = _app->get_params().dynamic_arm_pose_options;
+  const double state_timestamp = (_app->get_state() != nullptr) ? _app->get_state()->_timestamp : -1.0;
+  const double fixed_dt =
+      (_app->last_fixed_marker_update_time() >= 0.0) ? measurement.timestamp - _app->last_fixed_marker_update_time() : -1.0;
+  const bool fixed_skip_active =
+      _app->last_fixed_marker_update_time() >= 0.0 && fixed_dt < options.skip_after_fixed_marker_s;
+
+  std::ostringstream ss;
+  ss << std::fixed << std::setprecision(6);
+  ss << "{";
+  ss << "\"event_type\":\"dynamic_arm_pose_update\"";
+  ss << ",\"stamp\":" << measurement.timestamp;
+  ss << ",\"state_timestamp\":" << state_timestamp;
+  ss << ",\"accepted\":" << (result.accepted ? "true" : "false");
+  ss << ",\"state_updated\":" << (result.state_updated ? "true" : "false");
+  ss << ",\"reason\":\"" << json_escape(queue_reason.empty() ? result.reason : queue_reason) << "\"";
+  ss << ",\"marker_id\":" << measurement.marker_id;
+  ss << ",\"frame_id\":\"" << json_escape(measurement.frame_id) << "\"";
+  ss << ",\"source_camera_frame\":\"" << json_escape(measurement.source_camera_frame) << "\"";
+  ss << ",\"marker_frame\":\"" << json_escape(measurement.marker_frame) << "\"";
+  ss << ",\"target_frame\":\"" << json_escape(measurement.target_frame) << "\"";
+  ss << ",\"chi2\":" << result.chi2;
+  ss << ",\"innovation_translation_m\":" << result.translation_norm_m;
+  ss << ",\"innovation_rotation_deg\":" << result.rotation_deg;
+  ss << ",\"noise_multiplier\":" << options.noise_multiplier;
+  ss << ",\"measurement_only\":" << (options.measurement_only ? "true" : "false");
+  ss << ",\"last_fixed_marker_update_dt_s\":" << fixed_dt;
+  ss << ",\"fixed_marker_skip_active\":" << (fixed_skip_active ? "true" : "false");
+  ss << ",\"dynamic_covariance_fallback\":" << (measurement.dynamic_covariance_fallback ? "true" : "false");
+  ss << ",\"head_covariance_fallback\":" << (measurement.head_covariance_fallback ? "true" : "false");
+  ss << ",\"extrinsic_covariance_source\":\"" << json_escape(measurement.extrinsic_covariance_source) << "\"";
+  ss << ",\"head_pose_match_dt_s\":" << measurement.head_pose_match_dt_s;
+  ss << ",\"head_pose_match_mode\":\"" << json_escape(measurement.head_pose_match_mode) << "\"";
+  ss << ",\"std_roll_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 0);
+  ss << ",\"std_pitch_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 1);
+  ss << ",\"std_yaw_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 2);
+  ss << ",\"std_x_m\":" << covariance_std(measurement.covariance, 3);
+  ss << ",\"std_y_m\":" << covariance_std(measurement.covariance, 4);
+  ss << ",\"std_z_m\":" << covariance_std(measurement.covariance, 5);
+  ss << "}";
+
+  std_msgs::msg::String msg;
+  msg.data = ss.str();
+  pub_dynamic_arm_status->publish(msg);
 }
 
 void ROS2Visualizer::publish_state() {

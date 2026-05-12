@@ -72,6 +72,41 @@ is not strong enough to replace the checked-in calibration config because the
 arm camera did not see fixed marker ID `0` often enough while the head camera
 saw ID0+ID2.
 
+Latest full raw dynamic-ID2 update planning bag:
+
+```text
+docker_ws/bags/openvins_tests/phase2_live/dynamic_id2_arm_update_full_raw_20260512_090704
+```
+
+Read-only validation result:
+- Bag metadata: `62.39 s`, `2.9 GiB`, `71417` messages.
+- Raw streams are present for both cameras: head/arm color image, camera info,
+  and IMU topics, with monotonic image and IMU stamps.
+- `/head/marker_pose/observation`: `525` messages, marker ID `0` only,
+  `target_frame: head_imu`.
+- `/arm/marker_pose/observation`: `302` messages, marker ID `0` only,
+  `target_frame: arm_imu`.
+- `/head/marker_pose/dynamic_observation`: `111` messages, marker ID `2`
+  only, `camera_frame: head_d435i_head_color_optical_frame`,
+  `marker_frame: arm_marker_2`.
+- `/arm/marker_pose/head_derived/arm_camera_pose`: `18` accepted preview
+  messages in `marker_map`.
+- OpenVINS outputs remain separated: head pose in `marker_map`,
+  arm pose in `marker_map`, odom child frames `head_imu` and `arm_imu`.
+- TF contains the expected head/arm chains and `_head_preview` debug frames.
+
+Calibration characterization from this full raw bag:
+- raw detections: head ID0 `1578`, head ID2 `373`, head ID0+ID2 `373`, arm ID0
+  `822`
+- synchronized calibration samples: `159`
+- inliers/outliers: `154 / 5`
+- p95 translation residual `0.0120 m`
+- p95 rotation residual `3.839 deg`
+
+This is the preferred local source bag for planning/replay-testing a future
+dynamic-ID2 arm update. It should still not overwrite the checked-in calibration
+without a separate calibration-refresh decision.
+
 ## 0. Before Starting
 
 Use Docker/Jazzy, not host ROS. The host may have a different ROS distro.
@@ -378,7 +413,82 @@ Seeing `/head/marker_pose/dynamic_observation` confirms ID2 detection only. It
 does not mean the arm D435i OpenVINS state will update from ID2 yet; online arm
 pose/state fusion is intentionally not implemented in this phase.
 
-## 6. Record A Live Dynamic-ID2 Validation Bag
+## 6. Debug-Only Head-Derived Arm Pose Preview
+
+The preview node consumes dynamic ID2 observations, the head OpenVINS pose, and
+`arm_marker_extrinsics.yaml` to publish a candidate arm D435i camera pose for
+RViz/debugging. It does not publish `/arm/marker_pose/observation`, does not
+change `marker_fixed_ids`, and does not feed OpenVINS.
+
+Replay the latest live dynamic-ID2 bag and start the preview node:
+
+Terminal 1:
+
+```bash
+cd ~/Documents/assistive_multiview_prosthesis/docker_ws/docker-deployment
+
+docker compose run --rm realsense_camera \
+  'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && \
+   ros2 launch sensor_fusion_bringup head_derived_arm_pose_preview.launch.py use_sim_time:=true'
+```
+
+Terminal 2:
+
+```bash
+cd ~/Documents/assistive_multiview_prosthesis/docker_ws/docker-deployment
+
+docker compose run --rm realsense_camera \
+  'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && \
+   ros2 bag play bags/openvins_tests/phase2_live/dual_openvins_id2_dynamic_phase2_20260511_194110 \
+     --clock \
+     --topics /head/marker_pose/dynamic_observation /ov_msckf/poseimu /tf /tf_static'
+```
+
+Terminal 3:
+
+```bash
+cd ~/Documents/assistive_multiview_prosthesis/docker_ws/docker-deployment
+
+docker compose run --rm realsense_camera \
+  'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && \
+   echo "preview pose frame:" && \
+   ros2 topic echo --once /arm/marker_pose/head_derived/arm_camera_pose --field header.frame_id && \
+   echo "preview status:" && \
+   ros2 topic echo --once /arm/marker_pose/head_derived/status --field data'
+```
+
+Expected:
+
+```text
+/arm/marker_pose/head_derived/arm_camera_pose header.frame_id: marker_map
+/arm/marker_pose/head_derived/status contains accepted=true for good samples
+```
+
+Optional RViz display:
+
+```bash
+cd ~/Documents/assistive_multiview_prosthesis/docker_ws/docker-deployment
+
+docker compose run --rm realsense_camera \
+  'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && \
+   rviz2 -d /miahand_ws/src/multi_cam_localization/sensor_fusion_bringup/config/rviz/phase2_dual_openvins_head_preview.rviz'
+```
+
+RViz should show the preview topics and TF frames with `_head_preview` suffixes:
+
+```text
+/arm/marker_pose/head_derived/arm_camera_pose
+/arm/marker_pose/head_derived/arm_camera_body_pose
+/arm/marker_pose/head_derived/path
+marker_map -> arm_d435i_arm_color_optical_frame_head_preview
+marker_map -> arm_d435i_arm_color_optical_frame_head_preview_body_display
+marker_map -> arm_marker_2_head_preview
+```
+
+The preview path is a candidate camera pose only. Do not use it as acceptance
+evidence for online arm-state updates.
+
+## 7. Record A Live Dynamic-ID2 Validation Bag
 
 For the most useful bag, start recording while both cameras are stationary and
 before the OpenVINS initialization jerks. If RViz makes the system sluggish,
@@ -441,7 +551,7 @@ Recommended recording sequence:
    head and ID0 visible to both cameras when possible.
 10. Stop the recorder with `Ctrl+C` so the MCAP closes cleanly.
 
-## 7. Validate A Newly Recorded Bag
+## 8. Validate A Newly Recorded Bag
 
 Replace `<bag_name>` with the directory printed by the recorder.
 
@@ -498,7 +608,7 @@ runtime/topic validation artifact but do not refresh
 such as `--min-inliers 50` can be useful for residual characterization, but it
 does not meet the first accepted-calibration gate.
 
-## 8. Cleanup And Commit Hygiene
+## 9. Cleanup And Commit Hygiene
 
 Generated overlay artifacts should stay out of commits:
 
@@ -519,8 +629,11 @@ multi_cam_localization/sensor_fusion_msgs/msg/DynamicMarkerObservation.msg
 multi_cam_localization/sensor_fusion_msgs/CMakeLists.txt
 multi_cam_localization/sensor_fusion_bringup/scripts/aruco_marker_pose_node.py
 multi_cam_localization/sensor_fusion_bringup/scripts/calibrate_arm_marker_extrinsic.py
+multi_cam_localization/sensor_fusion_bringup/scripts/head_derived_arm_pose_preview_node.py
+multi_cam_localization/sensor_fusion_bringup/launch/head_derived_arm_pose_preview.launch.py
 multi_cam_localization/sensor_fusion_bringup/config/markers/head_aruco_map.yaml
 multi_cam_localization/sensor_fusion_bringup/config/markers/arm_marker_extrinsics.yaml
+multi_cam_localization/sensor_fusion_bringup/config/rviz/phase2_dual_openvins_head_preview.rviz
 multi_cam_localization/sensor_fusion_bringup/docs/phase2_dynamic_id2_marker_calibration_validation.md
 multi_cam_localization/sensor_fusion_bringup/CMakeLists.txt
 multi_cam_localization/sensor_fusion_bringup/test/test_aruco_marker_pose_math.py
