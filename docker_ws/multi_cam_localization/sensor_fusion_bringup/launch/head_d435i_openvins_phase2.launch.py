@@ -22,6 +22,12 @@ def generate_launch_description():
         "estimator_config.yaml",
     ])
 
+    grey_script = PathJoinSubstitution([
+        FindPackageShare("sensor_fusion_bringup"),
+        "scripts",
+        "color_to_grey_node.py",
+    ])
+
     head_camera = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(rs_launch),
         condition=IfCondition(LaunchConfiguration("start_camera")),
@@ -42,15 +48,14 @@ def generate_launch_description():
         }.items(),
     )
 
-
     grey_converter = Node(
-        package="image_proc",
-        executable="convert",
-        namespace="head/d435i_head",
+        package="sensor_fusion_bringup",
+        executable="color_to_grey_node.py",
         name="color_to_grey",
-        remappings=[
-            ("image", "/head/d435i_head/color/image_raw"),
-            ("image_mono", "/head/d435i_head/grey/image_raw"),
+        namespace="head/d435i_head",
+        parameters=[
+            {"input_topic": "/head/d435i_head/color/image_raw"},
+            {"output_topic": "/head/d435i_head/grey/image_raw"},
         ],
     )
 

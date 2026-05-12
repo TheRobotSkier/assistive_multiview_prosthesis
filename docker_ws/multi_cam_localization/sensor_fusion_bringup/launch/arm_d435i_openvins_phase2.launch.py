@@ -42,15 +42,14 @@ def generate_launch_description():
         }.items(),
     )
 
-
     grey_converter = Node(
-        package="image_proc",
-        executable="convert",
-        namespace="arm/d435i_arm",
+        package="sensor_fusion_bringup",
+        executable="color_to_grey_node.py",
         name="color_to_grey",
-        remappings=[
-            ("image", "/arm/d435i_arm/color/image_raw"),
-            ("image_mono", "/arm/d435i_arm/grey/image_raw"),
+        namespace="arm/d435i_arm",
+        parameters=[
+            {"input_topic": "/arm/d435i_arm/color/image_raw"},
+            {"output_topic": "/arm/d435i_arm/grey/image_raw"},
         ],
     )
 
