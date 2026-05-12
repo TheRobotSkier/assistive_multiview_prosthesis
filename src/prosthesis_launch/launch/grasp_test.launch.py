@@ -2,7 +2,7 @@
 
 Launches all nodes needed for a complete grasp test:
 
-  1. (Optional) Dual RealSense D435 cameras OR mock cloud publisher
+  1. (Optional) Dual RealSense D435i cameras with IMU OR mock cloud publisher
   2. Cloud snapshot node          — freezes segmented cloud for RViz
   3. Twist propagation            — detects hand→object collision (active)
   4. Grasp preshaping service     — C++/Rust FFI bridge
@@ -10,7 +10,7 @@ Launches all nodes needed for a complete grasp test:
   6. Pipeline manager             — state machine orchestrator
   7. Segmentation ROS bridge      — HTTP inference client
   8. Hand pose publisher          — reads TF, publishes /hand_pose
-  9. Static TF                    — wrist_link → d435_2_depth_optical_frame
+   9. Static TF                    — wrist_link → d435i_arm_depth_optical_frame
  10. Hand URDF                    — robot_state_publisher (xacro)
  11. Wrist Dynamixel driver
  12. RViz                         — grasp_test.rviz config
@@ -54,7 +54,7 @@ def _launch_setup(context, *args, **kwargs):
 
     # Choose the correct cloud topic based on camera vs mock
     if camera_enabled:
-        cloud_topic = "/cam1/d435_1/depth/color/points"
+        cloud_topic = "/head/d435i_head/depth/color/points"
     else:
         cloud_topic = "/camera/depth/color/points"
 
@@ -63,9 +63,9 @@ def _launch_setup(context, *args, **kwargs):
     # ── Cloud source ────────────────────────────────────────────────────
     if camera_enabled:
         camera_launch_path = os.path.join(
-            get_package_share_directory("camera"),
+            get_package_share_directory("sensor_fusion_bringup"),
             "launch",
-            "two_d435.launch.py",
+            "dual_d435i.launch.py",
         )
         nodes.append(
             IncludeLaunchDescription(
@@ -166,7 +166,7 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── Static TF: wrist_link → d435_2_depth_optical_frame ────────────
+    # ── Static TF: wrist_link → d435i_arm_depth_optical_frame ────────────
     # The hand-mounted camera (D435 #2) is rigidly attached to the wrist.
     # The exact translation/rotation depends on the physical mount;
     # update these values to match the actual hardware setup.
@@ -179,7 +179,7 @@ def _launch_setup(context, *args, **kwargs):
                 "0.0", "0.0", "0.0",  # translation (XYZ metres)
                 "0.0", "0.0", "0.0", "1.0",  # rotation (identity quaternion)
                 "wrist_link",
-                "d435_2_depth_optical_frame",
+                "d435i_arm_depth_optical_frame",
             ],
             output="screen",
         )

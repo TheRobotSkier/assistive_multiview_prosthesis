@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         usbutils \
         ros-jazzy-cyclonedds \
         ros-jazzy-rmw-cyclonedds-cpp \
+        ros-jazzy-librealsense2 \
+        ros-jazzy-realsense2-camera \
+        ros-jazzy-realsense2-description \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Python dependencies ──────────────────────────────────────────────────────

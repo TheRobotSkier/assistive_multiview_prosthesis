@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs rviz
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -80,6 +80,10 @@ clean:
 
 logs:
 	cd $(COMPOSE_DIR) && $(COMPOSE) logs -f
+
+# ── Camera logs (D435i — hardware profile) ────────────────────────────────
+logs-cameras:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile hardware logs -f prosthesis-hw
 
 # ── Robotlab RViz (view Jetson camera data on host via Ethernet) ──────
 rviz:

@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>sensor_fusion_bringup</name>
+  <version>0.1.0</version>
+  <description>Bringup package for dual D435i cameras with IMU on Jetson Orin Nano.</description>
+  <maintainer email="dev@multiview-prosthesis.org">multiview_prosthesis</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>realsense2_camera</exec_depend>
+  <exec_depend>realsense2_description</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

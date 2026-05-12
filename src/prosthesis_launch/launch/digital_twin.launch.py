@@ -2,8 +2,8 @@
 
 Launches all nodes needed for a complete digital twin test:
 
- 1. Dual RealSense D435 cameras (or mock cloud publisher)
- 2. Static TF: cam1camera_depth_optical_frame -> world (root)
+ 1. Dual RealSense D435i cameras with IMU (or mock cloud publisher)
+ 2. Static TF: d435i_head_depth_optical_frame -> world (root)
  3. Pointcloud merger       — TF-transforms both clouds into cam1 frame, fuses to /fused_pointcloud
  4. Pointcloud relay         — /fused_pointcloud -> /segmentation/input_cloud
  5. Segmentation ROS bridge  — HTTP inference client
@@ -55,12 +55,12 @@ def _launch_setup(context, *args, **kwargs):
     inference_url = LaunchConfiguration("inference_url")
 
     if camera_enabled:
-        cloud_topic = "/cam1/d435_1/depth/color/points"
-        cam1_frame = "cam1camera_depth_optical_frame"
-        cam1_link = "cam1camera_link"
-        cam1_color_frame = "cam1camera_color_optical_frame"
-        cam2_link_frame = "cam2camera_link"
-        cam2_color_frame = "cam2camera_color_optical_frame"
+        cloud_topic = "/head/d435i_head/depth/color/points"
+        cam1_frame = "d435i_head_depth_optical_frame"
+        cam1_link = "d435i_head_link"
+        cam1_color_frame = "d435i_head_color_optical_frame"
+        cam2_link_frame = "d435i_arm_link"
+        cam2_color_frame = "d435i_arm_color_optical_frame"
     else:
         cloud_topic = "/camera/depth/color/points"
         cam1_frame = "camera_depth_optical_frame"
@@ -74,9 +74,9 @@ def _launch_setup(context, *args, **kwargs):
     # ── 1. Cloud source ────────────────────────────────────────────────────
     if camera_enabled:
         camera_launch_path = os.path.join(
-            get_package_share_directory("camera"),
+            get_package_share_directory("sensor_fusion_bringup"),
             "launch",
-            "two_d435.launch.py",
+            "dual_d435i.launch.py",
         )
         nodes.append(
             IncludeLaunchDescription(
@@ -96,7 +96,7 @@ def _launch_setup(context, *args, **kwargs):
     # ── 2. Static TF: cam1 depth frame -> world (roots URDF in camera 1) ───
     # Since camera 1 is the stationary reference, this connects the TF tree.
     # cam2's position comes from ChArUco tracking → cam2_hand_tracker.
-    # RViz uses cam1camera_depth_optical_frame as fixed frame.
+    # RViz uses d435i_head_depth_optical_frame as fixed frame.
     if camera_enabled:
         nodes.append(
             Node(
@@ -140,8 +140,8 @@ def _launch_setup(context, *args, **kwargs):
                 executable="pointcloud_merger_node",
                 name="pointcloud_merger",
                 parameters=[{
-                    "cam1_topic": "/cam1/d435_1/depth/color/points",
-                    "cam2_topic": "/cam2/d435_2/depth/color/points",
+                    "cam1_topic": "/head/d435i_head/depth/color/points",
+                    "cam2_topic": "/arm/d435i_arm/depth/color/points",
                     "output_topic": "/fused_pointcloud",
                     "target_frame": cam1_frame,
                 }],
@@ -229,7 +229,7 @@ def _launch_setup(context, *args, **kwargs):
             )
         )
 
-    # ── 8b. Static TF: wrist_link → cam2camera_link (hand-mounted camera) ─
+    # ── 8b. Static TF: wrist_link → d435i_arm_link (hand-mounted camera) ─
     # Needed for the pointcloud merger's TF chain: cam2cloud → cam2link →
     # wrist_link → world → cam1frame.  Also used by RViz to display cam2's
     # pointcloud in the hand frame.

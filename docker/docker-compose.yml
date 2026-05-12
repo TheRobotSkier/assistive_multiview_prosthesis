@@ -46,7 +46,7 @@ services:
   rviz:
     container_name: rviz-test
     extends: prosthesis
-    command: rviz
+    command: rviz2
     profiles:
       - rviz
 
@@ -54,9 +54,18 @@ services:
   prosthesis-hw:
     extends: prosthesis
     container_name: prosthesis-hw
+    runtime: nvidia
+    ipc: host
     devices:
       - ${MIA_SERIAL_PORT:-/dev/ttyUSB1}:/dev/ttyUSB1
       - ${WRIST_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /dev:/dev
+      - /run/udev:/run/udev:ro
+    environment:
+      - CAM_HEAD_SERIAL=${CAM_HEAD_SERIAL:-}
+      - CAM_ARM_SERIAL=${CAM_ARM_SERIAL:-}
     profiles:
       - hardware
 
@@ -82,7 +91,12 @@ services:
   grasp_test:
     container_name: grasp_test
     extends: prosthesis
-    command: ["/bin/bash", "-c", "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch grasp_test.launch.py camera:=true gui:=true"]
+    command:
+      [
+        "/bin/bash",
+        "-c",
+        "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch grasp_test.launch.py camera:=true gui:=true",
+      ]
     environment:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - XAUTHORITY=/tmp/.Xauthority
@@ -103,7 +117,12 @@ services:
   digital_twin:
     container_name: digital_twin
     extends: prosthesis
-    command: ["/bin/bash", "-c", "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=true"]
+    command:
+      [
+        "/bin/bash",
+        "-c",
+        "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=true",
+      ]
     environment:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - XAUTHORITY=/tmp/.Xauthority
