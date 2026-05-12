@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill robotlab-view robotlab-stop
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -108,4 +108,15 @@ rviz:
 		localhost/rviz-robotlab \
 		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
 	@sleep 3
-	@echo "RViz container started (rviz-robotlab). Kill with: podman kill rviz-robotlab"
+	@echo "RViz container started (rviz-robotlab). Kill with: make rviz-kill"
+
+rviz-kill:
+	-podman kill rviz-robotlab 2>/dev/null
+	-podman rm rviz-robotlab 2>/dev/null
+	@echo "RViz stopped."
+
+robotlab-view: rviz
+	@echo "Robotlab view ready. Jetson pointclouds streaming to RViz over Ethernet."
+
+robotlab-stop: rviz-kill
+	@echo "Robotlab view stopped."
