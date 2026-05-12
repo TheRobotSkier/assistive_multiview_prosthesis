@@ -7,10 +7,10 @@ aruco:
 
 frames:
   map_frame: marker_map
-  camera_frame: arm_d435i_arm_color_optical_frame
-  detected_camera_frame: arm_d435i_arm_color_optical_frame
+  camera_frame: arm_d435_arm_color_optical_frame
+  detected_camera_frame: arm_d435_arm_color_optical_frame
   # Must match the Phase 2 OpenVINS launch marker_target_frame / imu_frame_id.
-  imu_frame: arm_imu
+  imu_frame: cam1_imu_link
 
 # OpenVINS/Kalibr camera-IMU calibration.
 # This gives the node camera intrinsics, distortion, and T_cam_imu.
