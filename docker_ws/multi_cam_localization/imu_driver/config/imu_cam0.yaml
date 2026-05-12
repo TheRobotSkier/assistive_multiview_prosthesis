@@ -1,3 +1,4 @@
+# IMU rate set to 15 Hz to match camera FPS
 /**:
   ros__parameters:
     bus: 7
