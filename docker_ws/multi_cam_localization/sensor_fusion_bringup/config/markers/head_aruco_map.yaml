@@ -106,8 +106,8 @@ vio_health:
   max_pose_covariance_trace: 10.0
 
 markers:
-  0:
-    frame_id: marker_0
+  1:
+    frame_id: marker_1
     size_m: 0.100
 
     # T_map_marker maps marker_0 coordinates into marker_map.
