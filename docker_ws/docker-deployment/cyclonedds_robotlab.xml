@@ -1,9 +1,13 @@
 <CycloneDDS>
-  <Domain><Id>0</Id></Domain>
-  <Discovery>
-    <Peers>
-      <Peer address="10.42.0.1"/>
-      <Peer address="10.42.0.2"/>
-    </Peers>
-  </Discovery>
+  <Domain Id="0">
+    <General>
+      <NetworkInterfaceAddress>10.42.0.2</NetworkInterfaceAddress>
+    </General>
+    <Discovery>
+      <Peers>
+        <Peer address="10.42.0.1"/>
+        <Peer address="10.42.0.2"/>
+      </Peers>
+    </Discovery>
+  </Domain>
 </CycloneDDS>
