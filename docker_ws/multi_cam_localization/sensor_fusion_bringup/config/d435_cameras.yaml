@@ -25,9 +25,3 @@ common:
 profiles:
   depth: "424x240x15"
   color: "640x480x15"
-
-pointcloud:
-  enable: true
-  stream_filter: 2
-align_depth:
-  enable: true
