@@ -26,6 +26,9 @@ float64 covariance_sigma_px
 
 float64 head_pose_match_dt_s
 string head_pose_match_mode
+string head_pose_source_topic
+string head_pose_source_type
+float64 head_pose_time_offset_s
 bool dynamic_covariance_fallback
 bool head_covariance_fallback
 string extrinsic_covariance_source

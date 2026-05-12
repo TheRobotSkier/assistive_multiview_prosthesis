@@ -178,6 +178,23 @@ struct VioManagerOptions {
       parser->parse_config("dynamic_arm_max_update_rotation_deg", dynamic_arm_pose_options.max_update_rotation_deg, false);
       parser->parse_config("dynamic_arm_min_update_interval_s", dynamic_arm_pose_options.min_update_interval_s, false);
       parser->parse_config("dynamic_arm_skip_after_fixed_marker_s", dynamic_arm_pose_options.skip_after_fixed_marker_s, false);
+      parser->parse_config("dynamic_arm_allow_initial_lock", dynamic_arm_pose_options.allow_initial_lock, false);
+      parser->parse_config("dynamic_arm_allow_reanchor", dynamic_arm_pose_options.allow_reanchor, false);
+      parser->parse_config("dynamic_arm_reanchor_measurement_only", dynamic_arm_pose_options.reanchor_measurement_only, false);
+      parser->parse_config("dynamic_arm_reanchor_min_samples", dynamic_arm_pose_options.reanchor_min_samples, false);
+      parser->parse_config("dynamic_arm_reanchor_window_s", dynamic_arm_pose_options.reanchor_window_s, false);
+      parser->parse_config("dynamic_arm_reanchor_min_sample_dt_s", dynamic_arm_pose_options.reanchor_min_sample_dt_s, false);
+      parser->parse_config("dynamic_arm_reanchor_max_velocity_mps", dynamic_arm_pose_options.reanchor_max_velocity_mps, false);
+      parser->parse_config("dynamic_arm_reanchor_max_sample_translation_std_m",
+                           dynamic_arm_pose_options.reanchor_max_sample_translation_std_m, false);
+      parser->parse_config("dynamic_arm_reanchor_max_sample_rotation_std_deg",
+                           dynamic_arm_pose_options.reanchor_max_sample_rotation_std_deg, false);
+      parser->parse_config("dynamic_arm_reanchor_trigger_translation_m", dynamic_arm_pose_options.reanchor_trigger_translation_m, false);
+      parser->parse_config("dynamic_arm_reanchor_trigger_rotation_deg", dynamic_arm_pose_options.reanchor_trigger_rotation_deg, false);
+      parser->parse_config("dynamic_arm_reanchor_cooldown_s", dynamic_arm_pose_options.reanchor_cooldown_s, false);
+      parser->parse_config("dynamic_arm_reanchor_skip_after_fixed_marker_s",
+                           dynamic_arm_pose_options.reanchor_skip_after_fixed_marker_s, false);
+      parser->parse_config("dynamic_arm_reanchor_covariance_multiplier", dynamic_arm_pose_options.reanchor_covariance_multiplier, false);
     }
     PRINT_DEBUG("  - dt_slam_delay: %.1f\n", dt_slam_delay);
     PRINT_DEBUG("  - zero_velocity_update: %d\n", try_zupt);
@@ -224,6 +241,21 @@ struct VioManagerOptions {
                 dynamic_arm_pose_options.max_update_rotation_deg);
     PRINT_DEBUG("  - dynamic arm min interval / ID0 skip: %.3f / %.3f s\n", dynamic_arm_pose_options.min_update_interval_s,
                 dynamic_arm_pose_options.skip_after_fixed_marker_s);
+    PRINT_DEBUG("  - dynamic arm initial-lock/reanchor?: %d / %d (measurement-only %d)\n",
+                (int)dynamic_arm_pose_options.allow_initial_lock, (int)dynamic_arm_pose_options.allow_reanchor,
+                (int)dynamic_arm_pose_options.reanchor_measurement_only);
+    PRINT_DEBUG("  - dynamic arm reanchor samples/window/min dt: %d / %.3f / %.3f s\n",
+                dynamic_arm_pose_options.reanchor_min_samples, dynamic_arm_pose_options.reanchor_window_s,
+                dynamic_arm_pose_options.reanchor_min_sample_dt_s);
+    PRINT_DEBUG("  - dynamic arm reanchor velocity/std gates: %.3f m/s, %.3f m, %.2f deg\n",
+                dynamic_arm_pose_options.reanchor_max_velocity_mps,
+                dynamic_arm_pose_options.reanchor_max_sample_translation_std_m,
+                dynamic_arm_pose_options.reanchor_max_sample_rotation_std_deg);
+    PRINT_DEBUG("  - dynamic arm reanchor trigger/cooldown/ID0 skip: %.3f m / %.2f deg, %.3f / %.3f s\n",
+                dynamic_arm_pose_options.reanchor_trigger_translation_m,
+                dynamic_arm_pose_options.reanchor_trigger_rotation_deg,
+                dynamic_arm_pose_options.reanchor_cooldown_s,
+                dynamic_arm_pose_options.reanchor_skip_after_fixed_marker_s);
   }
 
   // NOISE / CHI2 ============================

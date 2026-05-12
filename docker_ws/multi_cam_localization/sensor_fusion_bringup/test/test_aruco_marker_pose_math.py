@@ -1,3 +1,4 @@
+from collections import deque
 from pathlib import Path
 import sys
 
@@ -701,13 +702,94 @@ def test_dynamic_arm_measurement_head_sync_modes_and_fallback_flags():
     assert matched is not None
     assert matched.mode == "interpolated"
     assert matched.covariance_fallback is True
+    assert matched.time_offset_s == 0.0
     np.testing.assert_allclose(matched.T_map_headimu[:3, 3], [0.05, 0.0, 0.0], atol=1e-12)
 
     nearest = match_head_pose_measurement(samples, 10.0, max_dt_s=0.01)
     assert nearest is not None
     assert nearest.mode in {"nearest", "interpolated"}
+    assert abs(nearest.time_offset_s) <= 0.01
 
     assert match_head_pose_measurement(samples, 10.3, max_dt_s=0.06) is None
+
+
+def test_dynamic_arm_measurement_uses_only_already_buffered_head_pose():
+    samples = [
+        HeadPoseMeasurementSample(
+            stamp=None,
+            stamp_sec=10.0,
+            T_map_headimu=np.eye(4),
+            covariance=np.eye(6),
+            covariance_fallback=False,
+        ),
+    ]
+
+    assert match_head_pose_measurement(samples, 10.2, max_dt_s=0.05) is None
+
+    nearest = match_head_pose_measurement(samples, 10.03, max_dt_s=0.05)
+    assert nearest is not None
+    assert nearest.mode == "nearest"
+    assert math.isclose(nearest.time_offset_s, 0.03)
+
+
+def test_dynamic_arm_measurement_accepts_head_odometry_and_rejects_wrong_child():
+    from nav_msgs.msg import Odometry
+
+    node = DynamicArmPoseMeasurementNode.__new__(DynamicArmPoseMeasurementNode)
+    node.map_frame = "marker_map"
+    node.head_imu_frame = "head_imu"
+    node.head_fallback_diag = np.ones(6)
+    node.max_pose_covariance_trace = 10.0
+    node.head_buffer = deque()
+    node.head_pose_buffer_seconds = 5.0
+    events = []
+    node.publish_status = lambda accepted, reason, stamp_sec, fields: events.append((accepted, reason, fields))
+
+    msg = Odometry()
+    msg.header.stamp.sec = 10
+    msg.header.frame_id = "marker_map"
+    msg.child_frame_id = "head_imu"
+    msg.pose.pose.orientation.w = 1.0
+    for idx in range(6):
+        msg.pose.covariance[6 * idx + idx] = 0.01
+
+    DynamicArmPoseMeasurementNode.head_odom_cb(node, msg)
+    assert len(node.head_buffer) == 1
+    assert node.head_buffer[0].stamp_sec == 10.0
+    np.testing.assert_allclose(node.head_buffer[0].T_map_headimu, np.eye(4))
+
+    bad = Odometry()
+    bad.header.stamp.sec = 11
+    bad.header.frame_id = "marker_map"
+    bad.child_frame_id = "wrong_imu"
+    bad.pose.pose.orientation.w = 1.0
+    DynamicArmPoseMeasurementNode.head_odom_cb(node, bad)
+    assert events[-1][1] == "head_pose_wrong_child_frame"
+
+
+def test_dynamic_arm_measurement_pose_with_covariance_fallback_still_works():
+    from geometry_msgs.msg import PoseWithCovarianceStamped
+
+    node = DynamicArmPoseMeasurementNode.__new__(DynamicArmPoseMeasurementNode)
+    node.map_frame = "marker_map"
+    node.head_fallback_diag = np.ones(6)
+    node.max_pose_covariance_trace = 10.0
+    node.head_buffer = deque()
+    node.head_pose_buffer_seconds = 5.0
+    events = []
+    node.publish_status = lambda accepted, reason, stamp_sec, fields: events.append((accepted, reason, fields))
+
+    msg = PoseWithCovarianceStamped()
+    msg.header.stamp.sec = 12
+    msg.header.frame_id = "marker_map"
+    msg.pose.pose.orientation.w = 1.0
+    for idx in range(6):
+        msg.pose.covariance[6 * idx + idx] = 0.02
+
+    DynamicArmPoseMeasurementNode.head_pose_cb(node, msg)
+    assert len(node.head_buffer) == 1
+    assert node.head_buffer[0].stamp_sec == 12.0
+    assert node.head_buffer[0].covariance_fallback is False
 
 
 def test_dynamic_arm_measurement_gate_reports_bad_id2_quality():

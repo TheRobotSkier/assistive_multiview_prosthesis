@@ -159,6 +159,47 @@ bool measurement_only_does_not_mutate_test() {
          expect((state->_imu->quat() - before_quat).norm() < 1e-12, "measurement-only changed orientation");
 }
 
+bool dynamic_reanchor_defaults_are_safe_test() {
+  DynamicArmPoseUpdaterOptions options;
+  DynamicArmPoseUpdateResult result;
+
+  return expect(!options.allow_initial_lock, "dynamic initial-lock must default disabled") &&
+         expect(!options.allow_reanchor, "dynamic reanchor must default disabled") &&
+         expect(options.reanchor_measurement_only, "dynamic reanchor must default measurement-only") &&
+         expect(options.reanchor_min_samples == 5, "dynamic reanchor min samples default mismatch") &&
+         expect(std::abs(options.reanchor_window_s - 2.0) < 1e-12, "dynamic reanchor window default mismatch") &&
+         expect(!result.would_dynamic_initial_lock, "result should not default would-initial-lock") &&
+         expect(!result.dynamic_initial_lock_performed, "result should not default initial-lock performed") &&
+         expect(!result.would_dynamic_reanchor, "result should not default would-reanchor") &&
+         expect(!result.dynamic_reanchor_performed, "result should not default reanchor performed");
+}
+
+bool strict_frame_rejection_test() {
+  UpdaterDynamicArmPose updater(make_options(false));
+  DynamicArmPoseMeasurement measurement = make_measurement();
+  std::string reason;
+
+  DynamicArmPoseMeasurement wrong_map = measurement;
+  wrong_map.frame_id = "head_imu";
+  bool wrong_map_valid = updater.valid_measurement(wrong_map, reason);
+  bool ok = expect(!wrong_map_valid, "wrong map frame should reject") &&
+            expect(reason == "frame_mismatch", "wrong map frame reason mismatch");
+
+  DynamicArmPoseMeasurement wrong_source = measurement;
+  wrong_source.source_camera_frame = "arm_cam0";
+  wrong_map_valid = updater.valid_measurement(wrong_source, reason);
+  ok = expect(!wrong_map_valid, "wrong source camera should reject") &&
+       expect(reason == "source_camera_frame_mismatch", "wrong source camera reason mismatch") && ok;
+
+  DynamicArmPoseMeasurement wrong_marker_frame = measurement;
+  wrong_marker_frame.marker_frame = "marker_0";
+  wrong_map_valid = updater.valid_measurement(wrong_marker_frame, reason);
+  ok = expect(!wrong_map_valid, "wrong marker frame should reject") &&
+       expect(reason == "marker_frame_mismatch", "wrong marker frame reason mismatch") && ok;
+
+  return ok;
+}
+
 } // namespace
 
 int main() {
@@ -167,5 +208,7 @@ int main() {
   ok = update_pulls_toward_measurement_test() && ok;
   ok = rejection_does_not_mutate_test() && ok;
   ok = measurement_only_does_not_mutate_test() && ok;
+  ok = dynamic_reanchor_defaults_are_safe_test() && ok;
+  ok = strict_frame_rejection_test() && ok;
   return ok ? 0 : 1;
 }

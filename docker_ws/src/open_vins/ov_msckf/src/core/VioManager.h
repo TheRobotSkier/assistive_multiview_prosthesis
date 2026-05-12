@@ -199,6 +199,21 @@ protected:
   bool reset_to_marker_map(const MarkerPoseMeasurement &measurement, const Eigen::Vector3d &velocity,
                            const Eigen::Matrix3d &velocity_covariance, const std::string &reason);
 
+  /// Add a dynamic arm measurement to its separate reanchor/initial-lock history
+  void record_dynamic_arm_measurement(const DynamicArmPoseMeasurement &measurement);
+
+  /// Estimate arm velocity and consistency from recent dynamic arm observations
+  bool dynamic_arm_velocity_fit(Eigen::Vector3d &velocity, Eigen::Matrix3d &velocity_covariance,
+                                DynamicArmPoseUpdateResult &result) const;
+
+  /// Evaluate optional dynamic ID2 initial-lock/reanchor path
+  DynamicArmPoseUpdateResult try_dynamic_arm_reanchor(const DynamicArmPoseMeasurement &measurement, bool initial_lock,
+                                                      const std::string &trigger_reason);
+
+  /// Reset current arm OpenVINS gauge/state into marker_map using dynamic arm measurement
+  bool reset_to_dynamic_arm_pose(const DynamicArmPoseMeasurement &measurement, const Eigen::Vector3d &velocity,
+                                 const Eigen::Matrix3d &velocity_covariance, const std::string &reason);
+
   /// Remove cloned/frontend state after an explicit marker reset
   void clear_marker_reset_state();
 
@@ -252,6 +267,9 @@ protected:
   /// Recent marker observations used only for the explicit reset velocity fit
   std::deque<MarkerPoseMeasurement, Eigen::aligned_allocator<MarkerPoseMeasurement>> recent_marker_measurements;
 
+  /// Recent dynamic arm observations used only for dynamic initial-lock/reanchor evaluation
+  std::deque<DynamicArmPoseMeasurement, Eigen::aligned_allocator<DynamicArmPoseMeasurement>> recent_dynamic_arm_measurements;
+
   /// If OpenVINS global has been explicitly initialized/reinitialized as marker_map
   bool is_marker_global_initialized = false;
 
@@ -266,6 +284,9 @@ protected:
 
   /// Last dynamic arm update timestamp accepted by gates
   double last_dynamic_arm_update_timestamp = -1;
+
+  /// Last dynamic initial-lock/reanchor timestamp accepted by gates
+  double last_dynamic_arm_reanchor_timestamp = -1;
 
   /// This is the queue of measurement times that have come in since we starting doing initialization
   /// After we initialize, we will want to prop & update to the latest timestamp quickly

@@ -93,10 +93,10 @@ def generate_launch_description():
             },
             {"dynamic_arm_pose_topic": LaunchConfiguration("dynamic_arm_pose_topic")},
             {"dynamic_arm_status_topic": LaunchConfiguration("dynamic_arm_status_topic")},
-            {"dynamic_arm_global_frame_id": "marker_map"},
-            {"dynamic_arm_target_frame": "arm_imu"},
-            {"dynamic_arm_source_camera_frame": "head_d435i_head_color_optical_frame"},
-            {"dynamic_arm_marker_frame": "arm_marker_2"},
+            {"dynamic_arm_global_frame_id": LaunchConfiguration("dynamic_arm_global_frame_id")},
+            {"dynamic_arm_target_frame": LaunchConfiguration("dynamic_arm_target_frame")},
+            {"dynamic_arm_source_camera_frame": LaunchConfiguration("dynamic_arm_source_camera_frame")},
+            {"dynamic_arm_marker_frame": LaunchConfiguration("dynamic_arm_marker_frame")},
             {"dynamic_arm_marker_id": ParameterValue(LaunchConfiguration("dynamic_arm_marker_id"), value_type=int)},
             {
                 "dynamic_arm_time_tolerance_s": ParameterValue(
@@ -135,6 +135,70 @@ def generate_launch_description():
                     value_type=float,
                 )
             },
+            {"dynamic_arm_allow_initial_lock": ParameterValue(LaunchConfiguration("dynamic_arm_allow_initial_lock"), value_type=bool)},
+            {"dynamic_arm_allow_reanchor": ParameterValue(LaunchConfiguration("dynamic_arm_allow_reanchor"), value_type=bool)},
+            {
+                "dynamic_arm_reanchor_measurement_only": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_measurement_only"),
+                    value_type=bool,
+                )
+            },
+            {"dynamic_arm_reanchor_min_samples": ParameterValue(LaunchConfiguration("dynamic_arm_reanchor_min_samples"), value_type=int)},
+            {"dynamic_arm_reanchor_window_s": ParameterValue(LaunchConfiguration("dynamic_arm_reanchor_window_s"), value_type=float)},
+            {
+                "dynamic_arm_reanchor_min_sample_dt_s": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_min_sample_dt_s"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_reanchor_max_velocity_mps": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_max_velocity_mps"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_reanchor_max_sample_translation_std_m": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_max_sample_translation_std_m"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_reanchor_max_sample_rotation_std_deg": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_max_sample_rotation_std_deg"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_reanchor_trigger_translation_m": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_trigger_translation_m"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_reanchor_trigger_rotation_deg": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_trigger_rotation_deg"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_reanchor_cooldown_s": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_cooldown_s"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_reanchor_skip_after_fixed_marker_s": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_skip_after_fixed_marker_s"),
+                    value_type=float,
+                )
+            },
+            {
+                "dynamic_arm_reanchor_covariance_multiplier": ParameterValue(
+                    LaunchConfiguration("dynamic_arm_reanchor_covariance_multiplier"),
+                    value_type=float,
+                )
+            },
         ],
     )
 
@@ -170,6 +234,10 @@ def generate_launch_description():
             default_value="/ov_msckf_arm/dynamic_arm_update/status",
             description="Status topic for dynamic arm pose update decisions.",
         ),
+        DeclareLaunchArgument("dynamic_arm_global_frame_id", default_value="marker_map"),
+        DeclareLaunchArgument("dynamic_arm_target_frame", default_value="arm_imu"),
+        DeclareLaunchArgument("dynamic_arm_source_camera_frame", default_value="head_d435i_head_color_optical_frame"),
+        DeclareLaunchArgument("dynamic_arm_marker_frame", default_value="arm_marker_2"),
         DeclareLaunchArgument("dynamic_arm_marker_id", default_value="2"),
         DeclareLaunchArgument("dynamic_arm_time_tolerance_s", default_value="0.05"),
         DeclareLaunchArgument("dynamic_arm_noise_multiplier", default_value="4.0"),
@@ -178,6 +246,20 @@ def generate_launch_description():
         DeclareLaunchArgument("dynamic_arm_max_update_rotation_deg", default_value="15.0"),
         DeclareLaunchArgument("dynamic_arm_min_update_interval_s", default_value="0.10"),
         DeclareLaunchArgument("dynamic_arm_skip_after_fixed_marker_s", default_value="0.50"),
+        DeclareLaunchArgument("dynamic_arm_allow_initial_lock", default_value="false"),
+        DeclareLaunchArgument("dynamic_arm_allow_reanchor", default_value="false"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_measurement_only", default_value="true"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_min_samples", default_value="5"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_window_s", default_value="2.0"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_min_sample_dt_s", default_value="0.50"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_max_velocity_mps", default_value="2.0"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_max_sample_translation_std_m", default_value="0.12"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_max_sample_rotation_std_deg", default_value="8.0"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_trigger_translation_m", default_value="0.75"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_trigger_rotation_deg", default_value="20.0"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_cooldown_s", default_value="5.0"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_skip_after_fixed_marker_s", default_value="3.0"),
+        DeclareLaunchArgument("dynamic_arm_reanchor_covariance_multiplier", default_value="2.0"),
         arm_camera,
         TimerAction(period=5.0, actions=[openvins_phase2]),
     ])

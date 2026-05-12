@@ -37,8 +37,13 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "head_pose_topic",
-            default_value="/ov_msckf/poseimu",
-            description="Head OpenVINS PoseWithCovarianceStamped topic in marker_map.",
+            default_value="/ov_msckf/odomimu",
+            description="Head OpenVINS pose topic in marker_map.",
+        ),
+        DeclareLaunchArgument(
+            "head_pose_message_type",
+            default_value="odometry",
+            description="Message type on head_pose_topic: odometry or pose_with_covariance_stamped.",
         ),
         DeclareLaunchArgument(
             "dynamic_arm_pose_observation_topic",
@@ -67,6 +72,11 @@ def generate_launch_description():
             default_value="true",
             description="Require the dynamic marker observation stable flag before publishing measurements.",
         ),
+        DeclareLaunchArgument(
+            "max_head_pose_dt_s",
+            default_value="0.05",
+            description="Maximum absolute timestamp difference between ID2 observation and already-buffered head pose.",
+        ),
         Node(
             package="sensor_fusion_bringup",
             executable="dynamic_arm_pose_measurement_node.py",
@@ -79,6 +89,7 @@ def generate_launch_description():
                 {"arm_marker_extrinsics": LaunchConfiguration("arm_marker_extrinsics")},
                 {"dynamic_observation_topic": LaunchConfiguration("dynamic_observation_topic")},
                 {"head_pose_topic": LaunchConfiguration("head_pose_topic")},
+                {"head_pose_message_type": LaunchConfiguration("head_pose_message_type")},
                 {"dynamic_arm_pose_observation_topic": LaunchConfiguration("dynamic_arm_pose_observation_topic")},
                 {"dynamic_arm_measurement_status_topic": LaunchConfiguration("dynamic_arm_measurement_status_topic")},
                 {
@@ -95,6 +106,7 @@ def generate_launch_description():
                         value_type=bool,
                     )
                 },
+                {"max_head_pose_dt_s": ParameterValue(LaunchConfiguration("max_head_pose_dt_s"), value_type=float)},
             ],
         ),
     ])

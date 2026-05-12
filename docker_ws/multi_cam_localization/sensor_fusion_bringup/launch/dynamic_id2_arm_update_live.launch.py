@@ -1,0 +1,270 @@
+from datetime import datetime
+from pathlib import Path
+
+import yaml
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, OpaqueFunction
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _arg_or_config(context, name: str, default):
+    value = LaunchConfiguration(name).perform(context)
+    return default if value == "" else value
+
+
+def _mode_overrides(mode: str) -> dict:
+    if mode == "observe":
+        return {
+            "dynamic_arm_measurement_only": True,
+            "dynamic_arm_allow_initial_lock": False,
+            "dynamic_arm_allow_reanchor": False,
+            "dynamic_arm_reanchor_measurement_only": True,
+        }
+    if mode == "update":
+        return {
+            "dynamic_arm_measurement_only": False,
+            "dynamic_arm_allow_initial_lock": False,
+            "dynamic_arm_allow_reanchor": False,
+            "dynamic_arm_reanchor_measurement_only": True,
+        }
+    if mode == "would_reanchor":
+        return {
+            "dynamic_arm_measurement_only": True,
+            "dynamic_arm_allow_initial_lock": True,
+            "dynamic_arm_allow_reanchor": True,
+            "dynamic_arm_reanchor_measurement_only": True,
+        }
+    if mode == "active":
+        return {
+            "dynamic_arm_measurement_only": False,
+            "dynamic_arm_allow_initial_lock": True,
+            "dynamic_arm_allow_reanchor": True,
+            "dynamic_arm_reanchor_measurement_only": False,
+        }
+    raise RuntimeError(f"Unsupported dynamic ID2 mode '{mode}'")
+
+
+def _setup(context, *args, **kwargs):
+    package_dir = Path(FindPackageShare("sensor_fusion_bringup").perform(context))
+    config_path = Path(LaunchConfiguration("dynamic_config").perform(context))
+    if not config_path.is_absolute():
+        config_path = package_dir / config_path
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    launch_cfg = config.get("launch", {})
+    measurement_cfg = config.get("measurement", {})
+    openvins_cfg = config.get("openvins", {})
+
+    mode = str(_arg_or_config(context, "mode", launch_cfg.get("mode", "observe"))).strip()
+    start_cameras = _as_bool(_arg_or_config(context, "start_cameras", launch_cfg.get("start_cameras", True)))
+    start_preview = _as_bool(_arg_or_config(context, "start_preview", launch_cfg.get("start_preview", True)))
+    start_rviz = _as_bool(_arg_or_config(context, "start_rviz", launch_cfg.get("start_rviz", False)))
+    record_bag = _as_bool(_arg_or_config(context, "record_bag", launch_cfg.get("record_bag", False)))
+    use_sim_time = _as_bool(_arg_or_config(context, "use_sim_time", False))
+    verbosity = str(_arg_or_config(context, "verbosity", launch_cfg.get("verbosity", "INFO")))
+    marker_detection_rate_hz = str(launch_cfg.get("marker_detection_rate_hz", 15.0))
+
+    dynamic_params = dict(openvins_cfg)
+    dynamic_params.update(_mode_overrides(mode))
+    dynamic_params["use_dynamic_arm_pose_updates"] = bool(dynamic_params.get("use_dynamic_arm_pose_updates", True))
+
+    launch_dir = package_dir / "launch"
+    rviz_config = package_dir / "config" / "rviz" / "phase2_dual_openvins_head_preview.rviz"
+    head_marker_config = package_dir / "config" / "markers" / "head_aruco_map.yaml"
+    arm_marker_config = package_dir / "config" / "markers" / "arm_aruco_map.yaml"
+    arm_marker_extrinsics = package_dir / "config" / "markers" / "arm_marker_extrinsics.yaml"
+
+    actions = [
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(str(launch_dir / "head_d435i_openvins_phase2.launch.py")),
+            launch_arguments={
+                "start_camera": str(start_cameras).lower(),
+                "use_sim_time": str(use_sim_time).lower(),
+                "verbosity": verbosity,
+            }.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(str(launch_dir / "arm_d435i_openvins_phase2.launch.py")),
+            launch_arguments={
+                "start_camera": str(start_cameras).lower(),
+                "use_sim_time": str(use_sim_time).lower(),
+                "verbosity": verbosity,
+                "use_dynamic_arm_pose_updates": str(dynamic_params["use_dynamic_arm_pose_updates"]).lower(),
+                "dynamic_arm_measurement_only": str(dynamic_params["dynamic_arm_measurement_only"]).lower(),
+                "dynamic_arm_pose_topic": str(dynamic_params.get("dynamic_arm_pose_topic", "/arm/marker_pose/dynamic_arm_pose_observation")),
+                "dynamic_arm_status_topic": str(dynamic_params.get("dynamic_arm_status_topic", "/ov_msckf_arm/dynamic_arm_update/status")),
+                "dynamic_arm_global_frame_id": str(dynamic_params.get("dynamic_arm_global_frame_id", "marker_map")),
+                "dynamic_arm_target_frame": str(dynamic_params.get("dynamic_arm_target_frame", "arm_imu")),
+                "dynamic_arm_source_camera_frame": str(
+                    dynamic_params.get("dynamic_arm_source_camera_frame", "head_d435i_head_color_optical_frame")
+                ),
+                "dynamic_arm_marker_frame": str(dynamic_params.get("dynamic_arm_marker_frame", "arm_marker_2")),
+                "dynamic_arm_marker_id": str(dynamic_params.get("dynamic_arm_marker_id", 2)),
+                "dynamic_arm_time_tolerance_s": str(dynamic_params.get("dynamic_arm_time_tolerance_s", 0.05)),
+                "dynamic_arm_noise_multiplier": str(dynamic_params.get("dynamic_arm_noise_multiplier", 4.0)),
+                "dynamic_arm_chi2_gate": str(dynamic_params.get("dynamic_arm_chi2_gate", 16.81)),
+                "dynamic_arm_max_update_translation_m": str(dynamic_params.get("dynamic_arm_max_update_translation_m", 0.35)),
+                "dynamic_arm_max_update_rotation_deg": str(dynamic_params.get("dynamic_arm_max_update_rotation_deg", 15.0)),
+                "dynamic_arm_min_update_interval_s": str(dynamic_params.get("dynamic_arm_min_update_interval_s", 0.10)),
+                "dynamic_arm_skip_after_fixed_marker_s": str(dynamic_params.get("dynamic_arm_skip_after_fixed_marker_s", 0.50)),
+                "dynamic_arm_allow_initial_lock": str(dynamic_params["dynamic_arm_allow_initial_lock"]).lower(),
+                "dynamic_arm_allow_reanchor": str(dynamic_params["dynamic_arm_allow_reanchor"]).lower(),
+                "dynamic_arm_reanchor_measurement_only": str(dynamic_params["dynamic_arm_reanchor_measurement_only"]).lower(),
+                "dynamic_arm_reanchor_min_samples": str(dynamic_params.get("dynamic_arm_reanchor_min_samples", 5)),
+                "dynamic_arm_reanchor_window_s": str(dynamic_params.get("dynamic_arm_reanchor_window_s", 2.0)),
+                "dynamic_arm_reanchor_min_sample_dt_s": str(dynamic_params.get("dynamic_arm_reanchor_min_sample_dt_s", 0.50)),
+                "dynamic_arm_reanchor_max_velocity_mps": str(dynamic_params.get("dynamic_arm_reanchor_max_velocity_mps", 2.0)),
+                "dynamic_arm_reanchor_max_sample_translation_std_m": str(
+                    dynamic_params.get("dynamic_arm_reanchor_max_sample_translation_std_m", 0.12)
+                ),
+                "dynamic_arm_reanchor_max_sample_rotation_std_deg": str(
+                    dynamic_params.get("dynamic_arm_reanchor_max_sample_rotation_std_deg", 8.0)
+                ),
+                "dynamic_arm_reanchor_trigger_translation_m": str(dynamic_params.get("dynamic_arm_reanchor_trigger_translation_m", 0.75)),
+                "dynamic_arm_reanchor_trigger_rotation_deg": str(dynamic_params.get("dynamic_arm_reanchor_trigger_rotation_deg", 20.0)),
+                "dynamic_arm_reanchor_cooldown_s": str(dynamic_params.get("dynamic_arm_reanchor_cooldown_s", 5.0)),
+                "dynamic_arm_reanchor_skip_after_fixed_marker_s": str(
+                    dynamic_params.get("dynamic_arm_reanchor_skip_after_fixed_marker_s", 3.0)
+                ),
+                "dynamic_arm_reanchor_covariance_multiplier": str(dynamic_params.get("dynamic_arm_reanchor_covariance_multiplier", 2.0)),
+            }.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(str(launch_dir / "head_marker_pose_phase2.launch.py")),
+            launch_arguments={
+                "config_file": str(head_marker_config),
+                "use_sim_time": str(use_sim_time).lower(),
+                "marker_detection_rate_hz": marker_detection_rate_hz,
+            }.items(),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(str(launch_dir / "arm_marker_pose_phase2.launch.py")),
+            launch_arguments={
+                "config_file": str(arm_marker_config),
+                "use_sim_time": str(use_sim_time).lower(),
+                "marker_detection_rate_hz": marker_detection_rate_hz,
+            }.items(),
+        ),
+        Node(
+            package="sensor_fusion_bringup",
+            executable="dynamic_arm_pose_measurement_node.py",
+            name="dynamic_arm_pose_measurement_node",
+            output="screen",
+            parameters=[
+                {"use_sim_time": use_sim_time},
+                {"head_marker_config": str(head_marker_config)},
+                {"arm_marker_config": str(arm_marker_config)},
+                {"arm_marker_extrinsics": str(arm_marker_extrinsics)},
+                {"dynamic_observation_topic": str(measurement_cfg.get("dynamic_observation_topic", "/head/marker_pose/dynamic_observation"))},
+                {"head_pose_topic": str(measurement_cfg.get("head_pose_topic", "/ov_msckf/odomimu"))},
+                {"head_pose_message_type": str(measurement_cfg.get("head_pose_message_type", "odometry"))},
+                {
+                    "dynamic_arm_pose_observation_topic": str(
+                        measurement_cfg.get("dynamic_arm_pose_observation_topic", "/arm/marker_pose/dynamic_arm_pose_observation")
+                    )
+                },
+                {
+                    "dynamic_arm_measurement_status_topic": str(
+                        measurement_cfg.get("dynamic_arm_measurement_status_topic", "/arm/marker_pose/dynamic_arm_measurement/status")
+                    )
+                },
+                {
+                    "publish_dynamic_arm_pose_observation": bool(
+                        measurement_cfg.get("publish_dynamic_arm_pose_observation", True)
+                    )
+                },
+                {"marker_id": int(measurement_cfg.get("marker_id", 2))},
+                {"target_frame": str(measurement_cfg.get("target_frame", "arm_imu"))},
+                {"max_head_pose_dt_s": float(measurement_cfg.get("max_head_pose_dt_s", 0.05))},
+                {"head_pose_buffer_seconds": float(measurement_cfg.get("head_pose_buffer_seconds", 5.0))},
+                {"require_stable_dynamic_marker": bool(measurement_cfg.get("require_stable_dynamic_marker", True))},
+                {"max_pose_covariance_trace": float(measurement_cfg.get("max_pose_covariance_trace", 10.0))},
+                {"max_reprojection_error_px": float(measurement_cfg.get("max_reprojection_error_px", 3.0))},
+                {"max_marker_distance_m": float(measurement_cfg.get("max_marker_distance_m", 2.0))},
+                {"max_view_angle_deg": float(measurement_cfg.get("max_view_angle_deg", 75.0))},
+                {"min_marker_area_px2": float(measurement_cfg.get("min_marker_area_px2", 800.0))},
+                {"min_geometry_score": float(measurement_cfg.get("min_geometry_score", 0.35))},
+                {"extrinsic_covariance_source": str(measurement_cfg.get("extrinsic_covariance_source", "robust_diag_covariance_se3"))},
+            ],
+        ),
+    ]
+
+    if start_preview:
+        actions.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(str(launch_dir / "head_derived_arm_pose_preview.launch.py")),
+                launch_arguments={
+                    "use_sim_time": str(use_sim_time).lower(),
+                    "require_stable_dynamic_marker": str(measurement_cfg.get("require_stable_dynamic_marker", True)).lower(),
+                    "publish_tf": "true",
+                }.items(),
+            )
+        )
+
+    if start_rviz:
+        actions.append(Node(package="rviz2", executable="rviz2", name="rviz2", arguments=["-d", str(rviz_config)], output="screen"))
+
+    if record_bag:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        bag_path = f"bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_{stamp}"
+        topics = [
+            "/tf",
+            "/tf_static",
+            "/rosout",
+            "/head/d435i_head/color/image_raw",
+            "/head/d435i_head/color/camera_info",
+            "/head/d435i_head/imu",
+            "/arm/d435i_arm/color/image_raw",
+            "/arm/d435i_arm/color/camera_info",
+            "/arm/d435i_arm/imu",
+            "/head/marker_pose/observation",
+            "/arm/marker_pose/observation",
+            "/head/marker_pose/dynamic_observation",
+            "/arm/marker_pose/dynamic_arm_pose_observation",
+            "/arm/marker_pose/dynamic_arm_measurement/status",
+            "/ov_msckf_arm/dynamic_arm_update/status",
+            "/ov_msckf/poseimu",
+            "/ov_msckf/odomimu",
+            "/ov_msckf/pathimu",
+            "/ov_msckf_arm/poseimu",
+            "/ov_msckf_arm/odomimu",
+            "/ov_msckf_arm/pathimu",
+            "/arm/marker_pose/head_derived/arm_camera_pose",
+            "/arm/marker_pose/head_derived/path",
+        ]
+        actions.append(
+            ExecuteProcess(
+                cmd=["bash", "-lc", "mkdir -p bags/openvins_tests/phase2_live && ros2 bag record -o " + bag_path + " " + " ".join(topics)],
+                output="screen",
+            )
+        )
+
+    return actions
+
+
+def generate_launch_description():
+    default_config = "config/dynamic_id2_arm_update.yaml"
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument("dynamic_config", default_value=default_config),
+            DeclareLaunchArgument("mode", default_value=""),
+            DeclareLaunchArgument("start_cameras", default_value=""),
+            DeclareLaunchArgument("start_preview", default_value=""),
+            DeclareLaunchArgument("start_rviz", default_value=""),
+            DeclareLaunchArgument("record_bag", default_value=""),
+            DeclareLaunchArgument("use_sim_time", default_value="false"),
+            DeclareLaunchArgument("verbosity", default_value=""),
+            OpaqueFunction(function=_setup),
+        ]
+    )

@@ -33,6 +33,7 @@
 #include "types/Type.h"
 #include "utils/opencv_lambda_body.h"
 #include "utils/print.h"
+#include "utils/quat_ops.h"
 #include "utils/sensor_data.h"
 
 #include "init/InertialInitializer.h"
@@ -269,11 +270,6 @@ DynamicArmPoseUpdateResult VioManager::feed_measurement_dynamic_arm_pose(const D
     PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: dropping before VIO initialization\n" RESET);
     return result;
   }
-  if (!is_marker_global_initialized) {
-    result.reason = "marker_map_not_locked";
-    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: waiting for fixed marker_map lock before dynamic updates\n" RESET);
-    return result;
-  }
   if (last_dynamic_arm_timestamp >= 0.0 && message.timestamp <= last_dynamic_arm_timestamp + 1e-9) {
     result.reason = "stale_or_duplicate";
     PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: rejecting stale/duplicate %.6f <= %.6f\n" RESET, message.timestamp, last_dynamic_arm_timestamp);
@@ -288,7 +284,23 @@ DynamicArmPoseUpdateResult VioManager::feed_measurement_dynamic_arm_pose(const D
     return result;
   }
 
+  std::string validation_reason;
+  if (!updaterDynamicArmPose->valid_measurement(message, validation_reason)) {
+    result.reason = validation_reason;
+    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: rejecting invalid dynamic measurement (%s)\n" RESET, validation_reason.c_str());
+    return result;
+  }
   last_dynamic_arm_timestamp = message.timestamp;
+  record_dynamic_arm_measurement(message);
+
+  if (!is_marker_global_initialized) {
+    if (params.dynamic_arm_pose_options.allow_initial_lock) {
+      return try_dynamic_arm_reanchor(message, true, "marker_map_not_locked");
+    }
+    result.reason = "marker_map_not_locked";
+    PRINT_DEBUG(YELLOW "[DYNAMIC_ARM]: waiting for fixed marker_map lock before dynamic updates\n" RESET);
+    return result;
+  }
 
   if (last_fixed_marker_update_timestamp >= 0.0 &&
       message.timestamp - last_fixed_marker_update_timestamp < params.dynamic_arm_pose_options.skip_after_fixed_marker_s) {
@@ -309,6 +321,12 @@ DynamicArmPoseUpdateResult VioManager::feed_measurement_dynamic_arm_pose(const D
   result = updaterDynamicArmPose->try_update(state, message);
   if (result.accepted) {
     last_dynamic_arm_update_timestamp = message.timestamp;
+  } else if (params.dynamic_arm_pose_options.allow_reanchor &&
+             (result.translation_norm_m > params.dynamic_arm_pose_options.reanchor_trigger_translation_m ||
+              result.rotation_deg > params.dynamic_arm_pose_options.reanchor_trigger_rotation_deg ||
+              result.reason == "chi2_rejected" || result.reason == "translation_jump_rejected" ||
+              result.reason == "rotation_jump_rejected")) {
+    result = try_dynamic_arm_reanchor(message, false, result.reason);
   }
   std::vector<std::shared_ptr<Type>> check_order;
   check_order.push_back(state->_imu);
@@ -319,6 +337,178 @@ DynamicArmPoseUpdateResult VioManager::feed_measurement_dynamic_arm_pose(const D
     result.state_updated = false;
     result.reason = "nonfinite_state_after_update";
   }
+  return result;
+}
+
+void VioManager::record_dynamic_arm_measurement(const DynamicArmPoseMeasurement &measurement) {
+  recent_dynamic_arm_measurements.push_back(measurement);
+  const double oldest_allowed = measurement.timestamp - std::max(params.dynamic_arm_pose_options.reanchor_window_s, 0.0);
+  while (!recent_dynamic_arm_measurements.empty() && recent_dynamic_arm_measurements.front().timestamp < oldest_allowed) {
+    recent_dynamic_arm_measurements.pop_front();
+  }
+  while ((int)recent_dynamic_arm_measurements.size() > std::max(2 * params.dynamic_arm_pose_options.reanchor_min_samples, 20)) {
+    recent_dynamic_arm_measurements.pop_front();
+  }
+}
+
+bool VioManager::dynamic_arm_velocity_fit(Eigen::Vector3d &velocity, Eigen::Matrix3d &velocity_covariance,
+                                          DynamicArmPoseUpdateResult &result) const {
+
+  std::vector<DynamicArmPoseMeasurement, Eigen::aligned_allocator<DynamicArmPoseMeasurement>> usable;
+  for (const auto &measurement : recent_dynamic_arm_measurements) {
+    if (!measurement.hard_gate_passed || !measurement.stable || !measurement.p_IinG.allFinite() || !measurement.R_GtoI.allFinite() ||
+        !measurement.covariance.allFinite()) {
+      continue;
+    }
+    usable.push_back(measurement);
+  }
+
+  result.reanchor_sample_count = (int)usable.size();
+  if ((int)usable.size() < params.dynamic_arm_pose_options.reanchor_min_samples) {
+    result.reason = "dynamic_reanchor_insufficient_samples";
+    return false;
+  }
+
+  const double t0 = usable.front().timestamp;
+  const double t1 = usable.back().timestamp;
+  result.reanchor_sample_span_s = t1 - t0;
+  if (t1 - t0 < params.dynamic_arm_pose_options.reanchor_min_sample_dt_s) {
+    result.reason = "dynamic_reanchor_sample_span_too_short";
+    return false;
+  }
+
+  double sum_w = 0.0;
+  double sum_wt = 0.0;
+  Eigen::Vector3d sum_wp = Eigen::Vector3d::Zero();
+  for (const auto &measurement : usable) {
+    const double pos_var = std::max(measurement.covariance.block<3, 3>(3, 3).trace() / 3.0, 1e-8);
+    const double w = 1.0 / pos_var;
+    const double t = measurement.timestamp - t0;
+    sum_w += w;
+    sum_wt += w * t;
+    sum_wp += w * measurement.p_IinG;
+  }
+  if (sum_w <= 0.0) {
+    result.reason = "dynamic_reanchor_bad_weights";
+    return false;
+  }
+
+  const double t_mean = sum_wt / sum_w;
+  const Eigen::Vector3d p_mean = sum_wp / sum_w;
+  double denom = 0.0;
+  Eigen::Vector3d numer = Eigen::Vector3d::Zero();
+  for (const auto &measurement : usable) {
+    const double pos_var = std::max(measurement.covariance.block<3, 3>(3, 3).trace() / 3.0, 1e-8);
+    const double w = 1.0 / pos_var;
+    const double dt = measurement.timestamp - t0 - t_mean;
+    denom += w * dt * dt;
+    numer += w * dt * (measurement.p_IinG - p_mean);
+  }
+  if (denom <= 1e-12) {
+    result.reason = "dynamic_reanchor_velocity_fit_degenerate";
+    return false;
+  }
+
+  velocity = numer / denom;
+  result.reanchor_velocity_norm_mps = velocity.norm();
+  if (!velocity.allFinite() || velocity.norm() > params.dynamic_arm_pose_options.reanchor_max_velocity_mps) {
+    result.reason = "dynamic_reanchor_velocity_too_large";
+    return false;
+  }
+
+  double translation_residual_sq = 0.0;
+  double rotation_residual_sq = 0.0;
+  const Eigen::Matrix3d R_ref = usable.back().R_GtoI;
+  for (const auto &measurement : usable) {
+    const double dt = measurement.timestamp - t0 - t_mean;
+    const Eigen::Vector3d residual = measurement.p_IinG - (p_mean + velocity * dt);
+    translation_residual_sq += residual.squaredNorm();
+    rotation_residual_sq += std::pow(log_so3(measurement.R_GtoI * R_ref.transpose()).norm(), 2);
+  }
+  result.reanchor_sample_translation_std_m = std::sqrt(translation_residual_sq / std::max((int)usable.size(), 1));
+  result.reanchor_sample_rotation_std_deg =
+      180.0 / M_PI * std::sqrt(rotation_residual_sq / std::max((int)usable.size(), 1));
+  if (result.reanchor_sample_translation_std_m > params.dynamic_arm_pose_options.reanchor_max_sample_translation_std_m) {
+    result.reason = "dynamic_reanchor_translation_scatter_too_large";
+    return false;
+  }
+  if (result.reanchor_sample_rotation_std_deg > params.dynamic_arm_pose_options.reanchor_max_sample_rotation_std_deg) {
+    result.reason = "dynamic_reanchor_rotation_scatter_too_large";
+    return false;
+  }
+
+  const double min_var = std::pow(params.marker_pose_options.reset_min_velocity_std_mps, 2);
+  velocity_covariance = Eigen::Matrix3d::Identity() * min_var;
+  if ((int)usable.size() > 2 && denom > 0.0) {
+    const double var = std::max(min_var, result.reanchor_sample_translation_std_m * result.reanchor_sample_translation_std_m /
+                                             std::max(denom / std::max(sum_w, 1e-12), 1e-6));
+    velocity_covariance = Eigen::Matrix3d::Identity() * var;
+  }
+  if (!velocity_covariance.allFinite()) {
+    result.reason = "dynamic_reanchor_velocity_covariance_nonfinite";
+    return false;
+  }
+  return true;
+}
+
+DynamicArmPoseUpdateResult VioManager::try_dynamic_arm_reanchor(const DynamicArmPoseMeasurement &measurement, bool initial_lock,
+                                                                const std::string &trigger_reason) {
+  DynamicArmPoseUpdateResult result;
+  result.reason = trigger_reason;
+  if (is_marker_global_initialized) {
+    result = updaterDynamicArmPose->innovation(state, measurement);
+  }
+  if (initial_lock) {
+    result.would_dynamic_initial_lock = true;
+  } else {
+    result.would_dynamic_reanchor = true;
+  }
+
+  const double fixed_dt =
+      (last_fixed_marker_update_timestamp >= 0.0) ? measurement.timestamp - last_fixed_marker_update_timestamp : -1.0;
+  if (last_fixed_marker_update_timestamp >= 0.0 &&
+      fixed_dt < params.dynamic_arm_pose_options.reanchor_skip_after_fixed_marker_s) {
+    result.reanchor_fixed_skip_active = true;
+    result.reason = "dynamic_reanchor_skipped_recent_fixed_marker_update";
+    return result;
+  }
+
+  if (last_dynamic_arm_reanchor_timestamp >= 0.0 &&
+      measurement.timestamp - last_dynamic_arm_reanchor_timestamp < params.dynamic_arm_pose_options.reanchor_cooldown_s) {
+    result.reanchor_cooldown_active = true;
+    result.reason = "dynamic_reanchor_cooldown";
+    return result;
+  }
+
+  Eigen::Vector3d velocity = Eigen::Vector3d::Zero();
+  Eigen::Matrix3d velocity_covariance = Eigen::Matrix3d::Identity();
+  if (!dynamic_arm_velocity_fit(velocity, velocity_covariance, result)) {
+    return result;
+  }
+
+  result.accepted = true;
+  if (params.dynamic_arm_pose_options.reanchor_measurement_only) {
+    result.reason = initial_lock ? "would_dynamic_initial_lock" : "would_dynamic_reanchor";
+    return result;
+  }
+
+  if (reset_to_dynamic_arm_pose(measurement, velocity, velocity_covariance,
+                                initial_lock ? "dynamic_initial_lock" : "dynamic_reanchor")) {
+    result.state_updated = true;
+    last_dynamic_arm_update_timestamp = measurement.timestamp;
+    last_dynamic_arm_reanchor_timestamp = measurement.timestamp;
+    if (initial_lock) {
+      result.dynamic_initial_lock_performed = true;
+      result.reason = "dynamic_initial_lock_performed";
+    } else {
+      result.dynamic_reanchor_performed = true;
+      result.reason = "dynamic_reanchor_performed";
+    }
+    return result;
+  }
+
+  result.accepted = false;
+  result.reason = initial_lock ? "dynamic_initial_lock_reset_failed" : "dynamic_reanchor_reset_failed";
   return result;
 }
 
@@ -494,6 +684,36 @@ bool VioManager::reset_to_marker_map(const MarkerPoseMeasurement &measurement, c
   PRINT_WARNING(CYAN "[MARKER]: reset OpenVINS global gauge to marker_map using marker %d (%s), v=[%.3f %.3f %.3f] m/s\n" RESET,
                 measurement.marker_id, reason.c_str(), velocity(0), velocity(1), velocity(2));
   return true;
+}
+
+bool VioManager::reset_to_dynamic_arm_pose(const DynamicArmPoseMeasurement &measurement, const Eigen::Vector3d &velocity,
+                                           const Eigen::Matrix3d &velocity_covariance, const std::string &reason) {
+  MarkerPoseMeasurement reset_measurement;
+  reset_measurement.timestamp = measurement.timestamp;
+  reset_measurement.marker_id = measurement.marker_id;
+  reset_measurement.frame_id = measurement.frame_id;
+  reset_measurement.marker_frame = measurement.marker_frame;
+  reset_measurement.target_frame = measurement.target_frame;
+  reset_measurement.p_IinG = measurement.p_IinG;
+  reset_measurement.R_GtoI = measurement.R_GtoI;
+  reset_measurement.covariance =
+      std::max(params.dynamic_arm_pose_options.reanchor_covariance_multiplier, 1.0) * measurement.covariance;
+  reset_measurement.hard_gate_passed = measurement.hard_gate_passed;
+  reset_measurement.hard_gate_status = measurement.hard_gate_status;
+  reset_measurement.stable = measurement.stable;
+  reset_measurement.stable_frames = measurement.stable_frames;
+  reset_measurement.stability_factor = measurement.stability_factor;
+  reset_measurement.reprojection_error_px = measurement.reprojection_error_px;
+  reset_measurement.distance_m = measurement.distance_m;
+  reset_measurement.view_angle_deg = measurement.view_angle_deg;
+  reset_measurement.area_px2 = measurement.area_px2;
+  reset_measurement.side_mean_px = measurement.side_mean_px;
+  reset_measurement.side_min_px = measurement.side_min_px;
+  reset_measurement.geometry_score = measurement.geometry_score;
+  reset_measurement.covariance_sigma_px = measurement.covariance_sigma_px;
+  Eigen::Matrix3d reset_velocity_covariance =
+      std::max(params.dynamic_arm_pose_options.reanchor_covariance_multiplier, 1.0) * velocity_covariance;
+  return reset_to_marker_map(reset_measurement, velocity, reset_velocity_covariance, reason);
 }
 
 void VioManager::clear_marker_reset_state() {

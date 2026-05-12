@@ -31,6 +31,20 @@ struct DynamicArmPoseUpdaterOptions {
   double max_update_rotation_deg = 15.0;
   double min_update_interval_s = 0.10;
   double skip_after_fixed_marker_s = 0.50;
+  bool allow_initial_lock = false;
+  bool allow_reanchor = false;
+  bool reanchor_measurement_only = true;
+  int reanchor_min_samples = 5;
+  double reanchor_window_s = 2.0;
+  double reanchor_min_sample_dt_s = 0.50;
+  double reanchor_max_velocity_mps = 2.0;
+  double reanchor_max_sample_translation_std_m = 0.12;
+  double reanchor_max_sample_rotation_std_deg = 8.0;
+  double reanchor_trigger_translation_m = 0.75;
+  double reanchor_trigger_rotation_deg = 20.0;
+  double reanchor_cooldown_s = 5.0;
+  double reanchor_skip_after_fixed_marker_s = 3.0;
+  double reanchor_covariance_multiplier = 2.0;
 };
 
 struct DynamicArmPoseMeasurement {
@@ -63,6 +77,9 @@ struct DynamicArmPoseMeasurement {
   bool dynamic_covariance_fallback = false;
   bool head_covariance_fallback = false;
   std::string extrinsic_covariance_source;
+  std::string head_pose_source_topic;
+  std::string head_pose_source_type;
+  double head_pose_time_offset_s = 0.0;
 };
 
 struct DynamicArmPoseUpdateResult {
@@ -72,6 +89,17 @@ struct DynamicArmPoseUpdateResult {
   double chi2 = -1.0;
   double translation_norm_m = 0.0;
   double rotation_deg = 0.0;
+  bool would_dynamic_initial_lock = false;
+  bool dynamic_initial_lock_performed = false;
+  bool would_dynamic_reanchor = false;
+  bool dynamic_reanchor_performed = false;
+  int reanchor_sample_count = 0;
+  double reanchor_sample_span_s = 0.0;
+  double reanchor_velocity_norm_mps = 0.0;
+  double reanchor_sample_translation_std_m = 0.0;
+  double reanchor_sample_rotation_std_deg = 0.0;
+  bool reanchor_cooldown_active = false;
+  bool reanchor_fixed_skip_active = false;
 };
 
 class UpdaterDynamicArmPose {
@@ -84,11 +112,11 @@ public:
 
   bool measurement_only() const { return _options.measurement_only; }
 
+  bool valid_measurement(const DynamicArmPoseMeasurement &measurement, std::string &reason) const;
+
   static Eigen::Matrix<double, 6, 6> ros_covariance_to_update_order(const std::array<double, 36> &covariance_ros);
 
 private:
-  bool valid_measurement(const DynamicArmPoseMeasurement &measurement, std::string &reason) const;
-
   DynamicArmPoseUpdaterOptions _options;
 };
 

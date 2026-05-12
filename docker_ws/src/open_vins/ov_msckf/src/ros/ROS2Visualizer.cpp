@@ -789,6 +789,9 @@ void ROS2Visualizer::callback_dynamic_arm_pose(const sensor_fusion_msgs::msg::Dy
   measurement.covariance_sigma_px = msg->covariance_sigma_px;
   measurement.head_pose_match_dt_s = msg->head_pose_match_dt_s;
   measurement.head_pose_match_mode = msg->head_pose_match_mode;
+  measurement.head_pose_source_topic = msg->head_pose_source_topic;
+  measurement.head_pose_source_type = msg->head_pose_source_type;
+  measurement.head_pose_time_offset_s = msg->head_pose_time_offset_s;
   measurement.dynamic_covariance_fallback = msg->dynamic_covariance_fallback;
   measurement.head_covariance_fallback = msg->head_covariance_fallback;
   measurement.extrinsic_covariance_source = msg->extrinsic_covariance_source;
@@ -883,6 +886,8 @@ void ROS2Visualizer::publish_dynamic_arm_status(const DynamicArmPoseMeasurement 
       (_app->last_fixed_marker_update_time() >= 0.0) ? measurement.timestamp - _app->last_fixed_marker_update_time() : -1.0;
   const bool fixed_skip_active =
       _app->last_fixed_marker_update_time() >= 0.0 && fixed_dt < options.skip_after_fixed_marker_s;
+  const bool reanchor_fixed_skip_active =
+      _app->last_fixed_marker_update_time() >= 0.0 && fixed_dt < options.reanchor_skip_after_fixed_marker_s;
 
   std::ostringstream ss;
   ss << std::fixed << std::setprecision(6);
@@ -905,11 +910,25 @@ void ROS2Visualizer::publish_dynamic_arm_status(const DynamicArmPoseMeasurement 
   ss << ",\"measurement_only\":" << (options.measurement_only ? "true" : "false");
   ss << ",\"last_fixed_marker_update_dt_s\":" << fixed_dt;
   ss << ",\"fixed_marker_skip_active\":" << (fixed_skip_active ? "true" : "false");
+  ss << ",\"reanchor_fixed_skip_active\":" << ((result.reanchor_fixed_skip_active || reanchor_fixed_skip_active) ? "true" : "false");
+  ss << ",\"would_dynamic_initial_lock\":" << (result.would_dynamic_initial_lock ? "true" : "false");
+  ss << ",\"dynamic_initial_lock_performed\":" << (result.dynamic_initial_lock_performed ? "true" : "false");
+  ss << ",\"would_dynamic_reanchor\":" << (result.would_dynamic_reanchor ? "true" : "false");
+  ss << ",\"dynamic_reanchor_performed\":" << (result.dynamic_reanchor_performed ? "true" : "false");
+  ss << ",\"reanchor_sample_count\":" << result.reanchor_sample_count;
+  ss << ",\"reanchor_sample_span_s\":" << result.reanchor_sample_span_s;
+  ss << ",\"reanchor_velocity_norm_mps\":" << result.reanchor_velocity_norm_mps;
+  ss << ",\"reanchor_sample_translation_std_m\":" << result.reanchor_sample_translation_std_m;
+  ss << ",\"reanchor_sample_rotation_std_deg\":" << result.reanchor_sample_rotation_std_deg;
+  ss << ",\"reanchor_cooldown_active\":" << (result.reanchor_cooldown_active ? "true" : "false");
   ss << ",\"dynamic_covariance_fallback\":" << (measurement.dynamic_covariance_fallback ? "true" : "false");
   ss << ",\"head_covariance_fallback\":" << (measurement.head_covariance_fallback ? "true" : "false");
   ss << ",\"extrinsic_covariance_source\":\"" << json_escape(measurement.extrinsic_covariance_source) << "\"";
   ss << ",\"head_pose_match_dt_s\":" << measurement.head_pose_match_dt_s;
   ss << ",\"head_pose_match_mode\":\"" << json_escape(measurement.head_pose_match_mode) << "\"";
+  ss << ",\"head_pose_source_topic\":\"" << json_escape(measurement.head_pose_source_topic) << "\"";
+  ss << ",\"head_pose_source_type\":\"" << json_escape(measurement.head_pose_source_type) << "\"";
+  ss << ",\"head_pose_time_offset_s\":" << measurement.head_pose_time_offset_s;
   ss << ",\"std_roll_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 0);
   ss << ",\"std_pitch_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 1);
   ss << ",\"std_yaw_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 2);

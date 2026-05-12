@@ -21,6 +21,7 @@ import numpy as np
 import rclpy
 import yaml
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_fusion_msgs.msg import DynamicArmPoseObservation, DynamicMarkerObservation
@@ -74,6 +75,7 @@ class MatchedHeadPoseMeasurement:
     covariance: np.ndarray
     covariance_fallback: bool
     dt_s: float
+    time_offset_s: float
     mode: str
 
 
@@ -116,6 +118,7 @@ def match_head_pose_measurement(
                 covariance=(1.0 - alpha) * before.covariance + alpha * after.covariance,
                 covariance_fallback=bool(before.covariance_fallback or after.covariance_fallback),
                 dt_s=max(before_dt, after_dt),
+                time_offset_s=0.0,
                 mode="interpolated",
             )
 
@@ -130,6 +133,7 @@ def match_head_pose_measurement(
         covariance=nearest.covariance,
         covariance_fallback=bool(nearest.covariance_fallback),
         dt_s=dt,
+        time_offset_s=float(stamp_sec - nearest.stamp_sec),
         mode="nearest",
     )
 
@@ -246,7 +250,8 @@ class DynamicArmPoseMeasurementNode(Node):
         self.declare_parameter("arm_marker_config", "")
         self.declare_parameter("arm_marker_extrinsics", "")
         self.declare_parameter("dynamic_observation_topic", "/head/marker_pose/dynamic_observation")
-        self.declare_parameter("head_pose_topic", "/ov_msckf/poseimu")
+        self.declare_parameter("head_pose_topic", "/ov_msckf/odomimu")
+        self.declare_parameter("head_pose_message_type", "odometry")
         self.declare_parameter("dynamic_arm_pose_observation_topic", "/arm/marker_pose/dynamic_arm_pose_observation")
         self.declare_parameter("dynamic_arm_measurement_status_topic", "/arm/marker_pose/dynamic_arm_measurement/status")
         self.declare_parameter("publish_dynamic_arm_pose_observation", False)
@@ -287,6 +292,11 @@ class DynamicArmPoseMeasurementNode(Node):
         self.target_frame = str(self.get_parameter("target_frame").value)
         self.dynamic_topic = str(self.get_parameter("dynamic_observation_topic").value)
         self.head_pose_topic = str(self.get_parameter("head_pose_topic").value)
+        self.head_pose_message_type = str(self.get_parameter("head_pose_message_type").value).strip().lower()
+        if self.head_pose_message_type not in {"odometry", "pose_with_covariance_stamped"}:
+            raise RuntimeError(
+                "Parameter head_pose_message_type must be 'odometry' or 'pose_with_covariance_stamped'"
+            )
         self.output_topic = str(self.get_parameter("dynamic_arm_pose_observation_topic").value)
         self.status_topic = str(self.get_parameter("dynamic_arm_measurement_status_topic").value)
         self.publish_measurement_enabled = bool(self.get_parameter("publish_dynamic_arm_pose_observation").value)
@@ -324,6 +334,8 @@ class DynamicArmPoseMeasurementNode(Node):
         head_config_path = resolve_path(head_config)
         arm_config_path = resolve_path(arm_config)
         self.map_frame, self.head_camera_frame, self.T_headcam_headimu = load_head_camera_transform(head_config_path)
+        head_config_data = yaml.safe_load(head_config_path.read_text(encoding="utf-8"))
+        self.head_imu_frame = str(head_config_data.get("frames", {}).get("imu_frame", "head_imu"))
         self.arm_camera_frame, self.arm_imu_frame, self.T_armcam_armimu = load_arm_camera_transform(arm_config_path)
         map_frame_override = str(self.get_parameter("map_frame").value)
         if map_frame_override:
@@ -343,13 +355,21 @@ class DynamicArmPoseMeasurementNode(Node):
 
         qos = QoSProfile(reliability=ReliabilityPolicy.RELIABLE, history=HistoryPolicy.KEEP_LAST, depth=20)
         self.dynamic_sub = self.create_subscription(DynamicMarkerObservation, self.dynamic_topic, self.dynamic_cb, qos)
-        self.head_pose_sub = self.create_subscription(PoseWithCovarianceStamped, self.head_pose_topic, self.head_pose_cb, qos)
+        if self.head_pose_message_type == "odometry":
+            self.head_pose_sub = self.create_subscription(Odometry, self.head_pose_topic, self.head_odom_cb, qos)
+        else:
+            self.head_pose_sub = self.create_subscription(
+                PoseWithCovarianceStamped,
+                self.head_pose_topic,
+                self.head_pose_cb,
+                qos,
+            )
         self.measurement_pub = self.create_publisher(DynamicArmPoseObservation, self.output_topic, 10)
         self.status_pub = self.create_publisher(String, self.status_topic, 10)
 
         self.head_buffer: deque[HeadPoseMeasurementSample] = deque()
         self.get_logger().info(f"Dynamic observation topic: {self.dynamic_topic}")
-        self.get_logger().info(f"Head pose topic: {self.head_pose_topic}")
+        self.get_logger().info(f"Head pose topic: {self.head_pose_topic} type={self.head_pose_message_type}")
         self.get_logger().info(f"Measurement topic: {self.output_topic} enabled={self.publish_measurement_enabled}")
         self.get_logger().info(f"Status topic: {self.status_topic}")
         self.get_logger().info(f"Target frame: {self.target_frame}")
@@ -386,15 +406,43 @@ class DynamicArmPoseMeasurementNode(Node):
         if msg.header.frame_id != self.map_frame:
             self.publish_status(False, "head_pose_wrong_frame", stamp_sec, {})
             return
-        q_norm = quaternion_norm(msg.pose.pose)
+        self.store_head_pose_sample(
+            stamp=msg.header.stamp,
+            stamp_sec=stamp_sec,
+            pose=msg.pose.pose,
+            covariance=msg.pose.covariance,
+        )
+
+    def head_odom_cb(self, msg: Odometry) -> None:
+        stamp_sec = stamp_to_sec(msg.header.stamp)
+        if msg.header.frame_id != self.map_frame:
+            self.publish_status(False, "head_pose_wrong_frame", stamp_sec, {"head_pose_child_frame": str(msg.child_frame_id)})
+            return
+        if msg.child_frame_id != self.head_imu_frame:
+            self.publish_status(
+                False,
+                "head_pose_wrong_child_frame",
+                stamp_sec,
+                {"head_pose_child_frame": str(msg.child_frame_id), "expected_head_pose_child_frame": self.head_imu_frame},
+            )
+            return
+        self.store_head_pose_sample(
+            stamp=msg.header.stamp,
+            stamp_sec=stamp_sec,
+            pose=msg.pose.pose,
+            covariance=msg.pose.covariance,
+        )
+
+    def store_head_pose_sample(self, stamp, stamp_sec: float, pose, covariance) -> None:
+        q_norm = quaternion_norm(pose)
         if not math.isfinite(q_norm) or q_norm < 1e-9:
             self.publish_status(False, "head_pose_bad_quaternion", stamp_sec, {})
             return
-        T_map_headimu = pose_to_T(msg.pose.pose)
+        T_map_headimu = pose_to_T(pose)
         if not is_finite_transform(T_map_headimu):
             self.publish_status(False, "head_pose_non_finite", stamp_sec, {})
             return
-        P_head, used_fallback = covariance_matrix_from_ros(msg.pose.covariance, self.head_fallback_diag)
+        P_head, used_fallback = covariance_matrix_from_ros(covariance, self.head_fallback_diag)
         if float(np.trace(P_head)) > self.max_pose_covariance_trace:
             self.publish_status(
                 False,
@@ -405,7 +453,7 @@ class DynamicArmPoseMeasurementNode(Node):
             return
         self.head_buffer.append(
             HeadPoseMeasurementSample(
-                stamp=msg.header.stamp,
+                stamp=stamp,
                 stamp_sec=stamp_sec,
                 T_map_headimu=T_map_headimu,
                 covariance=P_head,
@@ -526,6 +574,9 @@ class DynamicArmPoseMeasurementNode(Node):
             out.covariance_sigma_px = float(msg.covariance_sigma_px)
             out.head_pose_match_dt_s = float(matched.dt_s)
             out.head_pose_match_mode = str(matched.mode)
+            out.head_pose_source_topic = self.head_pose_topic
+            out.head_pose_source_type = self.head_pose_message_type
+            out.head_pose_time_offset_s = float(matched.time_offset_s)
             out.dynamic_covariance_fallback = bool(dynamic_cov_fallback)
             out.head_covariance_fallback = bool(matched.covariance_fallback)
             out.extrinsic_covariance_source = self.extrinsic.covariance_source
@@ -538,6 +589,9 @@ class DynamicArmPoseMeasurementNode(Node):
                 "measurement_published": bool(self.publish_measurement_enabled),
                 "head_pose_match_dt_s": round(float(matched.dt_s), 6),
                 "head_pose_match_mode": matched.mode,
+                "head_pose_source_topic": self.head_pose_topic,
+                "head_pose_source_type": self.head_pose_message_type,
+                "head_pose_time_offset_s": round(float(matched.time_offset_s), 6),
                 "dynamic_covariance_fallback": bool(dynamic_cov_fallback),
                 "head_covariance_fallback": bool(matched.covariance_fallback),
                 "extrinsic_covariance_source": self.extrinsic.covariance_source,
@@ -558,6 +612,8 @@ class DynamicArmPoseMeasurementNode(Node):
             "marker_frame": str(msg.marker_frame),
             "source_camera_frame": str(msg.camera_frame),
             "target_frame": self.target_frame,
+            "head_pose_source_topic": self.head_pose_topic,
+            "head_pose_source_type": self.head_pose_message_type,
             "stable": bool(msg.stable),
             "stable_frames": int(msg.stable_frames),
             "reprojection_error_px": round(float(msg.reprojection_error_px), 4),
