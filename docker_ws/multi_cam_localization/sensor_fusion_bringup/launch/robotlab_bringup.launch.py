@@ -53,7 +53,7 @@ def generate_launch_description():
                 "unite_imu_method":           "0",
                 "enable_infra1":              "false",
                 "enable_infra2":              "false",
-                "initial_reset":              "false",
+                "initial_reset":              "true",
                 "depth_module.depth_profile": "640x480x15",
                 "rgb_camera.color_profile":   "640x480x15",
             }.items(),
