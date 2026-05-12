@@ -161,7 +161,7 @@ Visualization Manager:
           Value: true
         d435i_arm_link:
           Value: true
-        marker_0:
+        marker_1:
           Value: true
         marker_map:
           Value: true
@@ -178,7 +178,7 @@ Visualization Manager:
             {}
           arm_imu_from_marker:
             {}
-          marker_0:
+          marker_1:
             arm_d435i_arm_color_optical_frame_raw:
               {}
       Update Interval: 0

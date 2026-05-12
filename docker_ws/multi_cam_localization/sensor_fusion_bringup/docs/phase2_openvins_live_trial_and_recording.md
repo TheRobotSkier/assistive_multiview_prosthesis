@@ -139,7 +139,7 @@ rviz2 -d /miahand_ws/src/multi_cam_localization/sensor_fusion_bringup/config/rvi
 Watch these frames:
 
 - `marker_map`: RViz fixed frame.
-- `marker_0`: fixed 100 mm marker map frame.
+- `marker_1`: fixed 100 mm marker map frame.
 - `head_imu`: OpenVINS IMU frame after initialization and marker-map locking.
 - `head_cam0`: OpenVINS camera calibration frame under `head_imu`.
 - `head_imu_from_marker`: marker-only IMU pose estimate from the Python marker

@@ -100,11 +100,11 @@ vio_health:
   max_pose_covariance_trace: 10.0
 
 markers:
-  0:
-    frame_id: marker_0
+  1:
+    frame_id: marker_1
     size_m: 0.1533
 
-    # T_map_marker maps marker_0 coordinates into marker_map.
+    # T_map_marker maps marker_1 coordinates into marker_map.
     # Empirical axis correction from live validation:
     #   previous output axes behaved as x=right, y=down, z=depth.
     #   desired marker_map uses new_x=old_x, new_y=old_z, new_z=-old_y.
