@@ -1,5 +1,7 @@
 COMPOSE := docker_ws/docker-deployment/docker-compose.yml
 SUDO := echo robotlab | sudo -S
+CAM_CFG := docker_ws/multi_cam_localization/sensor_fusion_bringup/config/d435i_cameras.yaml
+CAM_CFG_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/d435i_cameras.yaml
 
 .PHONY: up cameras kill build openvins rviz-openvins
 
@@ -30,6 +32,7 @@ cameras:
 		-e ROS_DOMAIN_ID=0 \
 		-v $(CURDIR)/docker_ws:/miahand_ws/src \
 		-v $(CURDIR)/docker_ws/docker-deployment/cyclonedds_robotlab.xml:/tmp/cyclonedds_peer.xml:ro \
+		-v $(CURDIR)/$(CAM_CFG):$(CAM_CFG_INSTALL):ro \
 		-v /dev:/dev \
 		-v /run/udev:/run/udev:ro \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
