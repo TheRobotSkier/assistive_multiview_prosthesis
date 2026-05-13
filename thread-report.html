@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Thread report &mdash; Thread</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root {
+  --green: #22c55e; --amber: #eab308; --red: #ef4444;
+  --bg: #fafafa; --card-bg: #fff; --border: #e5e7eb;
+  --text: #1f2937; --muted: #6b7280; --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height:1.6; }
+.container { max-width:1200px; margin:0 auto; padding:1.5rem; }
+header { margin-bottom:1.5rem; }
+h1 { font-size:1.75rem; border-bottom:2px solid #333; padding-bottom:0.3em; }
+h2 { font-size:1.25rem; margin-bottom:0.75rem; color:#333; }
+.tag { display:inline-block; padding:0.15rem 0.5rem; background:#eef; border-radius:4px; font-size:0.8rem; color:#335; vertical-align:middle; }
+.subtitle { color:var(--muted); font-size:0.9rem; margin-top:0.25rem; }
+section { margin-bottom:2rem; }
+.cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:1rem; margin-bottom:2rem; }
+.card { background:var(--card-bg); border-radius:8px; padding:1.25rem 1rem; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+.card-value { font-size:2rem; font-weight:700; line-height:1.2; }
+.card-label { font-size:0.8rem; text-transform:uppercase; color:var(--muted); letter-spacing:0.03em; margin-top:0.25rem; }
+.card-sub { font-size:0.75rem; color:var(--muted); margin-top:0.15rem; }
+table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+th, td { padding:0.5rem 0.6rem; text-align:left; border-bottom:1px solid var(--border); }
+th { background:#f8f8f8; font-weight:600; font-size:0.78rem; text-transform:uppercase; color:var(--muted); letter-spacing:0.03em; }
+tr.session-row { cursor:default; }
+.compliance-dot { font-size:0.85rem; cursor:help; }
+.chart-wrap { margin:1rem 0; position:relative; }
+canvas { max-width:100%; }
+#drilldown { display:none; margin-top:1rem; background:var(--card-bg); border-radius:8px; padding:1rem; box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+#drilldown h3 { font-size:1rem; margin-bottom:0.5rem; }
+.scorecard { display:grid; grid-template-columns:1fr; gap:0.5rem; margin-bottom:1.5rem; }
+.sc-row { display:grid; grid-template-columns:2rem 1fr 5rem auto; align-items:center; gap:0.75rem; padding:0.5rem 0.75rem; background:var(--card-bg); border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+.sc-icon { font-size:1rem; text-align:center; }
+.sc-label { font-weight:600; font-size:0.85rem; }
+.sc-label small { font-weight:400; color:var(--muted); display:block; font-size:0.78rem; }
+.sc-value { font-weight:600; text-align:right; font-size:0.85rem; }
+.heatmap-wrap { overflow-x:auto; margin:1rem 0; }
+.heatmap { display:grid; grid-template-columns: 50px repeat(24, 1fr); gap:2px; font-size:0.7rem; }
+.heatmap-cell { aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:3px; color:#fff; font-weight:600; min-width:18px; }
+.heatmap-label { display:flex; align-items:center; font-size:0.7rem; color:var(--muted); }
+details { margin:1rem 0; }
+details summary { cursor:pointer; font-weight:600; color:#555; }
+details summary:hover { color:#222; }
+.stat-cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:0.75rem; margin:1rem 0; }
+.stat-card { background:var(--card-bg); border-radius:6px; padding:0.75rem; text-align:center; box-shadow:0 1px 2px rgba(0,0,0,0.06); }
+.stat-card .val { font-size:1.5rem; font-weight:700; }
+.stat-card .lbl { font-size:0.72rem; text-transform:uppercase; color:var(--muted); }
+footer { color:var(--muted); font-size:0.8rem; margin-top:2rem; padding-top:1rem; border-top:1px solid var(--border); }
+footer p { margin:0.15rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+<header><h1>Thread <span class="tag">empty</span></h1><p class="subtitle"> &middot; 0 beads &middot; 0 epics</p></header>
+<div class="cards"><div class="card" style="border-top:4px solid #ef4444"><div class="card-value">&mdash;</div><div class="card-label">Completion</div><div class="card-sub">0 of 0 beads</div></div><div class="card" style="border-top:4px solid #ef4444"><div class="card-value">—</div><div class="card-label">Cycle time (p50)</div><div class="card-sub">p90: —</div></div><div class="card" style="border-top:4px solid #ef4444"><div class="card-value">&mdash;</div><div class="card-label">Beads / day</div><div class="card-sub">across 0 active days</div></div><div class="card" style="border-top:4px solid #22c55e"><div class="card-value">&mdash;</div><div class="card-label">Cost spread</div><div class="card-sub">0s total compute</div></div><div class="card" style="border-top:4px solid #ef4444"><div class="card-value">&mdash;</div><div class="card-label">Parallelism</div><div class="card-sub">not enough session data to measure parallelism</div></div><div class="card" style="border-top:4px solid #ef4444"><div class="card-value">—</div><div class="card-label">Queue wait (p50)</div><div class="card-sub">p90: —</div></div></div>
+<section><h2>Sessions</h2>
+<p>No sessions detected.</p>
+</section>
+<section id="compliance"><h2>Compliance</h2>
+<div class="scorecard"><div class="sc-row"><div class="sc-icon">&#x1F7E2;</div><div class="sc-label">Claim compliance<small>no completed beads to check</small></div><div class="sc-value">100%</div></div><div class="sc-row"><div class="sc-icon">&#x1F534;</div><div class="sc-label">Close documentation<small>no completed beads to check</small></div><div class="sc-value">&mdash;</div></div><div class="sc-row"><div class="sc-icon">&#x1F7E2;</div><div class="sc-label">Dependency order<small>all blockers resolved before dependent work was closed</small></div><div class="sc-value">0</div></div><div class="sc-row"><div class="sc-icon">&#x1F7E2;</div><div class="sc-label">Scope stability<small>scope held steady during execution</small></div><div class="sc-value">0.00</div></div><div class="sc-row"><div class="sc-icon">&#x1F7E2;</div><div class="sc-label">Late-add beads<small>no reactive beads detected — work matched the original plan</small></div><div class="sc-value">0</div></div><div class="sc-row"><div class="sc-icon">&#x1F7E2;</div><div class="sc-label">Late-add blockers<small>no surprise blockers — dependencies were known before work started</small></div><div class="sc-value">0</div></div><div class="sc-row"><div class="sc-icon">&#x1F7E2;</div><div class="sc-label">Title/reason alignment<small>no close reasons to compare — documentation rate is low</small></div><div class="sc-value">0</div></div></div>
+</section>
+<section id="audit"><h2>Audit trail</h2>
+<p class="muted">interactions.jsonl not found &mdash; run <code>bd compact --audit</code> or enable agent hooks to populate.</p>
+</section>
+<section id="charts"><h2>Cycle time distribution</h2><div class="chart-wrap"><canvas id="histChart" height="250"></canvas></div><div id="drilldown"><h3 id="dd-title"></h3><table id="dd-table"></table></div><h2>Throughput over time</h2><div class="chart-wrap"><canvas id="tpChart" height="200"></canvas></div></section>
+
+<section id="knowledge"><details><summary>Agent knowledge base (0 memories)</summary><p style="color:var(--muted)">No persistent memories stored yet. Use <code>bd remember "insight"</code> to build institutional knowledge.</p></details></section>
+<footer><p>Generated by Thread &middot; 2026-05-11 22:05</p><p>Cost expressed as multiples of project median cycle time (1.0x = baseline)</p></footer>
+</div>
+<script>
+const MEDIAN_CYCLE_SECS = 1;
+const beadData = [];
+const dailyData = [];
+
+// --- Cycle time histogram ---
+const buckets = [
+  {label: '<1m', min: 0, max: 60, color: '#22c55e'},
+  {label: '1-2m', min: 60, max: 120, color: '#22c55e'},
+  {label: '2-5m', min: 120, max: 300, color: '#22c55e'},
+  {label: '5-10m', min: 300, max: 600, color: '#eab308'},
+  {label: '10-30m', min: 600, max: 1800, color: '#ef4444'},
+  {label: '>30m', min: 1800, max: Infinity, color: '#ef4444'}
+];
+
+const counts = buckets.map(b =>
+  beadData.filter(d => d.cycle_secs >= b.min && d.cycle_secs < b.max).length
+);
+
+const histCtx = document.getElementById('histChart');
+if (histCtx) {
+  const histChart = new Chart(histCtx, {
+    type: 'bar',
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [{
+        label: 'Beads',
+        data: counts,
+        backgroundColor: buckets.map(b => b.color),
+      }]
+    },
+    options: {
+      plugins: {
+        tooltip: {
+          callbacks: {
+            afterLabel: function(ctx) {
+              const b = buckets[ctx.dataIndex];
+              const inBucket = beadData.filter(d => d.cycle_secs >= b.min && d.cycle_secs < b.max);
+              if (inBucket.length === 0) return '';
+              const avgCost = inBucket.reduce((s,d) => s + d.cycle_secs, 0) / inBucket.length / MEDIAN_CYCLE_SECS;
+              return 'Avg cost: ' + avgCost.toFixed(1) + 'x median';
+            }
+          }
+        }
+      },
+      onClick: function(e, elements) {
+        if (!elements.length) return;
+        const idx = elements[0].index;
+        const b = buckets[idx];
+        const inBucket = beadData.filter(d => d.cycle_secs >= b.min && d.cycle_secs < b.max)
+          .sort((a,b) => b.cycle_secs - a.cycle_secs);
+        const dd = document.getElementById('drilldown');
+        const title = document.getElementById('dd-title');
+        const table = document.getElementById('dd-table');
+        if (inBucket.length === 0) { dd.style.display = 'none'; return; }
+        title.textContent = b.label + ' — ' + inBucket.length + ' beads';
+        const fmtDur = s => {
+          if (s < 60) return s + 's';
+          const m = Math.floor(s/60), sec = s % 60;
+          return sec ? m+'m '+sec+'s' : m+'m';
+        };
+        let html = '<thead><tr><th>ID</th><th>Title</th><th>Type</th><th>Cycle time</th><th>Cost</th></tr></thead><tbody>';
+        inBucket.forEach(d => {
+          const cost = (d.cycle_secs / MEDIAN_CYCLE_SECS).toFixed(1) + 'x';
+          html += '<tr><td>'+d.id+'</td><td>'+d.title+'</td><td>'+d.type+'</td><td>'+fmtDur(d.cycle_secs)+'</td><td>'+cost+'</td></tr>';
+        });
+        html += '</tbody>';
+        table.innerHTML = html;
+        dd.style.display = 'block';
+        dd.scrollIntoView({behavior:'smooth', block:'nearest'});
+      }
+    }
+  });
+}
+
+// --- Throughput bar chart with cycle time trend overlay ---
+const tpCtx = document.getElementById('tpChart');
+if (tpCtx) {
+  new Chart(tpCtx, {
+    type: 'bar',
+    data: {
+      labels: dailyData.map(d => d.day),
+      datasets: [
+        {
+          label: 'Beads closed',
+          data: dailyData.map(d => d.closed),
+          backgroundColor: '#6366f1',
+          yAxisID: 'y',
+        },
+        {
+          label: 'p50 cycle time (s)',
+          data: dailyData.map(d => d.median_ct),
+          type: 'line',
+          borderColor: '#ef4444',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          pointRadius: 3,
+          yAxisID: 'y1',
+        }
+      ]
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Beads closed' } },
+        y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Cycle time (s)' } }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>

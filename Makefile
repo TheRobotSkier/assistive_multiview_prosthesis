@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill robotlab-view robotlab-stop
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-static rviz-static-kill robotlab-view robotlab-stop
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -114,6 +114,56 @@ rviz-kill:
 	-podman kill rviz-robotlab 2>/dev/null
 	-podman rm rviz-robotlab 2>/dev/null
 	@echo "RViz stopped."
+
+# ── Robotlab RViz + static TF (both cameras at world origin) ─────────
+rviz-static:
+	@echo "Starting static TF publisher (both cameras → world origin)"
+	@test -f rviz/robotlab_cameras_static_tf.rviz || { echo "Missing rviz/robotlab_cameras_static_tf.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	xhost +
+	-podman rm -f static-tf-robotlab -t 1 2>/dev/null
+	podman run --rm -d --name rviz-robotlab \
+		--network host \
+		--ipc host \
+		--device /dev/dri \
+		--userns=keep-id \
+		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
+		-v $(CURDIR)/rviz/robotlab_cameras_static_tf.rviz:/rviz_config.rviz:ro \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "RViz started. Kill both with: make rviz-static-kill"
+	podman run --rm -d --name static-tf-robotlab \
+		--network host \
+		--ipc host \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && \
+		  ros2 run tf2_ros static_transform_publisher \
+		    --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 \
+		    --frame-id world --child-frame-id d435i_head_depth_optical_frame & \
+		  ros2 run tf2_ros static_transform_publisher \
+		    --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 \
+		    --frame-id world --child-frame-id d435i_arm_depth_optical_frame & \
+		  wait'
+	@echo "Static TF container started (static-tf-robotlab)"
+
+rviz-static-kill:
+	-podman kill rviz-robotlab 2>/dev/null
+	-podman rm rviz-robotlab 2>/dev/null
+	-podman kill static-tf-robotlab 2>/dev/null
+	-podman rm static-tf-robotlab 2>/dev/null
+	@echo "RViz and static TF publisher stopped."
 
 robotlab-view: rviz
 	@echo "Robotlab view ready. Jetson pointclouds streaming to RViz over Ethernet."
