@@ -14,6 +14,14 @@ launch:
   marker_detection_rate_hz: 15.0
   verbosity: INFO
 
+pointcloud:
+  # Keep the 30 Hz RGB stream for OpenVINS. Pointclouds are opt-in for grasping
+  # runs because depth processing adds Jetson load.
+  enable: false
+  max_rate_hz: 15.0
+  voxel_leaf_m: 0.01
+  record: false
+
 measurement:
   publish_dynamic_arm_pose_observation: true
   dynamic_observation_topic: /head/marker_pose/dynamic_observation

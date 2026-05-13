@@ -1,8 +1,8 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, TimerAction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
@@ -30,6 +30,7 @@ def generate_launch_description():
             "camera_namespace": "arm",
             "camera_name": "d435i_arm",
             "serial_no": "_310622071850",
+            "tf_prefix": "arm_",
             "enable_color": "true",
             "rgb_camera.color_profile": "640x480x30",
             "enable_gyro": "true",
@@ -37,10 +38,66 @@ def generate_launch_description():
             "unite_imu_method": "2",
             "gyro_fps": "200",
             "accel_fps": "200",
-            "enable_depth": "false",
-            "pointcloud.enable": "false",
+            "enable_depth": LaunchConfiguration("enable_pointclouds"),
+            "depth_module.depth_profile": "640x480x15",
+            "pointcloud.enable": LaunchConfiguration("enable_pointclouds"),
+            "pointcloud.stream_filter": "2",
+            "pointcloud.stream_index_filter": "0",
+            "pointcloud.ordered_pc": "false",
+            "pointcloud.allow_no_texture_points": "false",
             "align_depth.enable": "false",
+            "decimation_filter.enable": LaunchConfiguration("enable_pointclouds"),
+            "decimation_filter.filter_magnitude": LaunchConfiguration("pointcloud_decimation_magnitude"),
         }.items(),
+    )
+
+    pointcloud_neon_fix = TimerAction(
+        period=6.0,
+        actions=[
+            ExecuteProcess(
+                cmd=[
+                    "ros2",
+                    "param",
+                    "set",
+                    "/arm/d435i_arm",
+                    "pointcloud__neon_.enable",
+                    "true",
+                ],
+                output="screen",
+                condition=IfCondition(LaunchConfiguration("enable_pointcloud_neon_fix")),
+            )
+        ],
+        condition=IfCondition(
+            PythonExpression([
+                "'",
+                LaunchConfiguration("enable_pointclouds"),
+                "'.lower() in ['true', '1', 'yes', 'on'] and '",
+                LaunchConfiguration("start_camera"),
+                "'.lower() in ['true', '1', 'yes', 'on']",
+            ])
+        ),
+    )
+
+    pointcloud_marker_map = Node(
+        package="sensor_fusion_bringup",
+        executable="pointcloud_to_frame_node",
+        name="arm_d435i_points_to_marker_map",
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("enable_pointclouds")),
+        parameters=[
+            {"use_sim_time": LaunchConfiguration("use_sim_time")},
+            {"input_topic": "/arm/d435i_arm/depth/color/points"},
+            {"output_topic": "/arm/d435i_arm/points_marker_map"},
+            {"target_frame": "marker_map"},
+            {"camera_pose_frame": "arm_cam0"},
+            {"camera_color_optical_frame": "arm_d435i_arm_color_optical_frame"},
+            {"marker_map_locked_topic": "/ov_msckf_arm/marker_map_locked"},
+            {"require_marker_map_locked": True},
+            {"max_rate_hz": ParameterValue(LaunchConfiguration("pointcloud_max_rate_hz"), value_type=float)},
+            {"voxel_leaf_m": ParameterValue(LaunchConfiguration("pointcloud_voxel_leaf_m"), value_type=float)},
+            {"transform_timeout_s": ParameterValue(LaunchConfiguration("pointcloud_transform_timeout_s"), value_type=float)},
+            {"max_tf_age_s": ParameterValue(LaunchConfiguration("pointcloud_max_tf_age_s"), value_type=float)},
+        ],
     )
 
     openvins_phase2 = Node(
@@ -215,6 +272,21 @@ def generate_launch_description():
             description="Use /clock, typically true during rosbag replay.",
         ),
         DeclareLaunchArgument(
+            "enable_pointclouds",
+            default_value="false",
+            description="Enable 15 Hz depth/color pointclouds and marker_map republisher.",
+        ),
+        DeclareLaunchArgument("pointcloud_max_rate_hz", default_value="15.0"),
+        DeclareLaunchArgument("pointcloud_voxel_leaf_m", default_value="0.01"),
+        DeclareLaunchArgument("pointcloud_transform_timeout_s", default_value="0.02"),
+        DeclareLaunchArgument("pointcloud_max_tf_age_s", default_value="0.50"),
+        DeclareLaunchArgument("pointcloud_decimation_magnitude", default_value="2"),
+        DeclareLaunchArgument(
+            "enable_pointcloud_neon_fix",
+            default_value="true",
+            description="Apply Jetson pointcloud__neon_.enable fix after startup when pointclouds are enabled.",
+        ),
+        DeclareLaunchArgument(
             "use_dynamic_arm_pose_updates",
             default_value="false",
             description="Enable conservative dynamic ID2 arm pose update consumption in arm OpenVINS.",
@@ -261,5 +333,7 @@ def generate_launch_description():
         DeclareLaunchArgument("dynamic_arm_reanchor_skip_after_fixed_marker_s", default_value="3.0"),
         DeclareLaunchArgument("dynamic_arm_reanchor_covariance_multiplier", default_value="2.0"),
         arm_camera,
+        pointcloud_neon_fix,
+        pointcloud_marker_map,
         TimerAction(period=5.0, actions=[openvins_phase2]),
     ])

@@ -47,6 +47,7 @@
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <sensor_fusion_msgs/msg/dynamic_arm_pose_observation.hpp>
 #include <sensor_fusion_msgs/msg/marker_pose_observation.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <tf2/LinearMath/Quaternion.h>
@@ -198,6 +199,7 @@ protected:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_loop_pose, pub_loop_extrinsic;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud>::SharedPtr pub_loop_point;
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr pub_loop_intrinsics;
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_marker_map_locked;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_dynamic_arm_status;
   std::shared_ptr<tf2_ros::TransformBroadcaster> mTfBr;
 

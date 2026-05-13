@@ -56,6 +56,16 @@ Dynamic ID2 arm workflow:
 - The next physical ID2 fixture needs redesign due to prosthesis occlusion; refresh
   `config/markers/arm_marker_extrinsics.yaml` after the mount is final.
 
+D435i color pointcloud support:
+- Pointclouds are opt-in for the dynamic ID2 live workflow:
+  `enable_pointclouds:=true`. Leave them off for OpenVINS-only timing tests.
+- OpenVINS RGB streams should remain `640x480x30`; pointcloud depth is
+  `640x480x15` and transformed clouds are rate-limited to 15 Hz by default.
+- Stable grasping topics are `/head/d435i_head/points_marker_map` and
+  `/arm/d435i_arm/points_marker_map`; both are in `marker_map` after lock.
+- Validation commands:
+  `multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`
+
 Phase 1 marker correction is external only. Do not modify the OpenVINS internal
 EKF until the external marker-corrected odom path is validated and committed.
 

@@ -65,15 +65,20 @@ def _setup(context, *args, **kwargs):
     launch_cfg = config.get("launch", {})
     measurement_cfg = config.get("measurement", {})
     openvins_cfg = config.get("openvins", {})
+    pointcloud_cfg = config.get("pointcloud", {})
 
     mode = str(_arg_or_config(context, "mode", launch_cfg.get("mode", "observe"))).strip()
     start_cameras = _as_bool(_arg_or_config(context, "start_cameras", launch_cfg.get("start_cameras", True)))
     start_preview = _as_bool(_arg_or_config(context, "start_preview", launch_cfg.get("start_preview", True)))
     start_rviz = _as_bool(_arg_or_config(context, "start_rviz", launch_cfg.get("start_rviz", False)))
     record_bag = _as_bool(_arg_or_config(context, "record_bag", launch_cfg.get("record_bag", False)))
+    enable_pointclouds = _as_bool(_arg_or_config(context, "enable_pointclouds", pointcloud_cfg.get("enable", False)))
+    record_pointclouds = _as_bool(_arg_or_config(context, "record_pointclouds", pointcloud_cfg.get("record", False)))
     use_sim_time = _as_bool(_arg_or_config(context, "use_sim_time", False))
     verbosity = str(_arg_or_config(context, "verbosity", launch_cfg.get("verbosity", "INFO")))
     marker_detection_rate_hz = str(launch_cfg.get("marker_detection_rate_hz", 15.0))
+    pointcloud_max_rate_hz = str(_arg_or_config(context, "pointcloud_max_rate_hz", pointcloud_cfg.get("max_rate_hz", 15.0)))
+    pointcloud_voxel_leaf_m = str(_arg_or_config(context, "pointcloud_voxel_leaf_m", pointcloud_cfg.get("voxel_leaf_m", 0.01)))
 
     dynamic_params = dict(openvins_cfg)
     dynamic_params.update(_mode_overrides(mode))
@@ -92,6 +97,9 @@ def _setup(context, *args, **kwargs):
                 "start_camera": str(start_cameras).lower(),
                 "use_sim_time": str(use_sim_time).lower(),
                 "verbosity": verbosity,
+                "enable_pointclouds": str(enable_pointclouds).lower(),
+                "pointcloud_max_rate_hz": pointcloud_max_rate_hz,
+                "pointcloud_voxel_leaf_m": pointcloud_voxel_leaf_m,
             }.items(),
         ),
         IncludeLaunchDescription(
@@ -100,6 +108,9 @@ def _setup(context, *args, **kwargs):
                 "start_camera": str(start_cameras).lower(),
                 "use_sim_time": str(use_sim_time).lower(),
                 "verbosity": verbosity,
+                "enable_pointclouds": str(enable_pointclouds).lower(),
+                "pointcloud_max_rate_hz": pointcloud_max_rate_hz,
+                "pointcloud_voxel_leaf_m": pointcloud_voxel_leaf_m,
                 "use_dynamic_arm_pose_updates": str(dynamic_params["use_dynamic_arm_pose_updates"]).lower(),
                 "dynamic_arm_measurement_only": str(dynamic_params["dynamic_arm_measurement_only"]).lower(),
                 "dynamic_arm_pose_topic": str(dynamic_params.get("dynamic_arm_pose_topic", "/arm/marker_pose/dynamic_arm_pose_observation")),
@@ -237,12 +248,25 @@ def _setup(context, *args, **kwargs):
             "/ov_msckf/poseimu",
             "/ov_msckf/odomimu",
             "/ov_msckf/pathimu",
+            "/ov_msckf/marker_map_locked",
             "/ov_msckf_arm/poseimu",
             "/ov_msckf_arm/odomimu",
             "/ov_msckf_arm/pathimu",
+            "/ov_msckf_arm/marker_map_locked",
             "/arm/marker_pose/head_derived/arm_camera_pose",
             "/arm/marker_pose/head_derived/path",
         ]
+        if record_pointclouds:
+            topics.extend(
+                [
+                    "/head/d435i_head/depth/color/points",
+                    "/head/d435i_head/points_marker_map",
+                    "/head/d435i_head/points_marker_map/status",
+                    "/arm/d435i_arm/depth/color/points",
+                    "/arm/d435i_arm/points_marker_map",
+                    "/arm/d435i_arm/points_marker_map/status",
+                ]
+            )
         actions.append(
             ExecuteProcess(
                 cmd=["bash", "-lc", "mkdir -p bags/openvins_tests/phase2_live && ros2 bag record -o " + bag_path + " " + " ".join(topics)],
@@ -267,6 +291,10 @@ def generate_launch_description():
             DeclareLaunchArgument("start_preview", default_value=""),
             DeclareLaunchArgument("start_rviz", default_value=""),
             DeclareLaunchArgument("record_bag", default_value=""),
+            DeclareLaunchArgument("enable_pointclouds", default_value=""),
+            DeclareLaunchArgument("pointcloud_max_rate_hz", default_value=""),
+            DeclareLaunchArgument("pointcloud_voxel_leaf_m", default_value=""),
+            DeclareLaunchArgument("record_pointclouds", default_value=""),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("verbosity", default_value=""),
             OpaqueFunction(function=_setup),

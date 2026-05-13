@@ -113,6 +113,11 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   PRINT_DEBUG("Publishing: %s\n", pub_odomimu->get_topic_name());
   pub_pathimu = node->create_publisher<nav_msgs::msg::Path>("pathimu", 2);
   PRINT_DEBUG("Publishing: %s\n", pub_pathimu->get_topic_name());
+  pub_marker_map_locked = node->create_publisher<std_msgs::msg::Bool>("marker_map_locked", rclcpp::QoS(1).transient_local().reliable());
+  PRINT_DEBUG("Publishing: %s\n", pub_marker_map_locked->get_topic_name());
+  std_msgs::msg::Bool initial_marker_map_locked;
+  initial_marker_map_locked.data = false;
+  pub_marker_map_locked->publish(initial_marker_map_locked);
 
   // 3D points publishing
   pub_points_msckf = node->create_publisher<sensor_msgs::msg::PointCloud2>("points_msckf", 2);
@@ -949,6 +954,11 @@ void ROS2Visualizer::publish_state() {
   if (_app->get_params().marker_pose_options.enabled && _app->marker_global_initialized() && !marker_path_has_locked) {
     poses_imu.clear();
     marker_path_has_locked = true;
+  }
+  if (pub_marker_map_locked != nullptr) {
+    std_msgs::msg::Bool marker_map_locked_msg;
+    marker_map_locked_msg.data = _app->marker_global_initialized();
+    pub_marker_map_locked->publish(marker_map_locked_msg);
   }
 
   // We want to publish in the IMU clock frame

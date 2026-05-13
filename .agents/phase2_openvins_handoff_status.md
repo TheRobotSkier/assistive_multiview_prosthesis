@@ -18,6 +18,14 @@ default behavior is fixed ID0 updates/reanchor plus dynamic ID2 normal arm
 updates and guarded dynamic ID2 initial-lock/reanchor. The low-level fixed
 marker maps remain ID0-only; ID2 must stay out of `marker_fixed_ids`.
 
+Color pointclouds are now opt-in on the same live path with
+`enable_pointclouds:=true`. OpenVINS RGB input remains `640x480x30`; depth and
+color pointcloud generation use `640x480x15` depth and republish transformed
+grasping clouds on `/head/d435i_head/points_marker_map` and
+`/arm/d435i_arm/points_marker_map` in `marker_map` after marker-map lock.
+Validation commands live in
+`docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`.
+
 Rollback/diagnostic controls:
 
 ```text

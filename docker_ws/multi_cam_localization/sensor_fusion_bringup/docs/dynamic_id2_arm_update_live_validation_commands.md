@@ -78,6 +78,29 @@ head_pose_source_type: odometry
 It should not queue stale ID2 observations. If no already-buffered head odometry
 sample matches within `max_head_pose_dt_s`, status reports `no_head_pose_match`.
 
+## Optional Pointclouds
+
+Pointclouds are disabled by default so OpenVINS-only tests keep the calibrated
+30 Hz RGB input without extra depth processing load. Enable them only for
+grasping runs:
+
+```bash
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true'
+```
+
+The stable grasping topics are:
+
+```text
+/head/d435i_head/points_marker_map
+/arm/d435i_arm/points_marker_map
+```
+
+The detailed pointcloud validation sheet is:
+
+```text
+docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md
+```
+
 ## Status Checks
 
 Measurement producer status:

@@ -10,6 +10,11 @@ dynamic ID2 normal updates and guarded dynamic ID2 initial-lock/reanchor by
 default. The fixed marker map remains ID0-only; do not add ID2 to
 `marker_fixed_ids`.
 
+D435i color pointclouds are opt-in on the dynamic ID2 live launch with
+`enable_pointclouds:=true`. OpenVINS RGB remains 30 Hz, pointcloud depth is
+15 Hz, and the grasping topics are `/head/d435i_head/points_marker_map` and
+`/arm/d435i_arm/points_marker_map` in `marker_map` after marker-map lock.
+
 Important current caveat: the latest live ID2 measurement bag
 `dynamic_id2_arm_update_live_20260513_125316` validated the measurement path
 but not the OpenVINS update/reanchor path. It recorded `218` head dynamic ID2
@@ -23,6 +28,7 @@ Current dynamic ID2 user docs:
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_parameters.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_live_validation_commands.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_live_bag_recommendations.md`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_marker_id2_extrinsic_calibration_commands.md`
 
 Marker ID2 fixture note, 2026-05-13: the next physical ID2/arm-D435i fixture

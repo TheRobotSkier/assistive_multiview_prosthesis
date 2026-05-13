@@ -91,3 +91,5 @@ docker_ws/src/open_vins/.github/
 docker_ws/src/open_vins/Dockerfile_ros*
 docker_ws/src/open_vins/Doxyfile*
 docker_ws/src/open_vins/run_*.sh
+
+docker_ws/docker-deployment/docker-deployment-realsense_camera:latest.tar
