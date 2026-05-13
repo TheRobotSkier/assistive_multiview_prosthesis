@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import csv
+import json
 import os
 import sys
 from collections import defaultdict
@@ -90,7 +91,7 @@ def plot_latency_boxplot(latency_rows: list[dict], fmt: str, dpi: int):
 # ---------------------------------------------------------------------------
 
 def plot_latency_summary(latency_rows: list[dict], fmt: str, dpi: int):
-    """Mean ± std latency bar chart with P95/P99 annotations."""
+    """Mean +/- std latency bar chart with P95/P99 annotations."""
     import matplotlib.pyplot as plt
 
     if not latency_rows:
@@ -122,7 +123,7 @@ def plot_latency_summary(latency_rows: list[dict], fmt: str, dpi: int):
     ax.set_xticks(x)
     ax.set_xticklabels(objects, rotation=45, ha="right")
     ax.set_ylabel("Pipeline Latency (ms)")
-    ax.set_title("Test 1a: Latency Summary (mean ± std, P95/P99)")
+    ax.set_title("Test 1a: Latency Summary (mean +/- std, P95/P99)")
     ax.legend(loc="upper right", fontsize=8)
 
     # Annotate P95 values
@@ -135,12 +136,17 @@ def plot_latency_summary(latency_rows: list[dict], fmt: str, dpi: int):
 
 
 # ---------------------------------------------------------------------------
-# Figure 3: Intent precision bar chart
+# Figure 3: Intent precision bar chart (updated: grasp type + wrist error)
 # ---------------------------------------------------------------------------
 
 def plot_intent_precision(summary_rows: list[dict], delta_rows: list[dict],
                           fmt: str, dpi: int):
-    """Grouped bar chart: single-view vs. multi-view accuracy per object."""
+    """Grouped bar chart: single-view vs. multi-view per object.
+
+    Panel 1: Grasp type accuracy (%) — primary metric
+    Panel 2: Mean wrist rotation error (degrees)
+    Panel 3: Mean position error (mm) — diagnostic
+    """
     import matplotlib.pyplot as plt
 
     if not summary_rows:
@@ -163,8 +169,8 @@ def plot_intent_precision(summary_rows: list[dict], delta_rows: list[dict],
     fig, axes = plt.subplots(1, 3, figsize=(max(12, len(objects_with_both) * 1.5), 5))
 
     metrics = [
-        ("fully_correct_pct", "Fully Correct (%)"),
-        ("grasp_accuracy_pct", "Grasp Type Match (%)"),
+        ("grasp_correct_pct", "Grasp Type Correct (%)"),
+        ("mean_orientation_error_deg", "Wrist Rotation Error (deg)"),
         ("mean_position_error_mm", "Position Error (mm)"),
     ]
 
@@ -187,17 +193,17 @@ def plot_intent_precision(summary_rows: list[dict], delta_rows: list[dict],
         ax.legend(fontsize=7)
         ax.set_title(metric_label)
 
-    fig.suptitle("Test 1b: Intent Precision — Single-view vs. Multi-view", fontsize=12)
+    fig.suptitle("Test 1b: Intent Precision -- Single-view vs. Multi-view", fontsize=12)
     fig.tight_layout()
     _save_fig(fig, "fig3_intent_precision", fmt, dpi)
 
 
 # ---------------------------------------------------------------------------
-# Figure 4: Intent precision delta
+# Figure 4: Intent precision delta (grasp-type-only)
 # ---------------------------------------------------------------------------
 
 def plot_intent_delta(delta_rows: list[dict], fmt: str, dpi: int):
-    """Bar chart of Δ (multi - single) per object with threshold lines."""
+    """Bar chart of delta (multi - single) grasp correctness per object."""
     import matplotlib.pyplot as plt
 
     if not delta_rows:
@@ -205,7 +211,9 @@ def plot_intent_delta(delta_rows: list[dict], fmt: str, dpi: int):
         return
 
     objects = [d["object"] for d in delta_rows]
-    deltas = [float(d["delta_fully_correct_pct"]) for d in delta_rows]
+    # Use the new grasp_correct delta, fall back to legacy field
+    deltas = [float(d.get("delta_grasp_correct_pct",
+                           d.get("delta_fully_correct_pct", 0))) for d in delta_rows]
 
     fig, ax = plt.subplots(figsize=(max(8, len(objects) * 1.2), 5))
     x = np.arange(len(objects))
@@ -213,12 +221,12 @@ def plot_intent_delta(delta_rows: list[dict], fmt: str, dpi: int):
     bars = ax.bar(x, deltas, color=colors, edgecolor="black", linewidth=0.5)
 
     ax.axhline(y=0, color="black", linewidth=0.5)
-    ax.axhline(y=10, color="green", linestyle="--", linewidth=1.5, label="IDE (≥10%)")
+    ax.axhline(y=10, color="green", linestyle="--", linewidth=1.5, label="IDE ($\\geq$10%)")
 
     ax.set_xticks(x)
     ax.set_xticklabels(objects, rotation=45, ha="right")
-    ax.set_ylabel("Δ Fully Correct (%)")
-    ax.set_title("Test 1b: Intent Precision Δ (Multi-view − Single-view)")
+    ax.set_ylabel("$\\Delta$ Grasp Correct (%)")
+    ax.set_title("Test 1b: Intent Precision $\\Delta$ (Multi-view $-$ Single-view)")
     ax.legend()
 
     # Annotate values
@@ -231,7 +239,103 @@ def plot_intent_delta(delta_rows: list[dict], fmt: str, dpi: int):
 
 
 # ---------------------------------------------------------------------------
-# Figure 5: Pose error scatter
+# Figure 5: Cumulative wrist error CDF + grasp correctness
+# ---------------------------------------------------------------------------
+
+def plot_wrist_error_cdf(occlusion_rows: list[dict], summary_rows: list[dict],
+                         fmt: str, dpi: int):
+    """Two-panel figure:
+      Left:  Cumulative distribution of wrist rotation errors (CDF)
+             for single-view vs. multi-view.
+      Right: Grasp type correctness rate per object (grouped bar).
+    """
+    import matplotlib.pyplot as plt
+
+    if not occlusion_rows:
+        print("  SKIP: No occlusion data for CDF plot")
+        return
+
+    # --- Left panel: CDF of wrist errors ---
+    fig, (ax_cdf, ax_bar) = plt.subplots(1, 2, figsize=(14, 5),
+                                          gridspec_kw={"width_ratios": [1, 1.2]})
+
+    for cond, color, label in [("single_view", "#4c72b0", "Single-view"),
+                                ("multi_view", "#55a868", "Multi-view")]:
+        errors = [float(r["orientation_error_deg"]) for r in occlusion_rows
+                  if r.get("condition") == cond
+                  and "orientation_error_deg" in r
+                  and r.get("success", False)]
+        if not errors:
+            continue
+        errors = np.sort(errors)
+        cdf = np.arange(1, len(errors) + 1) / len(errors)
+        ax_cdf.plot(errors, cdf, color=color, linewidth=2, label=label)
+
+        # Annotate median and P90
+        median = np.median(errors)
+        p90 = np.percentile(errors, 90)
+        ax_cdf.axvline(median, color=color, linestyle=":", alpha=0.5, linewidth=1)
+        ax_cdf.annotate(f"median={median:.0f}°", xy=(median, 0.5),
+                        fontsize=7, color=color, ha="left", va="bottom",
+                        xytext=(5, 0), textcoords="offset points")
+
+    ax_cdf.set_xlabel("Wrist Rotation Error (deg)")
+    ax_cdf.set_ylabel("Cumulative Fraction")
+    ax_cdf.set_title("Wrist Rotation Error CDF")
+    ax_cdf.legend(loc="lower right")
+    ax_cdf.set_xlim(0, None)
+    ax_cdf.set_ylim(0, 1.05)
+    ax_cdf.grid(True, alpha=0.3)
+
+    # --- Right panel: Grasp correctness per object ---
+    if summary_rows:
+        by_object = defaultdict(dict)
+        for row in summary_rows:
+            by_object[row["object"]][row["condition"]] = row
+
+        objects = sorted(by_object.keys())
+        objects_with_both = [o for o in objects
+                             if "single_view" in by_object[o]
+                             and "multi_view" in by_object[o]]
+
+        if objects_with_both:
+            x = np.arange(len(objects_with_both))
+            width = 0.35
+
+            sv_vals = [float(by_object[o]["single_view"].get("grasp_correct_pct",
+                        by_object[o]["single_view"].get("grasp_accuracy_pct", 0)))
+                       for o in objects_with_both]
+            mv_vals = [float(by_object[o]["multi_view"].get("grasp_correct_pct",
+                        by_object[o]["multi_view"].get("grasp_accuracy_pct", 0)))
+                       for o in objects_with_both]
+
+            ax_bar.bar(x - width / 2, sv_vals, width, label="Single-view",
+                       color="#4c72b0", edgecolor="black", linewidth=0.3)
+            ax_bar.bar(x + width / 2, mv_vals, width, label="Multi-view",
+                       color="#55a868", edgecolor="black", linewidth=0.3)
+
+            ax_bar.set_xticks(x)
+            ax_bar.set_xticklabels([o.replace("_", "\n") for o in objects_with_both],
+                                   fontsize=6, rotation=45, ha="right")
+            ax_bar.set_ylabel("Grasp Type Correct (%)")
+            ax_bar.set_title("Grasp Type Correctness")
+            ax_bar.legend(fontsize=7)
+            ax_bar.set_ylim(0, 105)
+
+            # Annotate values
+            for i, (sv, mv) in enumerate(zip(sv_vals, mv_vals)):
+                ax_bar.annotate(f"{sv:.0f}", xy=(i - width / 2, sv), fontsize=6,
+                                ha="center", va="bottom")
+                ax_bar.annotate(f"{mv:.0f}", xy=(i + width / 2, mv), fontsize=6,
+                                ha="center", va="bottom")
+
+    fig.suptitle("Test 1b: Wrist Error Distribution & Grasp Correctness", fontsize=12)
+    fig.tight_layout()
+    _save_fig(fig, "fig5_wrist_cdf_grasp_correct", fmt, dpi)
+
+
+# ---------------------------------------------------------------------------
+# Figure 6: Pose error scatter
 # ---------------------------------------------------------------------------
 
 def plot_pose_error_scatter(occlusion_rows: list[dict], fmt: str, dpi: int):
@@ -258,19 +362,19 @@ def plot_pose_error_scatter(occlusion_rows: list[dict], fmt: str, dpi: int):
                    alpha=0.6, s=30, label=cond.replace("_", "-"))
 
     ax.axvline(x=10, color="gray", linestyle=":", alpha=0.5, label="10 mm threshold")
-    ax.axhline(y=15, color="gray", linestyle="--", alpha=0.5, label="15° threshold")
+    ax.axhline(y=15, color="gray", linestyle="--", alpha=0.5, label="15 deg threshold")
 
     ax.set_xlabel("Position Error (mm)")
     ax.set_ylabel("Orientation Error (deg)")
-    ax.set_title("Test 1b: Pose Error — Single-view vs. Multi-view")
+    ax.set_title("Test 1b: Pose Error -- Single-view vs. Multi-view")
     ax.legend(fontsize=8)
 
     fig.tight_layout()
-    _save_fig(fig, "fig5_pose_error_scatter", fmt, dpi)
+    _save_fig(fig, "fig6_pose_error_scatter", fmt, dpi)
 
 
 # ---------------------------------------------------------------------------
-# Figure 6: Point cloud coverage comparison (text-based summary)
+# Figure 7: Point cloud coverage comparison
 # ---------------------------------------------------------------------------
 
 def plot_cloud_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
@@ -325,14 +429,113 @@ def plot_cloud_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
                     ha="center", va="bottom")
 
     fig.tight_layout()
-    _save_fig(fig, "fig6_cloud_coverage", fmt, dpi)
+    _save_fig(fig, "fig7_cloud_coverage", fmt, dpi)
+
+
+# ---------------------------------------------------------------------------
+# Figure 8: Tier A vs Tier B latency comparison
+# ---------------------------------------------------------------------------
+
+def plot_tier_ab_latency(tier_a_rows: list[dict], tier_b_rows: list[dict],
+                         fmt: str, dpi: int):
+    """Grouped bar chart comparing Tier A (grasp planning) and Tier B (full pipeline) latency.
+
+    Tier B rows may contain multiple methods (emg, service). If both are present,
+    only the EMG method is used for the primary comparison. Otherwise the available
+    method is used.
+    """
+    import matplotlib.pyplot as plt
+
+    if not tier_a_rows and not tier_b_rows:
+        print("  SKIP: No latency data for Tier A/B comparison")
+        return
+
+    # Collect Tier A means per object
+    by_object_a = defaultdict(list)
+    for row in tier_a_rows:
+        by_object_a[row["object"]].append(float(row["pipeline_time_ms"]))
+
+    # Collect Tier B means per object (prefer EMG method, fall back to service)
+    by_object_b = defaultdict(list)
+    for row in tier_b_rows:
+        t = row.get("total_latency_ms", "")
+        status = row.get("status", "")
+        if not t or t == "nan" or status in ("not_implemented", "timeout", "no_service"):
+            continue
+        # If method column exists, prefer emg; otherwise include all
+        method = row.get("method", "")
+        if method == "emg":
+            by_object_b[row["object"]].append(("emg", float(t)))
+        elif method == "service":
+            by_object_b[row["object"]].append(("service", float(t)))
+        else:
+            by_object_b[row["object"]].append(("unknown", float(t)))
+
+    # For each object, pick the best method (prefer emg)
+    by_object_b_means = {}
+    for obj, entries in by_object_b.items():
+        emg_vals = [v for m, v in entries if m == "emg"]
+        svc_vals = [v for m, v in entries if m == "service"]
+        if emg_vals:
+            by_object_b_means[obj] = np.mean(emg_vals)
+        elif svc_vals:
+            by_object_b_means[obj] = np.mean(svc_vals)
+        else:
+            by_object_b_means[obj] = np.mean([v for _, v in entries])
+
+    # Use union of objects
+    all_objects = sorted(set(by_object_a.keys()) | set(by_object_b_means.keys()))
+    if not all_objects:
+        return
+
+    tier_a_means = [np.mean(by_object_a[o]) if o in by_object_a else 0 for o in all_objects]
+    tier_b_means = [by_object_b_means.get(o, 0) for o in all_objects]
+    has_a = [o in by_object_a for o in all_objects]
+    has_b = [o in by_object_b_means for o in all_objects]
+
+    fig, ax = plt.subplots(figsize=(max(8, len(all_objects) * 1.2), 5))
+    x = np.arange(len(all_objects))
+    width = 0.35
+
+    bars_a = ax.bar(x - width / 2, tier_a_means, width, label="Tier A (Grasp Planning)",
+                    color="#4c72b0", edgecolor="black", linewidth=0.3)
+    bars_b = ax.bar(x + width / 2, tier_b_means, width, label="Tier B (Full Pipeline)",
+                    color="#c44e52", edgecolor="black", linewidth=0.3)
+
+    # Dim bars where data is missing
+    for i, (bar, has) in enumerate(zip(bars_a, has_a)):
+        if not has:
+            bar.set_alpha(0.2)
+    for i, (bar, has) in enumerate(zip(bars_b, has_b)):
+        if not has:
+            bar.set_alpha(0.2)
+
+    ax.axhline(y=400, color="red", linestyle="--", linewidth=1.5, label="MAR (400 ms)")
+    ax.axhline(y=100, color="green", linestyle="--", linewidth=1.5, label="IDE (100 ms)")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(all_objects, rotation=45, ha="right")
+    ax.set_ylabel("Latency (ms)")
+    ax.set_title("Test 1: Tier A vs. Tier B Latency Comparison")
+    ax.legend(fontsize=8)
+
+    # Annotate overhead where both tiers have data
+    for i, o in enumerate(all_objects):
+        if has_a[i] and has_b[i]:
+            overhead = tier_b_means[i] - tier_a_means[i]
+            ax.annotate(f"+{overhead:.0f}", xy=(i, tier_b_means[i]),
+                        fontsize=7, ha="center", va="bottom", color="#c44e52")
+
+    fig.tight_layout()
+    _save_fig(fig, "fig8_tier_ab_latency", fmt, dpi)
 
 
 # ---------------------------------------------------------------------------
 # LaTeX table fragment
 # ---------------------------------------------------------------------------
 
-def generate_latex_table(latency_rows: list[dict], delta_rows: list[dict]):
+def generate_latex_table(latency_rows: list[dict], delta_rows: list[dict],
+                         summary_rows: list[dict] = None):
     """Generate a LaTeX table fragment summarizing key results."""
     if not latency_rows:
         print("  SKIP: No latency data for LaTeX table")
@@ -377,25 +580,50 @@ def generate_latex_table(latency_rows: list[dict], delta_rows: list[dict]):
             r"\begin{table}[H]",
             r"\centering",
             r"\small",
-            r"\begin{tabular}{l r r r}",
+            r"\begin{tabular}{l r r r r}",
             r"\toprule",
-            r"\textbf{Object} & \textbf{SV (\%)} & \textbf{MV (\%)} & \textbf{$\Delta$ (\%)} \\",
+            r"\textbf{Object} & \textbf{SV (\%)} & \textbf{MV (\%)} & \textbf{$\Delta$ (\%)} & \textbf{Wrist Err (deg)} \\",
             r"\midrule",
         ])
+
+        # Build lookup for wrist errors from summary
+        sv_wrist = {}
+        mv_wrist = {}
+        if summary_rows:
+            for row in summary_rows:
+                if row["condition"] == "single_view":
+                    sv_wrist[row["object"]] = float(row.get("mean_orientation_error_deg", 0))
+                elif row["condition"] == "multi_view":
+                    mv_wrist[row["object"]] = float(row.get("mean_orientation_error_deg", 0))
+
         for d in delta_rows:
+            obj = d["object"]
+            sv_pct = float(d.get("single_view_grasp_correct_pct",
+                                  d.get("single_view_fully_correct_pct", 0)))
+            mv_pct = float(d.get("multi_view_grasp_correct_pct",
+                                  d.get("multi_view_fully_correct_pct", 0)))
+            delta_val = float(d.get("delta_grasp_correct_pct",
+                                     d.get("delta_fully_correct_pct", 0)))
+            wrist_sv = sv_wrist.get(obj, 0)
+            wrist_mv = mv_wrist.get(obj, 0)
             lines.append(
-                f"{d['object'].replace('_', '\\_')} & "
-                f"{float(d['single_view_fully_correct_pct']):.1f} & "
-                f"{float(d['multi_view_fully_correct_pct']):.1f} & "
-                f"{float(d['delta_fully_correct_pct']):+.1f} \\\\"
+                f"{obj.replace('_', '\\_')} & "
+                f"{sv_pct:.1f} & "
+                f"{mv_pct:.1f} & "
+                f"{delta_val:+.1f} & "
+                f"{wrist_sv:.0f} / {wrist_mv:.0f} \\\\"
             )
-        mean_delta = np.mean([float(d["delta_fully_correct_pct"]) for d in delta_rows])
+        mean_delta = np.mean([float(d.get("delta_grasp_correct_pct",
+                                           d.get("delta_fully_correct_pct", 0)))
+                              for d in delta_rows])
         lines.extend([
             r"\midrule",
             f"\\textbf{{Mean}} & & & {mean_delta:+.1f} \\\\",
             r"\bottomrule",
             r"\end{tabular}",
-            r"\caption{Test 1b: Intent precision $\Delta$ (multi-view $-$ single-view). MAR $> 0$\,\%, IDE $\geq 10$\,\%.}",
+            r"\caption{Test 1b: Intent precision $\Delta$ (multi-view $-$ single-view). "
+            r"Grasp type correctness. MAR $> 0$\,\%, IDE $\geq 10$\,\%. "
+            r"Wrist Err shows SV / MV mean orientation error.}",
             r"\label{tab:test1_delta}",
             r"\end{table}",
         ])
@@ -426,20 +654,24 @@ def main():
     occlusion_rows = _load_csv(os.path.join(RESULTS_DIR, "occlusion_results.csv"))
     summary_rows = _load_csv(os.path.join(RESULTS_DIR, "intent_precision_summary.csv"))
     delta_rows = _load_csv(os.path.join(RESULTS_DIR, "intent_precision_delta.csv"))
+    tier_b_rows = _load_csv(os.path.join(RESULTS_DIR, "tier_b_latency_results.csv"))
 
     print(f"  Latency rows: {len(latency_rows)}")
     print(f"  Occlusion rows: {len(occlusion_rows)}")
     print(f"  Summary rows: {len(summary_rows)}")
     print(f"  Delta rows: {len(delta_rows)}")
+    print(f"  Tier B rows: {len(tier_b_rows)}")
 
     print("\nGenerating figures...")
     plot_latency_boxplot(latency_rows, args.format, args.dpi)
     plot_latency_summary(latency_rows, args.format, args.dpi)
     plot_intent_precision(summary_rows, delta_rows, args.format, args.dpi)
     plot_intent_delta(delta_rows, args.format, args.dpi)
+    plot_wrist_error_cdf(occlusion_rows, summary_rows, args.format, args.dpi)
     plot_pose_error_scatter(occlusion_rows, args.format, args.dpi)
     plot_cloud_coverage(occlusion_rows, args.format, args.dpi)
-    generate_latex_table(latency_rows, delta_rows)
+    plot_tier_ab_latency(latency_rows, tier_b_rows, args.format, args.dpi)
+    generate_latex_table(latency_rows, delta_rows, summary_rows)
 
     print(f"\nDone. Figures in: {FIGURES_DIR}")
 

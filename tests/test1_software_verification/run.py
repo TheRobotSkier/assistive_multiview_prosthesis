@@ -23,10 +23,11 @@ Inside Docker:
 import argparse
 import csv
 import json
-import multiprocessing
 import os
 import subprocess
 import sys
+import tempfile
+import textwrap
 import time
 
 import numpy as np
@@ -77,72 +78,67 @@ def _write_csv(path: str, rows: list[dict], fieldnames: list[str] | None = None)
 
 
 # ---------------------------------------------------------------------------
-# Baseline computation (runs in subprocess with different config)
+# Baseline computation (runs in a fresh subprocess with different config)
 # ---------------------------------------------------------------------------
 
-def _run_baseline_worker(obj_name: str, cloud_path: str, approach_json: str,
-                         config_path: str, results_dir: str, n_reps: int = 5):
-    """Worker function for baseline computation (runs in subprocess).
+# Inline script template for the baseline subprocess.
+# This runs in a FRESH Python process so that the Rust .so's OnceLock
+# picks up GRASP_CONFIG_PATH before any Rust code initializes.
+_BASELINE_SCRIPT = textwrap.dedent("""\
+    import sys, os, json
+    import numpy as np
 
-    Runs n_reps repetitions with the high-fidelity config and aggregates
-    results to produce a stable ground truth.
-    """
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    # Set config BEFORE importing ffi_bridge (which loads the Rust .so)
     os.environ["GRASP_CONFIG_PATH"] = config_path
+    sys.path.insert(0, script_dir)
 
-    # Force reload by importing fresh
-    import importlib
-    import ffi_bridge as fb
-    importlib.reload(fb)
-
+    from ffi_bridge import (
+        GraspLibrary, make_pose, make_twist, make_request, response_to_dict,
+    )
     from object_registry import load_object
     from hand_approaches import get_approach
 
     approach = json.loads(approach_json)
     obj = load_object(obj_name)
-    lib = fb.GraspLibrary()
+    lib = GraspLibrary()
 
-    pose = fb.make_pose(**approach["pose"])
-    twist = fb.make_twist(**approach["twist"])
-
-    # Baseline uses the FULL point cloud (no occlusion)
+    pose = make_pose(**approach["pose"])
+    twist = make_twist(**approach["twist"])
     cloud = obj["points"]
-    cameras = [(0.0, 0.0, 0.0)]  # placeholder — baseline uses full cloud
+    cameras = [(0.0, 0.0, 0.0)]  # placeholder -- baseline uses full cloud
 
-    # Run multiple repetitions and aggregate
     runs = []
     for i in range(n_reps):
-        req = fb.make_request(pose, twist, cloud, cameras)
+        req = make_request(pose, twist, cloud, cameras)
         status, resp, msg = lib.compute(req)
-        result = fb.response_to_dict(resp)
+        result = response_to_dict(resp)
         result["status"] = status
         result["message"] = msg
         runs.append(result)
 
-    # Aggregate: consensus grasp type + median pose
     successful = [r for r in runs if r["success"]]
     if not successful:
-        agg = runs[0]  # fallback
+        agg = runs[0]
         agg["object"] = obj_name
         agg["condition"] = "baseline"
         agg["n_baseline_reps"] = n_reps
         agg["n_successful"] = 0
     else:
-        # Grasp type = mode
         from collections import Counter
         grasp_counts = Counter(r["grasp_type_name"] for r in successful)
         best_grasp = grasp_counts.most_common(1)[0][0]
-        best_grasp_type = next(r["grasp_type"] for r in successful if r["grasp_type_name"] == best_grasp)
-
-        # Target pose = median of successful runs
-        targets = np.array([[r["target_px"], r["target_py"], r["target_pz"]] for r in successful])
-        quats = np.array([[r["wrist_qx"], r["wrist_qy"], r["wrist_qz"], r["wrist_qw"]] for r in successful])
+        best_grasp_type = next(
+            r["grasp_type"] for r in successful if r["grasp_type_name"] == best_grasp
+        )
+        targets = np.array(
+            [[r["target_px"], r["target_py"], r["target_pz"]] for r in successful]
+        )
+        quats = np.array(
+            [[r["wrist_qx"], r["wrist_qy"], r["wrist_qz"], r["wrist_qw"]] for r in successful]
+        )
         median_target = np.median(targets, axis=0)
-        median_quat = quats[np.argmax(np.abs(quats @ np.median(quats, axis=0)))]  # closest to median
-
-        # Score = max
+        median_quat = quats[np.argmax(np.abs(quats @ np.median(quats, axis=0)))]
         best_score = max(r["combined_score"] for r in successful)
-
         agg = {
             "object": obj_name,
             "condition": "baseline",
@@ -162,38 +158,76 @@ def _run_baseline_worker(obj_name: str, cloud_path: str, approach_json: str,
             "pipeline_time_ms": max(r["pipeline_time_ms"] for r in successful),
         }
 
-    # Write to temp file
-    tmp_path = os.path.join(results_dir, f"_baseline_{obj_name}.json")
-    with open(tmp_path, "w") as f:
+    with open(output_path, "w") as f:
         json.dump(agg, f)
+""")
 
 
-def compute_baseline(obj_name: str, approach: dict, results_dir: str) -> dict | None:
-    """Run baseline computation in a subprocess with the high-fidelity config."""
+def compute_baseline(
+    obj_name: str,
+    approach: dict,
+    results_dir: str,
+    timeout: int = 120,
+    n_reps: int = 5,
+) -> dict | None:
+    """Run baseline computation in a fresh subprocess with the high-fidelity config.
+
+    Uses subprocess.Popen (not multiprocessing.Process) to avoid fork()-related
+    issues with the Rust .so's OnceLock config singleton.
+    """
     config_path = os.path.join(CONFIG_DIR, "grasp_preshaping_baseline.yaml")
     approach_json = json.dumps(approach)
+    output_path = os.path.join(results_dir, f"_baseline_{obj_name}.json")
 
-    proc = multiprocessing.Process(
-        target=_run_baseline_worker,
-        args=(obj_name, "", approach_json, config_path, results_dir, 5),
-    )
-    proc.start()
-    proc.join(timeout=600)  # 10 min timeout (5 reps × ~600ms each)
+    # Pass variables into the inline script via a namespace dict
+    script = _BASELINE_SCRIPT
+    namespace = {
+        "config_path": config_path,
+        "script_dir": SCRIPT_DIR,
+        "approach_json": approach_json,
+        "obj_name": obj_name,
+        "n_reps": n_reps,
+        "output_path": output_path,
+    }
 
-    if proc.is_alive():
-        proc.terminate()
-        proc.join()
-        print(f"    WARNING: Baseline for {obj_name} timed out")
+    # Build the script with variable assignments prepended
+    header_lines = [
+        f"{k} = {repr(v)}" for k, v in namespace.items()
+    ]
+    full_script = "\n".join(header_lines) + "\n" + script
+
+    start = time.time()
+    try:
+        proc = subprocess.Popen(
+            [sys.executable, "-c", full_script],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = proc.communicate(timeout=timeout)
+        elapsed = time.time() - start
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.communicate()
+        elapsed = time.time() - start
+        print(f"TIMEOUT after {elapsed:.0f}s")
         return None
 
-    tmp_path = os.path.join(results_dir, f"_baseline_{obj_name}.json")
-    if not os.path.isfile(tmp_path):
-        print(f"    WARNING: Baseline for {obj_name} produced no output")
+    if proc.returncode != 0:
+        err_msg = stderr.decode("utf-8", errors="replace")[-500:]
+        print(f"FAILED (exit {proc.returncode}, {elapsed:.0f}s)")
+        if err_msg.strip():
+            print(f"    stderr: {err_msg}")
         return None
 
-    with open(tmp_path) as f:
+    if not os.path.isfile(output_path):
+        print(f"FAILED (no output file, {elapsed:.0f}s)")
+        return None
+
+    with open(output_path) as f:
         result = json.load(f)
-    os.remove(tmp_path)
+    os.remove(output_path)
+
+    result["_elapsed_s"] = elapsed
     return result
 
 
@@ -266,7 +300,8 @@ def run_latency_test(lib: GraspLibrary, objects: list[str],
 
 def run_occlusion_test(lib: GraspLibrary, objects: list[str],
                        repetitions: int = 10,
-                       compute_baselines: bool = True) -> list[dict]:
+                       compute_baselines: bool = True,
+                       baseline_timeout: int = 120) -> list[dict]:
     """Compare single-view vs. multi-view grasp quality.
 
     For each object, three conditions:
@@ -292,11 +327,16 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
                 print(f" SKIP (no approach)")
                 continue
 
-            result = compute_baseline(obj_name, approach, RESULTS_DIR)
+            result = compute_baseline(
+                obj_name, approach, RESULTS_DIR,
+                timeout=baseline_timeout,
+            )
             if result and result.get("success"):
                 baselines[obj_name] = result
+                elapsed = result.get("_elapsed_s", 0)
                 print(f" OK ({result['pipeline_time_ms']} ms, "
-                      f"grasp={result['grasp_type_name']})")
+                      f"grasp={result['grasp_type_name']}, "
+                      f"wall={elapsed:.1f}s)")
             else:
                 msg = result.get("message", "unknown") if result else "timeout"
                 print(f" FAILED ({msg})")
@@ -436,12 +476,13 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
 def compute_intent_precision(rows: list[dict]) -> list[dict]:
     """Compute per-object intent precision metrics for the occlusion test.
 
-    Uses multiple criteria with relaxed thresholds appropriate for a
-    stochastic SMC planner:
-      - Grasp type match: matches the baseline consensus
-      - Position error: < 30 mm (relaxed from 10 mm)
-      - Orientation error: < 45 deg (relaxed from 15 deg)
-      - Score improvement: multi-view mean score vs. single-view
+    Primary metric (Req 2.7): grasp type correctness — does the predicted
+    grasp type match the baseline consensus? This is the "fully correct"
+    metric for intent precision.
+
+    Secondary metrics (logged, not scored):
+      - Wrist rotation error: mean angular distance from baseline (degrees)
+      - Position error: mean Euclidean distance from baseline target (mm)
     """
     summary = []
 
@@ -478,19 +519,17 @@ def compute_intent_precision(rows: list[dict]) -> list[dict]:
             n_pos_ok = sum(
                 1 for r in cond_rows if r.get("position_error_mm", 999) < 30
             )
-            n_fully_correct = sum(
-                1 for r in cond_rows
-                if r.get("grasp_type_match", False)
-                and r.get("orientation_error_deg", 999) < 45
-                and r.get("position_error_mm", 999) < 30
-            )
 
             scores = [r["combined_score"] for r in cond_rows]
             mean_score = np.mean(scores)
             max_score = np.max(scores)
             mean_pos_err = np.mean([r.get("position_error_mm", float("nan")) for r in cond_rows])
             mean_orient_err = np.mean([r.get("orientation_error_deg", float("nan")) for r in cond_rows])
+            median_orient_err = np.median([r.get("orientation_error_deg", float("nan")) for r in cond_rows])
             mean_time = np.mean([r["pipeline_time_ms"] for r in cond_rows])
+
+            # Collect per-repetition wrist errors for CDF analysis
+            wrist_errors = [r.get("orientation_error_deg", float("nan")) for r in cond_rows]
 
             summary.append({
                 "object": obj_name,
@@ -498,15 +537,20 @@ def compute_intent_precision(rows: list[dict]) -> list[dict]:
                 "n_repetitions": n_total,
                 "n_successful": n_success,
                 "success_rate_pct": n_success / n_total * 100 if n_total > 0 else 0,
+                # Primary metric: grasp type correctness
+                "grasp_correct_pct": n_grasp_match / n_total * 100 if n_total > 0 else 0,
+                # Secondary metrics (diagnostic)
                 "grasp_accuracy_pct": n_grasp_match / n_total * 100 if n_total > 0 else 0,
                 "orientation_accuracy_pct": n_orient_ok / n_total * 100 if n_total > 0 else 0,
                 "position_accuracy_pct": n_pos_ok / n_total * 100 if n_total > 0 else 0,
-                "fully_correct_pct": n_fully_correct / n_total * 100 if n_total > 0 else 0,
                 "mean_score": mean_score,
                 "max_score": max_score,
                 "mean_position_error_mm": mean_pos_err,
                 "mean_orientation_error_deg": mean_orient_err,
+                "median_orientation_error_deg": median_orient_err,
                 "mean_time_ms": mean_time,
+                # Per-repetition wrist errors (JSON for CSV storage)
+                "wrist_errors_json": json.dumps(wrist_errors),
             })
 
     # Compute Delta (multi_view - single_view) per object
@@ -518,15 +562,18 @@ def compute_intent_precision(rows: list[dict]) -> list[dict]:
             sv, mv = sv[0], mv[0]
             delta_rows.append({
                 "object": obj_name,
-                "delta_fully_correct_pct": mv["fully_correct_pct"] - sv["fully_correct_pct"],
+                # Primary delta: grasp correctness
+                "delta_grasp_correct_pct": mv["grasp_correct_pct"] - sv["grasp_correct_pct"],
+                # Legacy field kept for backward compat
+                "delta_fully_correct_pct": mv["grasp_correct_pct"] - sv["grasp_correct_pct"],
                 "delta_grasp_accuracy_pct": mv["grasp_accuracy_pct"] - sv["grasp_accuracy_pct"],
                 "delta_success_rate_pct": mv["success_rate_pct"] - sv["success_rate_pct"],
                 "delta_position_error_mm": sv["mean_position_error_mm"] - mv["mean_position_error_mm"],
                 "delta_orientation_error_deg": sv["mean_orientation_error_deg"] - mv["mean_orientation_error_deg"],
                 "delta_score": mv["mean_score"] - sv["mean_score"],
                 "delta_max_score": mv["max_score"] - sv["max_score"],
-                "single_view_fully_correct_pct": sv["fully_correct_pct"],
-                "multi_view_fully_correct_pct": mv["fully_correct_pct"],
+                "single_view_grasp_correct_pct": sv["grasp_correct_pct"],
+                "multi_view_grasp_correct_pct": mv["grasp_correct_pct"],
                 "single_view_success_rate_pct": sv["success_rate_pct"],
                 "multi_view_success_rate_pct": mv["success_rate_pct"],
             })
@@ -550,10 +597,12 @@ def main():
                         help="Skip baseline computation (use previous results)")
     parser.add_argument("--objects", nargs="+", default=None,
                         help="Specific objects to test (default: all)")
-    parser.add_argument("--repetitions", type=int, default=10,
-                        help="Number of repetitions per condition (default: 10)")
+    parser.add_argument("--repetitions", type=int, default=30,
+                        help="Number of repetitions per condition (default: 30)")
     parser.add_argument("--debug", action="store_true",
                         help="Enable debug visualization dumps")
+    parser.add_argument("--baseline-timeout", type=int, default=120,
+                        help="Per-object baseline timeout in seconds (default: 120)")
     args = parser.parse_args()
 
     _ensure_dirs()
@@ -615,6 +664,7 @@ def main():
         occlusion_rows = run_occlusion_test(
             lib, objects, args.repetitions,
             compute_baselines=not args.no_baseline,
+            baseline_timeout=args.baseline_timeout,
         )
         _write_csv(
             os.path.join(RESULTS_DIR, "occlusion_results.csv"),
@@ -640,20 +690,19 @@ def main():
                 print("=" * 60)
                 for d in delta:
                     print(f"  {d['object']:25s}: "
-                          f"Δ_correct={d['delta_fully_correct_pct']:+.1f}%, "
-                          f"Δ_score={d['delta_score']:+.3f}, "
-                          f"Δ_success={d['delta_success_rate_pct']:+.1f}%")
+                          f"\u0394_grasp_correct={d['delta_grasp_correct_pct']:+.1f}%, "
+                          f"\u0394_score={d['delta_score']:+.3f}, "
+                          f"\u0394_success={d['delta_success_rate_pct']:+.1f}%")
 
                 # Overall metrics
-                mean_delta_correct = np.mean([d["delta_fully_correct_pct"] for d in delta])
+                mean_delta_correct = np.mean([d["delta_grasp_correct_pct"] for d in delta])
                 mean_delta_score = np.mean([d["delta_score"] for d in delta])
                 mean_delta_success = np.mean([d["delta_success_rate_pct"] for d in delta])
-                print(f"\n  Mean Δ (fully correct): {mean_delta_correct:+.1f}%")
-                print(f"  Mean Δ (score):         {mean_delta_score:+.4f}")
-                print(f"  Mean Δ (success rate):  {mean_delta_success:+.1f}%")
-                print(f"  MAR threshold: > 0%  →  {'PASS' if mean_delta_correct > 0 else 'FAIL'}")
-                print(f"  IDE threshold: ≥ 10%  →  {'PASS' if mean_delta_correct >= 10 else 'FAIL'}")
-
+                print(f"\n  Mean \u0394 (grasp correct): {mean_delta_correct:+.1f}%")
+                print(f"  Mean \u0394 (score):         {mean_delta_score:+.4f}")
+                print(f"  Mean \u0394 (success rate):  {mean_delta_success:+.1f}%")
+                print(f"  MAR threshold: > 0%  \u2192  {'PASS' if mean_delta_correct > 0 else 'FAIL'}")
+                print(f"  IDE threshold: \u2265 10%  \u2192  {'PASS' if mean_delta_correct >= 10 else 'FAIL'}")
     # --- Latency summary ---
     if run_latency and latency_rows:
         print("\n" + "=" * 60)

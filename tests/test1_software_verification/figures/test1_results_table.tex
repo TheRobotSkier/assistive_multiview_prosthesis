@@ -24,24 +24,24 @@ thin\_plate & 29.5 & 148.6 & 156.9 & \textcolor{green!60!black}{\checkmark} \\
 \begin{table}[H]
 \centering
 \small
-\begin{tabular}{l r r r}
+\begin{tabular}{l r r r r}
 \toprule
-\textbf{Object} & \textbf{SV (\%)} & \textbf{MV (\%)} & \textbf{$\Delta$ (\%)} \\
+\textbf{Object} & \textbf{SV (\%)} & \textbf{MV (\%)} & \textbf{$\Delta$ (\%)} & \textbf{Wrist Err (deg)} \\
 \midrule
-banana & 0.0 & 0.0 & +0.0 \\
-cylinder\_tilted & 0.0 & 0.0 & +0.0 \\
-cylinder\_upright & 0.0 & 0.0 & +0.0 \\
-ellipsoid & 0.0 & 10.0 & +10.0 \\
-l\_block & 0.0 & 0.0 & +0.0 \\
-mug & 0.0 & 0.0 & +0.0 \\
-power\_drill & 0.0 & 0.0 & +0.0 \\
-small\_cube & 0.0 & 0.0 & +0.0 \\
-tapered\_bottle & 0.0 & 0.0 & +0.0 \\
-thin\_plate & 0.0 & 0.0 & +0.0 \\
+banana & 0.0 & 0.0 & +0.0 & 57 / 89 \\
+cylinder\_tilted & 0.0 & 0.0 & +0.0 & 96 / 72 \\
+cylinder\_upright & 0.0 & 0.0 & +0.0 & 88 / 98 \\
+ellipsoid & 0.0 & 10.0 & +10.0 & 112 / 111 \\
+l\_block & 0.0 & 0.0 & +0.0 & 98 / 95 \\
+mug & 0.0 & 0.0 & +0.0 & 81 / 102 \\
+power\_drill & 0.0 & 0.0 & +0.0 & 97 / 59 \\
+small\_cube & 0.0 & 0.0 & +0.0 & 43 / 78 \\
+tapered\_bottle & 0.0 & 0.0 & +0.0 & 106 / 96 \\
+thin\_plate & 0.0 & 0.0 & +0.0 & 93 / 93 \\
 \midrule
 \textbf{Mean} & & & +1.0 \\
 \bottomrule
 \end{tabular}
-\caption{Test 1b: Intent precision $\Delta$ (multi-view $-$ single-view). MAR $> 0$\,\%, IDE $\geq 10$\,\%.}
+\caption{Test 1b: Intent precision $\Delta$ (multi-view $-$ single-view). Grasp type correctness. MAR $> 0$\,\%, IDE $\geq 10$\,\%. Wrist Err shows SV / MV mean orientation error.}
 \label{tab:test1_delta}
 \end{table}
