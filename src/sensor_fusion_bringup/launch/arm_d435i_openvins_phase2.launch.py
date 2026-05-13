@@ -1,12 +1,10 @@
-"""OpenVINS Phase 2 launch for ARM D435i camera (serial 841612071768).
+"""OpenVINS Phase 2 launch for ARM D435i camera (serial 310622071850).
 
 Camera: Intel RealSense D435i (built-in IMU) at arm mount.
 IMU:    D435i built-in, united at 200 Hz on /arm/d435i_arm/imu.
 Camera name convention matches cameras container: namespace=arm, name=d435i_arm.
 
-Calibration is a placeholder from arm_d435i_310622071850 (same model, different unit).
-Replace config/openvins/arm_d435i_841612071768/ with a proper Kalibr calibration run
-once available.
+Calibration in config/openvins/arm_d435i_310622071850/ is the original Kalibr run for this unit.
 
 When start_camera:=false, only launches the OpenVINS estimator node (for use
 alongside the cameras container which already publishes the camera topics).
@@ -31,7 +29,7 @@ def generate_launch_description():
         FindPackageShare("sensor_fusion_bringup"),
         "config",
         "openvins",
-        "arm_d435i_841612071768",
+        "arm_d435i_310622071850",
         "estimator_config.yaml",
     ])
 
@@ -41,7 +39,7 @@ def generate_launch_description():
         launch_arguments={
             "camera_namespace": "arm",
             "camera_name": "d435i_arm",
-            "serial_no": "_841612071768",
+            "serial_no": "_310622071850",
             "enable_color": "true",
             "rgb_camera.color_profile": "640x480x30",
             "enable_gyro": "true",

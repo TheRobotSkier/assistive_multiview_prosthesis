@@ -1,0 +1,50 @@
+%YAML:1.0
+# IMU calibration for Intel RealSense D435i built-in IMU (serial 310622071850) at ARM mount.
+# Original Kalibr calibration run — these are the real measured values.
+# rostopic: /arm/d435i_arm/imu  (D435i built-in IMU, united at 200 Hz)
+
+imu0:
+  T_i_b:
+    - [1.0, 0.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+
+  accelerometer_noise_density: 0.010805145755125
+  accelerometer_random_walk: 0.0003854976741129608
+  gyroscope_noise_density: 0.0025606617446109967
+  gyroscope_random_walk: 1.507779944779771e-05
+
+  rostopic: /arm/d435i_arm/imu
+  time_offset: 0.0
+  update_rate: 200
+
+  # OpenVINS IMU intrinsic model.
+  # We did not calibrate IMU intrinsics, so use identity scale/misalignment
+  # and zero gyro g-sensitivity.
+  model: "kalibr"
+
+  Tw:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+
+  Ta:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+
+  R_IMUtoACC:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+
+  R_IMUtoGYRO:
+    - [1.0, 0.0, 0.0]
+    - [0.0, 1.0, 0.0]
+    - [0.0, 0.0, 1.0]
+
+  Tg:
+    - [0.0, 0.0, 0.0]
+    - [0.0, 0.0, 0.0]
+    - [0.0, 0.0, 0.0]

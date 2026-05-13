@@ -7,7 +7,7 @@ cameras:
   arm:
     namespace: arm
     name: d435i_arm
-    serial_no: "_841612071768"
+    serial_no: "_310622071850"
     mount_location: prosthetic_arm
 
 common:
