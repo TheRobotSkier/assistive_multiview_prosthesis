@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-static rviz-static-kill robotlab-view robotlab-stop
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-static rviz-static-kill robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -170,3 +170,38 @@ robotlab-view: rviz
 
 robotlab-stop: rviz-kill
 	@echo "Robotlab view stopped."
+
+# ── Jetson deploy (git-push based sync over Ethernet) ────────────────────
+# JETSON_HOST must be reachable via SSH (see ~/.ssh/config for 'robotlab').
+# The Jetson pulls from a bare repo here via the post-receive hook.
+
+JETSON_HOST       := robotlab
+JETSON_DEPLOY_DIR := /home/robotlab/multiview_prosthesis
+JETSON_BARE_REPO  := /home/robotlab/multiview_prosthesis.git
+JETSON_BRANCH     := full_test_implementation
+
+# One-time setup: creates bare repo + checkout hook on Jetson, adds git remote.
+jetson-setup:
+	@echo "Setting up git deploy repo on Jetson (one-time)..."
+	ssh $(JETSON_HOST) 'mkdir -p $(JETSON_DEPLOY_DIR) && git init --bare $(JETSON_BARE_REPO)'
+	ssh $(JETSON_HOST) 'printf "#!/bin/bash\nGIT_WORK_TREE=$(JETSON_DEPLOY_DIR) git --git-dir=$(JETSON_BARE_REPO) checkout -f $(JETSON_BRANCH)\n" > $(JETSON_BARE_REPO)/hooks/post-receive && chmod +x $(JETSON_BARE_REPO)/hooks/post-receive'
+	git remote add jetson $(JETSON_HOST):$(JETSON_BARE_REPO) 2>/dev/null || git remote set-url jetson $(JETSON_HOST):$(JETSON_BARE_REPO)
+	git push jetson $(JETSON_BRANCH)
+	@echo "Jetson deploy ready. Use 'make jetson-sync' to push future changes."
+
+# Push committed changes on this branch to the Jetson (triggers checkout).
+jetson-sync:
+	git push jetson $(JETSON_BRANCH)
+
+# Sync → start cameras on Jetson → start RViz locally.
+# Commit your changes before running this.
+jetson-cameras: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras"
+	$(MAKE) rviz-static
+
+jetson-cameras-stop:
+	-ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras-stop"
+	$(MAKE) rviz-static-kill
+
+jetson-cameras-logs:
+	ssh $(JETSON_HOST) "echo robotlab | sudo -S docker logs -f cameras_test"
