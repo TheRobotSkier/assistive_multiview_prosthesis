@@ -1,0 +1,124 @@
+aruco:
+  dictionary: DICT_6X6_1000
+
+  # Final prosthesis setup uses the measured printed marker size.
+  # Use a size-specific config for old replay bags or larger bench-test prints.
+  default_marker_size_m: 0.100
+
+frames:
+  map_frame: marker_map
+  # Frame published by the RealSense node for arm camera (namespace=arm, name=d435i_arm).
+  camera_frame: arm_d435i_arm_color_optical_frame
+  detected_camera_frame: arm_d435i_arm_color_optical_frame
+  # Must match the Phase 2 OpenVINS launch marker_target_frame / imu_frame_id.
+  imu_frame: arm_imu
+
+# OpenVINS/Kalibr camera-IMU calibration.
+# This gives the node camera intrinsics, distortion, and T_cam_imu.
+# Path is the container-internal path inside the openVINS overlay volume mount.
+calibration:
+  kalibr_imucam_chain: /ovins_overlay/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/arm_d435i_841612071768/kalibr_imucam_chain.yaml
+
+topics:
+  image: /arm/d435i_arm/color/image_raw
+  openvins_odom: /ov_msckf_arm/odomimu
+  output_prefix: /arm/marker_pose
+
+timing:
+  max_odom_match_dt: 0.05
+  odom_buffer_seconds: 5.0
+  publish_uncorrected_before_lock: false
+
+quality:
+  min_marker_area_px2: 800.0
+  max_marker_distance_m: 2.0
+  stable_frames_required: 8
+  max_marker_translation_jump_m: 0.20
+  max_marker_rotation_jump_deg: 15.0
+  max_reprojection_error_px: 3.0
+  border_margin_px: 8.0
+  min_corner_angle_deg: 25.0
+  max_corner_angle_deg: 155.0
+  min_border_geometry_score: 0.35
+
+correction:
+  enabled: true
+  enable_periodic_marker_correction: true
+  periodic_correction_interval_s: 1.0
+  reanchor_cooldown_s: 3.0
+  max_periodic_translation_correction_m: 0.10
+  max_periodic_rotation_correction_deg: 5.0
+  correction_chi2_gate: 16.8
+  max_position_correction_step_m: 0.05
+  max_rotation_correction_step_deg: 2.0
+
+covariance:
+  initial_correction_std_m: 0.20
+  initial_correction_std_deg: 20.0
+
+  # Legacy scalar floors/caps remain as fallbacks for configs that do not set
+  # the axis-specific model below.
+  min_marker_position_std_m: 0.02
+  max_marker_position_std_m: 0.75
+  min_marker_rotation_std_deg: 2.0
+  max_marker_rotation_std_deg: 45.0
+  marker_covariance_area_ref_px2: 10000.0
+
+  # Marker-derived 6D covariance model. The node estimates uncertainty in the
+  # camera optical frame, rotates it into marker_map, and publishes the diagonal
+  # x/y/z/roll/pitch/yaw covariance.
+  corner_noise_floor_px: 0.35
+  max_view_angle_deg: 75.0
+  max_view_penalty: 4.0
+  min_marker_xy_std_m: 0.02
+  min_marker_z_std_m: 0.025
+  max_marker_xy_std_m: 0.75
+  max_marker_z_std_m: 0.75
+  min_marker_roll_pitch_std_deg: 2.0
+  min_marker_yaw_std_deg: 2.0
+  max_marker_roll_pitch_std_deg: 45.0
+  max_marker_yaw_std_deg: 45.0
+  marker_xy_std_px_gain: 8.0
+  marker_z_std_px_gain: 2.0
+  marker_roll_pitch_std_px_gain: 5.0
+  marker_yaw_std_px_gain: 3.0
+  temporal_missing_position_std_m: 0.05
+  temporal_missing_rotation_std_deg: 8.0
+  temporal_correction_position_gain: 0.50
+  temporal_correction_rotation_gain: 0.50
+  geometry_position_std_m: 0.03
+  geometry_rotation_std_deg: 5.0
+
+  correction_position_growth_std_mps: 0.03
+  correction_rotation_growth_std_degps: 2.0
+  high_position_std_m: 2.0
+  high_rotation_std_deg: 90.0
+
+twist:
+  zero_twist_on_large_reanchor: true
+  large_reanchor_translation_m: 0.5
+  large_reanchor_rotation_deg: 20.0
+  marker_velocity_enabled: false
+  post_reanchor_settle_s: 0.5
+  high_twist_std: 10.0
+
+vio_health:
+  max_position_norm_m: 5.0
+  max_linear_velocity_mps: 2.0
+  max_pose_covariance_trace: 10.0
+
+markers:
+  0:
+    frame_id: marker_0
+    size_m: 0.100
+
+    # T_map_marker maps marker_0 coordinates into marker_map.
+    # Empirical axis correction from live validation:
+    #   previous output axes behaved as x=right, y=down, z=depth.
+    #   desired marker_map uses new_x=old_x, new_y=old_z, new_z=-old_y.
+    # With RViz Fixed Frame=marker_map, physical upward motion must increase z.
+    T_map_marker:
+      - [1.0, 0.0, 0.0, 0.0]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, -1.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]

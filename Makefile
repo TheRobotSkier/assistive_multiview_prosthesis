@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -217,3 +217,48 @@ jetson-cameras-logs: robotlab-connect
 
 jetson-list-cameras: robotlab-connect
 	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make list-cameras"
+
+# ── Jetson OpenVINS (cameras + VIO containers + host RViz) ───────────────────
+# Syncs the repo, starts both Jetson containers, and opens the Phase 2 RViz.
+# Requires the overlay to already be at /home/robotlab/openvins_overlay/install_overlay/
+# on the Jetson (rsynced separately — it is not in git).
+jetson-openvins: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras && make openvins"
+	$(MAKE) rviz-openvins
+
+jetson-openvins-stop: robotlab-connect
+	-ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make openvins-stop && make cameras-stop"
+	$(MAKE) rviz-openvins-kill
+
+jetson-openvins-logs: robotlab-connect
+	ssh $(JETSON_HOST) "echo robotlab | sudo -S docker logs -f openvins"
+
+# ── Phase 2 RViz (OpenVINS TF + pointclouds) ─────────────────────────────────
+rviz-openvins:
+	@echo "Launching Phase 2 RViz (OpenVINS marker_map frame)"
+	@test -f rviz/phase2_dual_openvins.rviz || { echo "Missing rviz/phase2_dual_openvins.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	xhost +
+	podman run --rm -d --name rviz-openvins \
+		--network host \
+		--ipc host \
+		--device /dev/dri \
+		--userns=keep-id \
+		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
+		-v $(CURDIR)/rviz/phase2_dual_openvins.rviz:/rviz_config.rviz:ro \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "Phase 2 RViz started (rviz-openvins). Kill with: make rviz-openvins-kill"
+
+rviz-openvins-kill:
+	-podman kill rviz-openvins 2>/dev/null
+	-podman rm rviz-openvins 2>/dev/null
+	@echo "Phase 2 RViz stopped."
