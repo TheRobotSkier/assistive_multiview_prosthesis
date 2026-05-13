@@ -269,3 +269,5 @@ python3 -c "import ctypes; so = ctypes.CDLL('/prosthesis_ws/install/grasp_presha
 
 # 3. Run the Tier B test (in a second shell after launching mock pipeline):
 python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py --method service
+
+ros2 launch prosthesis_launch mock.launch.py

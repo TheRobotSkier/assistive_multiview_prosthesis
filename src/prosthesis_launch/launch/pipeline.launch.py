@@ -2,15 +2,16 @@
 
 Launches the complete prosthesis pipeline:
   1. Mia Hand driver (serial)
-  2. Wrist Dynamixel driver
-  3. EMG bridge (MindRove)
-  4. Segmentation ROS bridge
-  5. Twist propagation target selector
-  6. Grasp preshaping service
-  7. Grasp proximity controller
-  8. Force controller
-  9. Pipeline manager (state machine)
-  10. RViz
+  2. Command bridge (forwards ros2_control topics to driver services)
+  3. Wrist Dynamixel driver
+  4. EMG bridge (MindRove)
+  5. Segmentation ROS bridge
+  6. Twist propagation target selector
+  7. Grasp preshaping service
+  8. Grasp proximity controller
+  9. Force controller
+  10. Pipeline manager (state machine)
+  11. RViz
 
 Usage:
   ros2 launch pipeline.launch.py
@@ -65,6 +66,16 @@ def generate_launch_description():
         executable="mia_hand_driver_node",
         name="mia_hand_driver",
         parameters=[{"serial_port": "/dev/ttyUSB0"}],
+        output="screen",
+    )
+
+    # Command Bridge — forwards *_pos_ff_controller/commands to driver services
+    # and republishes joint positions as /joint_states
+    command_bridge = Node(
+        package="command_bridge",
+        executable="command_bridge_node",
+        name="command_bridge",
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -138,6 +149,8 @@ def generate_launch_description():
     # Assemble launch
     nodes = [
         pipeline_manager,
+        mia_hand_driver,
+        command_bridge,
         emg_bridge,
         segmentation_bridge,
         twist_propagation,
@@ -149,7 +162,6 @@ def generate_launch_description():
     # Conditional nodes - always included, can be toggled
     # (Launch system doesn't support true conditionals easily,
     #  so we include them and let the nodes handle missing hardware)
-    nodes.append(mia_hand_driver)
 
     # RViz - included by default
     nodes.append(rviz)

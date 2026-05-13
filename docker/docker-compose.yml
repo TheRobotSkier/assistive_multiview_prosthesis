@@ -25,6 +25,7 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
     network_mode: host
+    userns_mode: "keep-id"
     volumes:
       # X11 forwarding (works on Linux and WSL2 with WSLg)
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
@@ -58,7 +59,6 @@ services:
   # ── Test runner: reuses prosthesis image, runs smoke tests, exits ────────
   test:
     image: prosthesis:latest
-    user: "0:0"
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0

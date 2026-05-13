@@ -26,6 +26,8 @@ ARG USER_GID=1000
 
 RUN if id -u ${USER_UID} >/dev/null 2>&1; then \
         EXISTING_USER=$(getent passwd ${USER_UID} | cut -d: -f1) && \
+        EXISTING_GROUP=$(getent group ${USER_GID} | cut -d: -f1) && \
+        groupmod -n prosthesis "$EXISTING_GROUP" 2>/dev/null || true && \
         usermod -l prosthesis -d /home/prosthesis -m "$EXISTING_USER" 2>/dev/null || true; \
     else \
         groupadd -g ${USER_GID} prosthesis 2>/dev/null || true && \
@@ -44,7 +46,7 @@ COPY scripts/ scripts/
 COPY tests/ tests/
 
 RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
-RUN chown -R prosthesis:prosthesis tests/
+RUN chown -R ${USER_UID}:${USER_GID} tests/
 
 # Install ROS dependencies and build
 RUN . /opt/ros/jazzy/setup.sh \

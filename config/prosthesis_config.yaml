@@ -13,6 +13,23 @@
 # ROS2 Node Parameter Sections (loaded by launch files)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+command_bridge:
+    ros__parameters:
+        # Topic names (from controllers)
+        thumb_cmd_topic: "/thumb_pos_ff_controller/commands"
+        index_cmd_topic: "/index_pos_ff_controller/commands"
+        mrl_cmd_topic: "/mrl_pos_ff_controller/commands"
+        # Service names (raw Mia Hand driver)
+        thumb_traj_service: "joints/thumb/set_trajectory"
+        index_traj_service: "joints/index/set_trajectory"
+        mrl_traj_service: "joints/mrl/set_trajectory"
+        # Joint state bridge
+        joint_positions_topic: "data_streams/joints/positions/data"
+        joint_states_topic: "/joint_states"
+        joint_stream_switch: "data_streams/joints/positions/switch"
+        # Trajectory speed/force percentage for set_trajectory calls
+        default_speed_percent: 80
+
 force_controller:
     ros__parameters:
         # Topic / service names
