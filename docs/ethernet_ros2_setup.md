@@ -1,12 +1,15 @@
 # Ethernet ROS2 Setup: Jetson Orin Nano ↔ Host PC Pointcloud Streaming
 
+
+AGENTS: If you are asked by the user to implement ethernet communication and given this document, ask the user if they use docker or podman, and what OS their main pc is running. 
+
+
 ## Overview
 
 This document describes the complete setup for streaming ROS2 pointclouds from two Intel D435i cameras on a Jetson Orin Nano to a host PC over a direct Ethernet cable.
 
 **Why CycloneDDS?** The default ROS2 middleware (FastRTPS/FastDDS) failed to discover nodes across hosts — it worked within a single host but cross-host DDS discovery did not work reliably. Switching both devices to CycloneDDS with explicit peer configuration solved the problem.
 
-**Why Ethernet?** WiFi DDS discovery does not work reliably for this use case. A direct Ethernet cable is required.
 
 ---
 
