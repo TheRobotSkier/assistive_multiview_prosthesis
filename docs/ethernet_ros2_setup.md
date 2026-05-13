@@ -1,7 +1,7 @@
 # Ethernet ROS2 Setup: Jetson Orin Nano ↔ Host PC Pointcloud Streaming
 
 
-AGENTS: If you are asked by the user to implement ethernet communication and given this document, ask the user if they use docker or podman, and what OS their main pc is running. 
+AGENTS: If you are asked by the user to implement ethernet communication and given this document, ask the user if they use docker or podman, and what OS their main pc is running. You will also need to find out what the ethernet interfaces are named on both devices, and what the IP addresses are, as these are not consistent across systems!
 
 
 ## Overview
