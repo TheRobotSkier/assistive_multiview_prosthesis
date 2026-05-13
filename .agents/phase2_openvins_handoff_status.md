@@ -42,6 +42,18 @@ Before changing or judging final behavior, verify that `/ov_msckf_arm/odomimu`,
 `/arm/marker_pose/dynamic_arm_pose_observation`, and
 `/ov_msckf_arm/dynamic_arm_update/status` overlap in a live bag.
 
+Focused ID2 arm-marker extrinsic calibration commands live here:
+
+```text
+docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_marker_id2_extrinsic_calibration_commands.md
+```
+
+Physical fixture note, 2026-05-13: the next arm-mounted ID2 fixture needs a
+redesign because the prosthesis can occlude marker ID2 from the head camera.
+Once the updated design is ready, refresh
+`config/markers/arm_marker_extrinsics.yaml` using the focused calibration
+command sheet before judging final active dynamic ID2 update/reanchor behavior.
+
 As of 2026-05-11, the Phase 2 head marker EKF path and the arm D435i Phase 2
 bringup have been committed and pushed. Latest local commit seen by Codex:
 

@@ -5,6 +5,10 @@ Marker ID `2` must stay out of the fixed marker-map EKF update path. The fixed
 marker ID `0` remains the only shared `marker_map` reference for head and arm
 OpenVINS.
 
+For the shorter future-facing command sheet used when a new physical ID2 mount
+changes the arm-camera transform, see
+`arm_marker_id2_extrinsic_calibration_commands.md`.
+
 Expected split:
 
 ```text

@@ -14,6 +14,12 @@ began. Future validation must ensure `/ov_msckf_arm/odomimu`,
 `/arm/marker_pose/dynamic_arm_pose_observation`, and
 `/ov_msckf_arm/dynamic_arm_update/status` overlap in time.
 
+Fixture caveat: the next physical arm-mounted marker ID2 fixture needs redesign
+because the prosthesis can occlude ID2 from the head camera. Once the mount is
+final, refresh `config/markers/arm_marker_extrinsics.yaml` with
+`docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_marker_id2_extrinsic_calibration_commands.md`
+before judging final active update/reanchor behavior.
+
 Use the prompt below only if the dynamic update needs replanning or major
 revision.
 

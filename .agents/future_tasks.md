@@ -23,6 +23,16 @@ Current dynamic ID2 user docs:
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_parameters.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_live_validation_commands.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_live_bag_recommendations.md`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_marker_id2_extrinsic_calibration_commands.md`
+
+Marker ID2 fixture note, 2026-05-13: the next physical ID2/arm-D435i fixture
+needs a redesign because the prosthesis can occlude the marker from the head
+camera. After the redesigned mount is ready, use the focused calibration command
+sheet above to record an observation-mode bag, update
+`config/markers/arm_marker_extrinsics.yaml`, then record an active validation
+bag with overlapping `/ov_msckf_arm/odomimu`,
+`/arm/marker_pose/dynamic_arm_pose_observation`, and
+`/ov_msckf_arm/dynamic_arm_update/status`.
 
 As of 2026-05-11, the Phase 2 head marker EKF path and arm D435i Phase 2
 bringup have been committed and pushed. Latest local commit seen by Codex:

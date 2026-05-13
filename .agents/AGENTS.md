@@ -43,6 +43,8 @@ Dynamic ID2 arm workflow:
   `multi_cam_localization/sensor_fusion_bringup/config/dynamic_id2_arm_update.yaml`
 - One-command launch:
   `multi_cam_localization/sensor_fusion_bringup/launch/dynamic_id2_arm_update_live.launch.py`
+- Focused ID2 arm-camera extrinsic calibration commands:
+  `multi_cam_localization/sensor_fusion_bringup/docs/arm_marker_id2_extrinsic_calibration_commands.md`
 - Current default is `mode: active`, which enables fixed ID0 updates/reanchor
   plus dynamic ID2 normal updates and guarded dynamic ID2 initial-lock/reanchor.
 - Roll back with `mode:=observe`, `mode:=update`, `mode:=would_reanchor`, or
@@ -51,6 +53,8 @@ Dynamic ID2 arm workflow:
 - Before treating live dynamic ID2 reanchor as validated, require a bag where
   `/ov_msckf_arm/odomimu`, `/arm/marker_pose/dynamic_arm_pose_observation`, and
   `/ov_msckf_arm/dynamic_arm_update/status` overlap.
+- The next physical ID2 fixture needs redesign due to prosthesis occlusion; refresh
+  `config/markers/arm_marker_extrinsics.yaml` after the mount is final.
 
 Phase 1 marker correction is external only. Do not modify the OpenVINS internal
 EKF until the external marker-corrected odom path is validated and committed.
