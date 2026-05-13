@@ -17,7 +17,7 @@ CYCLONE_CFG := $(CURDIR)/config/cyclonedds_robotlab.xml
 CAM_CFG_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/d435i_cameras.yaml
 LAUNCH_INSTALL  := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/dual_d435i.launch.py
 
-.PHONY: cameras cameras-stop cameras-logs
+.PHONY: cameras cameras-stop cameras-logs list-cameras
 
 cameras:
 	$(SUDO) docker rm -f cameras_test 2>/dev/null || true
@@ -47,3 +47,6 @@ cameras-stop:
 
 cameras-logs:
 	$(SUDO) docker logs -f cameras_test
+
+list-cameras:
+	$(SUDO) bash $(CURDIR)/scripts/list_cameras.sh
