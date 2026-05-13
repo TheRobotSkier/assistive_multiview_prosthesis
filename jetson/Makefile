@@ -39,7 +39,6 @@ cameras:
 		--group-add video \
 		--group-add plugdev \
 		--group-add dialout \
-		--group-add i2c \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
@@ -71,7 +70,6 @@ openvins:
 		--group-add video \
 		--group-add plugdev \
 		--group-add dialout \
-		--group-add i2c \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \

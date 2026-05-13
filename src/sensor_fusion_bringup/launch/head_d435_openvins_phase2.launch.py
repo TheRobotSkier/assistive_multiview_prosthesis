@@ -1,11 +1,12 @@
-"""OpenVINS Phase 2 launch for HEAD D435 camera (serial 829212072207).
+"""OpenVINS Phase 2 launch for HEAD D435i camera (serial 336222071386).
 
-Camera: Intel RealSense D435 (no built-in IMU) at head mount.
-IMU:    External GY-91 on /cam1/data_raw.
+Camera: Intel RealSense D435i (built-in IMU) at head mount.
+IMU:    D435i built-in, united at 200 Hz on /head/d435i_head/imu.
 Camera name convention matches cameras container: namespace=head, name=d435i_head.
 
-When start_camera:=true (default), launches the RealSense node without gyro/accel
-(D435 has no built-in IMU). The external GY-91 must be running separately.
+Calibration is a placeholder from arm_d435i_841612071768 (same model, different unit).
+Replace config/openvins/head_d435i_336222071386/ with a proper Kalibr calibration run
+once available.
 
 When start_camera:=false, only launches the OpenVINS estimator node (for use
 alongside the cameras container which already publishes the camera topics).
@@ -30,22 +31,25 @@ def generate_launch_description():
         FindPackageShare("sensor_fusion_bringup"),
         "config",
         "openvins",
-        "head_d435_829212072207",
+        "head_d435i_336222071386",
         "estimator_config.yaml",
     ])
 
-    # D435 has no built-in IMU — disable gyro/accel streams.
+    # D435i has built-in IMU — enable gyro/accel streams united at 200 Hz.
     head_camera = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(rs_launch),
         condition=IfCondition(LaunchConfiguration("start_camera")),
         launch_arguments={
             "camera_namespace": "head",
             "camera_name": "d435i_head",
-            "serial_no": "_829212072207",
+            "serial_no": "_336222071386",
             "enable_color": "true",
             "rgb_camera.color_profile": "640x480x30",
-            "enable_gyro": "false",
-            "enable_accel": "false",
+            "enable_gyro": "true",
+            "enable_accel": "true",
+            "unite_imu_method": "2",
+            "gyro_fps": "200",
+            "accel_fps": "200",
             "enable_depth": "false",
             "pointcloud.enable": "false",
             "align_depth.enable": "false",
