@@ -258,7 +258,11 @@ def generate_launch_description():
     return LaunchDescription(
         [
             DeclareLaunchArgument("dynamic_config", default_value=default_config),
-            DeclareLaunchArgument("mode", default_value=""),
+            DeclareLaunchArgument(
+                "mode",
+                default_value="",
+                description="Workflow mode. Empty uses launch.mode from dynamic_config, currently active.",
+            ),
             DeclareLaunchArgument("start_cameras", default_value=""),
             DeclareLaunchArgument("start_preview", default_value=""),
             DeclareLaunchArgument("start_rviz", default_value=""),

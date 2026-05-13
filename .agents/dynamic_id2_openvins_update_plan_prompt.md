@@ -1,5 +1,22 @@
 # Dynamic ID2 Arm OpenVINS Update Planning Prompt
 
+Status note, 2026-05-13: the dynamic ID2 arm update system has been implemented.
+The one-command live workflow now defaults to `active` via
+`docker_ws/multi_cam_localization/sensor_fusion_bringup/config/dynamic_id2_arm_update.yaml`,
+which enables fixed ID0 updates/reanchor plus dynamic ID2 normal updates and
+guarded dynamic ID2 initial-lock/reanchor. Keep ID2 out of `marker_fixed_ids`.
+
+Latest validation caveat: `dynamic_id2_arm_update_live_20260513_125316`
+validated ID2 measurement production (`218` dynamic ID2 observations and `176`
+finite dynamic arm-pose observations), but it did not validate OpenVINS dynamic
+update/reanchor because `/ov_msckf_arm/odomimu` stopped before ID2 measurements
+began. Future validation must ensure `/ov_msckf_arm/odomimu`,
+`/arm/marker_pose/dynamic_arm_pose_observation`, and
+`/ov_msckf_arm/dynamic_arm_update/status` overlap in time.
+
+Use the prompt below only if the dynamic update needs replanning or major
+revision.
+
 Use this prompt in this chat or a fresh Codex chat when ready to plan the next
 implementation. Start in plan mode and do not code yet.
 

@@ -6,7 +6,7 @@ launch:
   # observe: publish/check measurements only; update: run normal EKF updates;
   # would_reanchor: log initial-lock/reanchor decisions without mutating state;
   # active: allow normal updates and guarded dynamic initial-lock/reanchor.
-  mode: observe
+  mode: active
   start_cameras: true
   start_preview: true
   start_rviz: false
@@ -36,7 +36,7 @@ measurement:
 
 openvins:
   use_dynamic_arm_pose_updates: true
-  dynamic_arm_measurement_only: true
+  dynamic_arm_measurement_only: false
   dynamic_arm_pose_topic: /arm/marker_pose/dynamic_arm_pose_observation
   dynamic_arm_status_topic: /ov_msckf_arm/dynamic_arm_update/status
   dynamic_arm_global_frame_id: marker_map
@@ -51,9 +51,9 @@ openvins:
   dynamic_arm_max_update_rotation_deg: 15.0
   dynamic_arm_min_update_interval_s: 0.10
   dynamic_arm_skip_after_fixed_marker_s: 0.50
-  dynamic_arm_allow_initial_lock: false
-  dynamic_arm_allow_reanchor: false
-  dynamic_arm_reanchor_measurement_only: true
+  dynamic_arm_allow_initial_lock: true
+  dynamic_arm_allow_reanchor: true
+  dynamic_arm_reanchor_measurement_only: false
   dynamic_arm_reanchor_min_samples: 5
   dynamic_arm_reanchor_window_s: 2.0
   dynamic_arm_reanchor_min_sample_dt_s: 0.50

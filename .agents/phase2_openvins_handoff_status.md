@@ -5,6 +5,43 @@ implementation work.
 
 ## Current Status
 
+As of 2026-05-13, the dynamic ID2 arm update workflow exists as the default
+one-command live path:
+
+```text
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/dynamic_id2_arm_update_live.launch.py
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/dynamic_id2_arm_update.yaml
+```
+
+`dynamic_id2_arm_update.yaml` now defaults `launch.mode: active`. Effective
+default behavior is fixed ID0 updates/reanchor plus dynamic ID2 normal arm
+updates and guarded dynamic ID2 initial-lock/reanchor. The low-level fixed
+marker maps remain ID0-only; ID2 must stay out of `marker_fixed_ids`.
+
+Rollback/diagnostic controls:
+
+```text
+mode:=observe         dynamic measurement publication/status only
+mode:=update          normal dynamic EKF updates, dynamic reanchor disabled
+mode:=would_reanchor  would-initial-lock/reanchor status without mutation
+use_dynamic_arm_pose_updates:=false  full dynamic-disable fallback
+```
+
+Recent live validation status:
+- `dynamic_id2_arm_update_live_20260513_095416`: active launch ran, but no ID2
+  dynamic observations were published.
+- `dynamic_id2_arm_update_live_20260513_125316`: measurement path worked with
+  `218` head dynamic ID2 observations and `176` finite dynamic arm-pose
+  observations; median reprojection `0.230 px`, p95 reprojection `0.555 px`,
+  median distance `0.597 m`, p95 view angle `47.4 deg`. It did not validate
+  OpenVINS dynamic update/reanchor because `/ov_msckf_arm/odomimu` stopped
+  before ID2 measurements began, leaving `/ov_msckf_arm/dynamic_arm_update/status`
+  at `0` messages.
+
+Before changing or judging final behavior, verify that `/ov_msckf_arm/odomimu`,
+`/arm/marker_pose/dynamic_arm_pose_observation`, and
+`/ov_msckf_arm/dynamic_arm_update/status` overlap in a live bag.
+
 As of 2026-05-11, the Phase 2 head marker EKF path and the arm D435i Phase 2
 bringup have been committed and pushed. Latest local commit seen by Codex:
 

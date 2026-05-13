@@ -2,6 +2,28 @@
 
 ## Current Phase 2 Status
 
+As of 2026-05-13, the single dynamic ID2 live workflow has been changed to
+default to `active` in
+`docker_ws/multi_cam_localization/sensor_fusion_bringup/config/dynamic_id2_arm_update.yaml`.
+That means the one-command launch enables fixed ID0 updates/reanchor plus
+dynamic ID2 normal updates and guarded dynamic ID2 initial-lock/reanchor by
+default. The fixed marker map remains ID0-only; do not add ID2 to
+`marker_fixed_ids`.
+
+Important current caveat: the latest live ID2 measurement bag
+`dynamic_id2_arm_update_live_20260513_125316` validated the measurement path
+but not the OpenVINS update/reanchor path. It recorded `218` head dynamic ID2
+observations and `176` finite dynamic arm-pose observations with good quality,
+but `/ov_msckf_arm/odomimu` stopped before the dynamic arm-pose measurements
+started, so `/ov_msckf_arm/dynamic_arm_update/status` had `0` messages. Before
+judging final active behavior, record a bag where arm odom, dynamic arm-pose
+observations, and OpenVINS dynamic update status overlap in time.
+
+Current dynamic ID2 user docs:
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_parameters.md`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_live_validation_commands.md`
+- `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_live_bag_recommendations.md`
+
 As of 2026-05-11, the Phase 2 head marker EKF path and arm D435i Phase 2
 bringup have been committed and pushed. Latest local commit seen by Codex:
 

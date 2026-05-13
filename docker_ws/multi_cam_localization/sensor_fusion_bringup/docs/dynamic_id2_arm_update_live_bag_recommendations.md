@@ -9,6 +9,8 @@ do not add marker ID2 to `marker_fixed_ids`.
 ```text
 docker_ws/bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260512_124920
 docker_ws/bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260512_132629
+docker_ws/bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260513_095416
+docker_ws/bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260513_125316
 ```
 
 ## Current Recommendation
@@ -31,6 +33,12 @@ If no already-buffered head pose matches, the observation is rejected immediatel
 with `no_head_pose_match`. Status includes the signed
 `head_pose_time_offset_s`, so it is easy to see whether accepted measurements
 used a slightly older or newer already-buffered head pose.
+
+The one-command workflow now defaults to `active`: fixed ID0 updates/reanchor
+remain enabled, and dynamic ID2 normal updates plus guarded dynamic ID2
+initial-lock/reanchor are enabled. Keep `mode:=observe`, `mode:=update`,
+`mode:=would_reanchor`, and `use_dynamic_arm_pose_updates:=false` as the
+rollback/diagnostic controls.
 
 ## Bag 124920
 
@@ -70,9 +78,51 @@ The right response is not to loosen the normal EKF gates broadly. Keep normal
 dynamic updates conservative for small innovations, and use a separate dynamic
 initial-lock/reanchor evaluator for large disagreements.
 
+## Bag 20260513_095416
+
+This active-mode recording did not validate dynamic ID2 because no ID2 was
+published:
+
+```text
+/head/marker_pose/dynamic_observation: 0
+/arm/marker_pose/dynamic_arm_pose_observation: 0
+/ov_msckf_arm/dynamic_arm_update/status: 0
+```
+
+Both fixed marker paths stayed ID0-only and odometry was finite, but the
+measurement node status was dominated by `head_pose_covariance_too_large`.
+
+## Bag 20260513_125316
+
+This would-reanchor recording validated ID2 detection and measurement
+production:
+
+```text
+/head/marker_pose/dynamic_observation: 218
+/arm/marker_pose/dynamic_arm_pose_observation: 176
+/ov_msckf_arm/dynamic_arm_update/status: 0
+```
+
+Dynamic ID2 quality was good: median reprojection `0.230 px`, p95 reprojection
+`0.555 px`, median distance `0.597 m`, and p95 view angle `47.4 deg`.
+Measurement timing was acceptable: median head-pose match dt `0.0106 s`, p95
+`0.0413 s`.
+
+This bag did not validate arm OpenVINS update/reanchor because arm odometry
+stopped before ID2 measurements began:
+
+```text
+/ov_msckf_arm/odomimu ended: 1778676842.1644704
+ID2 measurements started:  1778676850.8630111
+```
+
+Before final judgment of active behavior, record a bag where
+`/ov_msckf_arm/odomimu`, `/arm/marker_pose/dynamic_arm_pose_observation`, and
+`/ov_msckf_arm/dynamic_arm_update/status` overlap in time.
+
 ## Final Behavior To Validate
 
-Use the one-command launch in this order:
+Use the one-command launch in this order when revalidating a new setup:
 
 ```text
 observe -> update -> would_reanchor -> active
@@ -87,8 +137,8 @@ Expected improvements on replay:
 - `would_reanchor` should report plausible dynamic initial-lock/reanchor
   candidates instead of silent `marker_map_not_locked` or repeated chi2
   rejection.
-- `active` should have no non-finite state, no reset loop, no frame collision,
-  and no ID2 entry in `marker_fixed_ids`.
+- The default `active` workflow should have no non-finite state, no reset loop,
+  no frame collision, and no ID2 entry in `marker_fixed_ids`.
 
 ## Tuning Guidance
 

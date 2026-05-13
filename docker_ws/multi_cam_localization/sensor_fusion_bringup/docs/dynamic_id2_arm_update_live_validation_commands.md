@@ -18,7 +18,14 @@ xhost +si:localuser:root
 
 ## Main Live Command
 
-Start conservatively in observe mode:
+Default live workflow. This starts fixed ID0 updates/reanchor and dynamic ID2
+normal updates plus guarded dynamic ID2 initial-lock/reanchor:
+
+```bash
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py start_rviz:=true'
+```
+
+Conservative diagnostic start:
 
 ```bash
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py mode:=observe start_rviz:=true'
@@ -33,13 +40,16 @@ would_reanchor  log dynamic initial-lock/reanchor decisions without mutating sta
 active          enable normal updates plus guarded dynamic initial-lock/reanchor
 ```
 
-Recommended live order:
+Recommended live validation order for a new marker mount, calibration, or
+network/display setup:
 
 ```text
 observe -> update -> would_reanchor -> active
 ```
 
-Use `active` only after replay and live `would_reanchor` status are sensible.
+The repository default is now `active`, so pass `mode:=observe` or
+`mode:=would_reanchor` explicitly when you want diagnostic behavior before
+trusting the default active workflow.
 
 ## User Config
 
@@ -103,6 +113,14 @@ docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd
 ```
 
 ## What To Look For
+
+Minimum checks before trusting the default active workflow:
+
+- `/ov_msckf_arm/odomimu` keeps publishing through the full motion.
+- `/ov_msckf_arm/dynamic_arm_update/status` publishes after
+  `/arm/marker_pose/dynamic_arm_pose_observation` starts.
+- If `/ov_msckf_arm/odomimu` goes stale, stop and debug arm OpenVINS before
+  judging dynamic ID2 update or reanchor behavior.
 
 Good observe or would-reanchor behavior:
 
@@ -174,7 +192,13 @@ Only run `active` after tests, observe/update, and would-reanchor pass.
 The one-command launch can record the standard validation topics:
 
 ```bash
-docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py mode:=observe start_rviz:=true record_bag:=true'
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py start_rviz:=true record_bag:=true'
+```
+
+Diagnostic recording can still override the mode:
+
+```bash
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py mode:=would_reanchor start_rviz:=false record_bag:=true'
 ```
 
 The generated bag includes raw streams, fixed and dynamic marker observations,
@@ -234,6 +258,12 @@ Safe rollback for live use:
 
 ```bash
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py mode:=observe'
+```
+
+Disable dynamic reanchor but keep normal dynamic EKF updates:
+
+```bash
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py mode:=update'
 ```
 
 Full dynamic-disable fallback:

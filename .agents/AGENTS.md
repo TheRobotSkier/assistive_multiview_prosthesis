@@ -38,6 +38,20 @@ Arm D435i:
 - Serial: `310622071850`
 - Calibration output: `calibration/arm/d435i_310622071850/`
 
+Dynamic ID2 arm workflow:
+- User-facing config:
+  `multi_cam_localization/sensor_fusion_bringup/config/dynamic_id2_arm_update.yaml`
+- One-command launch:
+  `multi_cam_localization/sensor_fusion_bringup/launch/dynamic_id2_arm_update_live.launch.py`
+- Current default is `mode: active`, which enables fixed ID0 updates/reanchor
+  plus dynamic ID2 normal updates and guarded dynamic ID2 initial-lock/reanchor.
+- Roll back with `mode:=observe`, `mode:=update`, `mode:=would_reanchor`, or
+  full dynamic disable via `use_dynamic_arm_pose_updates:=false`.
+- Keep ID2 separate from fixed marker maps. Do not add ID2 to `marker_fixed_ids`.
+- Before treating live dynamic ID2 reanchor as validated, require a bag where
+  `/ov_msckf_arm/odomimu`, `/arm/marker_pose/dynamic_arm_pose_observation`, and
+  `/ov_msckf_arm/dynamic_arm_update/status` overlap.
+
 Phase 1 marker correction is external only. Do not modify the OpenVINS internal
 EKF until the external marker-corrected odom path is validated and committed.
 

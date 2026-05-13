@@ -9,11 +9,17 @@ docker_ws/multi_cam_localization/sensor_fusion_bringup/config/dynamic_id2_arm_up
 Dynamic ID2 is separate from the fixed ID0 marker-map path. Keep head and arm
 `marker_fixed_ids` at `"0"`.
 
+The single live workflow now defaults to `active`: fixed ID0 updates and
+fixed-ID0 reanchor remain enabled, while dynamic ID2 normal updates and guarded
+dynamic ID2 initial-lock/reanchor are enabled. Use `mode:=observe`,
+`mode:=would_reanchor`, or `openvins.use_dynamic_arm_pose_updates: false` when
+you want a safer diagnostic or disabled dynamic path.
+
 ## Launch
 
 | Parameter | Default | Description |
 | --- | ---: | --- |
-| `mode` | `observe` | Workflow mode: `observe`, `update`, `would_reanchor`, or `active`. |
+| `mode` | `active` | Workflow mode: `observe`, `update`, `would_reanchor`, or `active`. |
 | `start_cameras` | `true` | Start RealSense camera drivers through the head/arm OpenVINS launches. |
 | `start_preview` | `true` | Start the debug RViz preview path. Preview is not used by OpenVINS updates. |
 | `start_rviz` | `false` | Start RViz with the phase2 preview config. |
@@ -66,7 +72,7 @@ Safe tuning:
 | Parameter | Default | Units | Description |
 | --- | ---: | --- | --- |
 | `use_dynamic_arm_pose_updates` | `true` | bool | Enable the arm OpenVINS dynamic subscriber in the single launch. |
-| `dynamic_arm_measurement_only` | `true` | bool | Gate/log dynamic measurements without mutating state. |
+| `dynamic_arm_measurement_only` | `false` | bool | Gate/log dynamic measurements without mutating state. `active` sets this false. |
 | `dynamic_arm_pose_topic` | `/arm/marker_pose/dynamic_arm_pose_observation` | topic | Dynamic arm measurement input to arm OpenVINS. |
 | `dynamic_arm_status_topic` | `/ov_msckf_arm/dynamic_arm_update/status` | topic | JSON status from the OpenVINS dynamic updater. |
 | `dynamic_arm_global_frame_id` | `marker_map` | frame | Required global frame of dynamic arm measurements. |
@@ -90,9 +96,9 @@ loosening the normal EKF gate first.
 
 | Parameter | Default | Units | Description |
 | --- | ---: | --- | --- |
-| `dynamic_arm_allow_initial_lock` | `false` | bool | Allow dynamic ID2 to perform first arm `marker_map` lock. |
-| `dynamic_arm_allow_reanchor` | `false` | bool | Allow dynamic ID2 to reanchor after large rejected innovations. |
-| `dynamic_arm_reanchor_measurement_only` | `true` | bool | Report `would_dynamic_*` without mutating state. |
+| `dynamic_arm_allow_initial_lock` | `true` | bool | Allow dynamic ID2 to perform first arm `marker_map` lock. |
+| `dynamic_arm_allow_reanchor` | `true` | bool | Allow dynamic ID2 to reanchor after large rejected innovations. |
+| `dynamic_arm_reanchor_measurement_only` | `false` | bool | Report `would_dynamic_*` without mutating state when true. `active` sets this false. |
 | `dynamic_arm_reanchor_min_samples` | `5` | count | Required recent dynamic samples. |
 | `dynamic_arm_reanchor_window_s` | `2.0` | s | Recent sample window used for velocity/scatter checks. |
 | `dynamic_arm_reanchor_min_sample_dt_s` | `0.50` | s | Required time span between oldest and newest usable samples. |
@@ -105,13 +111,23 @@ loosening the normal EKF gate first.
 | `dynamic_arm_reanchor_skip_after_fixed_marker_s` | `3.0` | s | Fixed ID0 has priority over dynamic reanchor. |
 | `dynamic_arm_reanchor_covariance_multiplier` | `2.0` | scale | Extra covariance inflation for dynamic reset/reanchor. |
 
-Enable sequence:
+Validation sequence:
 
 1. `observe`: verify measurement status and covariance.
 2. `update`: verify small normal updates improve behavior without snaps.
 3. `would_reanchor`: verify candidates, sample count, velocity, scatter, cooldown,
    and fixed-ID0 skip state.
-4. `active`: enable only after replay and live would-reanchor are explainable.
+4. `active`: default live workflow, with normal dynamic updates and guarded
+   dynamic initial-lock/reanchor enabled.
+
+Recent live note:
+
+- `dynamic_id2_arm_update_live_20260513_125316` validated ID2 detection and
+  dynamic arm-pose measurement production: `218` ID2 observations and `176`
+  finite dynamic arm-pose observations.
+- It did not validate OpenVINS dynamic update/reanchor because
+  `/ov_msckf_arm/odomimu` stopped before ID2 measurements began. Confirm arm
+  OpenVINS stays alive before judging final active behavior.
 
 ## Acceptance Checklist
 
@@ -119,5 +135,5 @@ Enable sequence:
 - No delayed queued ID2 measurements are applied to the EKF.
 - Status explains accepted, rejected, skipped, and would-reanchor events.
 - Fixed ID0 still locks/reanchors when visible and has priority over dynamic ID2.
-- Dynamic reanchor is explicit, guarded, and default-disabled outside the single
-  launch mode mapping.
+- Dynamic reanchor is explicit and guarded; it can be disabled with
+  `mode:=observe`, `mode:=update`, or `use_dynamic_arm_pose_updates:=false`.

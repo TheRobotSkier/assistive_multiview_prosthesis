@@ -19,6 +19,7 @@ services:
       - dialout
     volumes:
       - ../:/miahand_ws/src
+      - ./cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ${XAUTHORITY}:/tmp/.Xauthority:ro,z
       - /dev:/dev
@@ -30,8 +31,10 @@ services:
       QT_X11_NO_MITSHM: 1
       DISPLAY: $DISPLAY
       XAUTHORITY: /tmp/.Xauthority
-      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
-      RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
+      ROS_DOMAIN_ID: 0
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+      CYCLONEDDS_URI: file:///tmp/cyclonedds_peer.xml
+      ROS_AUTOMATIC_DISCOVERY_RANGE: SUBNET
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: graphics,display,compute,utility
     user: "${USER_UID}:${USER_GID}"
