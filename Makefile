@@ -33,7 +33,7 @@ up:
 	cd $(COMPOSE_DIR) && $(COMPOSE) up -d --build --force-recreate
 
 up-hw:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile hardware up -d --build --force-recreate
+	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml up -d --build --force-recreate
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:

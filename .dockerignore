@@ -1,0 +1,17 @@
+# Rust build artifacts
+src/grasp_preshaping/target/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore

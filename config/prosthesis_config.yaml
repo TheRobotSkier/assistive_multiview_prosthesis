@@ -221,7 +221,7 @@ force:
 
 # ── Hardware ──────────────────────────────────────────────────────────────────
 hardware:
-    mia_serial_port: "/dev/ttyUSB1"
+    mia_serial_port: "/dev/ttyUSB0"
     wrist_port: "/dev/ttyUSB0"
     wrist_baudrate: 57600
     wrist_motor_id: 1

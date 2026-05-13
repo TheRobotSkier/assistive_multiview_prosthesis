@@ -1,14 +1,14 @@
 # Prosthesis — minimal Docker Compose
 # Usage:
-#   make up                        # mock hardware (default)
+#   make up                        # mock hardware (default, no devices)
 #   make up-hw                     # real hardware (USB devices mapped)
 #   make test                      # run smoke tests
 #   make build                     # build all images
 #
 # Or directly:
 #   podman-compose build
-#   podman-compose up              # mock
-#   podman-compose --profile hardware up
+#   podman-compose up                                       # mock
+#   podman-compose -f docker-compose.yml -f docker-compose.hw.yml up  # hardware
 
 services:
   # ── Main ROS 2 container ─────────────────────────────────────────────────
@@ -31,20 +31,8 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # Tests: bidirectional mount so results written in the container appear on host
       - ../tests:/prosthesis_ws/tests:rw
-    profiles:
-      - mock
     stdin_open: true
     tty: true
-
-  # ── Hardware variant: same image with USB devices ────────────────────────
-  prosthesis-hw:
-    image: prosthesis:latest
-    extends: prosthesis
-    devices:
-      - ${MIA_SERIAL_PORT:-/dev/ttyUSB1}:/dev/ttyUSB1
-      - ${WRIST_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0
-    profiles:
-      - hardware
 
   # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
   segmentation:

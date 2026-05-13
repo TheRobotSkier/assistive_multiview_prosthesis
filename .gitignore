@@ -34,7 +34,7 @@ __pycache__/
 
 # llm stuff
 .kilo/
-#plans/
+plans/
 .forge/
 .mcp.json
 
@@ -57,3 +57,6 @@ CLAUDE.md
 
 # Include preshaping binary
 !libgrasp_preshaping.so
+
+# Force logs
+tests/test2_hw_force_controller/results/
