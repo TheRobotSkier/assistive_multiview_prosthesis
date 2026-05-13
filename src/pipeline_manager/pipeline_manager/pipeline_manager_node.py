@@ -28,6 +28,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from std_msgs.msg import Int32, String, Float32
 from std_srvs.srv import Trigger
+from mia_hand_msgs.msg import ForceControllerStatus
 
 
 class State(enum.IntEnum):
@@ -68,6 +69,15 @@ class PipelineManagerNode(Node):
         self.declare_parameter('release_gesture', GESTURE_OPEN)
         self.declare_parameter('state_publish_rate_hz', 5.0)
 
+        # Topic / service name parameters
+        self.declare_parameter('emg_gesture_topic', '/emg/gesture_label')
+        self.declare_parameter('emg_confidence_topic', '/emg/confidence')
+        self.declare_parameter('grasp_type_topic', '/grasp_preshaping/grasp_type')
+        self.declare_parameter('force_status_topic', '/force_controller/status')
+        self.declare_parameter('compute_grasp_service', '/grasp_preshaping/compute_grasp')
+        self.declare_parameter('pipeline_state_topic', '/pipeline/state')
+        self.declare_parameter('pipeline_state_name_topic', '/pipeline/state_name')
+
         self._confidence_threshold = self.get_parameter('confidence_threshold').value
         self._grasp_gestures = self.get_parameter('grasp_gestures').value
         self._release_gesture = self.get_parameter('release_gesture').value
@@ -80,20 +90,28 @@ class PipelineManagerNode(Node):
 
         # ── Publishers ────────────────────────────────────────────────────
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-        self._state_pub = self.create_publisher(Int32, '/pipeline/state', latched)
-        self._state_name_pub = self.create_publisher(String, '/pipeline/state_name', latched)
+        self._state_pub = self.create_publisher(
+            Int32, self.get_parameter('pipeline_state_topic').value, latched)
+        self._state_name_pub = self.create_publisher(
+            String, self.get_parameter('pipeline_state_name_topic').value, latched)
 
         # ── Subscriptions ─────────────────────────────────────────────────
         self.create_subscription(
-            Int32, '/emg/gesture_label', self._on_emg_gesture, 10)
+            Int32, self.get_parameter('emg_gesture_topic').value,
+            self._on_emg_gesture, 10)
         self.create_subscription(
-            Float32, '/emg/confidence', self._on_emg_confidence, 10)  # noqa: F821
+            Float32, self.get_parameter('emg_confidence_topic').value,
+            self._on_emg_confidence, 10)  # noqa: F821
         self.create_subscription(
-            Int32, '/grasp_preshaping/grasp_type', self._on_grasp_type, 10)
+            Int32, self.get_parameter('grasp_type_topic').value,
+            self._on_grasp_type, 10)
+        self.create_subscription(
+            ForceControllerStatus, self.get_parameter('force_status_topic').value,
+            self._on_force_status, 10)
 
         # ── Service clients ───────────────────────────────────────────────
         self._compute_client = self.create_client(
-            Trigger, '/grasp_preshaping/compute_grasp')
+            Trigger, self.get_parameter('compute_grasp_service').value)
 
         # ── Timer ─────────────────────────────────────────────────────────
         self.create_timer(1.0 / rate, self._publish_state)
@@ -135,6 +153,21 @@ class PipelineManagerNode(Node):
         return new_state in valid.get(self._state, set())
 
     # ── Callbacks ─────────────────────────────────────────────────────────
+
+    def _on_force_status(self, msg: ForceControllerStatus):
+        """Handle force controller status updates.
+
+        When force_controller reports stable forces during GRASPING,
+        transition to HOLDING. This is the primary trigger for the
+        GRASPING -> HOLDING state transition.
+        """
+        if self._state == State.GRASPING and msg.force_stable and msg.active:
+            self._transition(State.HOLDING, 'Force stable — grip secured')
+
+        # If force controller detects slip during HOLDING, we could
+        # optionally re-enter GRASPING for re-grip. For now, just log.
+        if self._state == State.HOLDING and msg.slip_detected:
+            self.get_logger().warn('Slip detected during HOLDING — grip may be unstable')
 
     def _on_emg_gesture(self, msg: Int32):
         gesture = msg.data

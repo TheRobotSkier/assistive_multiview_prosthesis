@@ -28,6 +28,8 @@ services:
     volumes:
       # X11 forwarding (works on Linux and WSL2 with WSLg)
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Tests: bidirectional mount so results written in the container appear on host
+      - ../tests:/prosthesis_ws/tests:rw
     profiles:
       - mock
     stdin_open: true
@@ -63,3 +65,5 @@ services:
       - GRASP_CONFIG_PATH=/prosthesis_ws/config/grasp_preshaping.yaml
     command: ["/bin/bash", "/prosthesis_ws/scripts/run_tests.sh"]
     network_mode: host
+    volumes:
+      - ../tests:/prosthesis_ws/tests:rw

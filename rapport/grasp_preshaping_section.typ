@@ -92,7 +92,7 @@ The core challenges are:
     hand tracking → twist propagation → segmentation → \
     grasp\_preshaping → finger commands\
   ],
-  caption: [System context diagram showing the grasp preshaping pipeline's position in the overall system.]
+  caption: [System context diagram showing the grasp preshaping pipeline's position in the overall system.],
 ) <fig1>
 
 === Related Work and Positioning
@@ -123,7 +123,7 @@ Score Particles → Select Best Grasp → Output
     with approximate timing per stage. \
     Highlight: *TSDF is built once and reused* across all SMC iterations.\
   ],
-  caption: [Pipeline block diagram with timing annotations per stage.]
+  caption: [Pipeline block diagram with timing annotations per stage.],
 ) <fig2>
 
 The core library is implemented in Rust for zero-cost abstractions, no garbage collection pauses, memory safety, and seamless C FFI. A thin C++ ROS 2 bridge node handles message passing. The modules are:
@@ -146,7 +146,7 @@ The core library is implemented in Rust for zero-cost abstractions, no garbage c
     [Bridge node], [ROS 2 service, subscriptions, FFI calls], [`preshaping_service_bridge_node.cpp`],
     table.hline(stroke: 1.2pt),
   ),
-  caption: [Module responsibilities and file locations.]
+  caption: [Module responsibilities and file locations.],
 ) <table1>
 
 == Region of Interest and TSDF Construction
@@ -164,7 +164,7 @@ The core library is implemented in Rust for zero-cost abstractions, no garbage c
     #text(weight: "bold")[Fig. 3] ROI prediction: \
     sampled hand positions + resulting AABB overlaid on point cloud\
   ],
-  caption: [ROI prediction visualization with sampled hand positions and resulting bounding box.]
+  caption: [ROI prediction visualization with sampled hand positions and resulting bounding box.],
 ) <fig3>
 
 === Point Cloud Pruning and Morton Ordering
@@ -183,7 +183,7 @@ Sign determination: for each voxel, all cameras are checked. If the voxel is beh
     truncation band, positive/negative regions, \
     zero-crossing, camera rays\
   ],
-  caption: [2D TSDF cross-section showing truncation band, positive/negative regions, zero-crossing, and camera rays.]
+  caption: [2D TSDF cross-section showing truncation band, positive/negative regions, zero-crossing, and camera rays.],
 ) <fig4>
 
 === Design Decisions
@@ -229,7 +229,7 @@ A superquadric is fitted to the observed point cloud to estimate distances in un
     #text(weight: "bold")[Fig. 5] Three superquadric templates \
     with epsilon values and example fitted shapes\
   ],
-  caption: [Three superquadric templates (sphere, box, cylinder) with epsilon values and example shapes.]
+  caption: [Three superquadric templates (sphere, box, cylinder) with epsilon values and example shapes.],
 ) <fig5>
 
 #figure(
@@ -237,7 +237,7 @@ A superquadric is fitted to the observed point cloud to estimate distances in un
     #text(weight: "bold")[Fig. 6] TSDF cross-section with \
     Domain A/B/C color-coded, showing backside fill\
   ],
-  caption: [TSDF cross-section showing Domain A (camera authority), B (SQ authority), and C (blending zone) color-coded.]
+  caption: [TSDF cross-section showing Domain A (camera authority), B (SQ authority), and C (blending zone) color-coded.],
 ) <fig6>
 
 #figure(
@@ -256,7 +256,7 @@ A superquadric is fitted to the observed point cloud to estimate distances in un
     [`SQ_ENABLE_BACKSIDE`], [`true`],
     table.hline(stroke: 1.2pt),
   ),
-  caption: [Superquadric configuration parameters with default values.]
+  caption: [Superquadric configuration parameters with default values.],
 ) <table2>
 
 == Finger Contact Lookup Table (LUT)
@@ -275,7 +275,7 @@ A pre-computed table maps (contact point, closure amount) → SE(3) transform, c
     #text(weight: "bold")[Fig. 7] Hand model with labeled \
     contact points; three grasp types with active contacts highlighted\
   ],
-  caption: [Hand model with labeled contact points and three grasp types with active contacts highlighted.]
+  caption: [Hand model with labeled contact points and three grasp types with active contacts highlighted.],
 ) <fig7>
 
 == Grasp Scoring and Collision Detection
@@ -293,13 +293,19 @@ Given a hand pose and grasp type, finger contacts are swept from open (closure =
     table.hline(stroke: 1.2pt),
     [*Tier*], [*Condition*], [*Score*], [*Meaning*],
     table.hline(stroke: 0.5pt),
-    [*Tier 1*], [Collision + ≥min\_contacts + ≥min\_fingers (thumb + index)], [`0.8 + 0.2 × contact_fraction`], [Valid grasp],
-    [*Tier 2*], [Collision but too few finger groups or missing thumb/index], [`0.25 × contact_fraction + 0.25 × proximity_penalty`], [Soft rejection — gives gradient],
+    [*Tier 1*],
+    [Collision + ≥min\_contacts + ≥min\_fingers (thumb + index)],
+    [`0.8 + 0.2 × contact_fraction`],
+    [Valid grasp],
+    [*Tier 2*],
+    [Collision but too few finger groups or missing thumb/index],
+    [`0.25 × contact_fraction + 0.25 × proximity_penalty`],
+    [Soft rejection — gives gradient],
     [*Tier 3*], [Collision at closure = 0 (palm already inside object)], [`0.1`], [Bad starting position],
     [*Tier 4*], [No collision at all], [`0.0–0.05 (proximity score)`], [Hand misses object — proximity gives direction],
     table.hline(stroke: 1.2pt),
   ),
-  caption: [The four-tier scoring system with conditions, score formulas, and interpretations.]
+  caption: [The four-tier scoring system with conditions, score formulas, and interpretations.],
 ) <scoring_tiers>
 
 The tiered system is critical because a binary hit/miss score provides *zero gradient* for optimization. The four tiers create a smooth landscape that guides the SMC optimizer from "approaching the object" through "making contact" to "forming a stable grasp" (see @fig8).
@@ -327,7 +333,7 @@ Default weights: probability = 1.0, alignment = 1.0, force\_closure = 1.0, *cont
     #text(weight: "bold")[Fig. 8] Four-tier scoring landscape \
     vs. closure amount — annotate with example hand configs at each tier\
   ],
-  caption: [Four-tier scoring landscape plotted against closure amount, with example hand configurations at each tier.]
+  caption: [Four-tier scoring landscape plotted against closure amount, with example hand configurations at each tier.],
 ) <fig8>
 
 #figure(
@@ -342,7 +348,7 @@ Default weights: probability = 1.0, alignment = 1.0, force\_closure = 1.0, *cont
     [Lateral], [5], [2], [thumb + index], [Adduction],
     table.hline(stroke: 1.2pt),
   ),
-  caption: [Grasp type specifications: score contacts, minimum contacts, minimum fingers, and thumb mode.]
+  caption: [Grasp type specifications: score contacts, minimum contacts, minimum fingers, and thumb mode.],
 ) <table3>
 
 == Sequential Monte Carlo (SMC) Optimization
@@ -394,7 +400,7 @@ The TSDF is built once (dominant cost); each iteration only re-samples poses and
     #text(weight: "bold")[Fig. 9] SMC convergence: \
     best score vs. iteration across multiple runs\
   ],
-  caption: [SMC convergence plot showing best score vs. iteration across multiple runs.]
+  caption: [SMC convergence plot showing best score vs. iteration across multiple runs.],
 ) <fig9>
 
 #figure(
@@ -402,7 +408,7 @@ The TSDF is built once (dominant cost); each iteration only re-samples poses and
     #text(weight: "bold")[Fig. 10] Particle distribution at \
     iterations 0, 2, 4 — spatial clustering as variance decays\
   ],
-  caption: [Particle distribution at iterations 0, 2, and 4 showing spatial clustering as variance decays.]
+  caption: [Particle distribution at iterations 0, 2, and 4 showing spatial clustering as variance decays.],
 ) <fig10>
 
 #figure(
@@ -425,7 +431,7 @@ The TSDF is built once (dominant cost); each iteration only re-samples poses and
     [`INITIAL_PROPOSAL_STD_WRIST`], [`0.3`],
     table.hline(stroke: 1.2pt),
   ),
-  caption: [SMC configuration parameters with default values.]
+  caption: [SMC configuration parameters with default values.],
 ) <table4>
 
 == Results and Evaluation
@@ -455,7 +461,7 @@ Target: total under 50 ms. If profiling data exists, include a figure:
     #text(weight: "bold")[Fig. 12] Timing breakdown: \
     stacked bar or table of ms per pipeline stage\
   ],
-  caption: [Timing breakdown of the grasp preshaping pipeline, showing milliseconds spent in each stage.]
+  caption: [Timing breakdown of the grasp preshaping pipeline, showing milliseconds spent in each stage.],
 ) <fig12>
 
 === Grasp Success Rate
@@ -476,7 +482,7 @@ This directly justifies @fig6 and the three-domain fusion approach. Without back
     grasp with and without SQ backside estimation. \
     Without SQ, fingers pass through the object.\
   ],
-  caption: [Ablation comparison showing grasp planning with and without superquadric backside estimation.]
+  caption: [Ablation comparison showing grasp planning with and without superquadric backside estimation.],
 ) <fig13>
 
 === SMC Convergence Analysis
@@ -498,7 +504,7 @@ The Rust core library is called from a C++ ROS 2 bridge node (`preshaping_servic
     preshaping\_service\_bridge\_node with \
     subscriptions, publications, and service interface\
   ],
-  caption: [ROS 2 node graph showing the preshaping service bridge node with its subscriptions, publications, and service interface.]
+  caption: [ROS 2 node graph showing the preshaping service bridge node with its subscriptions, publications, and service interface.],
 ) <fig11>
 
 == Lessons Learned
@@ -510,14 +516,29 @@ The Rust core library is called from a C++ ROS 2 bridge node (`preshaping_servic
     table.hline(stroke: 1.2pt),
     [\#], [*Challenge*], [*Root Cause*], [*Resolution*],
     table.hline(stroke: 0.5pt),
-    [1], [TSDF sign wrong with opposing cameras], [Majority vote (`behind_count > n_cams/2`) fails with 2 opposite cameras: each sees the voxel as "in front" from its side, so `behind_count` only reaches 1], [Changed to `inside_votes > 0` (any camera with good alignment confirms inside) + superquadric tiebreaker],
-    [2], [High scores for grasps not touching surface], [After sign fix, negative voxels (deep inside) triggered as "collisions" → contact score high despite no surface contact], [Surface proximity filter in `find_active_contacts`: only count contacts with |dist| < threshold, reject deep-interior],
-    [3], [SMC loses best grasp across iterations], [ROS node selected from last iteration only; debug visualizer searched all iterations → different "best"], [Track overall best across all iterations for output + elite injection to prevent loss],
-    [4], [Closure fraction had no effect], [Rust `PRESHAPING_CLOSURE_FRACTION` was dead code; actual control in C++ ROS param (default 0.3)], [Removed dead Rust constant; centralized config via ROS parameter],
-    [5], [SQ artifacts near observed surface], [SQ surface slightly misaligned with camera surface → sign flips near boundary], [One-directional override (only positive → negative) + `SQ_MIN_SIGN_OVERRIDE_CELLS = 2` preserves camera authority near surface],
+    [1],
+    [TSDF sign wrong with opposing cameras],
+    [Majority vote (`behind_count > n_cams/2`) fails with 2 opposite cameras: each sees the voxel as "in front" from its side, so `behind_count` only reaches 1],
+    [Changed to `inside_votes > 0` (any camera with good alignment confirms inside) + superquadric tiebreaker],
+    [2],
+    [High scores for grasps not touching surface],
+    [After sign fix, negative voxels (deep inside) triggered as "collisions" → contact score high despite no surface contact],
+    [Surface proximity filter in `find_active_contacts`: only count contacts with |dist| < threshold, reject deep-interior],
+    [3],
+    [SMC loses best grasp across iterations],
+    [ROS node selected from last iteration only; debug visualizer searched all iterations → different "best"],
+    [Track overall best across all iterations for output + elite injection to prevent loss],
+    [4],
+    [Closure fraction had no effect],
+    [Rust `PRESHAPING_CLOSURE_FRACTION` was dead code; actual control in C++ ROS param (default 0.3)],
+    [Removed dead Rust constant; centralized config via ROS parameter],
+    [5],
+    [SQ artifacts near observed surface],
+    [SQ surface slightly misaligned with camera surface → sign flips near boundary],
+    [One-directional override (only positive → negative) + `SQ_MIN_SIGN_OVERRIDE_CELLS = 2` preserves camera authority near surface],
     table.hline(stroke: 1.2pt),
   ),
-  caption: [Summary of engineering challenges encountered, their root causes, and resolutions.]
+  caption: [Summary of engineering challenges encountered, their root causes, and resolutions.],
 ) <table5>
 
 Each challenge yielded a broader design insight:

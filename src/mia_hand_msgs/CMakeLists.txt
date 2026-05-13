@@ -17,6 +17,7 @@ set(msg_files
   "msg/MotorData.msg"
   "msg/JointData.msg"
   "msg/ForceData.msg"
+  "msg/ForceControllerStatus.msg"
 )
 
 set(srv_files

@@ -30,10 +30,10 @@ rebuild:
 
 # ── Run ────────────────────────────────────────────────────────────────────
 up:
-	cd $(COMPOSE_DIR) && $(COMPOSE) up -d
+	cd $(COMPOSE_DIR) && $(COMPOSE) up -d --build --force-recreate
 
 up-hw:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile hardware up -d
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile hardware up -d --build --force-recreate
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:

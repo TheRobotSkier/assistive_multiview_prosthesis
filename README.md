@@ -12,7 +12,7 @@ A ROS 2 Jazzy system for EMG-controlled robotic hand grasping with real-time poi
                                  │ gesture trigger
                                  ▼
 ┌──────────┐    cloud     ┌──────────────┐    segmented     ┌──────────────────┐
-│  Camera  │─────────────▶│ Segmentation │────────────────▶ │ Grasp Preshaping │
+│  Camera  │─────────────▶│ Segmentation │────────────────▶│ Grasp Preshaping │
 │  (D435)  │              │  (Minkowski) │                  │  (Rust pipeline) │
 └──────────┘              └──────────────┘                  └────────┬─────────┘
                                                                      │ preshape + wrist + hand pose
@@ -23,7 +23,7 @@ A ROS 2 Jazzy system for EMG-controlled robotic hand grasping with real-time poi
                                                           └────────┬─────────┘
                                                                    │
                                               ┌────────────────────┼────────────────────┐
-                                              ▼                    ▼                    ▼
+                                              ▼                   ▼                    ▼
                                       ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
                                       │ Wrist Driver │   │  Mia Hand    │   │   Force      │
                                       │ (Dynamixel)  │   │  Driver      │   │  Controller  │
@@ -250,3 +250,22 @@ ros2 run emg_bridge run_classifier
 ```
 
 Connect to the MindRove WiFi network first. The classifier publishes to `/emg/gesture_label`, `/emg/gesture_name`, `/emg/confidence`, and `/emg/proportional`.
+
+## Random Scratch Pad - Daniel
+
+All code changes are done and the Rust .so has been rebuilt. The Docker image rebuild takes longer than my tool timeout, so you'll need to run this yourself in your terminal:
+
+make build && make up
+
+Then verify inside the container:
+
+make shell
+# Inside container:
+# 1. Verify the .so resolves paths correctly:
+strings /prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so | grep GRASP_PRESHAPING_HOME
+
+# 2. Quick smoke test — load the library:
+python3 -c "import ctypes; so = ctypes.CDLL('/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so'); print('API version:', so.grasp_preshaping_api_version())"
+
+# 3. Run the Tier B test (in a second shell after launching mock pipeline):
+python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py --method service

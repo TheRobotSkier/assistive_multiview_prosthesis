@@ -34,7 +34,7 @@ __pycache__/
 
 # llm stuff
 .kilo/
-plans/
+#plans/
 .forge/
 .mcp.json
 

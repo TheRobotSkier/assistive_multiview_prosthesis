@@ -18,7 +18,7 @@ import math
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, PoseStamped
-from std_msgs.msg import Float64, Float64MultiArray
+from std_msgs.msg import Float64, Float64MultiArray, Int32
 
 
 class GraspProximityControllerNode(Node):
@@ -33,6 +33,17 @@ class GraspProximityControllerNode(Node):
         self.declare_parameter('wrist_accel_deg_s2', 180.0)
         self.declare_parameter('control_rate_hz', 10.0)
 
+        # Topic name parameters
+        self.declare_parameter('target_closures_topic', '/grasp_preshaping/target_finger_closures')
+        self.declare_parameter('wrist_pose_topic', '/grasp_preshaping/wrist_pose')
+        self.declare_parameter('target_hand_pose_topic', '/grasp_preshaping/target_hand_pose')
+        self.declare_parameter('hand_pose_topic', '/hand_pose')
+        self.declare_parameter('pipeline_state_topic', '/pipeline/state')
+        self.declare_parameter('thumb_cmd_topic', '/thumb_pos_ff_controller/commands')
+        self.declare_parameter('index_cmd_topic', '/index_pos_ff_controller/commands')
+        self.declare_parameter('mrl_cmd_topic', '/mrl_pos_ff_controller/commands')
+        self.declare_parameter('wrist_cmd_topic', '/wrist/set_position')
+
         self._enter_thresh = self.get_parameter('proximity_enter_threshold_m').value
         self._exit_thresh = self.get_parameter('proximity_exit_threshold_m').value
         self._partial_factor = self.get_parameter('partial_closure_factor').value
@@ -41,6 +52,10 @@ class GraspProximityControllerNode(Node):
         rate = self.get_parameter('control_rate_hz').value
 
         # ── State ─────────────────────────────────────────────────────────────
+        # Pipeline state — used to gate commands during GRASPING/HOLDING
+        # when the force controller has taken over joint commands.
+        self._pipeline_state: int = 0  # Default IDLE
+
         # Planned outputs from the preshaping bridge (set atomically when all arrive)
         self._planned_closures: list[float] | None = None    # [thumb, index, mrl]
         self._planned_wrist_deg: float | None = None         # scalar wrist rotation (deg)
@@ -58,52 +73,53 @@ class GraspProximityControllerNode(Node):
         self._is_near: bool = False
 
         # ── Subscriptions ─────────────────────────────────────────────────────
-        # PLACEHOLDER: topic published by a future version of preshaping_service_bridge_node
-        # Format: Float64MultiArray with data = [thumb_closure, index_closure, mrl_closure]
-        # Values are in range [0.0, 1.0].  Arrival of this message signals a new plan.
         self.create_subscription(
             Float64MultiArray,
-            '/grasp_preshaping/target_finger_closures',
+            self.get_parameter('target_closures_topic').value,
             self._on_planned_closures,
             10,
         )
 
-        # PLACEHOLDER: scalar wrist rotation in degrees published by a future version of
-        # preshaping_service_bridge_node.  Carries the planner's internal wrist_rotation
-        # value (SampledPose.wrist_rotation, converted to degrees).
         self.create_subscription(
             Float64,
-            '/grasp_preshaping/wrist_pose',
+            self.get_parameter('wrist_pose_topic').value,
             self._on_planned_wrist_rotation,
             10,
         )
 
-        # PLACEHOLDER: full 6-DOF pose of the hand/palm frame at the planned final grasp,
-        # expressed in the world frame.  Used for the proximity distance check.
         self.create_subscription(
             PoseStamped,
-            '/grasp_preshaping/target_hand_pose',
+            self.get_parameter('target_hand_pose_topic').value,
             self._on_planned_hand_frame,
             10,
         )
 
-        # Existing topic providing the current hand pose in world frame.
         self.create_subscription(
             PoseStamped,
-            '/hand_pose',
+            self.get_parameter('hand_pose_topic').value,
             self._on_current_hand_pose,
+            10,
+        )
+
+        # Pipeline state — gate proximity commands during force control phases.
+        # During GRASPING (4) and HOLDING (5), the force controller owns
+        # the joint command topics; proximity controller must not publish.
+        self.create_subscription(
+            Int32,
+            self.get_parameter('pipeline_state_topic').value,
+            self._on_pipeline_state,
             10,
         )
 
         # ── Publishers ────────────────────────────────────────────────────────
         self._thumb_pub = self.create_publisher(
-            Float64MultiArray, '/thumb_pos_ff_controller/commands', 10)
+            Float64MultiArray, self.get_parameter('thumb_cmd_topic').value, 10)
         self._index_pub = self.create_publisher(
-            Float64MultiArray, '/index_pos_ff_controller/commands', 10)
+            Float64MultiArray, self.get_parameter('index_cmd_topic').value, 10)
         self._mrl_pub = self.create_publisher(
-            Float64MultiArray, '/mrl_pos_ff_controller/commands', 10)
+            Float64MultiArray, self.get_parameter('mrl_cmd_topic').value, 10)
         self._wrist_pub = self.create_publisher(
-            Float64MultiArray, '/wrist/set_position', 10)
+            Float64MultiArray, self.get_parameter('wrist_cmd_topic').value, 10)
 
         # ── Control timer ─────────────────────────────────────────────────────
         self.create_timer(1.0 / rate, self._control_loop)
@@ -137,7 +153,15 @@ class GraspProximityControllerNode(Node):
     def _on_current_hand_pose(self, msg: PoseStamped) -> None:
         self._current_hand_pose = msg
 
-    def _try_commit_plan(self) -> None:
+    def _on_pipeline_state(self, msg: Int32) -> None:
+        """Track pipeline state to avoid conflicting with force controller.
+
+        The force controller is active during GRASPING (4) and HOLDING (5).
+        During these states, this proximity controller must NOT publish
+        joint commands to avoid bus contention on the shared position topics.
+        """
+        self._pipeline_state = msg.data
+
     def _try_commit_plan(self) -> None:
         """Atomically commit buffered plan when all three parts have arrived."""
         if (self._buf_closures is not None
@@ -166,6 +190,11 @@ class GraspProximityControllerNode(Node):
     # ── Control loop ──────────────────────────────────────────────────────────
 
     def _control_loop(self) -> None:
+        # Do not publish joint commands during GRASPING/HOLDING —
+        # the force controller owns the joint topics in those states.
+        if self._pipeline_state in (4, 5):  # GRASPING, HOLDING
+            return
+
         if (self._planned_closures is None
                 or self._planned_wrist_deg is None
                 or self._planned_hand_frame is None

@@ -41,8 +41,10 @@ COPY src/ src/
 COPY config/ config/
 COPY rviz/ rviz/
 COPY scripts/ scripts/
+COPY tests/ tests/
 
 RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
+RUN chown -R prosthesis:prosthesis tests/
 
 # Install ROS dependencies and build
 RUN . /opt/ros/jazzy/setup.sh \
@@ -56,6 +58,7 @@ ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV ROS_DOMAIN_ID=0
 ENV LD_LIBRARY_PATH="/prosthesis_ws/install/grasp_preshaping/lib:${LD_LIBRARY_PATH}"
 ENV GRASP_CONFIG_PATH="/prosthesis_ws/config/grasp_preshaping.yaml"
+ENV GRASP_PRESHAPING_HOME="/prosthesis_ws/src/grasp_preshaping"
 
 USER prosthesis
 

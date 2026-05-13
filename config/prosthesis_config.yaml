@@ -1,6 +1,102 @@
 # ── Central Prosthesis Configuration ──────────────────────────────────────────
-# All parameters are loaded by the pipeline launch file and passed to nodes.
-# Topic names, thresholds, hardware ports, and tuning parameters live here.
+# This file serves two purposes:
+#   1. ROS2 parameter file — node-namespaced sections (force_controller, pipeline_manager,
+#      proximity_controller, twist_propagation) are loaded by the launch files and passed
+#      directly to nodes via the ROS2 parameter system.
+#   2. Reference — the flat sections (topics, frames, hardware, etc.) are kept for
+#      external consumers (test scripts, documentation) that read this file with yaml.safe_load.
+#
+# When adding new parameters, add them to BOTH the node-namespaced section AND the
+# corresponding flat section.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ROS2 Node Parameter Sections (loaded by launch files)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+force_controller:
+    ros__parameters:
+        # Topic / service names
+        force_data_topic: "data_streams/fingers/forces/data"
+        force_stream_switch_service: "data_streams/fingers/forces/switch"
+        pipeline_state_topic: "/pipeline/state"
+        joint_states_topic: "/joint_states"
+        thumb_cmd_topic: "/thumb_pos_ff_controller/commands"
+        index_cmd_topic: "/index_pos_ff_controller/commands"
+        mrl_cmd_topic: "/mrl_pos_ff_controller/commands"
+        force_status_topic: "/force_controller/status"
+        # Tuning
+        target_force_min: 50.0
+        target_force_max: 200.0
+        kp: 0.01
+        ki: 0.001
+        update_rate_hz: 10.0
+        max_position_step: 0.05
+        integral_limit: 50.0
+        stability_window: 1.0
+        stability_tolerance: 15.0
+        slip_threshold: 30.0
+        max_force_emergency: 500.0
+        stale_data_timeout_s: 0.5
+        force_filter_window: 5
+        emergency_backoff_factor: 2.0
+
+pipeline_manager:
+    ros__parameters:
+        # Topic / service names
+        emg_gesture_topic: "/emg/gesture_label"
+        emg_confidence_topic: "/emg/confidence"
+        grasp_type_topic: "/grasp_preshaping/grasp_type"
+        force_status_topic: "/force_controller/status"
+        compute_grasp_service: "/grasp_preshaping/compute_grasp"
+        pipeline_state_topic: "/pipeline/state"
+        pipeline_state_name_topic: "/pipeline/state_name"
+        # Tuning
+        confidence_threshold: 0.55
+        grasp_gestures: [1, 2, 4]
+        release_gesture: 3
+        state_publish_rate_hz: 5.0
+
+proximity_controller:
+    ros__parameters:
+        # Topic names
+        target_closures_topic: "/grasp_preshaping/target_finger_closures"
+        wrist_pose_topic: "/grasp_preshaping/wrist_pose"
+        target_hand_pose_topic: "/grasp_preshaping/target_hand_pose"
+        hand_pose_topic: "/hand_pose"
+        pipeline_state_topic: "/pipeline/state"
+        thumb_cmd_topic: "/thumb_pos_ff_controller/commands"
+        index_cmd_topic: "/index_pos_ff_controller/commands"
+        mrl_cmd_topic: "/mrl_pos_ff_controller/commands"
+        wrist_cmd_topic: "/wrist/set_position"
+        # Tuning
+        proximity_enter_threshold_m: 0.08
+        proximity_exit_threshold_m: 0.10
+        partial_closure_factor: 0.3
+        min_closure_amount: 0.1
+        wrist_accel_deg_s2: 180.0
+        control_rate_hz: 10.0
+
+twist_propagation:
+    ros__parameters:
+        cycle_delay_s: 0.5
+        propagation_time_horizon_s: 2.0
+        propagation_dt_s: 0.02
+        hit_threshold_m: 0.05
+        min_points_near_hit: 3
+        twist_estimation_window: 5
+        active: false
+        input_cloud_topic: "/camera/depth/color/points"
+        segmented_cloud_topic: "/segmentation/object_cloud"
+        hand_pose_topic: "/hand_pose"
+        click_positive_topic: "/segmentation/click_positive"
+        hand_twist_topic: "/hand_twist"
+        compute_grasp_service: "/grasp_preshaping/compute_grasp"
+        segmentation_timeout_s: 5.0
+        cloud_max_age_s: 2.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Flat Reference Sections (used by test scripts and documentation)
+# ═══════════════════════════════════════════════════════════════════════════════
 
 # ── ROS Topics ────────────────────────────────────────────────────────────────
 topics:
@@ -39,6 +135,7 @@ topics:
 
     # Pipeline
     pipeline_state: "/pipeline/state"
+    pipeline_state_name: "/pipeline/state_name"
 
     # Haptic
     haptic_motors: "/haptic_band/motors"
@@ -46,6 +143,8 @@ topics:
     # Force
     finger_forces: "data_streams/fingers/forces/data"
     force_stream_switch: "data_streams/fingers/forces/switch"
+    force_controller_status: "/force_controller/status"
+    joint_states: "/joint_states"
 
 # ── TF Frames ─────────────────────────────────────────────────────────────────
 frames:
@@ -92,6 +191,16 @@ force:
     kp: 0.01
     ki: 0.001
     update_rate_hz: 10.0
+    max_position_step: 0.05       # Max position increment per tick (rad)
+    integral_limit: 50.0          # Anti-windup: max integral accumulator
+    stability_window_s: 1.0       # Seconds forces must be stable before declaring HOLDING
+    stability_tolerance: 15.0     # Raw sensor units — force must be within this of target
+    slip_threshold: 30.0          # Tangential force rate-of-change threshold for slip detection
+    emergency_force: 500.0        # Emergency release threshold (raw sensor units)
+    stale_data_timeout_s: 0.5     # Seconds without force data before warning
+    emergency_backoff_factor: 2.0 # Multiplier for max_step on emergency release
+    force_filter_window: 5        # Moving-average window for force readings
+    max_current_percent: 60.0     # Safety: max motor current as percentage (0-80)
 
 # ── Hardware ──────────────────────────────────────────────────────────────────
 hardware:

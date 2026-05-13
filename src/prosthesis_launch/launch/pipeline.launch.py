@@ -22,7 +22,15 @@ import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
+
+
+# Default config path: workspace-root config/prosthesis_config.yaml
+_WORKSPACE_ROOT = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", ".."
+)
+DEFAULT_CONFIG = os.path.join(_WORKSPACE_ROOT, "config", "prosthesis_config.yaml")
 
 
 def generate_launch_description():
@@ -32,8 +40,8 @@ def generate_launch_description():
     )
     config_arg = DeclareLaunchArgument(
         "config_file",
-        default_value="",
-        description="Path to prosthesis_config.yaml (empty = package default)",
+        default_value=DEFAULT_CONFIG,
+        description="Path to prosthesis_config.yaml",
     )
     camera_arg = DeclareLaunchArgument(
         "camera", default_value="true", description="Launch RealSense camera"
@@ -47,7 +55,7 @@ def generate_launch_description():
         package="pipeline_manager",
         executable="pipeline_manager_node",
         name="pipeline_manager",
-        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -92,7 +100,7 @@ def generate_launch_description():
         package="grasp_preshaping",
         executable="grasp_proximity_controller_node.py",
         name="proximity_controller",
-        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -101,6 +109,7 @@ def generate_launch_description():
         package="twist_propagation",
         executable="twist_propagation_node",
         name="twist_propagation",
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -109,7 +118,7 @@ def generate_launch_description():
         package="force_controller",
         executable="force_controller_node",
         name="force_controller",
-        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 

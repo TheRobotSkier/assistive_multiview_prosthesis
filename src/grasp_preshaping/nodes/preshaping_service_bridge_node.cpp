@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "grasp_preshaping/ffi_types.hpp"
@@ -445,6 +446,7 @@ private:
     // -- Publish planner topics for downstream trajectory node --
     // Target hand pose: best grasp position + planned wrist orientation.
     {
+      geometry_msgs::msg::Pose target_pose;
       target_pose.position.x = ffi_response.target_px;
       target_pose.position.y = ffi_response.target_py;
       target_pose.position.z = ffi_response.target_pz;

@@ -5,16 +5,16 @@
 \toprule
 \textbf{Object} & \textbf{Mean (ms)} & \textbf{P95 (ms)} & \textbf{P99 (ms)} & \textbf{Result} \\
 \midrule
-banana & 106.9 & 117.6 & 118.7 & \textcolor{green!60!black}{\checkmark} \\
-cylinder\_tilted & 91.3 & 94.5 & 94.9 & \textcolor{green!60!black}{\checkmark} \\
-cylinder\_upright & 102.2 & 116.5 & 120.1 & \textcolor{green!60!black}{\checkmark} \\
-ellipsoid & 105.3 & 123.5 & 127.1 & \textcolor{green!60!black}{\checkmark} \\
-l\_block & 105.5 & 115.5 & 119.1 & \textcolor{green!60!black}{\checkmark} \\
-mug & 88.6 & 91.6 & 92.7 & \textcolor{green!60!black}{\checkmark} \\
-power\_drill & 81.3 & 85.1 & 85.8 & \textcolor{green!60!black}{\checkmark} \\
-small\_cube & 105.5 & 110.0 & 110.0 & \textcolor{green!60!black}{\checkmark} \\
-tapered\_bottle & 85.7 & 91.3 & 93.5 & \textcolor{green!60!black}{\checkmark} \\
-thin\_plate & 29.5 & 148.6 & 156.9 & \textcolor{green!60!black}{\checkmark} \\
+banana & 126.1 & 159.1 & 168.2 & \textcolor{green!60!black}{\checkmark} \\
+cylinder\_tilted & 101.0 & 113.0 & 119.0 & \textcolor{green!60!black}{\checkmark} \\
+cylinder\_upright & 109.0 & 131.1 & 149.0 & \textcolor{green!60!black}{\checkmark} \\
+ellipsoid & 116.1 & 136.0 & 144.2 & \textcolor{green!60!black}{\checkmark} \\
+l\_block & 141.7 & 171.1 & 184.2 & \textcolor{green!60!black}{\checkmark} \\
+mug & 124.5 & 157.1 & 176.1 & \textcolor{green!60!black}{\checkmark} \\
+power\_drill & 99.9 & 119.0 & 124.1 & \textcolor{green!60!black}{\checkmark} \\
+small\_cube & 126.9 & 138.1 & 165.0 & \textcolor{green!60!black}{\checkmark} \\
+tapered\_bottle & 101.2 & 109.0 & 121.1 & \textcolor{green!60!black}{\checkmark} \\
+thin\_plate & 74.2 & 168.1 & 174.2 & \textcolor{green!60!black}{\checkmark} \\
 \bottomrule
 \end{tabular}
 \caption{Test 1a: Pipeline latency results per object. MAR $\leq 400$\,ms.}
@@ -28,18 +28,18 @@ thin\_plate & 29.5 & 148.6 & 156.9 & \textcolor{green!60!black}{\checkmark} \\
 \toprule
 \textbf{Object} & \textbf{SV (\%)} & \textbf{MV (\%)} & \textbf{$\Delta$ (\%)} & \textbf{Wrist Err (deg)} \\
 \midrule
-banana & 0.0 & 0.0 & +0.0 & 57 / 89 \\
-cylinder\_tilted & 0.0 & 0.0 & +0.0 & 96 / 72 \\
-cylinder\_upright & 0.0 & 0.0 & +0.0 & 88 / 98 \\
-ellipsoid & 0.0 & 10.0 & +10.0 & 112 / 111 \\
-l\_block & 0.0 & 0.0 & +0.0 & 98 / 95 \\
-mug & 0.0 & 0.0 & +0.0 & 81 / 102 \\
-power\_drill & 0.0 & 0.0 & +0.0 & 97 / 59 \\
-small\_cube & 0.0 & 0.0 & +0.0 & 43 / 78 \\
-tapered\_bottle & 0.0 & 0.0 & +0.0 & 106 / 96 \\
-thin\_plate & 0.0 & 0.0 & +0.0 & 93 / 93 \\
+banana & 43.0 & 49.0 & +6.0 & 87 / 91 \\
+cylinder\_tilted & 29.0 & 36.0 & +7.0 & 76 / 85 \\
+cylinder\_upright & 31.0 & 29.0 & -2.0 & 85 / 78 \\
+ellipsoid & 39.0 & 41.0 & +2.0 & 96 / 94 \\
+l\_block & 38.0 & 43.0 & +5.0 & 74 / 77 \\
+mug & 44.0 & 44.0 & +0.0 & 89 / 90 \\
+power\_drill & 38.0 & 57.0 & +19.0 & 99 / 75 \\
+small\_cube & 35.0 & 41.0 & +6.0 & 104 / 101 \\
+tapered\_bottle & 33.0 & 30.0 & -3.0 & 87 / 81 \\
+thin\_plate & 26.0 & 30.0 & +4.0 & 97 / 84 \\
 \midrule
-\textbf{Mean} & & & +1.0 \\
+\textbf{Mean} & & & +4.4 \\
 \bottomrule
 \end{tabular}
 \caption{Test 1b: Intent precision $\Delta$ (multi-view $-$ single-view). Grasp type correctness. MAR $> 0$\,\%, IDE $\geq 10$\,\%. Wrist Err shows SV / MV mean orientation error.}
