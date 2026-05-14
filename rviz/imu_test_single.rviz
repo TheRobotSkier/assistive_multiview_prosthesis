@@ -1,0 +1,34 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ''
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Reference Frame: imu_test_world
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+    - Alpha: 1
+      Class: rviz_default_plugins/PointCloud2
+      Color Transformer: RGB8
+      Enabled: true
+      Name: cam1 PointCloud
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Reliability Policy: Best Effort
+        Value: /cam1/cam1/depth/color/points
+      Size (Pixels): 3
+      Use Fixed Frame: true
+      Use rainbow: false
+  Enabled: true
+  Global Options:
+    Fixed Frame: imu_test_world
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
