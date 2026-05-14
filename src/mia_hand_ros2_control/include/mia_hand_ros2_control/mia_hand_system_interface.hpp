@@ -175,6 +175,10 @@ private:
   double jnt_vel_cmd_[3];    //!< Joint velocity commands.
   double jnt_vel_state_[3];  //!< Joint velocity states.
 
+  bool b_jnt_eff_state_defined_[3];  //!< Joint effort states defined or not.
+
+  double jnt_eff_state_[3];  //!< Joint effort states.
+
   std::array<CommandMode, 3> jnt_cmd_modes_;  //!< Current joint command modes.
 
   std::array<Rviz2JointInfo, 3> rviz2_joints_;  //!< Rviz2 joints info.

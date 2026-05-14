@@ -82,6 +82,7 @@ hardware_interface::CallbackReturn MiaHandSystemInterface::on_configure(
   {
     jnt_pos_state_[data_it] = 0.0;
     jnt_vel_state_[data_it] = 0.0;
+    jnt_eff_state_[data_it] = 0.0;
 
     jnt_pos_cmd_[data_it] = 0.0;
     jnt_vel_cmd_[data_it] = 0.0;
@@ -185,6 +186,13 @@ MiaHandSystemInterface::export_state_interfaces()
       jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
         jnt_names_[data_it], hardware_interface::HW_IF_VELOCITY,
         &jnt_vel_state_[data_it]));
+    }
+
+    if (b_jnt_eff_state_defined_[data_it])
+    {
+      jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
+        jnt_names_[data_it], hardware_interface::HW_IF_EFFORT,
+        &jnt_eff_state_[data_it]));
     }
 
     if (!rviz2_joints_[data_it].name.empty())
@@ -328,6 +336,27 @@ hardware_interface::return_type MiaHandSystemInterface::read(
     rviz2_joints_[2].pos = jnt_pos_state_[2];
     rviz2_joints_[1].vel = jnt_vel_state_[2];
     rviz2_joints_[2].vel = jnt_vel_state_[2];
+
+    int32_t thumb_nfor = 0;
+    int32_t index_nfor = 0;
+    int32_t mrl_nfor = 0;
+    int32_t thumb_tfor = 0;
+    int32_t index_tfor = 0;
+    int32_t mrl_tfor = 0;
+
+    if (mia_hand_->get_finger_forces(
+          thumb_nfor, index_nfor, mrl_nfor,
+          thumb_tfor, index_tfor, mrl_tfor))
+    {
+      jnt_eff_state_[0] = static_cast<double>(thumb_nfor);
+      jnt_eff_state_[1] = static_cast<double>(index_nfor);
+      jnt_eff_state_[2] = static_cast<double>(mrl_nfor);
+    }
+    else
+    {
+      RCLCPP_ERROR(*logger_,
+        "Failed to read finger force data: %s", mia_hand_->get_error_msg());
+    }
   }
   else
   {
@@ -430,6 +459,15 @@ bool MiaHandSystemInterface::read_joints_info(
         if (has_state_interface(*role_match_it, hardware_interface::HW_IF_VELOCITY))
         {
           b_jnt_vel_state_defined_[jnt_roles_it] = true;
+        }
+
+        if (has_state_interface(*role_match_it, hardware_interface::HW_IF_EFFORT))
+        {
+          b_jnt_eff_state_defined_[jnt_roles_it] = true;
+        }
+        else
+        {
+          b_jnt_eff_state_defined_[jnt_roles_it] = false;
         }
       }
       else  // Joint role not found
