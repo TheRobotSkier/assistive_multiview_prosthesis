@@ -10,6 +10,7 @@ class FingerState(Enum):
     CONTACT_SEEK = auto()
     CONTACTED = auto()
     RELEASED = auto()
+    SAFETY_STOPPED = auto()
 
 
 @dataclass(frozen=True)
@@ -83,13 +84,16 @@ def step_finger_state(
     if state == FingerState.CONTACTED:
         return (profile.contact_hold_velocity, FingerState.CONTACTED)
 
-    # Check safety stops
+    if state == FingerState.SAFETY_STOPPED:
+        return (0.0, FingerState.SAFETY_STOPPED)
+
+    # Check safety stops — return terminal SAFETY_STOPPED so next tick persists
     if elapsed_s >= profile.final_closure_timeout_s:
-        return (0.0, FingerState.CONTACTED)
+        return (0.0, FingerState.SAFETY_STOPPED)
 
     extra = current_position - predicted_closure
     if extra >= profile.max_extra_closure:
-        return (0.0, FingerState.CONTACTED)
+        return (0.0, FingerState.SAFETY_STOPPED)
 
     # State transitions
     if state == FingerState.OPEN_LOOP:

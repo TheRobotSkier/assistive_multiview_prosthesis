@@ -95,7 +95,7 @@ def test_step_finger_state_contact_seek_to_contacted():
 
 
 def test_step_finger_state_timeout_stops():
-    """Timeout past final_closure_timeout_s returns CONTACTED with zero velocity."""
+    """Timeout past final_closure_timeout_s returns SAFETY_STOPPED with zero velocity."""
     profile = ClosureProfile(0.35, 0.08, 0.25, 1.5, 50.0, 15.0, 0.2, 0.0, 3.0)
     velocity, new_state = step_finger_state(
         profile, FingerState.CONTACT_SEEK,
@@ -104,12 +104,12 @@ def test_step_finger_state_timeout_stops():
         current_force=ForceReading(force=0.0, baseline=0.0),
         elapsed_s=4.0,
     )
-    assert new_state == FingerState.CONTACTED
+    assert new_state == FingerState.SAFETY_STOPPED
     assert velocity == 0.0
 
 
 def test_step_finger_state_max_extra_closure_stops():
-    """Exceeding predicted + max_extra_closure stops the finger."""
+    """Exceeding predicted + max_extra_closure returns SAFETY_STOPPED."""
     profile = ClosureProfile(0.35, 0.08, 0.25, 1.5, 50.0, 15.0, 0.2, 0.0, 3.0)
     velocity, new_state = step_finger_state(
         profile, FingerState.CONTACT_SEEK,
@@ -118,7 +118,7 @@ def test_step_finger_state_max_extra_closure_stops():
         current_force=ForceReading(force=0.0, baseline=0.0),
         elapsed_s=0.1,
     )
-    assert new_state == FingerState.CONTACTED
+    assert new_state == FingerState.SAFETY_STOPPED
     assert velocity == 0.0
 
 
@@ -135,6 +135,20 @@ def test_released_resets_to_open_loop():
     assert new_state == FingerState.OPEN_LOOP
     # Far from predicted at distance 0.2 on 0.25 decay → near max speed
     assert velocity > 0.08
+
+
+def test_safety_stopped_persists():
+    """SAFETY_STOPPED stays terminal with zero velocity across ticks."""
+    profile = ClosureProfile(0.35, 0.08, 0.25, 1.5, 50.0, 15.0, 0.2, 0.05, 3.0)
+    velocity, new_state = step_finger_state(
+        profile, FingerState.SAFETY_STOPPED,
+        predicted_closure=0.5,
+        current_position=0.55,
+        current_force=ForceReading(force=0.0, baseline=0.0),
+        elapsed_s=0.0,
+    )
+    assert new_state == FingerState.SAFETY_STOPPED
+    assert velocity == 0.0
 
 
 def test_compute_baseline_from_history():
