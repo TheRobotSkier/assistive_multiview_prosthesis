@@ -26,6 +26,12 @@ topics:
     thumb_cmd: "/thumb_pos_ff_controller/commands"
     index_cmd: "/index_pos_ff_controller/commands"
     mrl_cmd: "/mrl_pos_ff_controller/commands"
+    thumb_pos_cmd: "/thumb_pos_ff_controller/commands"
+    index_pos_cmd: "/index_pos_ff_controller/commands"
+    mrl_pos_cmd: "/mrl_pos_ff_controller/commands"
+    thumb_vel_cmd: "/thumb_vel_ff_controller/commands"
+    index_vel_cmd: "/index_vel_ff_controller/commands"
+    mrl_vel_cmd: "/mrl_vel_ff_controller/commands"
 
     # Wrist
     wrist_set_position: "/wrist/set_position"
@@ -46,6 +52,17 @@ topics:
     # Force
     finger_forces: "data_streams/fingers/forces/data"
     force_stream_switch: "data_streams/fingers/forces/switch"
+
+# ── Controllers ───────────────────────────────────────────────────────────────
+controllers:
+  finger_position:
+    - "thumb_pos_ff_controller"
+    - "index_pos_ff_controller"
+    - "mrl_pos_ff_controller"
+  finger_velocity:
+    - "thumb_vel_ff_controller"
+    - "index_vel_ff_controller"
+    - "mrl_vel_ff_controller"
 
 # ── TF Frames ─────────────────────────────────────────────────────────────────
 frames:
@@ -87,11 +104,36 @@ execution:
 
 # ── Force Control ─────────────────────────────────────────────────────────────
 force:
-    target_force_min: 50.0
-    target_force_max: 200.0
-    kp: 0.01
-    ki: 0.001
-    update_rate_hz: 10.0
+  enabled: true
+  joint_states_topic: "/joint_states"
+  controller_manager_service: "/controller_manager/switch_controller"
+  active_profile: "soft"
+  baseline_window_s: 0.5
+  stale_force_timeout_s: 0.5
+  force_reading_timeout_ms: 500
+
+  profiles:
+    soft:
+      max_closing_speed: 0.35
+      min_closing_speed: 0.08
+      decay_distance: 0.25
+      decay_exponent: 1.5
+      contact_force_threshold: 50.0
+      contact_force_spike_threshold: 15.0
+      max_extra_closure: 0.20
+      contact_hold_velocity: 0.0
+      final_closure_timeout_s: 3.0
+
+    strong:
+      max_closing_speed: 0.55
+      min_closing_speed: 0.12
+      decay_distance: 0.30
+      decay_exponent: 1.2
+      contact_force_threshold: 100.0
+      contact_force_spike_threshold: 25.0
+      max_extra_closure: 0.30
+      contact_hold_velocity: 0.0
+      final_closure_timeout_s: 4.0
 
 # ── Hardware ──────────────────────────────────────────────────────────────────
 hardware:
