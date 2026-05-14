@@ -1,0 +1,55 @@
+aruco:
+  dictionary: DICT_6X6_1000
+  default_marker_size_m: 0.100
+
+frames:
+  # RViz fixed frame for the aligned point clouds.
+  world_frame: world
+
+filter:
+  # Exponential smoothing applied per camera after fusing all markers visible in
+  # the frame. Raise toward 1.0 for faster motion, lower for steadier static rigs.
+  smoothing_alpha: 0.45
+
+quality:
+  min_marker_area_px2: 800.0
+  max_marker_distance_m: 2.5
+  max_reprojection_error_px: 4.0
+
+cameras:
+  head:
+    image_topic: /head/d435i_head/color/image_raw
+    camera_info_topic: /head/d435i_head/color/camera_info
+    detected_camera_frame: head_d435i_head_color_optical_frame
+    link_frame: d435i_head_link
+    pose_topic: /head/camera_marker_tf/pose
+    valid_topic: /head/camera_marker_tf/valid
+    active_marker_topic: /head/camera_marker_tf/active_marker_id
+    quality_topic: /head/camera_marker_tf/quality
+    detection_rate_hz: 15.0
+
+  arm:
+    image_topic: /arm/d435i_arm/color/image_raw
+    camera_info_topic: /arm/d435i_arm/color/camera_info
+    detected_camera_frame: arm_d435i_arm_color_optical_frame
+    link_frame: d435i_arm_link
+    pose_topic: /arm/camera_marker_tf/pose
+    valid_topic: /arm/camera_marker_tf/valid
+    active_marker_topic: /arm/camera_marker_tf/active_marker_id
+    quality_topic: /arm/camera_marker_tf/quality
+    detection_rate_hz: 15.0
+
+markers:
+  # Marker frames use the convention in camera_marker_tf_node.py:
+  # origin at marker center, x right, y down in the printed plane.
+  #
+  # Put marker_0 flat in the chosen world origin to start. Add more markers by
+  # measuring their 4x4 T_world_marker transforms in meters.
+  0:
+    frame_id: marker_0
+    size_m: 0.100
+    T_world_marker:
+      - [1.0, 0.0, 0.0, 0.0]
+      - [0.0, 1.0, 0.0, 0.0]
+      - [0.0, 0.0, 1.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]

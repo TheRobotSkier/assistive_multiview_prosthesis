@@ -9,9 +9,10 @@ IMAGE     := docker-deployment-realsense_camera:latest
 REPO_ROOT := $(abspath $(CURDIR)/..)
 
 # Source files (single source of truth — live in src/ in the repo)
-CAM_CFG     := $(REPO_ROOT)/src/sensor_fusion_bringup/config/d435i_cameras.yaml
-LAUNCH_FILE := $(REPO_ROOT)/src/sensor_fusion_bringup/launch/dual_d435i.launch.py
-CYCLONE_CFG := $(CURDIR)/config/cyclonedds_robotlab.xml
+CAM_CFG       := $(REPO_ROOT)/src/sensor_fusion_bringup/config/d435i_cameras.yaml
+LAUNCH_FILE   := $(REPO_ROOT)/src/sensor_fusion_bringup/launch/dual_d435i.launch.py
+SFBP_SRC      := $(REPO_ROOT)/src/sensor_fusion_bringup
+CYCLONE_CFG   := $(CURDIR)/config/cyclonedds_robotlab.xml
 
 # Container lifetime limits (seconds). Adjust here to change all Jetson containers.
 # 7200 = 2 hours
@@ -30,15 +31,22 @@ IMU_CFG_INSTALL    := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fus
 CAM_CFG_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/d435i_cameras.yaml
 LAUNCH_INSTALL  := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/dual_d435i.launch.py
 
+# Camera marker-TF files mounted into the existing Jetson image at runtime.
+CAMERA_TF_LAUNCH        := $(SFBP_SRC)/launch/dual_camera_marker_tf.launch.py
+CAMERA_TF_SCRIPT        := $(SFBP_SRC)/scripts/camera_marker_tf_node.py
+CAMERA_TF_CONFIG_DIR    := $(SFBP_SRC)/config
+CAMERA_TF_LAUNCH_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/dual_camera_marker_tf.launch.py
+CAMERA_TF_SCRIPT_INSTALL := /miahand_ws/install/sensor_fusion_bringup/lib/sensor_fusion_bringup/camera_marker_tf_node.py
+CAMERA_TF_CONFIG_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config
+
 # OpenVINS overlay and source paths
 OVINS_OVERLAY   := /home/robotlab/openvins_overlay/install_overlay
-SFBP_SRC        := $(REPO_ROOT)/src/sensor_fusion_bringup
 
 # Container paths for the openVINS overlay share (volume-mounted at runtime)
 OVINS_PKG_SHARE := /ovins_overlay/install/sensor_fusion_bringup/share/sensor_fusion_bringup
 OVINS_PKG_LIB   := /ovins_overlay/install/sensor_fusion_bringup/lib/sensor_fusion_bringup
 
-.PHONY: cameras cameras-stop cameras-logs openvins openvins-stop openvins-logs list-cameras imu-test imu-test-stop imu-test-logs
+.PHONY: cameras cameras-stop cameras-logs camera-tf camera-tf-stop camera-tf-logs camera-positioning camera-positioning-stop openvins openvins-stop openvins-logs list-cameras imu-test imu-test-stop imu-test-logs
 
 # ── Cameras container (depth + pointcloud for both cameras) ──────────────────
 cameras:
@@ -68,6 +76,41 @@ cameras-stop:
 
 cameras-logs:
 	$(SUDO) docker logs -f cameras_test
+
+# ── Marker-map camera TF container ──────────────────────────────────────────
+# Runs alongside the cameras container. It publishes world -> d435i_*_link from
+# visible 100 mm ArUco markers, allowing both point clouds to render in RViz's
+# world frame without static fake camera poses.
+camera-tf:
+	$(SUDO) docker rm -f camera_marker_tf 2>/dev/null || true
+	$(SUDO) docker run -d \
+		--name camera_marker_tf \
+		--network host \
+		--ipc host \
+		--runtime nvidia \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v $(CYCLONE_CFG):/tmp/cyclonedds_peer.xml:ro \
+		-v $(CAMERA_TF_LAUNCH):$(CAMERA_TF_LAUNCH_INSTALL):ro \
+		-v $(CAMERA_TF_SCRIPT):$(CAMERA_TF_SCRIPT_INSTALL):ro \
+		-v $(CAMERA_TF_CONFIG_DIR):$(CAMERA_TF_CONFIG_INSTALL):ro \
+		$(IMAGE) \
+		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_camera_marker_tf.launch.py'
+
+camera-tf-stop:
+	$(SUDO) docker rm -f camera_marker_tf 2>/dev/null || true
+
+camera-tf-logs:
+	$(SUDO) docker logs -f camera_marker_tf
+
+camera-positioning:
+	$(MAKE) cameras
+	$(MAKE) camera-tf
+
+camera-positioning-stop:
+	$(MAKE) camera-tf-stop
+	$(MAKE) cameras-stop
 
 # ── OpenVINS container (RGB + IMU → VIO + ArUco correction) ─────────────────
 # Volume-mounts the overlay and repo config/launch/scripts so changes

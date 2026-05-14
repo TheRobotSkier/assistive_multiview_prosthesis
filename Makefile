@@ -17,7 +17,7 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-marker-tf rviz-marker-tf-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-camera-tf jetson-camera-tf-stop jetson-camera-tf-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -119,6 +119,36 @@ rviz-kill:
 	-podman rm rviz-robotlab 2>/dev/null
 	@echo "RViz stopped."
 
+# ── Robotlab RViz for live marker-derived camera TF ─────────────────
+rviz-marker-tf:
+	@echo "Launching RViz for live marker-derived world→camera TF"
+	@test -f rviz/robotlab_cameras_static_tf.rviz || { echo "Missing rviz/robotlab_cameras_static_tf.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	xhost +
+	podman run --rm -d --name rviz-marker-tf \
+		--network host \
+		--ipc host \
+		--device /dev/dri \
+		--userns=keep-id \
+		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
+		-v $(CURDIR)/rviz/robotlab_cameras_static_tf.rviz:/rviz_config.rviz:ro \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "Marker-TF RViz container started (rviz-marker-tf). Kill with: make rviz-marker-tf-kill"
+
+rviz-marker-tf-kill:
+	-podman kill rviz-marker-tf 2>/dev/null
+	-podman rm rviz-marker-tf 2>/dev/null
+	@echo "Marker-TF RViz stopped."
+
 # ── Robotlab RViz + static TF (both cameras at world origin) ─────────
 rviz-static:
 	@echo "Starting static TF publisher (both cameras → world origin)"
@@ -192,7 +222,7 @@ robotlab-connect:
 JETSON_HOST       := robotlab
 JETSON_DEPLOY_DIR := /home/robotlab/multiview_prosthesis
 JETSON_BARE_REPO  := /home/robotlab/multiview_prosthesis.git
-JETSON_BRANCH     := full_test_implementation
+JETSON_BRANCH     ?= $(shell git branch --show-current 2>/dev/null || echo full_test_implementation)
 
 # One-time setup: creates bare repo + checkout hook on Jetson, adds git remote.
 jetson-setup: robotlab-connect
@@ -219,6 +249,17 @@ jetson-cameras-stop: robotlab-connect
 
 jetson-cameras-logs: robotlab-connect
 	ssh $(JETSON_HOST) "echo robotlab | sudo -S docker logs -f cameras_test"
+
+jetson-camera-tf: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make camera-positioning"
+	$(MAKE) rviz-marker-tf
+
+jetson-camera-tf-stop: robotlab-connect
+	-ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make camera-positioning-stop"
+	$(MAKE) rviz-marker-tf-kill
+
+jetson-camera-tf-logs: robotlab-connect
+	ssh $(JETSON_HOST) "echo robotlab | sudo -S docker logs -f camera_marker_tf"
 
 jetson-list-cameras: robotlab-connect
 	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make list-cameras"
