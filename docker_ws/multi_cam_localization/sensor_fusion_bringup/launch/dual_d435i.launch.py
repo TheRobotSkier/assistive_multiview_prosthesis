@@ -41,7 +41,12 @@ def _camera_actions(cam, common):
             "tf_prefix": f"{cam['namespace']}_",
             "enable_color": True,
             "enable_depth": _as_bool(common.get("enable_depth", common["pointcloud_enable"])),
-            "clip_distance": float(common.get("pointcloud_max_range_m", -1.0)) if pointcloud_enabled else -1.0,
+            "enable_infra": False,
+            "enable_infra1": False,
+            "enable_infra2": False,
+            "clip_distance": float(common.get("pointcloud_max_range_m", -2.0))
+            if pointcloud_enabled and float(common.get("pointcloud_max_range_m", -2.0)) > 0.0
+            else -2.0,
             "pointcloud.enable": pointcloud_enabled,
             "pointcloud.stream_filter": int(common.get("pointcloud_stream_filter", 2)),
             "pointcloud.stream_index_filter": int(common.get("pointcloud_stream_index_filter", 0)),

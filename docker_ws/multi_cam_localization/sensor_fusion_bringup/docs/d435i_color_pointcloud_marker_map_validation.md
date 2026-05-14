@@ -124,7 +124,7 @@ pointcloud_max_rate_hz:=10.0
 pointcloud_voxel_leaf_m:=0.02
 pointcloud_max_range_m:=2.0
 pointcloud_decimation_magnitude:=3
-enable_pointcloud_neon_fix:=true
+enable_pointcloud_neon_fix:=false
 ```
 
 These keep OpenVINS RGB at `640x480x30`, keep RealSense depth at
@@ -144,9 +144,18 @@ docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd
 On the Jetson RealSense build, the pointcloud filter is declared as
 `pointcloud__neon_` instead of plain `pointcloud`. The launch sets both the
 plain and `pointcloud__neon_` startup parameters directly so the filter and RGB
-texture stream are active when pointclouds are enabled. The top-level live
-launch also re-applies `pointcloud__neon_.enable:=true` after camera startup by
-default for pointcloud-enabled runs.
+texture stream are active when pointclouds are enabled. The delayed
+`enable_pointcloud_neon_fix` setter remains available as a legacy fallback, but
+the default is `false` because startup parameters now enable pointclouds
+reliably and the delayed setter can print misleading `Node not found` errors
+when DDS discovery lags.
+
+The custom D435i launches explicitly set `enable_infra`, `enable_infra1`, and
+`enable_infra2` to `false`. This matches the official RealSense launch defaults
+and avoids opening extra infrared streams alongside depth/color, which caused
+depth frame timeouts during pointcloud testing. A non-positive
+`pointcloud_max_range_m` disables launch-level RealSense clipping by setting
+`clip_distance:=-2.0`; positive values are forwarded as the clip distance.
 
 By default, transformed pointclouds publish whenever TF to `marker_map` is
 available. To require an explicit OpenVINS marker-map lock before transformed
@@ -302,6 +311,11 @@ explicit lock gives status reason `published_unlocked`. After lock, expect
 `published`. If strict locking is enabled, expect `marker_map_not_locked` before
 lock.
 
+If status alternates between `published` and `rate_limited`, the pointcloud path
+is healthy. `rate_limited` only means raw RealSense pointclouds are arriving
+faster than `pointcloud_max_rate_hz`, so the transform node is intentionally
+dropping intermediate clouds to protect OpenVINS timing.
+
 The status JSON also includes `input_points`, `transform_input_points`, and
 `output_points`. If range clipping and decimation are helping,
 `transform_input_points` should be much lower than the raw 640x480 point count,
@@ -364,6 +378,8 @@ Expected fields are `x`, `y`, `z`, and `rgb`.
 - If `/arm/d435i_arm/points_marker_map` is selected but no points appear, echo
   `/arm/d435i_arm/points_marker_map/status`. `tf_unavailable` means OpenVINS has
   not initialized `marker_map` yet.
+- If status says `rate_limited`, leave it alone unless the visual cloud rate is
+  too low. It is expected with the default rate cap.
 - CycloneDDS `Failed to parse type hash` warnings are discovery noise. Treat
   them as non-fatal if the topic has publishers and messages are flowing.
 

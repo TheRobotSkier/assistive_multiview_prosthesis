@@ -28,10 +28,10 @@ pointcloud:
   voxel_leaf_m: 0.02
   max_range_m: 2.0
   decimation_magnitude: 3
-  # Jetson RealSense sometimes needs pointcloud__neon_.enable re-applied after
-  # the camera node is fully up. This delayed setter runs only when pointclouds
-  # are enabled.
-  enable_neon_fix: true
+  # Legacy Jetson fallback that re-applies pointcloud__neon_.enable after the
+  # camera node is fully up. Startup parameters now enable pointclouds reliably,
+  # so keep this false unless a specific RealSense build needs the fallback.
+  enable_neon_fix: false
   # False means the marker_map pointcloud republisher is gated by TF availability
   # only. Set true to drop clouds until OpenVINS publishes marker_map_locked=true.
   require_marker_map_locked: false

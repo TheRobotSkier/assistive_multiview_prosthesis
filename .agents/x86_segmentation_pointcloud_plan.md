@@ -18,14 +18,20 @@ The segmentation code on the older integration branch consumes:
 
 It expects `sensor_msgs/msg/PointCloud2` with `x`, `y`, `z`, and preferably
 packed PCL-style `rgb` fields. Unordered `height=1` clouds are acceptable.
+Use PointCloud2 as the segmentation contract; voxel filtering/downsampling
+should be an optional preprocessing step, not the primary message interface.
+
+As of 2026-05-14, Jetson live validation confirmed color pointclouds are visible
+in RViz2 while OpenVINS remains stable. The status topic showed
+`accepted:true`/`reason:"published"` interleaved with expected
+`reason:"rate_limited"` messages.
 
 ## Recommended X86 Responsibilities
 
-- Subscribe to raw Jetson RealSense color pointclouds:
-  - `/head/d435i_head/depth/color/points`
-  - `/arm/d435i_arm/depth/color/points`
-- Subscribe to `/tf` and `/tf_static` from the Jetson.
-- Transform each raw cloud into `marker_map` on the x86 PC.
+- First integration path: subscribe to the already validated Jetson marker-map
+  pointclouds:
+  - `/head/d435i_head/points_marker_map`
+  - `/arm/d435i_arm/points_marker_map`
 - Optionally crop, range-filter, voxel/downsample, and merge the two clouds.
 - Publish the segmentation-ready cloud on:
   - `/segmentation/input_cloud`
@@ -34,14 +40,23 @@ packed PCL-style `rgb` fields. Unordered `height=1` clouds are acceptable.
 - Preserve `x`, `y`, `z`, and `rgb` fields so the segmentation node can consume
   the cloud without format rewrites.
 
+If Jetson load becomes too high, move more work to x86:
+
+- Subscribe to raw Jetson RealSense color pointclouds:
+  - `/head/d435i_head/depth/color/points`
+  - `/arm/d435i_arm/depth/color/points`
+- Subscribe to `/tf` and `/tf_static` from the Jetson.
+- Transform each raw cloud into `marker_map` on the x86 PC.
+
 ## Jetson Responsibilities
 
 - Continue publishing OpenVINS and marker-map TF on the Jetson.
 - Keep fixed ID0 and dynamic ID2 marker update behavior unchanged.
 - Keep `marker_fixed_ids` ID0-only; do not add ID2.
 - Keep pointclouds opt-in with `enable_pointclouds:=true`.
-- Prefer raw pointcloud transport to x86 over Jetson-side transformed,
-  downsampled, or merged pointcloud processing when Jetson CPU/EMC is high.
+- Keep the current Jetson-side `points_marker_map` republishers for near-term
+  RViz and segmentation integration because they are now validated.
+- Prefer raw pointcloud transport to x86 later if Jetson CPU/EMC is high.
 
 ## QoS Recommendation
 
@@ -60,12 +75,12 @@ RealSense pointcloud topics, it should match best-effort QoS.
 
 ## Initial X86 Validation
 
-1. Confirm the x86 PC sees raw pointcloud topics and TF:
-   - `/head/d435i_head/depth/color/points`
-   - `/arm/d435i_arm/depth/color/points`
+1. Confirm the x86 PC sees the transformed pointcloud topics:
+   - `/head/d435i_head/points_marker_map`
+   - `/arm/d435i_arm/points_marker_map`
    - `/tf`
    - `/tf_static`
-2. Confirm x86 can transform both raw cloud frame IDs to `marker_map`.
+2. Confirm both pointcloud headers are already `marker_map`.
 3. Publish `/segmentation/input_cloud` at a limited rate, initially 3-6 Hz.
 4. Confirm:
    - `ros2 topic echo --once /segmentation/input_cloud --field header.frame_id`

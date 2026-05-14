@@ -20,6 +20,12 @@ RealSense clouds with sensor-data/best-effort QoS, then republishes transformed
 high-bandwidth path drop-friendly while making the transformed topics visible to
 default RViz PointCloud2 displays and plain `ros2 topic` CLI commands.
 
+Final live validation update: after disabling the unintended RealSense infrared
+streams, color pointclouds are visible in RViz2 while OpenVINS remains healthy.
+The status topic reports alternating `published` and `rate_limited`, which is
+the expected behavior when raw pointclouds arrive faster than
+`pointcloud_max_rate_hz`.
+
 ## Implemented Changes
 
 ### Opt-In D435i Color Pointclouds
@@ -48,6 +54,9 @@ Pointcloud/depth settings when enabled:
 
 ```text
 enable_depth: true
+enable_infra: false
+enable_infra1: false
+enable_infra2: false
 depth_module.depth_profile: 640x480x15
 pointcloud.enable: true
 pointcloud__neon_.enable: true
@@ -60,13 +69,21 @@ align_depth.enable: false
 decimation_filter.enable: true
 decimation_filter.filter_magnitude: 3
 clip_distance: 2.0
+enable_pointcloud_neon_fix: false
 ```
 
 The `pointcloud__neon_` parameters are included because the Jetson RealSense
-build exposes the pointcloud filter under that parameter prefix. The top-level
-live launch also passes through the delayed `enable_pointcloud_neon_fix` setter
-so `pointcloud__neon_.enable` is re-applied after camera startup when
-pointclouds are enabled.
+build exposes the pointcloud filter under that parameter prefix. The delayed
+`enable_pointcloud_neon_fix` setter is now a legacy fallback only; startup
+parameters enabled raw pointclouds reliably during validation, while the delayed
+setter could print distracting `Node not found` errors when DDS discovery lagged.
+
+The explicit infrared disables were added after a raw camera test showed the
+custom launch opening `Infra(1)` and `Infra(2)` profiles in addition to depth and
+color, followed by RealSense `Frames didn't arrived within 5 seconds` depth
+timeouts. The official `rs_launch.py` defaults keep infrared streams disabled and
+allowed depth frames to publish, so the custom D435i launches now match that
+behavior.
 
 ### Stable Pointcloud Topics
 
@@ -276,22 +293,31 @@ ov_msckf run_subscribe_msckf_marker
 Validated:
 
 - raw RealSense color image topics remained close to 30 Hz in earlier tests
-- raw RealSense pointcloud topics published around 15 Hz when enabled
-- transformed color pointclouds were visible in RViz in `marker_map`
+- raw RealSense depth topics published around 15 Hz in single and dual-camera
+  tests after disabling infrared streams
+- raw RealSense pointcloud topics published around 15 Hz in dual-camera raw
+  tests and around 10-11 Hz in the full OpenVINS launch under load
+- transformed color pointcloud topics published when test TFs supplied
+  `marker_map -> head_cam0` and `marker_map -> arm_cam0`, proving the transform
+  node and RViz-facing topics work once OpenVINS camera TF exists
+- live RViz2 validation confirmed color pointclouds are visible in `marker_map`
+  while OpenVINS remains stable
+- `/head/d435i_head/points_marker_map/status` reported `accepted:true` with
+  `reason:"published"` interleaved with expected `reason:"rate_limited"` drops
 - OpenVINS-only dual-camera baseline now runs much better with the Jetson-safe
   profile
 - no ID2 was added to `marker_fixed_ids`
 - fixed ID0 and dynamic ID2 topic separation was preserved
 
-Still to validate before commit:
+Remaining validation before deeper follow-up work:
 
-- OpenVINS-only baseline remains stable for one more run after all current file
-  edits
-- pointcloud-enabled run with conservative settings does not destabilize
-  OpenVINS
-- transformed pointcloud headers are `marker_map`
-- both `/head/d435i_head/points_marker_map` and
-  `/arm/d435i_arm/points_marker_map` publish while OpenVINS remains alive
+- optionally repeat the arm status/rate check for
+  `/arm/d435i_arm/points_marker_map/status` and
+  `/arm/d435i_arm/points_marker_map`
+- record one short pointcloud-enabled bag if later regression testing needs a
+  known-good reference
+- investigate the remaining long-run drift/reanchor behavior in a fresh focused
+  task after committing this implementation baseline
 
 ## Recommended Next Tests
 
@@ -304,27 +330,47 @@ docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd
 Then run the conservative pointcloud test:
 
 ```bash
-docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true start_preview:=false start_rviz:=false pointcloud_max_rate_hz:=8.0 pointcloud_voxel_leaf_m:=0.03 pointcloud_max_range_m:=1.5 pointcloud_decimation_magnitude:=4'
+docker compose run --rm --name openvins_pc realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true start_preview:=false start_rviz:=false pointcloud_require_marker_map_locked:=false pointcloud_max_rate_hz:=8.0 pointcloud_voxel_leaf_m:=0.02 pointcloud_max_range_m:=2.0 pointcloud_decimation_magnitude:=3 enable_pointcloud_neon_fix:=false'
 ```
 
-Check transformed pointcloud rates:
+In another terminal, first confirm raw pointclouds are flowing:
 
 ```bash
-docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 topic hz /head/d435i_head/points_marker_map'
-```
-
-```bash
-docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 topic hz /arm/d435i_arm/points_marker_map'
-```
-
-Check pointcloud frame IDs:
-
-```bash
-docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 topic echo --once /head/d435i_head/points_marker_map --field header.frame_id'
+docker exec openvins_pc bash -lc 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && timeout 8 ros2 topic hz /head/d435i_head/depth/color/points'
 ```
 
 ```bash
-docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 topic echo --once /arm/d435i_arm/points_marker_map --field header.frame_id'
+docker exec openvins_pc bash -lc 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && timeout 8 ros2 topic hz /arm/d435i_arm/depth/color/points'
+```
+
+Then check transformed pointcloud status. If this says `tf_unavailable` for
+`head_cam0` or `arm_cam0`, OpenVINS has not initialized the camera TF yet; move
+or tilt the cameras enough for initialization while keeping the marker visible.
+
+```bash
+docker exec openvins_pc bash -lc 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && timeout 8 ros2 topic echo /head/d435i_head/points_marker_map/status'
+```
+
+```bash
+docker exec openvins_pc bash -lc 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && timeout 8 ros2 topic echo /arm/d435i_arm/points_marker_map/status'
+```
+
+Once status reports published clouds, check rates and frame IDs:
+
+```bash
+docker exec openvins_pc bash -lc 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && timeout 8 ros2 topic hz /head/d435i_head/points_marker_map'
+```
+
+```bash
+docker exec openvins_pc bash -lc 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && timeout 8 ros2 topic hz /arm/d435i_arm/points_marker_map'
+```
+
+```bash
+docker exec openvins_pc bash -lc 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 topic echo --once /head/d435i_head/points_marker_map --field header.frame_id'
+```
+
+```bash
+docker exec openvins_pc bash -lc 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 topic echo --once /arm/d435i_arm/points_marker_map --field header.frame_id'
 ```
 
 Expected frame:
@@ -343,17 +389,30 @@ The x86 segmentation-side plan is documented in:
 
 The recommended architecture is:
 
-- keep OpenVINS, marker-map TF, and raw camera streams on the Jetson
-- move optional merge, segmentation-specific crop/downsample, and segmentation
-  input preparation to the x86 Ubuntu PC
-- publish the segmentation-ready pointcloud as `/segmentation/input_cloud`
-  in `marker_map`
+- keep OpenVINS, marker-map TF, RealSense image/IMU, and the opt-in
+  `points_marker_map` republishers on the Jetson for now
+- move segmentation, optional cloud merge, segmentation-specific crop/downsample,
+  and any heavier grasp-input preparation to the x86 Ubuntu PC
+- publish the segmentation-ready pointcloud as `/segmentation/input_cloud` in
+  `marker_map`
 - preserve the existing `/segmentation/click_positive` target for future hit
   or click commands
 
+For the first x86 integration, subscribe to the already validated Jetson topics:
+
+```text
+/head/d435i_head/points_marker_map
+/arm/d435i_arm/points_marker_map
+```
+
+If Jetson CPU/EMC becomes too high, move the marker-map pointcloud transform
+and merge/downsample step to the x86 PC later by subscribing to raw RealSense
+pointclouds plus `/tf` and `/tf_static`.
+
 ## Commit Recommendation
 
-Do not commit until the conservative pointcloud-enabled test is complete.
+This is a reasonable point to commit the implementation baseline if the user has
+confirmed RViz2 color pointcloud visibility and OpenVINS stability.
 
 Before committing, remove generated build/install/log overlay changes from the
 git index/worktree view so only source/config/docs changes are committed.

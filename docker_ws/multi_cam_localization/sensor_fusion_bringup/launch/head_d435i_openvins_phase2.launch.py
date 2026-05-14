@@ -37,6 +37,9 @@ def generate_launch_description():
             "gyro_fps": 200,
             "accel_fps": 200,
             "enable_depth": ParameterValue(LaunchConfiguration("enable_pointclouds"), value_type=bool),
+            "enable_infra": False,
+            "enable_infra1": False,
+            "enable_infra2": False,
             "depth_module.depth_profile": "640x480x15",
             "clip_distance": ParameterValue(
                 PythonExpression([
@@ -44,7 +47,9 @@ def generate_launch_description():
                     LaunchConfiguration("pointcloud_max_range_m"),
                     "' if '",
                     LaunchConfiguration("enable_pointclouds"),
-                    "'.lower() in ['true', '1', 'yes', 'on'] else '-1.0'",
+                    "'.lower() in ['true', '1', 'yes', 'on'] and float('",
+                    LaunchConfiguration("pointcloud_max_range_m"),
+                    "') > 0.0 else '-2.0'",
                 ]),
                 value_type=float,
             ),

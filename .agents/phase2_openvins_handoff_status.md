@@ -22,9 +22,16 @@ Color pointclouds are now opt-in on the same live path with
 `enable_pointclouds:=true`. OpenVINS RGB input remains `640x480x30`; depth and
 color pointcloud generation use `640x480x15` depth and republish transformed
 grasping clouds on `/head/d435i_head/points_marker_map` and
-`/arm/d435i_arm/points_marker_map` in `marker_map` after marker-map lock.
+`/arm/d435i_arm/points_marker_map` in `marker_map` after OpenVINS has initialized
+the camera TF. The default does not require the explicit lock topic; it publishes
+whenever marker-map TF is available.
 Validation commands live in
 `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`.
+
+Final 2026-05-14 validation: color pointclouds are visible in RViz2 and OpenVINS
+still runs well. `/head/d435i_head/points_marker_map/status` reported
+`accepted:true` with `reason:"published"` interleaved with expected
+`reason:"rate_limited"` messages.
 
 As of 2026-05-14, the live D435i OpenVINS launch path defaults
 `hold_back_imu_for_frames:=true` for both RealSense nodes. This is intended to
@@ -45,6 +52,12 @@ dual-camera profile: `track_frequency: 21.0`, `num_pts: 200`,
 `fast_threshold: 25`, `min_px_dist: 15`, `max_clones: 8`, `max_slam: 25`,
 `max_msckf_in_update: 25`, and `num_opencv_threads: 2`. RealSense RGB remains
 `640x480x30`, so no recalibration is implied by this tuning step.
+
+Pointcloud root-cause fix: custom D435i launches were explicitly updated to set
+`enable_infra`, `enable_infra1`, and `enable_infra2` false. Without this, the
+RealSense driver opened extra infrared streams and depth/pointcloud frames timed
+out. The delayed `enable_pointcloud_neon_fix` default is now false; startup
+`pointcloud__neon_` parameters are sufficient.
 
 Rollback/diagnostic controls:
 

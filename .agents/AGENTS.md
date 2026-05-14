@@ -68,14 +68,23 @@ D435i color pointcloud support:
   `enable_pointclouds:=true`. Leave them off for OpenVINS-only timing tests.
 - OpenVINS RGB streams should remain `640x480x30`; pointcloud depth is
   `640x480x15` and transformed clouds are rate-limited to 10 Hz by default.
+- 2026-05-14 live validation: RViz2 color pointclouds now work while OpenVINS
+  remains stable. Status messages alternating `published` and `rate_limited`
+  are expected.
 - The live OpenVINS D435i launches default `hold_back_imu_for_frames:=true`.
   This is a RealSense live-publication ordering setting, not a rosbag playback
   rewrite switch.
 - The D435i launch files pass RealSense parameters directly to
   `realsense2_camera_node` instead of depending on the upstream `rs_launch.py`
   argument list.
+- Keep `enable_infra`, `enable_infra1`, and `enable_infra2` false in custom
+  D435i launches. Enabling the extra infra streams caused RealSense depth
+  timeouts and blank pointclouds.
+- `enable_pointcloud_neon_fix` is a legacy fallback and now defaults false.
+  Startup `pointcloud__neon_` parameters are sufficient on the validated Jetson.
 - Stable grasping topics are `/head/d435i_head/points_marker_map` and
-  `/arm/d435i_arm/points_marker_map`; both are in `marker_map` after lock.
+  `/arm/d435i_arm/points_marker_map`; both are in `marker_map` once OpenVINS
+  has initialized marker-map camera TF.
 - Validation commands:
   `multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`
 - Planned x86 segmentation-side pointcloud work:

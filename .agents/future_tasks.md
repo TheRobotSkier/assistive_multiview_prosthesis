@@ -13,11 +13,16 @@ default. The fixed marker map remains ID0-only; do not add ID2 to
 D435i color pointclouds are opt-in on the dynamic ID2 live launch with
 `enable_pointclouds:=true`. OpenVINS RGB remains 30 Hz, pointcloud depth is
 15 Hz, and the grasping topics are `/head/d435i_head/points_marker_map` and
-`/arm/d435i_arm/points_marker_map` in `marker_map` after marker-map lock.
+`/arm/d435i_arm/points_marker_map` in `marker_map` once OpenVINS camera TF is
+available.
 As of 2026-05-14, the live D435i OpenVINS launches default
 `hold_back_imu_for_frames:=true` to keep RealSense image/IMU publication order
 chronological under Jetson load. X86-side segmentation pointcloud work is
 tracked in `.agents/x86_segmentation_pointcloud_plan.md`.
+
+Final 2026-05-14 pointcloud status: RViz2 color pointclouds work and OpenVINS
+still runs well. The pointcloud status topic reporting alternating `published`
+and `rate_limited` is expected with the output rate cap.
 
 Important current caveat: the latest live ID2 measurement bag
 `dynamic_id2_arm_update_live_20260513_125316` validated the measurement path
