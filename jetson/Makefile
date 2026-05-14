@@ -13,6 +13,15 @@ CAM_CFG     := $(REPO_ROOT)/src/sensor_fusion_bringup/config/d435i_cameras.yaml
 LAUNCH_FILE := $(REPO_ROOT)/src/sensor_fusion_bringup/launch/dual_d435i.launch.py
 CYCLONE_CFG := $(CURDIR)/config/cyclonedds_robotlab.xml
 
+# IMU dead reckoning test paths
+IMU_LAUNCH     := $(REPO_ROOT)/src/sensor_fusion_bringup/launch/imu_test.launch.py
+IMU_SCRIPT     := $(REPO_ROOT)/src/sensor_fusion_bringup/scripts/imu_dead_reckoning_node.py
+IMU_CFG_DIR    := $(REPO_ROOT)/src/sensor_fusion_bringup/config
+
+IMU_LAUNCH_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/imu_test.launch.py
+IMU_SCRIPT_INSTALL := /miahand_ws/install/sensor_fusion_bringup/lib/sensor_fusion_bringup/imu_dead_reckoning_node.py
+IMU_CFG_INSTALL    := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config
+
 # Install paths inside the cameras container
 CAM_CFG_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/d435i_cameras.yaml
 LAUNCH_INSTALL  := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/dual_d435i.launch.py
@@ -25,7 +34,7 @@ SFBP_SRC        := $(REPO_ROOT)/src/sensor_fusion_bringup
 OVINS_PKG_SHARE := /ovins_overlay/install/sensor_fusion_bringup/share/sensor_fusion_bringup
 OVINS_PKG_LIB   := /ovins_overlay/install/sensor_fusion_bringup/lib/sensor_fusion_bringup
 
-.PHONY: cameras cameras-stop cameras-logs openvins openvins-stop openvins-logs list-cameras
+.PHONY: cameras cameras-stop cameras-logs openvins openvins-stop openvins-logs list-cameras imu-test imu-test-stop imu-test-logs
 
 # ── Cameras container (depth + pointcloud for both cameras) ──────────────────
 cameras:
@@ -89,3 +98,33 @@ openvins-logs:
 
 list-cameras:
 	$(SUDO) bash $(CURDIR)/scripts/list_cameras.sh
+
+# ── IMU dead reckoning test container ────────────────────────────────────────
+imu-test:
+	$(SUDO) docker rm -f imu_test 2>/dev/null || true
+	$(SUDO) docker run -d \
+		--name imu_test \
+		--network host \
+		--ipc host \
+		--runtime nvidia \
+		--privileged \
+		--group-add video \
+		--group-add plugdev \
+		--group-add dialout \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v $(CYCLONE_CFG):/tmp/cyclonedds_peer.xml:ro \
+		-v $(IMU_LAUNCH):$(IMU_LAUNCH_INSTALL):ro \
+		-v $(IMU_SCRIPT):$(IMU_SCRIPT_INSTALL):ro \
+		-v $(IMU_CFG_DIR):$(IMU_CFG_INSTALL):ro \
+		-v /dev:/dev \
+		-v /run/udev:/run/udev:ro \
+		$(IMAGE) \
+		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; ros2 launch sensor_fusion_bringup imu_test.launch.py'
+
+imu-test-stop:
+	$(SUDO) docker rm -f imu_test 2>/dev/null || true
+
+imu-test-logs:
+	$(SUDO) docker logs -f imu_test
