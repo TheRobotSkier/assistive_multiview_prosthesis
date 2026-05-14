@@ -12,14 +12,29 @@ launch:
   start_rviz: false
   record_bag: false
   marker_detection_rate_hz: 15.0
+  # Keeps RealSense IMU/image publication order chronological for OpenVINS.
+  # This adds a little IMU latency, but avoids images arriving after newer IMU
+  # samples when image processing or Jetson load spikes.
+  hold_back_imu_for_frames: true
   verbosity: INFO
 
 pointcloud:
   # Keep the 30 Hz RGB stream for OpenVINS. Pointclouds are opt-in for grasping
   # runs because depth processing adds Jetson load.
   enable: false
-  max_rate_hz: 15.0
-  voxel_leaf_m: 0.01
+  # Conservative Jetson defaults; override from the launch command if grasping
+  # needs denser clouds and OpenVINS timing remains healthy.
+  max_rate_hz: 10.0
+  voxel_leaf_m: 0.02
+  max_range_m: 2.0
+  decimation_magnitude: 3
+  # Jetson RealSense sometimes needs pointcloud__neon_.enable re-applied after
+  # the camera node is fully up. This delayed setter runs only when pointclouds
+  # are enabled.
+  enable_neon_fix: true
+  # False means the marker_map pointcloud republisher is gated by TF availability
+  # only. Set true to drop clouds until OpenVINS publishes marker_map_locked=true.
+  require_marker_map_locked: false
   record: false
 
 measurement:

@@ -14,6 +14,10 @@ D435i color pointclouds are opt-in on the dynamic ID2 live launch with
 `enable_pointclouds:=true`. OpenVINS RGB remains 30 Hz, pointcloud depth is
 15 Hz, and the grasping topics are `/head/d435i_head/points_marker_map` and
 `/arm/d435i_arm/points_marker_map` in `marker_map` after marker-map lock.
+As of 2026-05-14, the live D435i OpenVINS launches default
+`hold_back_imu_for_frames:=true` to keep RealSense image/IMU publication order
+chronological under Jetson load. X86-side segmentation pointcloud work is
+tracked in `.agents/x86_segmentation_pointcloud_plan.md`.
 
 Important current caveat: the latest live ID2 measurement bag
 `dynamic_id2_arm_update_live_20260513_125316` validated the measurement path
@@ -227,19 +231,21 @@ velocity has already become inconsistent.
 
 Known robustness follow-up:
 - Repeated dual live runs hit the OpenVINS `Propagator.cpp` assertion comparing
-  requested propagation duration against summed IMU dt. A defensive guard/drop
-  experiment prevented the abort but could leave OpenVINS stuck dropping every
-  camera update, so it was rejected. Current performance direction is to keep
-  RealSense/OpenVINS at 30 fps and throttle only the Python marker detector to
-  15 Hz with image queue depth 1. If the original Propagator assertion still
-  appears under the lower marker load, treat that as a separate OpenVINS
-  recovery problem.
+  requested propagation duration against summed IMU dt. A 2026-05-14 retry keeps
+  RealSense/OpenVINS at 30 fps, caps only the internal stale camera queue, and
+  turns incomplete IMU coverage into `[PROP]` diagnostics instead of a hard
+  assertion. After repeated `[PROP]` messages still appeared from a stale
+  timestamp, both D435i configs were switched to the Jetson-safe profile
+  (`track_frequency: 21.0`, `num_pts: 200`, `fast_threshold: 25`,
+  `min_px_dist: 15`, `max_clones: 8`, `max_slam: 25`,
+  `max_msckf_in_update: 25`, `num_opencv_threads: 2`).
 - After marker throttling, failures still occurred under heavy desktop load
   with RViz and VS Code open; the same setup ran longer in MAXN SUPER mode. The
-  next OpenVINS robustness fix should not reintroduce the rejected guard. Better
-  candidates are camera-frame queue/backlog control before propagation,
-  newest-frame processing when the estimator is behind, and a deliberate
-  recovery path that skips stale camera updates without freezing the state time.
+  next OpenVINS robustness fix should avoid accepting intermittent VIO process
+  death. Better candidates are a deliberate Jetson-safe tuning profile,
+  camera-frame backlog control before propagation, newest-frame processing when
+  the estimator is behind, and a recovery path that skips stale camera updates
+  without freezing the state time.
 - A stable no-RViz dual-camera bag has been recorded, so planning the
   arm-mounted marker ID 2 observation/calibration path is reasonable. Still avoid
   implementing online arm state updates until an ID2-visible calibration bag has

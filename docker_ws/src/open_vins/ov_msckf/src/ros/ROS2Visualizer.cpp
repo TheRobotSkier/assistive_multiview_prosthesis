@@ -571,10 +571,11 @@ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr ms
   // If the processing queue is currently active / running just return so we can keep getting measurements
   // Otherwise create a second thread to do our update in an async manor
   // The visualization of the state, images, and features will be synchronous with the update!
-  if (thread_update_running)
+  bool expected = false;
+  if (!thread_update_running.compare_exchange_strong(expected, true))
     return;
-  thread_update_running = true;
-  std::thread thread([&] {
+  const double imu_timestamp = message.timestamp;
+  std::thread thread([this, imu_timestamp] {
     // Lock on the queue (prevents new images from appending)
     std::lock_guard<std::mutex> lck(camera_queue_mtx);
 
@@ -586,13 +587,13 @@ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr ms
 
     // If we do not have enough unique cameras then we need to wait
     // We should wait till we have one of each camera to ensure we propagate in the correct order
-    auto params = _app->get_params();
+    const auto &params = _app->get_params();
     size_t num_unique_cameras = (params.state_options.num_cameras == 2) ? 1 : params.state_options.num_cameras;
     if (unique_cam_ids.size() == num_unique_cameras) {
 
       // Loop through our queue and see if we are able to process any of our camera measurements
       // We are able to process if we have at least one IMU measurement greater than the camera time
-      double timestamp_imu_inC = message.timestamp - _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
+      double timestamp_imu_inC = imu_timestamp - _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
       while (!camera_queue.empty() && camera_queue.at(0).timestamp < timestamp_imu_inC) {
         auto rT0_1 = boost::posix_time::microsec_clock::local_time();
         double update_dt = 100.0 * (timestamp_imu_inC - camera_queue.at(0).timestamp);
@@ -655,6 +656,12 @@ void ROS2Visualizer::callback_monocular(const sensor_msgs::msg::Image::SharedPtr
   std::lock_guard<std::mutex> lck(camera_queue_mtx);
   camera_queue.push_back(message);
   std::sort(camera_queue.begin(), camera_queue.end());
+  const size_t max_camera_queue_size = 3;
+  while (camera_queue.size() > max_camera_queue_size) {
+    PRINT_WARNING(YELLOW "[QUEUE]: dropping stale camera frame at %.6f (queue size %zu > %zu)\n" RESET, camera_queue.front().timestamp,
+                  camera_queue.size(), max_camera_queue_size);
+    camera_queue.pop_front();
+  }
 }
 
 void ROS2Visualizer::callback_stereo(const sensor_msgs::msg::Image::ConstSharedPtr msg0, const sensor_msgs::msg::Image::ConstSharedPtr msg1,
@@ -709,6 +716,12 @@ void ROS2Visualizer::callback_stereo(const sensor_msgs::msg::Image::ConstSharedP
   std::lock_guard<std::mutex> lck(camera_queue_mtx);
   camera_queue.push_back(message);
   std::sort(camera_queue.begin(), camera_queue.end());
+  const size_t max_camera_queue_size = 3;
+  while (camera_queue.size() > max_camera_queue_size) {
+    PRINT_WARNING(YELLOW "[QUEUE]: dropping stale stereo camera frame at %.6f (queue size %zu > %zu)\n" RESET,
+                  camera_queue.front().timestamp, camera_queue.size(), max_camera_queue_size);
+    camera_queue.pop_front();
+  }
 }
 
 void ROS2Visualizer::callback_marker_pose(const sensor_fusion_msgs::msg::MarkerPoseObservation::SharedPtr msg) {

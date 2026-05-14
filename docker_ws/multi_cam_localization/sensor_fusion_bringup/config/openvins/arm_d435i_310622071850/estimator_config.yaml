@@ -13,10 +13,10 @@ calib_cam_timeoffset: false # use offline Kalibr time offset for initial bringup
 calib_imu_intrinsics: false # if imu intrinsics should be calibrated (rotation and skew-scale matrix)
 calib_imu_g_sensitivity: false # if gyroscope gravity sensitivity (Tg) should be calibrated
 
-max_clones: 11 # how many clones in the sliding window
-max_slam: 50 # number of features in our state vector
+max_clones: 8 # Jetson-safe dual-camera sliding window
+max_slam: 25 # Jetson-safe SLAM feature budget
 max_slam_in_update: 25 # update can be split into sequential updates of batches, how many in a batch
-max_msckf_in_update: 40 # how many MSCKF features to use in the update
+max_msckf_in_update: 25 # Jetson-safe MSCKF update feature budget
 dt_slam_delay: 1 # delay before initializing (helps with stability from bad initialization...)
 
 gravity_mag: 9.81 # magnitude of gravity in this location
@@ -78,15 +78,15 @@ filepath_gt: "/tmp/ov_groundtruth.txt"
 # our front-end feature tracking parameters
 # we have a KLT and descriptor based (KLT is better implemented...)
 use_klt: true # if true we will use KLT, otherwise use a ORB descriptor + robust matching
-num_pts: 300 # increased for D435i RGB monocular tracking
-fast_threshold: 15 # lowered from 30 for more RGB features
+num_pts: 200 # Jetson-safe dual-camera RGB monocular tracking
+fast_threshold: 25 # avoid the heavier low-threshold feature extraction path
 grid_x: 5 # reverted; grid 8 did not improve D435i RGB tracking
 grid_y: 5 # reverted; grid 6 did not improve D435i RGB tracking
-min_px_dist: 10 # lowered from 15 to allow more features
+min_px_dist: 15 # keep features spaced out to reduce tracking/update cost
 knn_ratio: 0.70 # descriptor knn threshold for the top two descriptor matches
-track_frequency: 31.0 # frequency we will perform feature tracking at (in frames per second / hertz)
+track_frequency: 21.0 # process a subset of the 30 Hz RGB stream; camera calibration remains 30 Hz
 downsample_cameras: false # will downsample image in half if true
-num_opencv_threads: 4 # -1: auto, 0-1: serial, >1: number of threads
+num_opencv_threads: 2 # reduce CPU contention between the two OpenVINS instances
 histogram_method: "HISTOGRAM" # reverted from CLAHE
 
 # aruco tag tracker for the system
@@ -113,4 +113,3 @@ use_mask: false
 # imu config should also have the correct noise values
 relative_config_imu: "kalibr_imu_chain.yaml"
 relative_config_imucam: "kalibr_imucam_chain.yaml"
-

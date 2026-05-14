@@ -197,6 +197,43 @@ sensor_fusion_bringup_uninstall/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sensor_fusion_bringup_uninstall.dir/build.make CMakeFiles/sensor_fusion_bringup_uninstall.dir/build
 .PHONY : sensor_fusion_bringup_uninstall/fast
 
+#=============================================================================
+# Target rules for targets named pointcloud_to_frame_node
+
+# Build rule for target.
+pointcloud_to_frame_node: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 pointcloud_to_frame_node
+.PHONY : pointcloud_to_frame_node
+
+# fast build rule for target.
+pointcloud_to_frame_node/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pointcloud_to_frame_node.dir/build.make CMakeFiles/pointcloud_to_frame_node.dir/build
+.PHONY : pointcloud_to_frame_node/fast
+
+src/pointcloud_to_frame_node.o: src/pointcloud_to_frame_node.cpp.o
+.PHONY : src/pointcloud_to_frame_node.o
+
+# target to build an object file
+src/pointcloud_to_frame_node.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pointcloud_to_frame_node.dir/build.make CMakeFiles/pointcloud_to_frame_node.dir/src/pointcloud_to_frame_node.cpp.o
+.PHONY : src/pointcloud_to_frame_node.cpp.o
+
+src/pointcloud_to_frame_node.i: src/pointcloud_to_frame_node.cpp.i
+.PHONY : src/pointcloud_to_frame_node.i
+
+# target to preprocess a source file
+src/pointcloud_to_frame_node.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pointcloud_to_frame_node.dir/build.make CMakeFiles/pointcloud_to_frame_node.dir/src/pointcloud_to_frame_node.cpp.i
+.PHONY : src/pointcloud_to_frame_node.cpp.i
+
+src/pointcloud_to_frame_node.s: src/pointcloud_to_frame_node.cpp.s
+.PHONY : src/pointcloud_to_frame_node.s
+
+# target to generate assembly for a file
+src/pointcloud_to_frame_node.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pointcloud_to_frame_node.dir/build.make CMakeFiles/pointcloud_to_frame_node.dir/src/pointcloud_to_frame_node.cpp.s
+.PHONY : src/pointcloud_to_frame_node.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -212,6 +249,10 @@ help:
 	@echo "... test"
 	@echo "... sensor_fusion_bringup_uninstall"
 	@echo "... uninstall"
+	@echo "... pointcloud_to_frame_node"
+	@echo "... src/pointcloud_to_frame_node.o"
+	@echo "... src/pointcloud_to_frame_node.i"
+	@echo "... src/pointcloud_to_frame_node.s"
 .PHONY : help
 
 

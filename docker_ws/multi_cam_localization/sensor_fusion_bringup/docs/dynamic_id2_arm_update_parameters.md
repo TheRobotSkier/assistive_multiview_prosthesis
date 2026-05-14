@@ -25,6 +25,7 @@ you want a safer diagnostic or disabled dynamic path.
 | `start_rviz` | `false` | Start RViz with the phase2 preview config. |
 | `record_bag` | `false` | Record the standard validation topics from the single launch. |
 | `marker_detection_rate_hz` | `15.0` | Marker detector throttle for head and arm marker nodes. |
+| `hold_back_imu_for_frames` | `true` | Ask the RealSense drivers to keep image/IMU publication order chronological for OpenVINS. |
 | `verbosity` | `INFO` | OpenVINS verbosity. |
 
 Mode mapping:

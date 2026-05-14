@@ -465,7 +465,7 @@ void ROS1Visualizer::callback_inertial(const sensor_msgs::Imu::ConstPtr &msg) {
 
     // If we do not have enough unique cameras then we need to wait
     // We should wait till we have one of each camera to ensure we propagate in the correct order
-    auto params = _app->get_params();
+    const auto &params = _app->get_params();
     size_t num_unique_cameras = (params.state_options.num_cameras == 2) ? 1 : params.state_options.num_cameras;
     if (unique_cam_ids.size() == num_unique_cameras) {
 

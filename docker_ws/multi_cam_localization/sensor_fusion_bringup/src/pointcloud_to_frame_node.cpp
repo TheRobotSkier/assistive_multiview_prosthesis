@@ -125,12 +125,15 @@ public:
     require_marker_map_locked_ = declare_parameter<bool>("require_marker_map_locked", true);
     max_rate_hz_ = declare_parameter<double>("max_rate_hz", 15.0);
     voxel_leaf_m_ = declare_parameter<double>("voxel_leaf_m", 0.01);
+    max_source_range_m_ = declare_parameter<double>("max_source_range_m", 0.0);
     transform_timeout_s_ = declare_parameter<double>("transform_timeout_s", 0.02);
     max_tf_age_s_ = declare_parameter<double>("max_tf_age_s", 0.50);
     status_period_s_ = declare_parameter<double>("status_period_s", 1.0);
     use_latest_tf_ = declare_parameter<bool>("use_latest_tf", true);
 
-    pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(output_topic_, rclcpp::SensorDataQoS());
+    auto input_qos = rclcpp::SensorDataQoS().keep_last(2);
+    auto output_qos = rclcpp::QoS(2).reliable();
+    pub_ = create_publisher<sensor_msgs::msg::PointCloud2>(output_topic_, output_qos);
     status_pub_ = create_publisher<std_msgs::msg::String>(output_topic_ + "/status", 10);
 
     if (!marker_map_locked_topic_.empty()) {
@@ -142,16 +145,17 @@ public:
     }
 
     sub_ = create_subscription<sensor_msgs::msg::PointCloud2>(
-        input_topic_, rclcpp::SensorDataQoS(), std::bind(&PointCloudToFrameNode::cloud_callback, this, std::placeholders::_1));
+        input_topic_, input_qos, std::bind(&PointCloudToFrameNode::cloud_callback, this, std::placeholders::_1));
 
     RCLCPP_INFO(get_logger(), "Transforming %s into %s on %s", input_topic_.c_str(), target_frame_.c_str(), output_topic_.c_str());
+    RCLCPP_INFO(get_logger(), "Pointcloud QoS: input sensor-data/best-effort keep_last=2, output reliable keep_last=2");
     RCLCPP_INFO(get_logger(), "Camera pose alias: %s == %s", camera_pose_frame_.c_str(), camera_color_optical_frame_.c_str());
   }
 
 private:
   void cloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
     if (require_marker_map_locked_ && !marker_map_locked_) {
-      publish_status(false, "marker_map_not_locked", *msg, 0, "waiting for marker-map lock");
+      publish_status(false, "marker_map_not_locked", *msg, point_count(*msg), 0, "waiting for marker-map lock");
       return;
     }
 
@@ -159,7 +163,7 @@ private:
     if (max_rate_hz_ > 0.0 && last_publish_time_.nanoseconds() > 0) {
       const double dt = (now - last_publish_time_).seconds();
       if (dt >= 0.0 && dt < (1.0 / max_rate_hz_)) {
-        publish_status(false, "rate_limited", *msg, 0, "");
+        publish_status(false, "rate_limited", *msg, point_count(*msg), 0, "");
         return;
       }
     }
@@ -167,15 +171,17 @@ private:
     geometry_msgs::msg::TransformStamped transform;
     std::string reason;
     if (!lookup_composed_transform(*msg, transform, reason)) {
-      publish_status(false, reason, *msg, 0, "");
+      publish_status(false, reason, *msg, point_count(*msg), 0, "");
       return;
     }
 
+    const sensor_msgs::msg::PointCloud2 filtered_input = range_filter(*msg);
+
     sensor_msgs::msg::PointCloud2 transformed;
     try {
-      tf2::doTransform(*msg, transformed, transform);
+      tf2::doTransform(filtered_input, transformed, transform);
     } catch (const std::exception &exc) {
-      publish_status(false, "transform_failed", *msg, 0, exc.what());
+      publish_status(false, "transform_failed", *msg, point_count(filtered_input), 0, exc.what());
       return;
     }
 
@@ -184,7 +190,8 @@ private:
     output.header.frame_id = target_frame_;
     pub_->publish(output);
     last_publish_time_ = now;
-    publish_status(true, "published", *msg, point_count(output), "");
+    publish_status(true, marker_map_locked_ ? "published" : "published_unlocked", *msg, point_count(filtered_input),
+                   point_count(output), "");
   }
 
   bool lookup_composed_transform(const sensor_msgs::msg::PointCloud2 &cloud, geometry_msgs::msg::TransformStamped &out,
@@ -225,6 +232,60 @@ private:
     out.child_frame_id = cloud.header.frame_id;
     out.transform = to_msg(composed);
     return true;
+  }
+
+  sensor_msgs::msg::PointCloud2 range_filter(const sensor_msgs::msg::PointCloud2 &cloud) const {
+    if (max_source_range_m_ <= 0.0 || point_count(cloud) == 0 || cloud.point_step == 0) {
+      return cloud;
+    }
+
+    const int x_offset = field_offset(cloud, "x");
+    const int y_offset = field_offset(cloud, "y");
+    const int z_offset = field_offset(cloud, "z");
+    if (x_offset < 0 || y_offset < 0 || z_offset < 0) {
+      return cloud;
+    }
+
+    sensor_msgs::msg::PointCloud2 out = cloud;
+    out.height = 1;
+    out.width = 0;
+    out.row_step = 0;
+    out.is_dense = true;
+    out.data.clear();
+    out.data.reserve(cloud.data.size());
+
+    const double max_range_sq = max_source_range_m_ * max_source_range_m_;
+    const std::size_t count = point_count(cloud);
+    for (std::size_t i = 0; i < count; ++i) {
+      const std::size_t base = i * static_cast<std::size_t>(cloud.point_step);
+      const std::size_t max_offset =
+          base + static_cast<std::size_t>(std::max({x_offset, y_offset, z_offset})) + sizeof(float);
+      if (max_offset > cloud.data.size()) {
+        continue;
+      }
+
+      const float x = read_float32(cloud.data, base + static_cast<std::size_t>(x_offset), cloud.is_bigendian);
+      const float y = read_float32(cloud.data, base + static_cast<std::size_t>(y_offset), cloud.is_bigendian);
+      const float z = read_float32(cloud.data, base + static_cast<std::size_t>(z_offset), cloud.is_bigendian);
+      if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) {
+        continue;
+      }
+
+      const double range_sq = static_cast<double>(x) * static_cast<double>(x) +
+                              static_cast<double>(y) * static_cast<double>(y) +
+                              static_cast<double>(z) * static_cast<double>(z);
+      if (range_sq > max_range_sq) {
+        continue;
+      }
+
+      const auto begin = cloud.data.begin() + static_cast<std::vector<uint8_t>::difference_type>(base);
+      const auto end = begin + static_cast<std::vector<uint8_t>::difference_type>(cloud.point_step);
+      out.data.insert(out.data.end(), begin, end);
+      ++out.width;
+    }
+
+    out.row_step = out.width * out.point_step;
+    return out;
   }
 
   sensor_msgs::msg::PointCloud2 voxel_downsample(const sensor_msgs::msg::PointCloud2 &cloud) const {
@@ -282,7 +343,7 @@ private:
   }
 
   void publish_status(bool accepted, const std::string &reason, const sensor_msgs::msg::PointCloud2 &input,
-                      std::size_t output_points, const std::string &detail) {
+                      std::size_t transform_input_points, std::size_t output_points, const std::string &detail) {
     const rclcpp::Time now = get_clock()->now();
     const bool reason_changed = reason != last_status_reason_;
     if (!reason_changed && status_period_s_ > 0.0 && last_status_time_.nanoseconds() > 0 &&
@@ -299,11 +360,14 @@ private:
     ss << ",\"target_frame\":\"" << json_escape(target_frame_) << "\"";
     ss << ",\"camera_pose_frame\":\"" << json_escape(camera_pose_frame_) << "\"";
     ss << ",\"camera_color_optical_frame\":\"" << json_escape(camera_color_optical_frame_) << "\"";
+    ss << ",\"require_marker_map_locked\":" << (require_marker_map_locked_ ? "true" : "false");
     ss << ",\"marker_map_locked\":" << (marker_map_locked_ ? "true" : "false");
     ss << ",\"input_points\":" << point_count(input);
+    ss << ",\"transform_input_points\":" << transform_input_points;
     ss << ",\"output_points\":" << output_points;
     ss << ",\"max_rate_hz\":" << max_rate_hz_;
     ss << ",\"voxel_leaf_m\":" << voxel_leaf_m_;
+    ss << ",\"max_source_range_m\":" << max_source_range_m_;
     if (!detail.empty()) {
       ss << ",\"detail\":\"" << json_escape(detail) << "\"";
     }
@@ -326,6 +390,7 @@ private:
   bool marker_map_locked_ = false;
   double max_rate_hz_ = 15.0;
   double voxel_leaf_m_ = 0.01;
+  double max_source_range_m_ = 0.0;
   double transform_timeout_s_ = 0.02;
   double max_tf_age_s_ = 0.50;
   double status_period_s_ = 1.0;

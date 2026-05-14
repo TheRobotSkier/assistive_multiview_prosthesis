@@ -26,6 +26,26 @@ grasping clouds on `/head/d435i_head/points_marker_map` and
 Validation commands live in
 `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`.
 
+As of 2026-05-14, the live D435i OpenVINS launch path defaults
+`hold_back_imu_for_frames:=true` for both RealSense nodes. This is intended to
+keep image and IMU publication order chronological under Jetson load. Compare
+with `hold_back_imu_for_frames:=false` only when diagnosing the OpenVINS
+`Propagator.cpp` timing assert.
+
+Later on 2026-05-14, an OpenVINS image subscriber sensor-data QoS experiment was
+rolled back after both marker-enabled OpenVINS nodes exited at startup with
+`double free or corruption`. The retained OpenVINS stability changes are:
+const-reference `get_params()` access, a small internal stale-camera-frame cap,
+and non-fatal `[PROP]` diagnostics instead of the old `Propagator.cpp`
+assertion. Rebuild `ov_msckf` sequentially before testing these changes.
+
+After the first improved baseline still showed repeated `[PROP]` messages from a
+stale timestamp, both D435i OpenVINS configs were switched to a Jetson-safe
+dual-camera profile: `track_frequency: 21.0`, `num_pts: 200`,
+`fast_threshold: 25`, `min_px_dist: 15`, `max_clones: 8`, `max_slam: 25`,
+`max_msckf_in_update: 25`, and `num_opencv_threads: 2`. RealSense RGB remains
+`640x480x30`, so no recalibration is implied by this tuning step.
+
 Rollback/diagnostic controls:
 
 ```text
@@ -89,7 +109,7 @@ cd ~/Documents/assistive_multiview_prosthesis/docker_ws/docker-deployment
 docker compose run --rm realsense_camera \
   "source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && \
    ros2 interface show sensor_fusion_msgs/msg/MarkerPoseObservation && \
-   ros2 pkg executables ov_msckf | grep run_subscribe_msckf_marker && \
+   test -x install_overlay/ov_msckf/lib/ov_msckf/run_subscribe_msckf_marker && \
    ros2 launch sensor_fusion_bringup head_d435i_openvins_phase2.launch.py --show-args && \
    ros2 launch sensor_fusion_bringup head_marker_pose_phase2.launch.py --show-args"
 ```
@@ -438,11 +458,13 @@ online arm state updates yet. If the goal is to refresh the extrinsic config
 before that, record a longer calibration bag with more overlap where the head
 sees ID0+ID2 and the arm sees ID0; require at least `100` inliers.
 
-The Propagator guard/drop experiment was rejected because it could leave the
-head node stuck dropping every camera update. Current direction is to keep
-RealSense/OpenVINS at `640x480x30`, reduce only the Python ArUco marker load
-with `marker_detection_rate_hz:=15.0` and marker image queue depth 1, and avoid
-long RViz/VS Code live runs when recording validation data.
+Earlier Propagator guard/drop experiments were rejected because they could leave
+the head node stuck dropping every camera update. The current 2026-05-14 retry is
+narrower: keep RealSense/OpenVINS at `640x480x30`, cap only the internal stale
+camera queue, and make incomplete IMU coverage a non-fatal `[PROP]` diagnostic
+instead of a hard assertion. If the baseline still falls behind, the next step is
+a Jetson-safe OpenVINS profile with fewer tracked features and a lower
+`track_frequency`, not accepting intermittent VIO process death.
 
 Recommended next-chat prompt:
 

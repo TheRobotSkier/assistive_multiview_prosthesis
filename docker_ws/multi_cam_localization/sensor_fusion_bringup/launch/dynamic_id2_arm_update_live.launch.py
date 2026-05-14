@@ -76,9 +76,22 @@ def _setup(context, *args, **kwargs):
     record_pointclouds = _as_bool(_arg_or_config(context, "record_pointclouds", pointcloud_cfg.get("record", False)))
     use_sim_time = _as_bool(_arg_or_config(context, "use_sim_time", False))
     verbosity = str(_arg_or_config(context, "verbosity", launch_cfg.get("verbosity", "INFO")))
+    hold_back_imu_for_frames = _as_bool(
+        _arg_or_config(context, "hold_back_imu_for_frames", launch_cfg.get("hold_back_imu_for_frames", True))
+    )
     marker_detection_rate_hz = str(launch_cfg.get("marker_detection_rate_hz", 15.0))
     pointcloud_max_rate_hz = str(_arg_or_config(context, "pointcloud_max_rate_hz", pointcloud_cfg.get("max_rate_hz", 15.0)))
     pointcloud_voxel_leaf_m = str(_arg_or_config(context, "pointcloud_voxel_leaf_m", pointcloud_cfg.get("voxel_leaf_m", 0.01)))
+    pointcloud_max_range_m = str(_arg_or_config(context, "pointcloud_max_range_m", pointcloud_cfg.get("max_range_m", 2.0)))
+    pointcloud_decimation_magnitude = str(
+        _arg_or_config(context, "pointcloud_decimation_magnitude", pointcloud_cfg.get("decimation_magnitude", 2))
+    )
+    pointcloud_require_marker_map_locked = str(
+        _as_bool(_arg_or_config(context, "pointcloud_require_marker_map_locked", pointcloud_cfg.get("require_marker_map_locked", False)))
+    ).lower()
+    enable_pointcloud_neon_fix = str(
+        _as_bool(_arg_or_config(context, "enable_pointcloud_neon_fix", pointcloud_cfg.get("enable_neon_fix", enable_pointclouds)))
+    ).lower()
 
     dynamic_params = dict(openvins_cfg)
     dynamic_params.update(_mode_overrides(mode))
@@ -97,9 +110,14 @@ def _setup(context, *args, **kwargs):
                 "start_camera": str(start_cameras).lower(),
                 "use_sim_time": str(use_sim_time).lower(),
                 "verbosity": verbosity,
+                "hold_back_imu_for_frames": str(hold_back_imu_for_frames).lower(),
                 "enable_pointclouds": str(enable_pointclouds).lower(),
                 "pointcloud_max_rate_hz": pointcloud_max_rate_hz,
                 "pointcloud_voxel_leaf_m": pointcloud_voxel_leaf_m,
+                "pointcloud_max_range_m": pointcloud_max_range_m,
+                "pointcloud_decimation_magnitude": pointcloud_decimation_magnitude,
+                "pointcloud_require_marker_map_locked": pointcloud_require_marker_map_locked,
+                "enable_pointcloud_neon_fix": enable_pointcloud_neon_fix,
             }.items(),
         ),
         IncludeLaunchDescription(
@@ -108,9 +126,14 @@ def _setup(context, *args, **kwargs):
                 "start_camera": str(start_cameras).lower(),
                 "use_sim_time": str(use_sim_time).lower(),
                 "verbosity": verbosity,
+                "hold_back_imu_for_frames": str(hold_back_imu_for_frames).lower(),
                 "enable_pointclouds": str(enable_pointclouds).lower(),
                 "pointcloud_max_rate_hz": pointcloud_max_rate_hz,
                 "pointcloud_voxel_leaf_m": pointcloud_voxel_leaf_m,
+                "pointcloud_max_range_m": pointcloud_max_range_m,
+                "pointcloud_decimation_magnitude": pointcloud_decimation_magnitude,
+                "pointcloud_require_marker_map_locked": pointcloud_require_marker_map_locked,
+                "enable_pointcloud_neon_fix": enable_pointcloud_neon_fix,
                 "use_dynamic_arm_pose_updates": str(dynamic_params["use_dynamic_arm_pose_updates"]).lower(),
                 "dynamic_arm_measurement_only": str(dynamic_params["dynamic_arm_measurement_only"]).lower(),
                 "dynamic_arm_pose_topic": str(dynamic_params.get("dynamic_arm_pose_topic", "/arm/marker_pose/dynamic_arm_pose_observation")),
@@ -294,9 +317,14 @@ def generate_launch_description():
             DeclareLaunchArgument("enable_pointclouds", default_value=""),
             DeclareLaunchArgument("pointcloud_max_rate_hz", default_value=""),
             DeclareLaunchArgument("pointcloud_voxel_leaf_m", default_value=""),
+            DeclareLaunchArgument("pointcloud_max_range_m", default_value=""),
+            DeclareLaunchArgument("pointcloud_decimation_magnitude", default_value=""),
+            DeclareLaunchArgument("pointcloud_require_marker_map_locked", default_value=""),
+            DeclareLaunchArgument("enable_pointcloud_neon_fix", default_value=""),
             DeclareLaunchArgument("record_pointclouds", default_value=""),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("verbosity", default_value=""),
+            DeclareLaunchArgument("hold_back_imu_for_frames", default_value=""),
             OpaqueFunction(function=_setup),
         ]
     )

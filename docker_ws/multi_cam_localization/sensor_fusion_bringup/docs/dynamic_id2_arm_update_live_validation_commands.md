@@ -18,6 +18,10 @@ xhost +si:localuser:root
 
 ## Main Live Command
 
+The live workflow defaults `hold_back_imu_for_frames:=true` for both RealSense
+D435i drivers. Keep that enabled for OpenVINS timing tests unless you are
+explicitly comparing against the old publication-order behavior.
+
 Default live workflow. This starts fixed ID0 updates/reanchor and dynamic ID2
 normal updates plus guarded dynamic ID2 initial-lock/reanchor:
 
@@ -68,6 +72,26 @@ Common overrides can be passed on the launch command line:
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py mode:=would_reanchor start_rviz:=true record_bag:=true'
 ```
 
+OpenVINS timing baseline, with pointclouds, preview, and RViz off:
+
+```bash
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=false start_preview:=false start_rviz:=false'
+```
+
+This baseline uses the Jetson-safe OpenVINS config profile for both D435i
+cameras: RealSense RGB still publishes `640x480x30`, while OpenVINS tracks at
+`21 Hz` with fewer features, fewer clones, and fewer OpenCV threads.
+
+Old RealSense publication-order comparison:
+
+```bash
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=false start_preview:=false start_rviz:=false hold_back_imu_for_frames:=false'
+```
+
+`hold_back_imu_for_frames` is a live RealSense driver setting. Bags recorded
+with it true or false can be compared, but changing the flag during playback
+does not change an already recorded bag's message timing.
+
 The measurement node should report:
 
 ```text
@@ -93,6 +117,34 @@ The stable grasping topics are:
 ```text
 /head/d435i_head/points_marker_map
 /arm/d435i_arm/points_marker_map
+```
+
+Use these transformed topics in RViz when fixed frame is `marker_map`. The raw
+RealSense topics under `/depth/color/points` are still useful for debugging, but
+they are in RealSense optical frames and may not have a direct TF chain to
+`marker_map`.
+
+The Jetson RealSense pointcloud filter is enabled through startup parameters for
+both the plain `pointcloud.*` and Jetson `pointcloud__neon_.*` names. The
+top-level live launch also enables the delayed `pointcloud__neon_.enable` setter
+by default for pointcloud-enabled runs.
+
+For Jetson stability, the default dynamic-ID2 pointcloud settings are now
+conservative:
+
+```text
+pointcloud_max_rate_hz:=10.0
+pointcloud_voxel_leaf_m:=0.02
+pointcloud_max_range_m:=2.0
+pointcloud_decimation_magnitude:=3
+enable_pointcloud_neon_fix:=true
+```
+
+If OpenVINS reports large timing delays or hits the propagator timing assert,
+reduce load further before collecting grasping data:
+
+```bash
+ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true pointcloud_max_rate_hz:=8.0 pointcloud_voxel_leaf_m:=0.03 pointcloud_max_range_m:=1.5 pointcloud_decimation_magnitude:=4
 ```
 
 The detailed pointcloud validation sheet is:

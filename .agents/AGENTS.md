@@ -17,6 +17,13 @@ Active source package:
 Generated overlay artifacts must not be committed:
 `build_overlay/`, `install_overlay/`, `log_overlay/`
 
+Jetson build safety:
+- OpenVINS / `ov_msckf` builds can crash the Jetson if run with other heavy
+  work. Build sequentially only, and do not run camera streams, RViz, file
+  transfers, or other memory-heavy tasks at the same time.
+- Use:
+  `MAKEFLAGS=-j1 CMAKE_BUILD_PARALLEL_LEVEL=1 colcon --executor sequential --parallel-workers 1 ...`
+
 If Docker creates root-owned overlay files, fix ownership only for generated
 overlay directories from `docker_ws`:
 
@@ -60,11 +67,19 @@ D435i color pointcloud support:
 - Pointclouds are opt-in for the dynamic ID2 live workflow:
   `enable_pointclouds:=true`. Leave them off for OpenVINS-only timing tests.
 - OpenVINS RGB streams should remain `640x480x30`; pointcloud depth is
-  `640x480x15` and transformed clouds are rate-limited to 15 Hz by default.
+  `640x480x15` and transformed clouds are rate-limited to 10 Hz by default.
+- The live OpenVINS D435i launches default `hold_back_imu_for_frames:=true`.
+  This is a RealSense live-publication ordering setting, not a rosbag playback
+  rewrite switch.
+- The D435i launch files pass RealSense parameters directly to
+  `realsense2_camera_node` instead of depending on the upstream `rs_launch.py`
+  argument list.
 - Stable grasping topics are `/head/d435i_head/points_marker_map` and
   `/arm/d435i_arm/points_marker_map`; both are in `marker_map` after lock.
 - Validation commands:
   `multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`
+- Planned x86 segmentation-side pointcloud work:
+  `.agents/x86_segmentation_pointcloud_plan.md`
 
 Phase 1 marker correction is external only. Do not modify the OpenVINS internal
 EKF until the external marker-corrected odom path is validated and committed.

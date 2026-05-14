@@ -315,6 +315,9 @@ message(STATUS "Execute custom install script")
 
 # begin of custom install code
 
+# install("TARGETS" "pointcloud_to_frame_node" "DESTINATION" "lib/sensor_fusion_bringup")
+include("/miahand_ws/src/build_overlay/sensor_fusion_bringup/ament_cmake_symlink_install_targets_0_${CMAKE_INSTALL_CONFIG_NAME}.cmake")
+
 # install(DIRECTORY "launch/" "DESTINATION" "share/sensor_fusion_bringup/launch")
 ament_cmake_symlink_install_directory("/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup" DIRECTORY "launch/" "DESTINATION" "share/sensor_fusion_bringup/launch")
 

@@ -1,7 +1,6 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
 from launch.conditions import IfCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -9,12 +8,6 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    rs_launch = PathJoinSubstitution([
-        FindPackageShare("realsense2_camera"),
-        "launch",
-        "rs_launch.py",
-    ])
-
     ov_config = PathJoinSubstitution([
         FindPackageShare("sensor_fusion_bringup"),
         "config",
@@ -23,32 +16,52 @@ def generate_launch_description():
         "estimator_config.yaml",
     ])
 
-    head_camera = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(rs_launch),
+    head_camera = Node(
+        package="realsense2_camera",
+        executable="realsense2_camera_node",
+        namespace="head",
+        name="d435i_head",
+        output="screen",
+        emulate_tty=True,
         condition=IfCondition(LaunchConfiguration("start_camera")),
-        launch_arguments={
-            "camera_namespace": "head",
+        parameters=[{
             "camera_name": "d435i_head",
             "serial_no": "_336222071386",
             "tf_prefix": "head_",
-            "enable_color": "true",
+            "enable_color": True,
             "rgb_camera.color_profile": "640x480x30",
-            "enable_gyro": "true",
-            "enable_accel": "true",
-            "unite_imu_method": "2",
-            "gyro_fps": "200",
-            "accel_fps": "200",
-            "enable_depth": LaunchConfiguration("enable_pointclouds"),
+            "enable_gyro": True,
+            "enable_accel": True,
+            "unite_imu_method": 2,
+            "hold_back_imu_for_frames": ParameterValue(LaunchConfiguration("hold_back_imu_for_frames"), value_type=bool),
+            "gyro_fps": 200,
+            "accel_fps": 200,
+            "enable_depth": ParameterValue(LaunchConfiguration("enable_pointclouds"), value_type=bool),
             "depth_module.depth_profile": "640x480x15",
-            "pointcloud.enable": LaunchConfiguration("enable_pointclouds"),
-            "pointcloud.stream_filter": "2",
-            "pointcloud.stream_index_filter": "0",
-            "pointcloud.ordered_pc": "false",
-            "pointcloud.allow_no_texture_points": "false",
-            "align_depth.enable": "false",
-            "decimation_filter.enable": LaunchConfiguration("enable_pointclouds"),
-            "decimation_filter.filter_magnitude": LaunchConfiguration("pointcloud_decimation_magnitude"),
-        }.items(),
+            "clip_distance": ParameterValue(
+                PythonExpression([
+                    "'",
+                    LaunchConfiguration("pointcloud_max_range_m"),
+                    "' if '",
+                    LaunchConfiguration("enable_pointclouds"),
+                    "'.lower() in ['true', '1', 'yes', 'on'] else '-1.0'",
+                ]),
+                value_type=float,
+            ),
+            "pointcloud.enable": ParameterValue(LaunchConfiguration("enable_pointclouds"), value_type=bool),
+            "pointcloud.stream_filter": 2,
+            "pointcloud.stream_index_filter": 0,
+            "pointcloud.ordered_pc": False,
+            "pointcloud.allow_no_texture_points": False,
+            "pointcloud__neon_.enable": ParameterValue(LaunchConfiguration("enable_pointclouds"), value_type=bool),
+            "pointcloud__neon_.stream_filter": 2,
+            "pointcloud__neon_.stream_index_filter": 0,
+            "pointcloud__neon_.ordered_pc": False,
+            "pointcloud__neon_.allow_no_texture_points": False,
+            "align_depth.enable": False,
+            "decimation_filter.enable": ParameterValue(LaunchConfiguration("enable_pointclouds"), value_type=bool),
+            "decimation_filter.filter_magnitude": ParameterValue(LaunchConfiguration("pointcloud_decimation_magnitude"), value_type=int),
+        }],
     )
 
     pointcloud_neon_fix = TimerAction(
@@ -92,9 +105,10 @@ def generate_launch_description():
             {"camera_pose_frame": "head_cam0"},
             {"camera_color_optical_frame": "head_d435i_head_color_optical_frame"},
             {"marker_map_locked_topic": "/ov_msckf/marker_map_locked"},
-            {"require_marker_map_locked": True},
+            {"require_marker_map_locked": ParameterValue(LaunchConfiguration("pointcloud_require_marker_map_locked"), value_type=bool)},
             {"max_rate_hz": ParameterValue(LaunchConfiguration("pointcloud_max_rate_hz"), value_type=float)},
             {"voxel_leaf_m": ParameterValue(LaunchConfiguration("pointcloud_voxel_leaf_m"), value_type=float)},
+            {"max_source_range_m": ParameterValue(LaunchConfiguration("pointcloud_max_range_m"), value_type=float)},
             {"transform_timeout_s": ParameterValue(LaunchConfiguration("pointcloud_transform_timeout_s"), value_type=float)},
             {"max_tf_age_s": ParameterValue(LaunchConfiguration("pointcloud_max_tf_age_s"), value_type=float)},
         ],
@@ -152,19 +166,34 @@ def generate_launch_description():
             description="Use /clock, typically true during rosbag replay.",
         ),
         DeclareLaunchArgument(
+            "hold_back_imu_for_frames",
+            default_value="true",
+            description="Ask RealSense to publish IMU/image messages in timestamp order for OpenVINS.",
+        ),
+        DeclareLaunchArgument(
             "enable_pointclouds",
             default_value="false",
             description="Enable 15 Hz depth/color pointclouds and marker_map republisher.",
         ),
-        DeclareLaunchArgument("pointcloud_max_rate_hz", default_value="15.0"),
-        DeclareLaunchArgument("pointcloud_voxel_leaf_m", default_value="0.01"),
+        DeclareLaunchArgument("pointcloud_max_rate_hz", default_value="10.0"),
+        DeclareLaunchArgument("pointcloud_voxel_leaf_m", default_value="0.02"),
+        DeclareLaunchArgument(
+            "pointcloud_max_range_m",
+            default_value="2.0",
+            description="Clip/filter pointcloud points farther than this source-frame range. Set <=0 to disable.",
+        ),
+        DeclareLaunchArgument(
+            "pointcloud_require_marker_map_locked",
+            default_value="false",
+            description="Drop transformed pointclouds until OpenVINS reports marker-map lock. False publishes whenever TF is available.",
+        ),
         DeclareLaunchArgument("pointcloud_transform_timeout_s", default_value="0.02"),
         DeclareLaunchArgument("pointcloud_max_tf_age_s", default_value="0.50"),
-        DeclareLaunchArgument("pointcloud_decimation_magnitude", default_value="2"),
+        DeclareLaunchArgument("pointcloud_decimation_magnitude", default_value="3"),
         DeclareLaunchArgument(
             "enable_pointcloud_neon_fix",
-            default_value="true",
-            description="Apply Jetson pointcloud__neon_.enable fix after startup when pointclouds are enabled.",
+            default_value="false",
+            description="Legacy delayed Jetson pointcloud__neon_.enable fix. Startup parameters normally handle this.",
         ),
         head_camera,
         pointcloud_neon_fix,

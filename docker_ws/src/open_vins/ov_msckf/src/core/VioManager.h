@@ -123,7 +123,7 @@ public:
   double last_fixed_marker_update_time() { return last_fixed_marker_update_timestamp; }
 
   /// Accessor for current system parameters
-  VioManagerOptions get_params() { return params; }
+  const VioManagerOptions &get_params() const { return params; }
 
   /// Accessor to get the current state
   std::shared_ptr<State> get_state() { return state; }

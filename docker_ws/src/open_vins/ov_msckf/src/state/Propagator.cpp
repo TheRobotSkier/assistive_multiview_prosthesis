@@ -98,7 +98,18 @@ void Propagator::propagate_and_clone(std::shared_ptr<State> state, double timest
       dt_summed += prop_data.at(i + 1).timestamp - prop_data.at(i).timestamp;
     }
   }
-  assert(std::abs((time1 - time0) - dt_summed) < 1e-4);
+  const double requested_dt = time1 - time0;
+  const double dt_error = requested_dt - dt_summed;
+  if (prop_data.size() < 2 || std::abs(dt_error) >= 1e-4) {
+    PRINT_WARNING(RED "[PROP]: unable to propagate %.6f -> %.6f without complete IMU coverage\n" RESET, state->_timestamp, timestamp);
+    PRINT_WARNING(RED "[PROP]: imu window %.6f -> %.6f requested_dt=%.9f dt_summed=%.9f error=%.9f samples=%zu\n" RESET, time0,
+                  time1, requested_dt, dt_summed, dt_error, prop_data.size());
+    if (!prop_data.empty()) {
+      PRINT_WARNING(RED "[PROP]: selected IMU first=%.6f last=%.6f last_offset=%.6f new_offset=%.6f\n" RESET,
+                    prop_data.front().timestamp, prop_data.back().timestamp, last_prop_time_offset, t_off_new);
+    }
+    return;
+  }
 
   // Last angular velocity (used for cloning when estimating time offset)
   // Remember to correct them before we store them
