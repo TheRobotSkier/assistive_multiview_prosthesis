@@ -62,3 +62,70 @@ def integrate_gyro(q: np.ndarray, omega: np.ndarray, dt: float) -> np.ndarray:
     s = math.sin(angle / 2.0)
     dq = np.array([axis[0]*s, axis[1]*s, axis[2]*s, math.cos(angle / 2.0)], dtype=float)
     return quat_normalize(quat_mult(q, dq))
+
+
+# ── Per-camera state ────────────────────────────────────────────────────────
+
+class CalibState(Enum):
+    CALIBRATING = "CALIBRATING"
+    TRACKING = "TRACKING"
+
+
+@dataclass
+class CameraState:
+    name: str
+    imu_topic: str
+    calib_duration: float
+
+    state: CalibState = CalibState.CALIBRATING
+    accel_samples: list = field(default_factory=list)
+    gyro_samples: list = field(default_factory=list)
+    calib_start_sec: float = -1.0
+
+    # Calibration results
+    g_world: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=float))
+    gyro_bias: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=float))
+
+    # Integration state
+    q: np.ndarray = field(default_factory=lambda: np.array([0.0, 0.0, 0.0, 1.0]))
+    v: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=float))
+    p: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=float))
+    last_stamp_sec: float = -1.0
+
+
+def finish_calibration(state: CameraState, logger) -> None:
+    """Compute g_world and gyro_bias from collected samples; switch to TRACKING."""
+    if not state.accel_samples or not state.gyro_samples:
+        logger.warning(f"[{state.name}] Calibration ended with no samples — staying in CALIBRATING")
+        return
+    state.g_world = np.mean(state.accel_samples, axis=0)
+    state.gyro_bias = np.mean(state.gyro_samples, axis=0)
+    state.state = CalibState.TRACKING
+    g_mag = float(np.linalg.norm(state.g_world))
+    logger.info(
+        f"[{state.name}] Calibration done: "
+        f"g_world={state.g_world.tolist()}, "
+        f"gyro_bias={state.gyro_bias.tolist()}, "
+        f"|g|={g_mag:.3f} m/s² (expected ~9.81)"
+    )
+
+
+def integration_step(state: CameraState, accel: np.ndarray, gyro: np.ndarray,
+                     stamp_sec: float) -> None:
+    """One IMU integration step. Mutates state in-place."""
+    if state.last_stamp_sec < 0:
+        state.last_stamp_sec = stamp_sec
+        return
+    dt = stamp_sec - state.last_stamp_sec
+    state.last_stamp_sec = stamp_sec
+    if dt <= 0.0 or dt > 0.5:
+        return
+
+    omega = gyro - state.gyro_bias
+    state.q = integrate_gyro(state.q, omega, dt)
+
+    a_world = rotate_vec(state.q, accel)
+    a_lin = a_world - state.g_world
+
+    state.v += a_lin * dt
+    state.p += state.v * dt
