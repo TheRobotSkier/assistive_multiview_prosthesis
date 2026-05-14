@@ -129,3 +129,146 @@ def integration_step(state: CameraState, accel: np.ndarray, gyro: np.ndarray,
 
     state.v += a_lin * dt
     state.p += state.v * dt
+
+
+# ── ROS2 node ───────────────────────────────────────────────────────────────
+
+import rclpy
+from geometry_msgs.msg import TransformStamped
+from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import Imu
+from tf2_ros import TransformBroadcaster
+
+
+class ImuDeadReckoningNode(Node):
+    def __init__(self) -> None:
+        super().__init__("imu_dead_reckoning_node")
+
+        self.declare_parameter("camera_configs", "[]")
+        self.declare_parameter("calibration_duration", 2.0)
+        self.declare_parameter("config_dir", "")
+
+        configs_json: str = self.get_parameter("camera_configs").value
+        calib_dur: float = float(self.get_parameter("calibration_duration").value)
+        config_dir: str = str(self.get_parameter("config_dir").value)
+
+        try:
+            configs: list = json.loads(configs_json)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"camera_configs is not valid JSON: {exc}") from exc
+
+        self.tf_broadcaster = TransformBroadcaster(self)
+        self._camera_states: dict = {}
+
+        sensor_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+        )
+
+        for cfg in configs:
+            name: str = cfg["name"]
+            topic: str = cfg["imu_topic"]
+            state = CameraState(name=name, imu_topic=topic, calib_duration=calib_dur)
+            self._camera_states[name] = state
+            self.create_subscription(
+                Imu, topic,
+                lambda msg, n=name: self._imu_cb(n, msg),
+                sensor_qos,
+            )
+            self.get_logger().info(
+                f"[{name}] Subscribed to IMU topic: {topic}"
+            )
+
+        if config_dir:
+            self._log_calib_matches(configs, config_dir)
+
+        self.get_logger().info(
+            f"IMU dead reckoning node ready. "
+            f"Cameras: {[c['name'] for c in configs]}. "
+            f"Calibration duration: {calib_dur} s (hold cameras still)."
+        )
+
+    def _imu_cb(self, camera_name: str, msg: Imu) -> None:
+        state = self._camera_states[camera_name]
+        stamp_sec = float(msg.header.stamp.sec) + float(msg.header.stamp.nanosec) * 1e-9
+        accel = np.array([
+            msg.linear_acceleration.x,
+            msg.linear_acceleration.y,
+            msg.linear_acceleration.z,
+        ], dtype=float)
+        gyro = np.array([
+            msg.angular_velocity.x,
+            msg.angular_velocity.y,
+            msg.angular_velocity.z,
+        ], dtype=float)
+
+        if state.state == CalibState.CALIBRATING:
+            if state.calib_start_sec < 0.0:
+                state.calib_start_sec = stamp_sec
+                self.get_logger().info(
+                    f"[{camera_name}] Calibration started — hold camera still for "
+                    f"{state.calib_duration:.1f} s"
+                )
+            state.accel_samples.append(accel)
+            state.gyro_samples.append(gyro)
+            if stamp_sec - state.calib_start_sec >= state.calib_duration:
+                finish_calibration(state, self.get_logger())
+            return
+
+        # TRACKING
+        integration_step(state, accel, gyro, stamp_sec)
+        self._publish_tf(camera_name, state, msg.header.stamp)
+
+    def _publish_tf(self, camera_name: str, state: CameraState, stamp) -> None:
+        tf = TransformStamped()
+        tf.header.stamp = stamp
+        tf.header.frame_id = "imu_test_world"
+        tf.child_frame_id = f"{camera_name}_imu"
+        tf.transform.translation.x = float(state.p[0])
+        tf.transform.translation.y = float(state.p[1])
+        tf.transform.translation.z = float(state.p[2])
+        tf.transform.rotation.x = float(state.q[0])
+        tf.transform.rotation.y = float(state.q[1])
+        tf.transform.rotation.z = float(state.q[2])
+        tf.transform.rotation.w = float(state.q[3])
+        self.tf_broadcaster.sendTransform(tf)
+
+    def _log_calib_matches(self, configs: list, config_dir: str) -> None:
+        try:
+            entries = [
+                e for e in os.listdir(config_dir)
+                if os.path.isdir(os.path.join(config_dir, e))
+            ]
+        except OSError:
+            self.get_logger().warning(f"Cannot list config_dir: {config_dir}")
+            return
+        for cfg in configs:
+            serial: str = cfg.get("serial", "")
+            matches = [e for e in entries if serial and serial in e]
+            if matches:
+                self.get_logger().info(
+                    f"[{cfg['name']}] Calibration dir matched: {matches[0]} (informational)"
+                )
+            else:
+                self.get_logger().warning(
+                    f"[{cfg['name']}] No calib dir for serial={serial!r} "
+                    "(using runtime gravity estimation)"
+                )
+
+
+def main(args=None) -> None:
+    rclpy.init(args=args)
+    node = ImuDeadReckoningNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
