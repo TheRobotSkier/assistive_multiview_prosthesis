@@ -13,7 +13,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -262,3 +262,75 @@ rviz-openvins-kill:
 	-podman kill rviz-openvins 2>/dev/null
 	-podman rm rviz-openvins 2>/dev/null
 	@echo "Phase 2 RViz stopped."
+
+# ── Jetson IMU dead reckoning test ────────────────────────────────────────────
+# Use jetson-imu-test-single or jetson-imu-test-dual depending on how many
+# cameras are connected. The Jetson container is the same in both cases;
+# only the RViz config differs.
+
+jetson-imu-test-single: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make imu-test"
+	$(MAKE) rviz-imu-test-single
+
+jetson-imu-test-dual: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make imu-test"
+	$(MAKE) rviz-imu-test-dual
+
+jetson-imu-test-stop: robotlab-connect
+	-ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make imu-test-stop"
+	$(MAKE) rviz-imu-test-kill
+
+jetson-imu-test-logs: robotlab-connect
+	ssh $(JETSON_HOST) "echo robotlab | sudo -S docker logs -f imu_test"
+
+# ── IMU test RViz (local PC) ──────────────────────────────────────────────────
+rviz-imu-test-single:
+	@test -f rviz/imu_test_single.rviz || { echo "Missing rviz/imu_test_single.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	xhost +
+	podman run --rm -d --name rviz-imu-test \
+		--network host \
+		--ipc host \
+		--device /dev/dri \
+		--userns=keep-id \
+		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
+		-v $(CURDIR)/rviz/imu_test_single.rviz:/rviz_config.rviz:ro \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "IMU test RViz (single cam) started. Kill with: make rviz-imu-test-kill"
+
+rviz-imu-test-dual:
+	@test -f rviz/imu_test_dual.rviz || { echo "Missing rviz/imu_test_dual.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	xhost +
+	podman run --rm -d --name rviz-imu-test \
+		--network host \
+		--ipc host \
+		--device /dev/dri \
+		--userns=keep-id \
+		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
+		-v $(CURDIR)/rviz/imu_test_dual.rviz:/rviz_config.rviz:ro \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "IMU test RViz (dual cam) started. Kill with: make rviz-imu-test-kill"
+
+rviz-imu-test-kill:
+	-podman kill rviz-imu-test 2>/dev/null
+	-podman rm rviz-imu-test 2>/dev/null
+	@echo "IMU test RViz stopped."
