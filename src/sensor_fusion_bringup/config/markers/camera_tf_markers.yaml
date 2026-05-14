@@ -20,7 +20,7 @@ cameras:
   head:
     image_topic: /head/d435i_head/color/image_raw
     camera_info_topic: /head/d435i_head/color/camera_info
-    detected_camera_frame: head_d435i_head_color_optical_frame
+    detected_camera_frame: d435i_head_color_optical_frame
     link_frame: d435i_head_link
     pose_topic: /head/camera_marker_tf/pose
     valid_topic: /head/camera_marker_tf/valid
@@ -31,7 +31,7 @@ cameras:
   arm:
     image_topic: /arm/d435i_arm/color/image_raw
     camera_info_topic: /arm/d435i_arm/color/camera_info
-    detected_camera_frame: arm_d435i_arm_color_optical_frame
+    detected_camera_frame: d435i_arm_color_optical_frame
     link_frame: d435i_arm_link
     pose_topic: /arm/camera_marker_tf/pose
     valid_topic: /arm/camera_marker_tf/valid
