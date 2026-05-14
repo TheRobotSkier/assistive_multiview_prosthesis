@@ -13,6 +13,10 @@ else
   COMPOSE := docker compose
 endif
 
+# Container lifetime limits (seconds). Adjust here to change all host containers.
+# 1800 = 30 minutes
+HOST_CONTAINER_LIFETIME := 1800
+
 .PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
@@ -106,7 +110,7 @@ rviz:
 		-v $(CURDIR)/rviz/robotlab_cameras.rviz:/rviz_config.rviz:ro \
 		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
 		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
 	@sleep 3
 	@echo "RViz container started (rviz-robotlab). Kill with: make rviz-kill"
 
@@ -137,7 +141,7 @@ rviz-static:
 		-v $(CURDIR)/rviz/robotlab_cameras_static_tf.rviz:/rviz_config.rviz:ro \
 		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
 		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
 	@sleep 3
 	@echo "RViz started. Kill both with: make rviz-static-kill"
 	podman run --rm -d --name static-tf-robotlab \
@@ -149,13 +153,14 @@ rviz-static:
 		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
 		localhost/rviz-robotlab \
 		bash -c 'source /opt/ros/jazzy/setup.bash && \
-		  ros2 run tf2_ros static_transform_publisher \
-		    --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 \
-		    --frame-id world --child-frame-id d435i_head_depth_optical_frame & \
-		  ros2 run tf2_ros static_transform_publisher \
-		    --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 \
-		    --frame-id world --child-frame-id d435i_arm_depth_optical_frame & \
-		  wait'
+		  timeout $(HOST_CONTAINER_LIFETIME) bash -c "\
+		    ros2 run tf2_ros static_transform_publisher \
+		      --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 \
+		      --frame-id world --child-frame-id d435i_head_depth_optical_frame & \
+		    ros2 run tf2_ros static_transform_publisher \
+		      --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 \
+		      --frame-id world --child-frame-id d435i_arm_depth_optical_frame & \
+		    wait"'
 	@echo "Static TF container started (static-tf-robotlab)"
 
 rviz-static-kill:
@@ -254,7 +259,7 @@ rviz-openvins:
 		-v $(CURDIR)/rviz/phase2_dual_openvins.rviz:/rviz_config.rviz:ro \
 		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
 		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
 	@sleep 3
 	@echo "Phase 2 RViz started (rviz-openvins). Kill with: make rviz-openvins-kill"
 
@@ -303,7 +308,7 @@ rviz-imu-test-single:
 		-v $(CURDIR)/rviz/imu_test_single.rviz:/rviz_config.rviz:ro \
 		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
 		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
 	@sleep 3
 	@echo "IMU test RViz (single cam) started. Kill with: make rviz-imu-test-kill"
 
@@ -326,7 +331,7 @@ rviz-imu-test-dual:
 		-v $(CURDIR)/rviz/imu_test_dual.rviz:/rviz_config.rviz:ro \
 		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
 		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
+		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
 	@sleep 3
 	@echo "IMU test RViz (dual cam) started. Kill with: make rviz-imu-test-kill"
 

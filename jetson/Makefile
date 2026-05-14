@@ -13,6 +13,10 @@ CAM_CFG     := $(REPO_ROOT)/src/sensor_fusion_bringup/config/d435i_cameras.yaml
 LAUNCH_FILE := $(REPO_ROOT)/src/sensor_fusion_bringup/launch/dual_d435i.launch.py
 CYCLONE_CFG := $(CURDIR)/config/cyclonedds_robotlab.xml
 
+# Container lifetime limits (seconds). Adjust here to change all Jetson containers.
+# 7200 = 2 hours
+JETSON_CONTAINER_LIFETIME := 7200
+
 # IMU dead reckoning test paths
 IMU_LAUNCH     := $(REPO_ROOT)/src/sensor_fusion_bringup/launch/imu_test.launch.py
 IMU_SCRIPT     := $(REPO_ROOT)/src/sensor_fusion_bringup/scripts/imu_dead_reckoning_node.py
@@ -57,7 +61,7 @@ cameras:
 		-v /dev:/dev \
 		-v /run/udev:/run/udev:ro \
 		$(IMAGE) \
-		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; ros2 launch sensor_fusion_bringup dual_d435i.launch.py'
+		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_d435i.launch.py'
 
 cameras-stop:
 	$(SUDO) docker rm -f cameras_test 2>/dev/null || true
@@ -88,7 +92,7 @@ openvins:
 		-v $(SFBP_SRC)/launch:$(OVINS_PKG_SHARE)/launch:ro \
 		-v $(SFBP_SRC)/scripts:$(OVINS_PKG_LIB):ro \
 		$(IMAGE) \
-		bash -c 'source /miahand_ws/install/setup.bash && source /ovins_overlay/install/local_setup.bash && ros2 launch sensor_fusion_bringup dual_openvins_phase2.launch.py start_camera:=false'
+		bash -c 'source /miahand_ws/install/setup.bash && source /ovins_overlay/install/local_setup.bash && timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_openvins_phase2.launch.py start_camera:=false'
 
 openvins-stop:
 	$(SUDO) docker rm -f openvins 2>/dev/null || true
@@ -121,7 +125,7 @@ imu-test:
 		-v /dev:/dev \
 		-v /run/udev:/run/udev:ro \
 		$(IMAGE) \
-		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; ros2 launch sensor_fusion_bringup imu_test.launch.py'
+		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup imu_test.launch.py'
 
 imu-test-stop:
 	$(SUDO) docker rm -f imu_test 2>/dev/null || true
