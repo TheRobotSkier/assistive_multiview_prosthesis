@@ -89,6 +89,14 @@ D435i color pointcloud support:
   `multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`
 - Planned x86 segmentation-side pointcloud work:
   `.agents/x86_segmentation_pointcloud_plan.md`
+- Future pose prediction/collision planning should use:
+  `.agents/future_pose_prediction_collision_prompt.md`
+  Key rule: publish/check future predictions only on accepted pointcloud updates
+  so prediction cadence follows pointcloud cadence.
+- Prosthesis self-filter planning should use:
+  `.agents/prosthesis_self_filter_pointcloud_prompt_2026-05-15.md`
+  Goal: remove points inside user-measured prosthesis boxes before collision
+  checking so the system does not collide with itself.
 
 Phase 1 marker correction is external only. Do not modify the OpenVINS internal
 EKF until the external marker-corrected odom path is validated and committed.

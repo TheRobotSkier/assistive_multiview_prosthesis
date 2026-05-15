@@ -33,6 +33,9 @@ in RViz2 while OpenVINS remains stable. The status topic showed
   - `/head/d435i_head/points_marker_map`
   - `/arm/d435i_arm/points_marker_map`
 - Optionally crop, range-filter, voxel/downsample, and merge the two clouds.
+- Apply a prosthesis self-filter before collision checking or segmentation when
+  user-measured prosthesis bounding boxes are available. Planning prompt:
+  `.agents/prosthesis_self_filter_pointcloud_prompt_2026-05-15.md`.
 - Publish the segmentation-ready cloud on:
   - `/segmentation/input_cloud`
 - Keep the output cloud header frame as:
@@ -94,6 +97,9 @@ RealSense pointcloud topics, it should match best-effort QoS.
 
 - Whether to feed segmentation one merged cloud or one selected camera cloud.
 - Whether crop/downsample should happen before or after merging.
+- Whether prosthesis self-filtering should happen before or after merging. The
+  likely first version is after transform/merge in `marker_map`, using boxes
+  defined relative to the arm D435i camera and transformed through TF.
 - Whether the segmentation node should expose a configurable input QoS profile.
 - Whether the click-producing future-pose collision node should publish one
   click per predicted collision or rate-limit/cluster clicks.

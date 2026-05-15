@@ -24,6 +24,19 @@ Final 2026-05-14 pointcloud status: RViz2 color pointclouds work and OpenVINS
 still runs well. The pointcloud status topic reporting alternating `published`
 and `rate_limited` is expected with the output rate cap.
 
+Future prediction/collision planning prompt has been refreshed for the working
+pointcloud baseline:
+`.agents/future_pose_prediction_collision_prompt.md`. The important planning
+change is that predicted future poses and collision checks should be
+synchronized to accepted pointcloud publications. If pointcloud output is 8 Hz,
+prediction/check output should be 8 Hz too.
+
+Planned prosthesis self-filter prompt:
+`.agents/prosthesis_self_filter_pointcloud_prompt_2026-05-15.md`. The goal is
+to remove points inside user-measured prosthesis bounding boxes, likely measured
+relative to the arm D435i camera, before future collision checking so the system
+does not report collisions with itself.
+
 Important current caveat: the latest live ID2 measurement bag
 `dynamic_id2_arm_update_live_20260513_125316` validated the measurement path
 but not the OpenVINS update/reanchor path. It recorded `218` head dynamic ID2
@@ -95,6 +108,12 @@ Repository hygiene:
   decision is made
 
 Near-term next work:
+- Commit the validated Jetson-safe D435i marker-map pointcloud baseline.
+- In a new planning-only chat, investigate future pose prediction and
+  pointcloud collision checking using
+  `.agents/future_pose_prediction_collision_prompt.md`.
+- In a separate planning chat, investigate prosthesis self-filtering using
+  `.agents/prosthesis_self_filter_pointcloud_prompt_2026-05-15.md`.
 - Per-instance OpenVINS TF frame support has been live-smoke checked: head and
   arm publish separate `/ov_msckf` and `/ov_msckf_arm` topics, `poseimu` headers
   remain in `marker_map`, odom child frames are `head_imu` and `arm_imu`, marker
