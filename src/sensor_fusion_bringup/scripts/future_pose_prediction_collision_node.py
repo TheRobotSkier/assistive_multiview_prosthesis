@@ -259,6 +259,7 @@ class FuturePosePredictionCollisionNode(Node):
         self._click_topic = self.get_parameter("click_topic").value
         self._voxel_leaf_m = self.get_parameter("voxel_leaf_m").value
         self._status_period_s = self.get_parameter("status_period_s").value
+        self._collision_radius = self.get_parameter("collision_geometry_radius_m").value
 
         # ── State ──────────────────────────────────────────────────────────
         self._lock = threading.Lock()
@@ -285,6 +286,8 @@ class FuturePosePredictionCollisionNode(Node):
             PointStamped, self._click_topic, 10)
         self._click_status_pub = self.create_publisher(
             String, f"{self._click_topic}/status", 10)
+        self._path_pub = self.create_publisher(
+            Path, f"{self._trajectory_topic}/path", 10)
 
         # ── Status timer (health telemetry only — never triggers prediction)
         status_period_ns = self._status_period_s
@@ -434,6 +437,7 @@ class FuturePosePredictionCollisionNode(Node):
                     kdtree,
                     self._hit_threshold_m,
                     self._min_points_near_hit,
+                    self._collision_radius,
                 )
                 if result is not None:
                     hit_found = True
@@ -453,6 +457,14 @@ class FuturePosePredictionCollisionNode(Node):
             traj.cloud_source_topic = self._cloud_topic
             traj.odom_age_s = float(odom_age)
             self._trajectory_pub.publish(traj)
+
+            path = Path()
+            path.header.stamp = msg.header.stamp
+            path.header.frame_id = msg.header.frame_id
+            path.poses = [
+                PoseStamped(header=path.header, pose=p) for p in poses
+            ]
+            self._path_pub.publish(path)
 
         # ── Publish click ───────────────────────────────────────────────
         if hit_found and hit_point is not None:

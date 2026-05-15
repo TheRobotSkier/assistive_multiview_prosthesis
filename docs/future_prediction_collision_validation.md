@@ -118,7 +118,7 @@ docker exec -it prosthesis rviz2
 ```
 
 - Fixed frame: `marker_map`
-- Add display: `By topic /prediction/future_trajectory` → Path
+- Add display: `By topic /prediction/future_trajectory/path` → Path
 - Add display: `By topic /segmentation/click_positive` → PointStamped
 
 ## 6. Launch args
@@ -153,3 +153,23 @@ docker exec -it prosthesis bash -c \
 ```
 
 Both prediction and click output stop immediately.
+
+## 9. Parameter Tuning for Earlier Click Detection
+
+The click fires when the predicted arm sphere surface (center + `collision_geometry_radius_m`)
+comes within `hit_threshold_m` of at least `min_points_near_hit` cloud points.
+To make clicks fire earlier:
+
+```bash
+docker exec -it prosthesis bash -c \
+  'source /prosthesis_ws/install/setup.bash && ros2 launch sensor_fusion_bringup future_prediction_collision.launch.py enable_prediction:=true enable_collision_check:=true collision_geometry_radius_m:=0.15 hit_threshold_m:=0.10 min_points_near_hit:=2'
+```
+
+| Parameter | Default | To fire earlier | Effect |
+|-----------|---------|-----------------|--------|
+| `collision_geometry_radius_m` | 0.10 | Increase → 0.15-0.20 | Sphere surface reaches cloud cluster sooner |
+| `hit_threshold_m` | 0.05 | Increase → 0.10-0.20 | Larger proximity bubble around each cloud point |
+| `min_points_near_hit` | 3 | Decrease → 1-2 | Fewer cloud points needed to confirm a hit |
+| `horizon_s` | 1.0 | Increase → 1.5-2.0 | Look farther ahead for potential collisions |
+| `voxel_leaf_m` | 0.02 | Decrease → 0.01 | Denser KDTree (more points checked) |
+| `dt_s` | 0.02 | Decrease → 0.01 | Finer prediction steps (more CPU) |
