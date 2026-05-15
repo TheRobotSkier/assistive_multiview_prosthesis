@@ -85,15 +85,6 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Force Controller
-    force_controller = Node(
-        package="force_controller",
-        executable="force_controller_node",
-        name="force_controller",
-        parameters=[{"config_file": LaunchConfiguration("config_file")}],
-        output="screen",
-    )
-
     # RViz
     rviz_config = os.path.join(
         os.path.dirname(__file__), "..", "..", "..", "..", "rviz", "prosthesis.rviz"
@@ -114,7 +105,6 @@ def generate_launch_description():
             twist_propagation,
             preshaping_service,
             proximity_controller,
-            force_controller,
             rviz,
         ]
     )

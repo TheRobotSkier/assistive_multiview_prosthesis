@@ -57,8 +57,8 @@ services:
     runtime: nvidia
     ipc: host
     devices:
-      - ${MIA_SERIAL_PORT:-/dev/ttyUSB1}:/dev/ttyUSB1
-      - ${WRIST_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0
+      - ${MIA_SERIAL_PORT:-/dev/mia_hand}:/dev/mia_hand
+      - ${WRIST_PORT:-/dev/wrist_motor}:/dev/wrist_motor
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev:/dev

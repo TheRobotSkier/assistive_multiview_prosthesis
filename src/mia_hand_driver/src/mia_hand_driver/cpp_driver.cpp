@@ -1276,7 +1276,8 @@ bool CppDriver::init()
 }
 
 CppDriver::CppDriver():
-  err_msg_("")
+  err_msg_(""),
+  emergency_stop_on_(false)
 {
 }
 

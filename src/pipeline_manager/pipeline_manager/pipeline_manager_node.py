@@ -68,16 +68,19 @@ class PipelineManagerNode(Node):
         self.declare_parameter('grasp_gestures', [GESTURE_POWER, GESTURE_PINCH, GESTURE_POINT])
         self.declare_parameter('release_gesture', GESTURE_OPEN)
         self.declare_parameter('state_publish_rate_hz', 5.0)
+        self.declare_parameter('segmentation_timeout_s', 10.0)
 
         self._confidence_threshold = self.get_parameter('confidence_threshold').value
         self._grasp_gestures = self.get_parameter('grasp_gestures').value
         self._release_gesture = self.get_parameter('release_gesture').value
         rate = self.get_parameter('state_publish_rate_hz').value
+        self._segmentation_timeout_s = self.get_parameter('segmentation_timeout_s').value
 
         # ── State ─────────────────────────────────────────────────────────
         self._state = State.IDLE
         self._history: list[Transition] = []
         self._grasp_type: int = 0
+        self._segmentation_timer = None
 
         # ── Publishers ────────────────────────────────────────────────────
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -120,7 +123,7 @@ class PipelineManagerNode(Node):
         )
         self._history.append(transition)
         self.get_logger().info(
-            f'State: {old.name} -> {new.name} ({reason})')
+            f'State: {old.name} -> {new_state.name} ({reason})')
         self._publish_state()
         return True
 
@@ -146,17 +149,27 @@ class PipelineManagerNode(Node):
         if gesture == self._release_gesture:
             if self._state not in (State.IDLE, State.RELEASING):
                 self._transition(State.RELEASING, 'EMG: OPEN')
-                # Auto-transition to IDLE after a short delay
-                self.create_timer(1.0, lambda: self._transition(State.IDLE, 'Release complete'),
-                                  one_shot=True)  # type: ignore[arg-type]
+                self._release_timer = self.create_timer(
+                    1.0, self._on_release_timer)
             return
 
         # Grasp trigger gesture
         if gesture in self._grasp_gestures and self._state == State.IDLE:
             self._transition(State.SEGMENTING, f'EMG: gesture={gesture}')
-            # In a full pipeline, segmentation completion triggers PLANNING.
-            # For now, immediately call the compute service.
-            self._request_preshaping()
+            self._segmentation_timer = self.create_timer(
+                self._segmentation_timeout_s,
+                self._on_segmentation_timeout)
+
+    def _on_release_timer(self):
+        self._release_timer.cancel()
+        self._transition(State.IDLE, 'Release complete')
+
+    def _on_segmentation_timeout(self):
+        self._segmentation_timer.cancel()
+        self._segmentation_timer = None
+        if self._state == State.SEGMENTING:
+            self.get_logger().warn('Segmentation timeout — no object cloud received')
+            self._transition(State.IDLE, 'Segmentation timeout')
 
     def _on_emg_confidence(self, msg):
         # Could be used for gesture validation
@@ -170,11 +183,11 @@ class PipelineManagerNode(Node):
             return
         if msg.width * msg.height == 0:
             return
-        if self._grasp_type == 0:
-            self.get_logger().warn(
-                'Object cloud received but no grasp type set — staying in SEGMENTING')
-            return
+        if self._segmentation_timer is not None:
+            self._segmentation_timer.cancel()
+            self._segmentation_timer = None
         self._transition(State.PLANNING, 'Segmentation complete: object cloud received')
+        self._request_preshaping()
 
     def _request_preshaping(self):
         """Call the grasp preshaping compute service."""

@@ -85,7 +85,6 @@ joint_state_broadcaster:
       - j_thumb_fle
       - j_index_fle
       - j_mrl_fle
-      - j_thumb_opp
     interfaces:
       - position
       - velocity

@@ -17,7 +17,7 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill print-force test-static-grasp
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -339,3 +339,39 @@ rviz-imu-test-kill:
 	-podman kill rviz-imu-test 2>/dev/null
 	-podman rm rviz-imu-test 2>/dev/null
 	@echo "IMU test RViz stopped."
+
+# ── MIA Hand Physical Tests ──────────────────────────────────────────────────
+# print-force: launch ros2_control, reset to relaxed, continuously print forces
+# test-static-grasp: reset, wait, close to YAML-defined positions, monitor contact
+
+print-force:
+	@echo "=== MIA Hand Force Monitor ==="
+	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
+	@test -f scripts/print_force.sh || { echo "Missing scripts/print_force.sh"; exit 1; }
+	-podman rm -f mia-force-print 2>/dev/null
+	podman run --rm -it --name mia-force-print \
+		--network host \
+		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-e MIA_PORT=/dev/ttyUSB0 \
+		prosthesis-smoke-test:latest \
+		bash /prosthesis_ws/scripts/print_force.sh
+
+test-static-grasp:
+	@echo "=== MIA Hand Static Grasp Test ==="
+	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
+	@test -f scripts/static_grasp_test.sh || { echo "Missing scripts/static_grasp_test.sh"; exit 1; }
+	@test -f config/static_grasp_test.yaml || { echo "Missing config/static_grasp_test.yaml"; exit 1; }
+	-podman rm -f mia-static-grasp 2>/dev/null
+	podman run --rm -it --name mia-static-grasp \
+		--network host \
+		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-e MIA_PORT=/dev/ttyUSB0 \
+		-e GRASP_TEST_CONFIG=/prosthesis_ws/config/static_grasp_test.yaml \
+		prosthesis-smoke-test:latest \
+		python3 /prosthesis_ws/scripts/static_grasp_test.sh

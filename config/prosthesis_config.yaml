@@ -136,9 +136,13 @@ force:
       final_closure_timeout_s: 4.0
 
 # ── Hardware ──────────────────────────────────────────────────────────────────
+# Recommended: persistent udev symlinks (see docs/hardware_device_naming.md).
+# Fallback: ttyUSB names — may swap after reboot.
+#   MIA Hand  (FTDI FTAO4Z0Y) → /dev/mia_hand   or /dev/ttyUSB0
+#   Wrist     (FTDI FTBY495J) → /dev/wrist_motor or /dev/ttyUSB1
 hardware:
-    mia_serial_port: "/dev/ttyUSB1"
-    wrist_port: "/dev/ttyUSB0"
+    mia_serial_port: "/dev/mia_hand"
+    wrist_port: "/dev/wrist_motor"
     wrist_baudrate: 57600
     wrist_motor_id: 1
     haptic_bt_addr1: "84:2E:14:09:E1:4E"

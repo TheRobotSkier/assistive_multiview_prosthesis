@@ -8,9 +8,8 @@ Launches the complete prosthesis pipeline:
   5. Twist propagation target selector
   6. Grasp preshaping service
   7. Grasp proximity controller
-  8. Force controller
-  9. Pipeline manager (state machine)
-  10. RViz
+  8. Pipeline manager (state machine)
+  9. RViz
 
 Usage:
   ros2 launch pipeline.launch.py
@@ -104,15 +103,6 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Force Controller
-    force_controller = Node(
-        package="force_controller",
-        executable="force_controller_node",
-        name="force_controller",
-        parameters=[{"config_file": LaunchConfiguration("config_file")}],
-        output="screen",
-    )
-
     # RViz config - look in the rviz/ directory at workspace root
     rviz_config = os.path.join(
         os.path.dirname(__file__), "..", "..", "..", "..", "rviz", "prosthesis.rviz"
@@ -134,7 +124,6 @@ def generate_launch_description():
         twist_propagation,
         preshaping_service,
         proximity_controller,
-        force_controller,
     ]
 
     # Conditional nodes - always included, can be toggled

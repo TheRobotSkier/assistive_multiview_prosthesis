@@ -14,11 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-jazzy-librealsense2 \
         ros-jazzy-realsense2-camera \
         ros-jazzy-realsense2-description \
+        ros-jazzy-ros2-control \
+        ros-jazzy-ros2-controllers \
+        ros-jazzy-joint-state-broadcaster \
+        ros-jazzy-position-controllers \
+        ros-jazzy-velocity-controllers \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Python dependencies ──────────────────────────────────────────────────────
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
         dynamixel-sdk \
+        pytest \
         requests
 
 # ── User setup ───────────────────────────────────────────────────────────────

@@ -159,9 +159,18 @@ def launch_fun(context, *args, **kwargs):
         )
     )
 
+    mia_safety_node = Node(
+        name = 'mia_safety_node',
+        package = 'mia_hand_ros2_control',
+        executable = 'mia_safety_node.py',
+        parameters = [{'serial_port': serial_port}],
+        output = 'both'
+    )
+
     return [
         ros2_control_node,
         robot_state_publisher,
+        mia_safety_node,
         joint_state_broadcaster_spawner,
         controller_spawner_after_joint_state_broadcaster_spawner,
         rviz2_joint_state_publisher_after_joint_state_broadcaster_spawner,
