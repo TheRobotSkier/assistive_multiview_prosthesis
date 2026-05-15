@@ -1,41 +1,27 @@
 #!/usr/bin/env python3
-"""Grasp Proximity Controller Node with force-aware final closure.
+"""Grasp Proximity Controller Node.
 
 Subscribes to planner output topics and the current hand position, then applies
-proximity-based logic before issuing joint and wrist commands:
+proximity-based logic before issuing preshape/close/reset commands via the
+hand_control_interface_node:
 
-  - FAR:  command partial planned closure and wrist pose via position controllers.
-  - NEAR: switch to velocity controllers, apply force-aware final closure.
-
-Per-finger closure states (from force_aware_closure.py):
-  open_loop, contact_seek, contacted, released, safety_stopped.
+  - FAR:  command partial planned closure and wrist pose via preshape messages.
+  - NEAR: trigger grasp close via the hand control interface.
 """
 
 from __future__ import annotations
 
 import math
-from collections import deque
-from enum import Enum, auto
 from pathlib import Path
 from typing import List, Optional
 
 import yaml
 
 import rclpy
-from controller_manager_msgs.srv import SwitchController
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, PoseStamped
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64, Float64MultiArray, Int32
-
-from force_aware_closure import (
-    ClosureProfile,
-    FingerState,
-    ForceReading,
-    compute_baseline,
-    compute_closure_speed,
-    step_finger_state,
-)
+from std_msgs.msg import Empty, Float64, Float64MultiArray, Int32
 
 FINGER_JOINTS = ["j_thumb_fle", "j_index_fle", "j_mrl_fle"]
 FINGER_COUNT = 3
@@ -45,28 +31,6 @@ _CONFIG_CANDIDATES = [
     Path(_PKG_SHARE) / ".." / ".." / ".." / "config" / "prosthesis_config.yaml",
     Path(__file__).resolve().parents[3] / "config" / "prosthesis_config.yaml",
 ]
-
-PROFILE_KEYS = [
-    "max_closing_speed",
-    "min_closing_speed",
-    "decay_distance",
-    "decay_exponent",
-    "contact_force_threshold",
-    "contact_force_spike_threshold",
-    "max_extra_closure",
-    "contact_hold_velocity",
-    "final_closure_timeout_s",
-]
-
-
-def _load_profile(raw: dict) -> ClosureProfile:
-    return ClosureProfile(**{k: float(raw[k]) for k in PROFILE_KEYS})
-
-
-class _ClosurePhase(Enum):
-    IDLE = auto()
-    APPROACHING = auto()
-    FINAL_CLOSURE = auto()
 
 
 class GraspProximityControllerNode(Node):
@@ -95,39 +59,6 @@ class GraspProximityControllerNode(Node):
         config = self._load_config()
         force_cfg = config.get("force", {})
         self._force_enabled = bool(force_cfg.get("enabled", False))
-        self._force_active_profile = str(force_cfg.get("active_profile", "soft"))
-        self._force_profiles: dict[str, ClosureProfile] = {}
-        profiles_raw = force_cfg.get("profiles", {})
-        for name, raw in profiles_raw.items():
-            self._force_profiles[name] = _load_profile(raw)
-
-        self._force_baseline_window_s = float(force_cfg.get("baseline_window_s", 0.5))
-        self._force_stale_timeout_s = float(force_cfg.get("stale_force_timeout_s", 0.5))
-        self._force_reading_timeout_ms = int(force_cfg.get("force_reading_timeout_ms", 500))
-        self._joint_states_topic = str(force_cfg.get("joint_states_topic", "/joint_states"))
-        self._controller_manager_service = str(
-            force_cfg.get("controller_manager_service", "/controller_manager/switch_controller")
-        )
-
-        topic_cfg = config.get("topics", {})
-        controllers_cfg = config.get("controllers", {})
-
-        self._pos_topics: List[str] = [
-            str(topic_cfg.get("thumb_pos_cmd", "/thumb_pos_ff_controller/commands")),
-            str(topic_cfg.get("index_pos_cmd", "/index_pos_ff_controller/commands")),
-            str(topic_cfg.get("mrl_pos_cmd", "/mrl_pos_ff_controller/commands")),
-        ]
-        self._vel_topics: List[str] = [
-            str(topic_cfg.get("thumb_vel_cmd", "/thumb_vel_ff_controller/commands")),
-            str(topic_cfg.get("index_vel_cmd", "/index_vel_ff_controller/commands")),
-            str(topic_cfg.get("mrl_vel_cmd", "/mrl_vel_ff_controller/commands")),
-        ]
-        self._finger_pos_controllers: List[str] = list(
-            controllers_cfg.get("finger_position", ["thumb_pos_ff_controller", "index_pos_ff_controller", "mrl_pos_ff_controller"])
-        )
-        self._finger_vel_controllers: List[str] = list(
-            controllers_cfg.get("finger_velocity", ["thumb_vel_ff_controller", "index_vel_ff_controller", "mrl_vel_ff_controller"])
-        )
 
         # ── State ─────────────────────────────────────────────────────────────
         self._planned_closures: Optional[List[float]] = None
@@ -141,26 +72,11 @@ class GraspProximityControllerNode(Node):
         self._current_hand_pose: Optional[PoseStamped] = None
         self._is_near: bool = False
 
-        # Force-aware closure state
-        self._closure_phase = _ClosurePhase.IDLE
-        self._closure_start_stamp: Optional[rclpy.time.Time] = None
+        self._last_wrist_deg: float = 0.0
 
-        # Pipeline state tracking for release
         self._pipeline_state: int = 0  # State.IDLE
         self._release_start_time: Optional[rclpy.time.Time] = None
-        self._finger_states: List[FingerState] = [FingerState.RELEASED] * FINGER_COUNT
         self._joint_positions: List[float] = [0.0] * FINGER_COUNT
-        self._joint_efforts: List[float] = [0.0] * FINGER_COUNT
-        self._force_history: List[deque] = [
-            deque(maxlen=50) for _ in range(FINGER_COUNT)
-        ]
-        self._last_force_time: Optional[rclpy.time.Time] = None
-        self._last_missing_effort_warn_time: Optional[rclpy.time.Time] = None
-
-        # Controller switch state
-        self._controllers_active: Optional[str] = None  # "position" or "velocity"
-        self._switch_pending: bool = False
-        self._switch_target_mode: Optional[str] = None
 
         # ── Subscriptions ──────────────────────────────────────────────────────
         self.create_subscription(
@@ -189,7 +105,7 @@ class GraspProximityControllerNode(Node):
         )
         self.create_subscription(
             JointState,
-            self._joint_states_topic,
+            "/joint_states",
             self._on_joint_states,
             10,
         )
@@ -201,19 +117,9 @@ class GraspProximityControllerNode(Node):
         )
 
         # ── Publishers ─────────────────────────────────────────────────────────
-        self._pos_pubs = [
-            self.create_publisher(Float64MultiArray, t, 10) for t in self._pos_topics
-        ]
-        self._vel_pubs = [
-            self.create_publisher(Float64MultiArray, t, 10) for t in self._vel_topics
-        ]
-        self._wrist_pub = self.create_publisher(Float64MultiArray, "/wrist/set_position", 10)
-
-        # ── Controller switch client ───────────────────────────────────────────
-        if self._force_enabled:
-            self._switch_client = self.create_client(
-                SwitchController, self._controller_manager_service
-            )
+        self._preshape_pub = self.create_publisher(Float64MultiArray, "/hand_control/preshape", 10)
+        self._close_pub = self.create_publisher(Empty, "/hand_control/close", 10)
+        self._reset_pub = self.create_publisher(Empty, "/hand_control/reset", 10)
 
         # ── Control timer ──────────────────────────────────────────────────────
         self.create_timer(1.0 / rate, self._control_loop)
@@ -265,8 +171,6 @@ class GraspProximityControllerNode(Node):
         self._current_hand_pose = msg
 
     def _on_joint_states(self, msg: JointState) -> None:
-        now = self.get_clock().now()
-
         try:
             indices = [msg.name.index(jname) for jname in FINGER_JOINTS]
         except ValueError:
@@ -274,22 +178,6 @@ class GraspProximityControllerNode(Node):
 
         for i, idx in enumerate(indices):
             self._joint_positions[i] = float(msg.position[idx])
-
-        if all(idx < len(msg.effort) for idx in indices):
-            for i, idx in enumerate(indices):
-                effort = float(msg.effort[idx])
-                self._joint_efforts[i] = effort
-                self._force_history[i].append(effort)
-            self._last_force_time = now
-        else:
-            if (
-                self._last_missing_effort_warn_time is None
-                or (now - self._last_missing_effort_warn_time).nanoseconds / 1e9 > 2.0
-            ):
-                self._last_missing_effort_warn_time = now
-                self.get_logger().warn(
-                    "joint_states has positions but missing efforts for force closure"
-                )
 
     def _on_pipeline_state(self, msg: Int32) -> None:
         new_state = msg.data
@@ -304,24 +192,15 @@ class GraspProximityControllerNode(Node):
             self._handle_release_start()
 
     def _handle_release_start(self) -> None:
-        if self._closure_phase == _ClosurePhase.FINAL_CLOSURE:
-            self._publish_velocity_commands(0.0, 0.0, 0.0)
-
-        if self._force_enabled:
-            self._switch_to_position_controllers()
-
-        self._publish_joint_commands(0.0, 0.0, 0.0)
+        self._reset_pub.publish(Empty())
 
         self._planned_closures = None
         self._planned_wrist_deg = None
         self._planned_hand_frame = None
         self._is_near = False
-        self._closure_phase = _ClosurePhase.IDLE
-        self._closure_start_stamp = None
-        self._finger_states = [FingerState.RELEASED] * FINGER_COUNT
 
         self._release_start_time = self.get_clock().now()
-        self.get_logger().info("Release started — commanding fingers open")
+        self.get_logger().info("Release started — commanding fingers open via control interface")
 
     def _try_commit_plan(self) -> None:
         if (
@@ -336,9 +215,6 @@ class GraspProximityControllerNode(Node):
             self._buf_wrist_deg = None
             self._buf_hand_frame = None
             self._is_near = False
-            self._closure_phase = _ClosurePhase.IDLE
-            self._closure_start_stamp = None
-            self._finger_states = [FingerState.RELEASED] * FINGER_COUNT
             self.get_logger().info(
                 f"New plan committed — closures={self._planned_closures}, "
                 f"wrist={self._planned_wrist_deg:.1f} deg"
@@ -346,9 +222,6 @@ class GraspProximityControllerNode(Node):
             self._publish_wrist_command(self._planned_wrist_deg)
             approach = [self._partial_factor * c for c in self._planned_closures]
             self._publish_joint_commands(approach[0], approach[1], approach[2])
-            # Ensure position controllers are active
-            if self._force_enabled:
-                self._switch_to_position_controllers()
 
     # ── Control loop ───────────────────────────────────────────────────────
 
@@ -379,7 +252,6 @@ class GraspProximityControllerNode(Node):
         if self._is_near:
             if dist > self._exit_thresh:
                 self._is_near = False
-                self._closure_phase = _ClosurePhase.IDLE
                 self.get_logger().info(
                     f"Left near zone (dist={dist:.3f} > exit={self._exit_thresh:.3f})"
                 )
@@ -407,145 +279,11 @@ class GraspProximityControllerNode(Node):
             )
 
     def _control_force_closure(self, thumb: float, index: float, mrl: float) -> None:
-        """Force-aware final closure state machine."""
-        now = self.get_clock().now()
-
-        # Transition into final closure
-        if self._closure_phase == _ClosurePhase.IDLE:
-            self._closure_phase = _ClosurePhase.FINAL_CLOSURE
-            self._closure_start_stamp = now
-            self._finger_states = [FingerState.OPEN_LOOP] * FINGER_COUNT
-            for i in range(FINGER_COUNT):
-                self._force_history[i].clear()
-            self.get_logger().info("Entering force-aware final closure")
-            self._switch_to_velocity_controllers()
-
-        if self._switch_pending:
-            return  # Wait for controller switch to complete
-
-        if self._controllers_active != "velocity":
-            return  # Still switching
-
-        predicted = self._planned_closures or [0.0, 0.0, 0.0]
-        elapsed = (now - self._closure_start_stamp).nanoseconds / 1e9 if self._closure_start_stamp else 0.0
-
-        profile = self._force_profiles.get(self._force_active_profile)
-        if profile is None:
-            self.get_logger().error(f"Unknown force profile '{self._force_active_profile}'")
-            return
-
-        # Check force data freshness
-        force_stale = False
-        if self._last_force_time is not None:
-            since_force = (now - self._last_force_time).nanoseconds / 1e9
-            if since_force > self._force_stale_timeout_s:
-                force_stale = True
-        else:
-            force_stale = True
-
-        if force_stale:
-            if elapsed * 1000.0 > self._force_reading_timeout_ms:
-                self.get_logger().error(
-                    f"Force data has not arrived within {self._force_reading_timeout_ms} ms — stopping closure"
-                )
-                self._stop_all_fingers()
-                return
-
-        velocities = [0.0, 0.0, 0.0]
-        all_contacted = True
-
-        for i in range(FINGER_COUNT):
-            if force_stale:
-                force_reading = ForceReading(force=0.0, baseline=0.0)
-            else:
-                hist = list(self._force_history[i])
-                baseline = compute_baseline(hist) if hist else 0.0
-                force_reading = ForceReading(force=self._joint_efforts[i], baseline=baseline)
-
-            vel, new_state = step_finger_state(
-                profile=profile,
-                state=self._finger_states[i],
-                predicted_closure=predicted[i],
-                current_position=self._joint_positions[i],
-                current_force=force_reading,
-                elapsed_s=elapsed,
-            )
-            self._finger_states[i] = new_state
-            velocities[i] = vel
-            if new_state not in (FingerState.CONTACTED, FingerState.SAFETY_STOPPED):
-                all_contacted = False
-                self.get_logger().debug(
-                    f"Finger {i}: state={new_state.name} vel={vel:.3f} "
-                    f"pos={self._joint_positions[i]:.3f} pred={predicted[i]:.3f} "
-                    f"force={self._joint_efforts[i]:.1f}"
-                )
-
-        if all_contacted:
-            self.get_logger().info("All fingers contacted — grasp complete")
-
-        self._publish_velocity_commands(velocities[0], velocities[1], velocities[2])
+        self._close_pub.publish(Empty())
+        self.get_logger().info("Triggered grasp close via control interface")
 
     def _stop_all_fingers(self) -> None:
-        self._publish_velocity_commands(0.0, 0.0, 0.0)
-        for i in range(FINGER_COUNT):
-            self._finger_states[i] = FingerState.SAFETY_STOPPED
-
-    # ── Controller switching ───────────────────────────────────────────────
-
-    def _switch_to_velocity_controllers(self) -> None:
-        if self._controllers_active == "velocity":
-            return
-        self._switch_pending = True
-        self.get_logger().info("Switching to velocity controllers...")
-        if not self._switch_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().error("SwitchController service not available")
-            self._switch_pending = False
-            return
-        req = SwitchController.Request()
-        req.start_controllers = self._finger_vel_controllers
-        req.stop_controllers = self._finger_pos_controllers
-        req.strictness = SwitchController.Request.BEST_EFFORT
-        self._switch_target_mode = "velocity"
-        future = self._switch_client.call_async(req)
-        future.add_done_callback(self._on_switch_result)
-
-    def _switch_to_position_controllers(self) -> None:
-        if self._controllers_active == "position":
-            return
-        self._switch_pending = True
-        if not self._switch_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().error("SwitchController service not available")
-            self._switch_pending = False
-            return
-        req = SwitchController.Request()
-        req.start_controllers = self._finger_pos_controllers
-        req.stop_controllers = self._finger_vel_controllers
-        req.strictness = SwitchController.Request.BEST_EFFORT
-        self._switch_target_mode = "position"
-        future = self._switch_client.call_async(req)
-        future.add_done_callback(self._on_switch_result)
-
-    def _on_switch_result(self, future) -> None:
-        self._switch_pending = False
-        try:
-            result = future.result()
-            if result.ok:
-                self._controllers_active = self._switch_target_mode
-                self.get_logger().info(
-                    f"Controller switch succeeded — active={self._controllers_active}"
-                )
-            else:
-                self._controllers_active = None
-                self.get_logger().error(
-                    f"Controller switch failed — result.ok=False, "
-                    f"requested start={self._finger_vel_controllers if self._switch_target_mode == 'velocity' else self._finger_pos_controllers}, "
-                    f"stop={self._finger_pos_controllers if self._switch_target_mode == 'velocity' else self._finger_vel_controllers}"
-                )
-        except Exception as e:
-            self._controllers_active = None
-            self.get_logger().error(f"Controller switch exception: {e}")
-        finally:
-            self._switch_target_mode = None
+        self._reset_pub.publish(Empty())
 
     # ── Helpers ────────────────────────────────────────────────────────────
 
@@ -556,29 +294,17 @@ class GraspProximityControllerNode(Node):
         dz = a.pose.position.z - b.position.z
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
-    def _floor_closure(self, planned: float) -> float:
-        if planned <= 0.0:
-            return 0.0
-        return max(planned, self._min_closure)
-
     def _publish_joint_commands(self, thumb: float, index: float, mrl: float) -> None:
-        values = [thumb, index, mrl]
-        for i in range(FINGER_COUNT):
-            msg = Float64MultiArray()
-            msg.data = [self._floor_closure(values[i])]
-            self._pos_pubs[i].publish(msg)
+        msg = Float64MultiArray()
+        msg.data = [self._last_wrist_deg, thumb, index, mrl]
+        self._preshape_pub.publish(msg)
 
     def _publish_velocity_commands(self, thumb_vel: float, index_vel: float, mrl_vel: float) -> None:
-        velocities = [thumb_vel, index_vel, mrl_vel]
-        for i in range(FINGER_COUNT):
-            msg = Float64MultiArray()
-            msg.data = [float(velocities[i])]
-            self._vel_pubs[i].publish(msg)
+        if thumb_vel != 0.0 or index_vel != 0.0 or mrl_vel != 0.0:
+            self._close_pub.publish(Empty())
 
     def _publish_wrist_command(self, target_deg: float) -> None:
-        msg = Float64MultiArray()
-        msg.data = [target_deg, self._wrist_accel]
-        self._wrist_pub.publish(msg)
+        self._last_wrist_deg = target_deg
 
 
 def main(args: Optional[list[str]] = None) -> None:

@@ -121,6 +121,15 @@ def generate_launch_description():
         output="screen",
     )
 
+    # ── Hand control interface — executes preshape/close/reset on hardware ─
+    hand_control = Node(
+        package="grasp_preshaping",
+        executable="hand_control_interface_node.py",
+        name="hand_control_interface",
+        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        output="screen",
+    )
+
     # ── Preshaping service bridge (C++/Rust FFI) ─────────────────────────
     preshaping = Node(
         package="grasp_preshaping",
@@ -160,6 +169,7 @@ def generate_launch_description():
         mia_hand_ros2_control,
         wrist_driver,
         hand_pose,
+        hand_control,
         preshaping,
         proximity,
         pipeline_manager,

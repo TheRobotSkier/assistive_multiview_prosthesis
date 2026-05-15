@@ -31,3 +31,13 @@ force_thresholds:
 
 # Time to wait after resetting to relaxed position (seconds)
 relaxed_wait_s: 2
+
+# ---- Default Preshape (used when NaN is sent on /hand_control/preshape) ----
+# These are fallback positions when individual values are missing from a preshape command.
+# wrist_deg: wrist Dynamixel rotation in degrees
+# thumb_closure, index_closure, mrl_closure: joint positions in radians
+default_preshape:
+  wrist_deg: 0.0
+  thumb_closure: 0.3
+  index_closure: 0.3
+  mrl_closure: 0.3
