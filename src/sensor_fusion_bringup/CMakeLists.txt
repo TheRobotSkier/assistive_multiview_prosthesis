@@ -15,10 +15,16 @@ install(
 
 install(
   PROGRAMS
-    scripts/analyze_marker_covariance_bags.py
-    scripts/aruco_marker_pose_node.py
-    scripts/marker_quality_monitor.py
+    scripts/future_pose_prediction_collision_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  install(
+    DIRECTORY test/
+    DESTINATION share/${PROJECT_NAME}/test
+  )
+endif()
 
 ament_package()
