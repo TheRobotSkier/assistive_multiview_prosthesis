@@ -1,12 +1,12 @@
 <CycloneDDS>
   <Domain Id="0">
     <General>
-      <NetworkInterfaceAddress>192.168.100.1</NetworkInterfaceAddress>
+      <NetworkInterfaceAddress>10.42.0.1</NetworkInterfaceAddress>
     </General>
     <Discovery>
       <Peers>
-        <Peer address="192.168.100.1"/>
-        <Peer address="192.168.100.2"/>
+        <Peer address="10.42.0.1"/>
+        <Peer address="10.42.0.2"/>
       </Peers>
     </Discovery>
   </Domain>

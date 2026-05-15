@@ -93,31 +93,33 @@ File: `config/cyclonedds_peer.xml` (relative to host repo root)
 
 > **Note**: Use `<Domain Id="0">` as an attribute (not `<Domain><Id>0</Id></Domain>`). The latter form caused parse errors.
 
-### RViz Container (`make rviz`)
+### Host ROS2/RViz Docker Container
 
-The `rviz` target in the host `Makefile` launches a podman container with RViz2 configured to receive topics from the Jetson.
+The host uses Docker with the local `localhost/ros2-jazzy-rviz:latest` image and the helper script `scripts/ros2_ethernet_hello_host.sh`. The helper mounts `config/cyclonedds_peer.xml`, uses host networking, and sets the CycloneDDS environment consistently for shell, hello-world, topic listing, and RViz.
+
+By default, `make rviz` opens `rviz/phase2_dual_openvins_head_preview.rviz`. Override it with `RVIZ_CONFIG=/path/to/file.rviz make rviz` if needed.
+
+Build the host image once:
+
+```bash
+make build-jazzy-rviz
+```
 
 Key environment variables and flags:
 
-```makefile
-rviz:
-	xhost +
-	podman run --rm -d --name rviz-robotlab \
-		--network host \
-		--ipc host \
-		--device /dev/dri \
-		--userns=keep-id \
-		-e DISPLAY=$(DISPLAY) \
-		-e XAUTHORITY=/tmp/.xauth \
-		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
-		-e ROS_DOMAIN_ID=0 \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-		-v $(XAUTHORITY):/tmp/.xauth:ro \
-		-v $(CURDIR)/rviz/robotlab_cameras.rviz:/rviz_config.rviz:ro \
-		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
-		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz'
+```bash
+docker run --rm -it \
+  --name ros2-jazzy-host-shell \
+  --network host \
+  --ipc host \
+  -e DISPLAY=$DISPLAY \
+  -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+  -e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+  -e ROS_DOMAIN_ID=0 \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  -v "$PWD/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro" \
+  localhost/ros2-jazzy-rviz:latest \
+  bash
 ```
 
 **Critical flags explained:**
@@ -126,30 +128,20 @@ rviz:
 |------|---------|
 | `--network host` | Container shares host network stack — required for DDS to reach Jetson |
 | `--ipc host` | Shared IPC namespace — required for efficient ROS2 intra-process |
-| `--userns=keep-id` | **Required for Wayland/XWayland**: without this, the container runs as a different UID and X11 drops the connection in under 1 second |
 | `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp` | Selects CycloneDDS as the ROS2 middleware |
 | `CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml` | Points CycloneDDS to the peer config |
 | `ROS_DOMAIN_ID=0` | Must match Jetson |
 
-**Building the RViz image** (if not already built):
+**Host helper commands:**
 
 ```bash
-# From the host repo root
-docker build -f docker/Dockerfile.rviz -t localhost/rviz-robotlab .
-# or with podman:
-podman build -f docker/Dockerfile.rviz -t localhost/rviz-robotlab .
-```
-
-**Running:**
-
-```bash
+# From the host repo root.
+make ros2-ethernet-shell
+make ros2-listen-jetson
+make ros2-pub-host
+make ros2-topic-list
+make ros2-node-list
 make rviz
-```
-
-**Stopping:**
-
-```bash
-podman kill rviz-robotlab
 ```
 
 ---
@@ -177,6 +169,37 @@ File: `docker_ws/docker-deployment/cyclonedds_robotlab.xml` (in `jetson-docker` 
 ```
 
 Same structure as the host config, but `NetworkInterfaceAddress` is set to the Jetson's IP (`10.42.0.2`).
+
+If you cannot change the Jetson repository yet, create `/tmp/cyclonedds_peer.xml` directly on the Jetson and make sure the existing ROS2 container uses it:
+
+```bash
+cat >/tmp/cyclonedds_peer.xml <<'EOF'
+<CycloneDDS>
+  <Domain Id="0">
+    <General>
+      <NetworkInterfaceAddress>10.42.0.2</NetworkInterfaceAddress>
+    </General>
+    <Discovery>
+      <Peers>
+        <Peer address="10.42.0.1"/>
+        <Peer address="10.42.0.2"/>
+      </Peers>
+    </Discovery>
+  </Domain>
+</CycloneDDS>
+EOF
+```
+
+Then exec into the existing Jetson ROS2 Jazzy/D435i container:
+
+```bash
+docker ps
+docker exec -it <container_name> bash
+source /opt/ros/jazzy/setup.bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml
+export ROS_DOMAIN_ID=0
+```
 
 ### Camera Container (`make cameras`)
 
@@ -276,38 +299,49 @@ ping 10.42.0.2
 ping 10.42.0.1
 ```
 
-### 2. Verify ROS2 topics are visible on host
+### 2. Verify hello-world messages both ways
+
+Jetson to host:
 
 ```bash
-# Run inside a ROS2 environment on host with correct env vars:
-RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-CYCLONEDDS_URI=$(pwd)/config/cyclonedds_peer.xml \
-ROS_DOMAIN_ID=0 \
-ros2 topic list
+# Host terminal 1
+make ros2-listen-jetson
+
+# Jetson container
+ros2 topic pub /jetson_hello std_msgs/msg/String "{data: 'hello from jetson'}" -r 1
+```
+
+Host to Jetson:
+
+```bash
+# Jetson container
+ros2 topic echo /host_hello std_msgs/msg/String
+
+# Host terminal 2
+make ros2-pub-host
+```
+
+### 3. Verify ROS2 topics are visible on host
+
+```bash
+make ros2-topic-list
 ```
 
 Expected: `/head/d435i_head/depth/color/points`, `/arm/d435i_arm/depth/color/points`, etc.
 
-Or exec into the running RViz container:
+### 4. Check pointcloud rate
 
 ```bash
-podman exec -it rviz-robotlab bash
-source /opt/ros/jazzy/setup.bash
-ros2 topic list
-```
-
-### 3. Check pointcloud rate
-
-```bash
+make ros2-ethernet-shell
 ros2 topic hz /head/d435i_head/depth/color/points
 ```
 
 Expected: ~15 Hz.
 
-### 4. Check node graph
+### 5. Check node graph
 
 ```bash
-ros2 node list
+make ros2-node-list
 ```
 
 Should show nodes from both host and Jetson.
@@ -326,9 +360,9 @@ Should show nodes from both host and Jetson.
 
 ### X11 drops immediately (RViz shows window then closes)
 
-- Cause: Running podman without `--userns=keep-id` under Wayland/XWayland. The container runs as a remapped UID, which is rejected by the X server.
-- Fix: Ensure `--userns=keep-id` is in the `podman run` command.
-- Also ensure `xhost +` was run before starting the container.
+- Ensure `DISPLAY` is set on the host.
+- Ensure `/tmp/.X11-unix` is mounted into the Docker container.
+- If X11 rejects the container, run `xhost +local:docker` on the host and try `make rviz` again.
 
 ### Camera container starts but no topics appear
 
@@ -366,24 +400,45 @@ Pointcloud data is large (~10-30 MB/s per camera). Ensure:
 | `<Interfaces><NetworkInterface>` syntax (CycloneDDS v0.10.5+) | **Container crash** — not compatible with container image |
 | `<NetworkInterfaceAddress>` (deprecated syntax) | **Works** — use this until image is updated |
 | `<Domain><Id>0</Id></Domain>` form | **Parse error** — use `<Domain Id="0">` attribute form |
-| podman without `--userns=keep-id` under Wayland | **X11 drops in <1s** |
-| podman with `--userns=keep-id` | **Works** |
+| Docker host networking with explicit peers | **Works for host-to-Jetson ROS2 discovery** |
 
 ---
 
 ## Quick Start Reference
 
 ```bash
-# On Jetson (SSH in first)
-ssh robotlab
-cd ~/jetson_ws/jetson-docker
-make cameras
+# On Jetson, from a local terminal
+ip -br addr
+sudo ip addr add 10.42.0.2/24 dev <jetson_eth_if>
+sudo ip link set <jetson_eth_if> up
+ping 10.42.0.1
+
+# In the existing Jetson ROS2 container
+docker ps
+docker exec -it <container_name> bash
+source /opt/ros/jazzy/setup.bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml
+export ROS_DOMAIN_ID=0
 
 # On Host
 cd /path/to/multiview_prosthesis
+ping 10.42.0.2
+make ros2-listen-jetson
+
+# In the Jetson container
+ros2 topic pub /jetson_hello std_msgs/msg/String "{data: 'hello from jetson'}" -r 1
+
+# To test the other direction, run this on the Jetson container
+ros2 topic echo /host_hello std_msgs/msg/String
+
+# And run this on the host
+make ros2-pub-host
+
+# Optional RViz
 make rviz
 
-# Verify (on host, in a ROS2 shell or exec into rviz container)
-ros2 topic list
+# Verify camera topics, once the Jetson camera container is publishing
+make ros2-topic-list
 ros2 topic hz /head/d435i_head/depth/color/points
 ```

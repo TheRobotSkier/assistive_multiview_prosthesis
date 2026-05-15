@@ -2,6 +2,7 @@
 # Works with podman-compose or docker compose (auto-detected)
 
 COMPOSE_DIR := docker
+DOCKER_CMD ?= docker
 
 # Auto-detect compose command
 PODMAN_COMPOSE := $(shell which podman-compose 2>/dev/null)
@@ -13,7 +14,7 @@ else
   COMPOSE := docker compose
 endif
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill robotlab-view robotlab-stop
+.PHONY: build build-prosthesis build-segmentation build-jazzy-rviz rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list rviz rviz-kill robotlab-view robotlab-stop
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -24,6 +25,9 @@ build-prosthesis:
 
 build-segmentation:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build segmentation
+
+build-jazzy-rviz:
+	$(DOCKER_CMD) build -f docker/Dockerfile.jazzy-rviz -t localhost/ros2-jazzy-rviz:latest .
 
 rebuild:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build --no-cache
@@ -86,33 +90,29 @@ logs-cameras:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile hardware logs -f prosthesis-hw
 
 # ── Robotlab RViz (view Jetson camera data on host via Ethernet) ──────
+ros2-ethernet-shell:
+	./scripts/ros2_ethernet_hello_host.sh shell
+
+ros2-listen-jetson:
+	./scripts/ros2_ethernet_hello_host.sh listen-jetson
+
+ros2-pub-host:
+	./scripts/ros2_ethernet_hello_host.sh pub-host
+
+ros2-topic-list:
+	./scripts/ros2_ethernet_hello_host.sh topic-list
+
+ros2-node-list:
+	./scripts/ros2_ethernet_hello_host.sh node-list
+
 rviz:
-	@echo "Launching RViz on host (connects to robotlab via Ethernet ROS network)"
-	@test -f rviz/robotlab_cameras.rviz || { echo "Missing rviz/robotlab_cameras.rviz"; exit 1; }
+	@echo "Launching RViz on host with Docker (connects to robotlab via Ethernet ROS network)"
+	@test -f rviz/phase2_dual_openvins_head_preview.rviz || { echo "Missing rviz/phase2_dual_openvins_head_preview.rviz"; exit 1; }
 	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
-	xhost +
-	podman run --rm -d --name rviz-robotlab \
-		--network host \
-		--ipc host \
-		--device /dev/dri \
-		--userns=keep-id \
-		-e DISPLAY=$(DISPLAY) \
-		-e XAUTHORITY=/tmp/.xauth \
-		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
-		-e ROS_DOMAIN_ID=0 \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-		-v $(XAUTHORITY):/tmp/.xauth:ro \
-		-v $(CURDIR)/rviz/robotlab_cameras.rviz:/rviz_config.rviz:ro \
-		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
-		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && rviz2 -d /rviz_config.rviz' 2>&1 &
-	@sleep 3
-	@echo "RViz container started (rviz-robotlab). Kill with: make rviz-kill"
+	./scripts/ros2_ethernet_hello_host.sh rviz
 
 rviz-kill:
-	-podman kill rviz-robotlab 2>/dev/null
-	-podman rm rviz-robotlab 2>/dev/null
+	-$(DOCKER_CMD) rm -f ros2-jazzy-host-rviz 2>/dev/null
 	@echo "RViz stopped."
 
 robotlab-view: rviz
