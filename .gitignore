@@ -57,3 +57,8 @@ CLAUDE.md
 
 # Include preshaping binary
 !libgrasp_preshaping.so
+.local_version
+embeddeddolt/.lock
+generated_aruco_a4/
+embeddeddolt/
+backup/

@@ -64,7 +64,7 @@ Visualization Manager:
         Value: /odometry/filtered
   Enabled: true
   Global Options:
-    Fixed Frame: d435i_head_depth_optical_frame
+    Fixed Frame: base_link
   Tools:
     - Class: rviz_default_plugins/Interact
     - Class: rviz_default_plugins/MoveCamera

@@ -14,15 +14,11 @@ else
   COMPOSE := docker compose
 endif
 
-<<<<<<< HEAD
-.PHONY: build build-prosthesis build-segmentation build-jazzy-rviz rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list rviz rviz-kill robotlab-view robotlab-stop
-=======
 # Container lifetime limits (seconds). Adjust here to change all host containers.
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
->>>>>>> c49d9c60325d2c6293822b2d6ea7d8560bd2668d
+.PHONY: build build-prosthesis build-segmentation build-jazzy-rviz rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -117,29 +113,8 @@ rviz:
 	@echo "Launching RViz on host with Docker (connects to robotlab via Ethernet ROS network)"
 	@test -f rviz/phase2_dual_openvins_head_preview.rviz || { echo "Missing rviz/phase2_dual_openvins_head_preview.rviz"; exit 1; }
 	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
-<<<<<<< HEAD
+	# Use helper script which detects docker/podman and configures the container
 	./scripts/ros2_ethernet_hello_host.sh rviz
-=======
-	xhost +
-	podman run --rm -d --name rviz-robotlab \
-		--network host \
-		--ipc host \
-		--device /dev/dri \
-		--userns=keep-id \
-		-e DISPLAY=$(DISPLAY) \
-		-e XAUTHORITY=/tmp/.xauth \
-		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
-		-e ROS_DOMAIN_ID=0 \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-		-v $(XAUTHORITY):/tmp/.xauth:ro \
-		-v $(CURDIR)/rviz/robotlab_cameras.rviz:/rviz_config.rviz:ro \
-		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
-		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
-	@sleep 3
-	@echo "RViz container started (rviz-robotlab). Kill with: make rviz-kill"
->>>>>>> c49d9c60325d2c6293822b2d6ea7d8560bd2668d
 
 rviz-kill:
 	-$(DOCKER_CMD) rm -f ros2-jazzy-host-rviz 2>/dev/null

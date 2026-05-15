@@ -69,7 +69,17 @@ def _camera_actions(cam, common):
                 ],
                 output="screen",
                 condition=IfCondition(LaunchConfiguration("enable_pointcloud_neon_fix")),
-            )
+            ),
+            ExecuteProcess(
+                cmd=[
+                    "ros2", "param", "set",
+                    f"/{cam['namespace']}/{cam['name']}",
+                    common["pointcloud_neon_stream_filter_param"],
+                    str(common["pointcloud_neon_stream_filter_value"]),
+                ],
+                output="screen",
+                condition=IfCondition(LaunchConfiguration("enable_pointcloud_neon_fix")),
+            ),
         ],
     )
 
