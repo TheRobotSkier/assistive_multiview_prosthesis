@@ -15,28 +15,29 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     IncludeLaunchDescription,
-    TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-def _rig_is(name: str) -> IfCondition:
+def _condition(expr) -> IfCondition:
     return IfCondition(PythonExpression([
-        "'", LaunchConfiguration("rig_mode"), "' == '", name, "'"
+        *expr
     ]))
 
 
 def generate_launch_description():
     pkg = FindPackageShare("sensor_fusion_bringup")
+    use_fallback = LaunchConfiguration("use_marker_odometry_fallback")
 
     head_openvins_mixed = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([pkg, "launch", "head_d435_openvins_phase2.launch.py"])
         ),
-        condition=_rig_is("mixed_d435_d435i"),
+        condition=_condition(["'", LaunchConfiguration("rig_mode"), "' == 'mixed_d435_d435i' and '", use_fallback, "' == 'false'"]),
         launch_arguments={
             "verbosity": LaunchConfiguration("verbosity"),
             "start_camera": LaunchConfiguration("start_camera"),
@@ -49,7 +50,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([pkg, "launch", "head_d435i_openvins_phase2.launch.py"])
         ),
-        condition=_rig_is("dual_d435i"),
+        condition=_condition(["'", LaunchConfiguration("rig_mode"), "' == 'dual_d435i' and '", use_fallback, "' == 'false'"]),
         launch_arguments={
             "verbosity": LaunchConfiguration("verbosity"),
             "start_camera": LaunchConfiguration("start_camera"),
@@ -61,6 +62,7 @@ def generate_launch_description():
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([pkg, "launch", "arm_d435i_openvins_phase2.launch.py"])
         ),
+        condition=_condition(["'", use_fallback, "' == 'false'"]),
         launch_arguments={
             "verbosity": LaunchConfiguration("verbosity"),
             "start_camera": LaunchConfiguration("start_camera"),
@@ -86,6 +88,34 @@ def generate_launch_description():
         }.items(),
     )
 
+    head_marker_odom_bridge = Node(
+        package="sensor_fusion_bringup",
+        executable="marker_pose_odometry_bridge.py",
+        name="head_marker_pose_odometry_bridge",
+        output="screen",
+        condition=_condition(["'", use_fallback, "' == 'true'"]),
+        parameters=[{
+            "input_pose_topic": "/head/marker_pose/imu_pose",
+            "output_odom_topic": "/ov_msckf_head/odomimu",
+            "odom_child_frame": "head_imu",
+            "tf_child_frame": "head_d435i_head_link",
+        }],
+    )
+
+    arm_marker_odom_bridge = Node(
+        package="sensor_fusion_bringup",
+        executable="marker_pose_odometry_bridge.py",
+        name="arm_marker_pose_odometry_bridge",
+        output="screen",
+        condition=_condition(["'", use_fallback, "' == 'true'"]),
+        parameters=[{
+            "input_pose_topic": "/arm/marker_pose/imu_pose",
+            "output_odom_topic": "/ov_msckf_arm/odomimu",
+            "odom_child_frame": "arm_imu",
+            "tf_child_frame": "arm_d435i_arm_link",
+        }],
+    )
+
     return LaunchDescription([
         DeclareLaunchArgument(
             "rig_mode",
@@ -108,11 +138,16 @@ def generate_launch_description():
             default_value="false",
             description="Use /clock (true for rosbag replay).",
         ),
+        DeclareLaunchArgument(
+            "use_marker_odometry_fallback",
+            default_value="true",
+            description="Use ArUco pose as OpenVINS-compatible odom when marker estimator binary is unavailable.",
+        ),
         head_openvins_mixed,
         head_openvins_d435i,
         arm_openvins,
-        # Marker pose nodes wait for OpenVINS to be ready (openvins delays 5 s;
-        # add 2 s here for a total of ~7 s before marker observations flow).
-        TimerAction(period=7.0, actions=[head_marker_pose]),
-        TimerAction(period=7.0, actions=[arm_marker_pose]),
+        head_marker_pose,
+        arm_marker_pose,
+        head_marker_odom_bridge,
+        arm_marker_odom_bridge,
     ])

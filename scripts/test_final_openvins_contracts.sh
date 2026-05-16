@@ -20,7 +20,8 @@ python3 -m py_compile \
     "$WS_ROOT/src/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py" \
     "$WS_ROOT/src/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py" \
     "$WS_ROOT/src/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py" \
-    "$WS_ROOT/src/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py"
+    "$WS_ROOT/src/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py" \
+    "$WS_ROOT/src/sensor_fusion_bringup/scripts/marker_pose_odometry_bridge.py"
 
 python3 - "$WS_ROOT" <<'PY'
 import sys
@@ -63,7 +64,10 @@ for text, side, imu in ((head_launch, "head", "head_imu"), (arm_launch, "arm", "
     assert '{"marker_fixed_ids": "0,1"}' in text
 
 assert 'default_value="dual_d435i"' in dual_launch
-assert "TimerAction(period=7.0" in dual_launch
+assert 'default_value="true"' in dual_launch
+assert "marker_pose_odometry_bridge.py" in dual_launch
+assert "/ov_msckf_head/odomimu" in dual_launch
+assert "/ov_msckf_arm/odomimu" in dual_launch
 assert "check-final-openvins" in make
 PY
 

@@ -19,6 +19,7 @@ install(
     scripts/aruco_marker_pose_node.py
     scripts/i2c_mpu9250_imu_node.py
     scripts/imu_dead_reckoning_node.py
+    scripts/marker_pose_odometry_bridge.py
     scripts/marker_quality_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
