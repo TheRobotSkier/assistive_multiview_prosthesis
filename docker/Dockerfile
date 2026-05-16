@@ -45,6 +45,9 @@ COPY src/ src/
 COPY config/ config/
 COPY rviz/ rviz/
 COPY scripts/ scripts/
+COPY Makefile Makefile
+COPY docker/docker-compose.yml docker/docker-compose.yml
+COPY jetson/ jetson/
 
 RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
 

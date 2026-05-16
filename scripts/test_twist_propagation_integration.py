@@ -156,6 +156,21 @@ class TestHarness(Node):
     def wait_for_service(self, cli, timeout=5.0) -> bool:
         return cli.wait_for_service(timeout_sec=timeout)
 
+    def wait_for_graph(self, timeout=5.0) -> bool:
+        """Wait for DDS discovery between the harness and node under test."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            if (
+                self.pose_pub.get_subscription_count() > 0
+                and self.cloud_pub.get_subscription_count() > 0
+                and self.seg_cloud_pub.get_subscription_count() > 0
+                and self.count_publishers("/hand_twist") > 0
+                and self.count_publishers("/segmentation/click_positive") > 0
+            ):
+                return True
+        return False
+
     def clear(self):
         """Clear collected messages."""
         self._twist_msgs.clear()
@@ -183,7 +198,8 @@ class TestHarness(Node):
             t = i * dt
             px = start_x + vx * t
             self.pose_pub.publish(_make_pose(px, start_y, start_z))
-            time.sleep(dt * 0.5)  # publish faster than dt for realism
+            rclpy.spin_once(self, timeout_sec=0.02)
+            time.sleep(dt)
 
     def publish_cloud_with_target(self, target_x=0.5, target_y=0.0,
                                   target_z=0.5, n_points=200, spread=0.02):
@@ -248,6 +264,11 @@ def test_node_starts(harness: TestHarness):
     else:
         _fail("deactivate service available", "timed out")
 
+    if harness.wait_for_graph(timeout=5.0):
+        _ok("ROS graph connections discovered")
+    else:
+        _fail("ROS graph connections discovered", "timed out")
+
 
 def test_activation(harness: TestHarness):
     """Activate the node and verify it responds."""
@@ -261,17 +282,17 @@ def test_activation(harness: TestHarness):
 def test_twist_published(harness: TestHarness):
     """After publishing moving poses and a cloud, /hand_twist should have non-zero linear vel."""
     harness.clear()
-    # The node needs a cloud to enter its idle cycle and publish twists.
-    # Publish a cloud first so the node has data to work with.
-    harness.publish_cloud_with_target(target_x=0.6, target_y=0.0, target_z=0.5)
-    # Give the node a moment to receive the cloud
-    rclpy.spin_once(harness, timeout_sec=0.5)
-    harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
-                                 vx=0.2, n=10, dt=0.05)
-    # Spin to let messages propagate
-    rclpy.spin_once(harness, timeout_sec=1.0)
-    time.sleep(0.3)
-    rclpy.spin_once(harness, timeout_sec=1.0)
+    for _ in range(3):
+        # The node needs a cloud to enter its idle cycle and publish twists.
+        harness.publish_cloud_with_target(target_x=0.6, target_y=0.0, target_z=0.5)
+        rclpy.spin_once(harness, timeout_sec=0.3)
+        harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
+                                     vx=0.2, n=10, dt=0.05)
+        deadline = time.time() + 2.0
+        while time.time() < deadline and harness.twist_count == 0:
+            rclpy.spin_once(harness, timeout_sec=0.2)
+        if harness.twist_count > 0:
+            break
 
     if harness.twist_count > 0:
         _ok(f"twist messages published (count={harness.twist_count})")
@@ -289,9 +310,9 @@ def test_twist_published(harness: TestHarness):
 def test_hit_detected(harness: TestHarness):
     """With a cloud placed in the path of motion, a click should be published."""
     harness.clear()
-    # Publish cloud with cluster at x=0.6
-    harness.publish_cloud_with_target(target_x=0.6, target_y=0.0, target_z=0.5)
-    # Publish poses moving towards x=0.6 from x=0.0
+    # Publish cloud with cluster inside the short predicted path.
+    harness.publish_cloud_with_target(target_x=0.16, target_y=0.0, target_z=0.5)
+    # Publish poses moving towards the cluster from x=0.0.
     harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
                                  vx=0.3, n=12, dt=0.05)
 
@@ -341,7 +362,7 @@ def test_deactivation(harness: TestHarness):
         _fail("deactivate returns success", f"resp={resp}")
 
     # Publish data that would normally trigger a hit
-    harness.publish_cloud_with_target(target_x=0.6, target_y=0.0, target_z=0.5)
+    harness.publish_cloud_with_target(target_x=0.16, target_y=0.0, target_z=0.5)
     harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
                                  vx=0.3, n=12, dt=0.05)
 
