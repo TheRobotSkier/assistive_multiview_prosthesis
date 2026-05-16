@@ -18,6 +18,7 @@ setup(
             "pointcloud_fuser_node = camera.pointcloud_fuser_node:main",
             "pointcloud_merger_node = camera.pointcloud_merger_node:main",
             "cam2_hand_tracker_node = camera.cam2_hand_tracker_node:main",
+            "openvins_hand_tracker_node = camera.openvins_hand_tracker_node:main",
         ],
     },
     data_files=[

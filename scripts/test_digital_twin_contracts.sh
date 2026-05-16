@@ -18,6 +18,8 @@ fi
 python3 -m py_compile \
     "$WS_ROOT/src/pipeline_manager/pipeline_manager/digital_twin_joint_state_publisher.py" \
     "$WS_ROOT/src/prosthesis_launch/launch/digital_twin.launch.py" \
+    "$WS_ROOT/src/camera/camera/openvins_hand_tracker_node.py" \
+    "$WS_ROOT/src/camera/camera/pointcloud_merger_node.py" \
     "$WS_ROOT/src/camera/camera/pointcloud_relay_node.py"
 
 python3 - "$WS_ROOT" <<'PY'
@@ -42,8 +44,25 @@ launch = (root / "src/prosthesis_launch/launch/digital_twin.launch.py").read_tex
 assert 'LaunchConfiguration("launch_cameras")' in launch
 assert 'default_value="false"' in launch
 assert "if camera_enabled and launch_cameras_enabled:" in launch
+assert "elif not camera_enabled:" in launch
 assert '"/head/d435i_head/depth/color/points"' in launch
 assert '"/arm/d435i_arm/depth/color/points"' in launch
+assert '"target_frame": world_frame' in launch
+assert '"marker_map_to_world_tf"' in launch
+assert '"openvins_hand_tracker_node"' in launch
+assert '"camera_frame": cam2_link_frame' in launch
+assert '"head_d435i_head_depth_optical_frame"' in launch
+assert '"arm_d435i_arm_link"' in launch
+
+merger = (root / "src/camera/camera/pointcloud_merger_node.py").read_text()
+assert "def _transform_to_target" in merger
+assert "transformed = self._transform_to_target(cloud1)" in merger
+assert "transformed = self._transform_to_target(cloud2)" in merger
+
+rviz = (root / "rviz/digital_twin.rviz").read_text()
+assert "Fixed Frame: world" in rviz
+assert "Value: /head/d435i_head/depth/color/points" in rviz
+assert "Value: /arm/d435i_arm/depth/color/points" in rviz
 PY
 
 ros2 run pipeline_manager digital_twin_joint_state_publisher >/tmp/digital_twin_joint_state_publisher.log 2>&1 &

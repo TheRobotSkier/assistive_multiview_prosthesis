@@ -31,26 +31,26 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /robot_description
     - Class: rviz_default_plugins/PointCloud2
-      Name: Cam1_Pointcloud
+      Name: Head_Pointcloud
       Enabled: true
       Value: true
       Topic:
         Depth: 5
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /cam1/d435_1/depth/color/points
+        Value: /head/d435i_head/depth/color/points
       Color Transformer: RGB8
       Size (m): 0.003
       Style: Flat Squares
     - Class: rviz_default_plugins/PointCloud2
-      Name: Cam2_Pointcloud
+      Name: Arm_Pointcloud
       Enabled: true
       Value: true
       Topic:
         Depth: 5
         History Policy: Keep Last
         Reliability Policy: Best Effort
-        Value: /cam2/d435_2/depth/color/points
+        Value: /arm/d435i_arm/depth/color/points
       Color Transformer: RGB8
       Size (m): 0.003
       Style: Flat Squares
@@ -87,29 +87,29 @@ Visualization Manager:
         Depth: 5
         Value: /segmentation/seed_markers
     - Class: rviz_default_plugins/Axes
-      Name: CharucoBoard
+      Name: WristFrame
       Enabled: true
       Value: true
-      Reference Frame: charuco_board
+      Reference Frame: wrist_link
       Length: 0.15
       Radius: 0.01
     - Class: rviz_default_plugins/Camera
-      Name: Camera1_View
+      Name: Head_View
       Enabled: false
       Value: false
       Topic:
         Depth: 5
-        Value: /cam1/d435_1/color/image_raw
+        Value: /head/d435i_head/color/image_raw
     - Class: rviz_default_plugins/Camera
-      Name: Camera2_View
+      Name: Arm_View
       Enabled: false
       Value: false
       Topic:
         Depth: 5
-        Value: /cam2/d435_2/color/image_raw
+        Value: /arm/d435i_arm/color/image_raw
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: cam1camera_depth_optical_frame
+    Fixed Frame: world
     Frame Rate: 30
   Name: root
   Tools:

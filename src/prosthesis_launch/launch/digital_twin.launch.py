@@ -3,13 +3,12 @@
 Launches all nodes needed for a complete digital twin test:
 
  1. Jetson RealSense camera topics, optional local RealSense launch, or mock cloud publisher
- 2. Static TF: d435i_head_depth_optical_frame -> world (root)
- 3. Pointcloud merger       — TF-transforms both clouds into cam1 frame, fuses to /fused_pointcloud
+ 2. Static TF: marker_map -> world identity anchor
+ 3. Pointcloud merger       — TF-transforms both clouds into world frame, fuses to /fused_pointcloud
  4. Pointcloud relay         — /fused_pointcloud -> /segmentation/input_cloud
  5. Segmentation ROS bridge  — HTTP inference client
  6. Click relay              — forwards RViz clicks to segmentation seeds
- 7. ChArUco TF node          — detects board, publishes charuco_board→cam*_link transforms
- 8. Cam2 hand tracker        — composes ChArUco TFs → publishes world→wrist_link dynamically
+ 7. OpenVINS hand tracker    — derives world→wrist_link from arm camera TF
  9. Cloud snapshot node      — freezes segmented cloud for RViz
 10. Twist propagation        — detects hand->object collision (active)
 11. Grasp preshaping service — C++/Rust FFI bridge
@@ -56,14 +55,17 @@ def _launch_setup(context, *args, **kwargs):
     config_file = LaunchConfiguration("config_file")
     inference_url = LaunchConfiguration("inference_url")
 
+    world_frame = "world"
+    marker_map_frame = "marker_map"
+
     if camera_enabled:
         scene_cloud_topic = "/fused_pointcloud"
         relay_input_topic = "/fused_pointcloud"
-        cam1_frame = "d435i_head_depth_optical_frame"
-        cam1_link = "d435i_head_link"
-        cam1_color_frame = "d435i_head_color_optical_frame"
-        cam2_link_frame = "d435i_arm_link"
-        cam2_color_frame = "d435i_arm_color_optical_frame"
+        cam1_frame = "head_d435i_head_depth_optical_frame"
+        cam1_link = "head_d435i_head_link"
+        cam1_color_frame = "head_d435i_head_color_optical_frame"
+        cam2_link_frame = "arm_d435i_arm_link"
+        cam2_color_frame = "arm_d435i_arm_color_optical_frame"
     else:
         scene_cloud_topic = "/camera/depth/color/points"
         relay_input_topic = "/camera/depth/color/points"
@@ -87,7 +89,7 @@ def _launch_setup(context, *args, **kwargs):
                 PythonLaunchDescriptionSource(camera_launch_path),
             )
         )
-    else:
+    elif not camera_enabled:
         nodes.append(
             Node(
                 package="pipeline_manager",
@@ -97,21 +99,20 @@ def _launch_setup(context, *args, **kwargs):
             )
         )
 
-    # ── 2. Static TF: cam1 depth frame -> world (roots URDF in camera 1) ───
-    # Since camera 1 is the stationary reference, this connects the TF tree.
-    # cam2's position comes from ChArUco tracking → cam2_hand_tracker.
-    # RViz uses d435i_head_depth_optical_frame as fixed frame.
+    # ── 2. Static TF: marker_map -> world identity anchor ─────────────────
+    # OpenVINS publishes camera poses in marker_map. The rest of the grasping
+    # stack uses world, so keep world as an identity child of marker_map.
     if camera_enabled:
         nodes.append(
             Node(
                 package="tf2_ros",
                 executable="static_transform_publisher",
-                name="cam1_to_world_tf",
+                name="marker_map_to_world_tf",
                 arguments=[
                     "0.0", "0.0", "0.0",
                     "0.0", "0.0", "0.0", "1.0",
-                    cam1_frame,
-                    "world",
+                    marker_map_frame,
+                    world_frame,
                 ],
                 output="screen",
             )
@@ -128,15 +129,14 @@ def _launch_setup(context, *args, **kwargs):
             arguments=[
                 "0.0", "0.0", "0.0",
                 "0.0", "0.0", "0.0", "1.0",
-                "world",
+                world_frame,
                 "wrist_link",
             ],
             output="screen",
         )
     )
 
-    # ── 3. Pointcloud merger — TF-transforms cam2 into cam1 frame, merges ──
-    # Replaces the old fuser which just relayed whichever fired last.
+    # ── 3. Pointcloud merger — TF-transforms both clouds into world ───────
     if camera_enabled:
         nodes.append(
             Node(
@@ -147,7 +147,7 @@ def _launch_setup(context, *args, **kwargs):
                     "cam1_topic": "/head/d435i_head/depth/color/points",
                     "cam2_topic": "/arm/d435i_arm/depth/color/points",
                     "output_topic": "/fused_pointcloud",
-                    "target_frame": cam1_frame,
+                    "target_frame": world_frame,
                 }],
                 output="screen",
             )
@@ -188,73 +188,25 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 7. ChArUco TF node — detects board, publishes charuco_board→cam*_link ─
-    # This is the foundation for cam2 tracking: gives us the board pose
-    # relative to each camera so the cam2_hand_tracker can compose world→cam2.
+    # ── 7. OpenVINS hand tracker — world→wrist_link from arm camera TF ────
     if camera_enabled:
         nodes.append(
             Node(
                 package="camera",
-                executable="charuco_tf_node",
-                name="charuco_tf_node",
+                executable="openvins_hand_tracker_node",
+                name="openvins_hand_tracker",
                 parameters=[{
-                    "board_frame": "charuco_board",
-                    # Override defaults to match our tf_prefix + camera_name setup
-                    "cam1_frame_id": cam1_color_frame,
-                    "cam1_link_frame": cam1_link,
-                    "cam2_frame_id": cam2_color_frame,
-                    "cam2_link_frame": cam2_link_frame,
-                }],
-                output="screen",
-            )
-        )
-
-    # ── 8. Cam2 Hand Tracker — world→wrist_link from ChArUco tracking ─────
-    # Composes: cam1→world (static) + cam1→board (ChArUco) + board→cam2 (ChArUco)
-    # → world→cam2 → apply wrist offset → world→wrist_link TF.
-    if camera_enabled:
-        nodes.append(
-            Node(
-                package="camera",
-                executable="cam2_hand_tracker_node",
-                name="cam2_hand_tracker",
-                parameters=[{
-                    "board_frame": "charuco_board",
-                    "cam1_link": cam1_link,
-                    "cam1_depth_frame": cam1_frame,
-                    "cam2_link": cam2_link_frame,
-                    "world_frame": "world",
-                    # wrist→cam2 mounting offset (same as static TF below)
-                    "wrist_cam2_tx": -0.04,
-                    "wrist_cam2_ty": -0.01,
-                    "wrist_cam2_tz": 0.20,
-                    "wrist_cam2_roll": 1.57,
-                    "wrist_cam2_pitch": 0.0,
-                    "wrist_cam2_yaw": 1.57,
+                    "world_frame": world_frame,
+                    "camera_frame": cam2_link_frame,
+                    "wrist_frame": "wrist_link",
+                    "wrist_cam_tx": -0.04,
+                    "wrist_cam_ty": -0.01,
+                    "wrist_cam_tz": 0.20,
+                    "wrist_cam_roll": 1.57,
+                    "wrist_cam_pitch": 0.0,
+                    "wrist_cam_yaw": 1.57,
                     "publish_rate": 15.0,
                 }],
-                output="screen",
-            )
-        )
-
-    # ── 8b. Static TF: wrist_link → d435i_arm_link (hand-mounted camera) ─
-    # Needed for the pointcloud merger's TF chain: cam2cloud → cam2link →
-    # wrist_link → world → cam1frame.  Also used by RViz to display cam2's
-    # pointcloud in the hand frame.
-    #   translation: (-0.04, -0.01, 0.20) — camera behind palm
-    #   rotation:    (1.57, 0.0, 1.57)    — aligns camera Z forward with wrist +X
-    if camera_enabled:
-        nodes.append(
-            Node(
-                package="tf2_ros",
-                executable="static_transform_publisher",
-                name="wrist_to_camera2_tf",
-                arguments=[
-                    "-0.04", "-0.01", "0.20",
-                    "1.57", "0.0", "1.57",
-                    "wrist_link",
-                    cam2_link_frame,
-                ],
                 output="screen",
             )
         )

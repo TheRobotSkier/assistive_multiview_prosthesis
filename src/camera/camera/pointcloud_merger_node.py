@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Pointcloud merger — transforms cam2 cloud into cam1 frame and fuses them.
+"""Pointcloud merger — transforms camera clouds into one target frame and fuses them.
 
 Strategy:
   1. Subscribe to both camera pointclouds
-  2. Try to transform cam2's cloud into cam1's frame via TF
-  3. If TF available: properly merge both clouds by raw byte concatenation
-  4. If TF NOT available: fall back to cam1-only passthrough (stable, no glitch)
+  2. Transform each cloud into target_frame via TF
+  3. If TF available: merge transformed clouds by raw byte concatenation
+  4. If TF NOT available: fall back to cam1-only passthrough
 
 Publishes:
   /fused_pointcloud (sensor_msgs/PointCloud2)
@@ -20,7 +20,7 @@ from sensor_msgs.msg import PointCloud2
 
 
 class PointcloudMerger(Node):
-    """Transforms cam2 cloud into cam1 frame and merges both into one cloud."""
+    """Transforms input clouds into target_frame and merges them."""
 
     def __init__(self):
         super().__init__("pointcloud_merger")
@@ -70,28 +70,16 @@ class PointcloudMerger(Node):
         if cloud1 is None and cloud2 is None:
             return
 
-        # ── Try proper merge (TF-transform cam2 into cam1 frame) ─────────
         all_clouds: list[PointCloud2] = []
         if cloud1 is not None:
-            all_clouds.append(cloud1)
+            transformed = self._transform_to_target(cloud1)
+            if transformed is not None:
+                all_clouds.append(transformed)
 
         if cloud2 is not None:
-            try:
-                # Use can_transform + small wait for robustness
-                if self._tf_buffer.can_transform(
-                    self._target_frame, cloud2.header.frame_id,
-                    rclpy.time.Time(),
-                    timeout=rclpy.duration.Duration(seconds=0.1),
-                ):
-                    transform = self._tf_buffer.lookup_transform(
-                        self._target_frame,
-                        cloud2.header.frame_id,
-                        rclpy.time.Time(),
-                    )
-                    transformed = tf2_sensor_msgs.do_transform_cloud(cloud2, transform)
-                    all_clouds.append(transformed)
-            except Exception:
-                pass  # TF unavailable — fallback
+            transformed = self._transform_to_target(cloud2)
+            if transformed is not None:
+                all_clouds.append(transformed)
 
         if len(all_clouds) >= 2:
             merged = self._concat_clouds(all_clouds)
@@ -114,6 +102,28 @@ class PointcloudMerger(Node):
             )
         if cloud1 is not None:
             self._pub.publish(cloud1)
+
+    def _transform_to_target(self, cloud: PointCloud2) -> PointCloud2 | None:
+        if cloud.header.frame_id == self._target_frame:
+            return cloud
+        try:
+            if not self._tf_buffer.can_transform(
+                self._target_frame,
+                cloud.header.frame_id,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.1),
+            ):
+                return None
+            transform = self._tf_buffer.lookup_transform(
+                self._target_frame,
+                cloud.header.frame_id,
+                rclpy.time.Time(),
+            )
+            transformed = tf2_sensor_msgs.do_transform_cloud(cloud, transform)
+            transformed.header.frame_id = self._target_frame
+            return transformed
+        except Exception:
+            return None
 
     def _concat_clouds(self, clouds: list[PointCloud2]) -> PointCloud2 | None:
         """Concatenate raw byte data from multiple PointCloud2 messages."""
