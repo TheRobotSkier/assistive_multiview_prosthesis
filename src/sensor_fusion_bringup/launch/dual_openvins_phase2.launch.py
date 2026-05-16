@@ -75,6 +75,7 @@ def generate_launch_description():
             PathJoinSubstitution([pkg, "launch", "head_marker_pose_phase2.launch.py"])
         ),
         launch_arguments={
+            "config_file": PathJoinSubstitution([pkg, "config", "markers", "head_aruco_map.yaml"]),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
         }.items(),
     )
@@ -84,6 +85,7 @@ def generate_launch_description():
             PathJoinSubstitution([pkg, "launch", "arm_marker_pose_phase2.launch.py"])
         ),
         launch_arguments={
+            "config_file": PathJoinSubstitution([pkg, "config", "markers", "arm_aruco_map.yaml"]),
             "use_sim_time": LaunchConfiguration("use_sim_time"),
         }.items(),
     )
