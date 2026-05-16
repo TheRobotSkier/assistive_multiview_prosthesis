@@ -45,8 +45,10 @@ assert "gyroscope_noise_density: 0.01" in imu_chain
 jetson_make_path = root / "jetson/Makefile"
 if jetson_make_path.exists():
     jetson_make = jetson_make_path.read_text()
-    assert "CAMERA_CONFIG ?= mixed_d435_d435i_cameras.yaml" in jetson_make
-    assert "RIG_MODE      ?= mixed_d435_d435i" in jetson_make
+    assert "CAMERA_CONFIG ?= d435i_cameras.yaml" in jetson_make
+    assert "RIG_MODE      ?= dual_d435i" in jetson_make
+    assert "$(MAKE) cameras CAMERA_CONFIG=mixed_d435_d435i_cameras.yaml" in jetson_make
+    assert "$(MAKE) openvins RIG_MODE=mixed_d435_d435i" in jetson_make
     assert "cameras-final" in jetson_make
     assert "openvins-final" in jetson_make
 PY

@@ -15,8 +15,8 @@ LAUNCH_DIR  := $(SFBP_SRC)/launch
 SCRIPT_DIR  := $(SFBP_SRC)/scripts
 CYCLONE_CFG := $(CURDIR)/config/cyclonedds_robotlab.xml
 
-CAMERA_CONFIG ?= mixed_d435_d435i_cameras.yaml
-RIG_MODE      ?= mixed_d435_d435i
+CAMERA_CONFIG ?= d435i_cameras.yaml
+RIG_MODE      ?= dual_d435i
 
 # Container lifetime limits (seconds). Adjust here to change all Jetson containers.
 # 7200 = 2 hours

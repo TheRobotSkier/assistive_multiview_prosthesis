@@ -89,8 +89,8 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             "rig_mode",
-            default_value="mixed_d435_d435i",
-            description="mixed_d435_d435i for current bench rig, dual_d435i for final rig.",
+            default_value="dual_d435i",
+            description="dual_d435i for final rig, mixed_d435_d435i for fallback bench rig.",
         ),
         DeclareLaunchArgument("verbosity", default_value="INFO"),
         DeclareLaunchArgument(
