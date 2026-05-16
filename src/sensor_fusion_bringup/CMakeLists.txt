@@ -21,7 +21,16 @@ install(
     scripts/imu_dead_reckoning_node.py
     scripts/marker_pose_odometry_bridge.py
     scripts/marker_quality_monitor.py
+    scripts/future_pose_prediction_collision_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  install(
+    DIRECTORY test/
+    DESTINATION share/${PROJECT_NAME}/test
+  )
+endif()
 
 ament_package()

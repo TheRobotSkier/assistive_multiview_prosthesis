@@ -81,50 +81,6 @@ Visualization Manager:
           Value: true
         arm_imu_from_marker:
           Value: true
-        d435i_color_frame:
-          Value: true
-        d435i_color_optical_frame:
-          Value: true
-        d435i_depth_frame:
-          Value: true
-        d435i_depth_optical_frame:
-          Value: true
-        d435i_link:
-          Value: true
-        head_cam0:
-          Value: true
-        head_d435i_head_accel_frame:
-          Value: true
-        head_d435i_head_accel_optical_frame:
-          Value: true
-        head_d435i_head_color_frame:
-          Value: true
-        head_d435i_head_color_optical_frame:
-          Value: true
-        head_d435i_head_color_optical_frame_body_display:
-          Value: true
-        head_d435i_head_color_optical_frame_from_marker:
-          Value: true
-        head_d435i_head_color_optical_frame_raw:
-          Value: true
-        head_d435i_head_depth_frame:
-          Value: true
-        head_d435i_head_depth_optical_frame:
-          Value: true
-        head_d435i_head_gyro_frame:
-          Value: true
-        head_d435i_head_gyro_optical_frame:
-          Value: true
-        head_d435i_head_imu_frame:
-          Value: true
-        head_d435i_head_imu_optical_frame:
-          Value: true
-        head_d435i_head_link:
-          Value: true
-        head_imu:
-          Value: true
-        head_imu_from_marker:
-          Value: true
         marker_0:
           Value: true
         marker_map:
@@ -145,19 +101,8 @@ Visualization Manager:
               {}
           arm_imu_from_marker:
             {}
-          head_d435i_head_color_optical_frame_body_display:
-            {}
-          head_d435i_head_color_optical_frame_from_marker:
-            {}
-          head_imu:
-            head_cam0:
-              {}
-          head_imu_from_marker:
-            {}
           marker_0:
             arm_d435i_arm_color_optical_frame_raw:
-              {}
-            head_d435i_head_color_optical_frame_raw:
               {}
       Update Interval: 0
       Value: true
@@ -512,6 +457,21 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/PointStamped
+      Color: 204; 41; 204
+      Enabled: true
+      History Length: 1
+      Name: PointStamped
+      Radius: 0.20000000298023224
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /segmentation/click_positive
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -533,7 +493,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 3.6941232681274414
+      Distance: 2.6612548828125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -548,10 +508,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4299997389316559
+      Pitch: 0.45999911427497864
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.014998435974121
+      Yaw: 3.8849830627441406
     Saved: ~
 Window Geometry:
   Displays:

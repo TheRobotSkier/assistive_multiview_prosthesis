@@ -28,15 +28,22 @@ assert "make jetson-sync" in start
 assert "make cameras-final && make openvins-final" in start
 assert "--profile digital_twin" in start
 assert "segmentation digital_twin" in start
+assert "digital_twin_rviz" in start
+assert "xhost +local:" in start
 assert "SKIP_JETSON" in start
 
 assert "make openvins-stop && make cameras-stop" in stop
 assert "STOP_JETSON" in stop
 
 digital = compose["services"]["digital_twin"]
+rviz = compose["services"]["digital_twin_rviz"]
 assert "segmentation" in digital["depends_on"]
 assert not digital.get("devices")
 assert any(v == "RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" for v in digital["environment"])
+assert "DT_CAMERA" in " ".join(digital["command"])
+assert "DT_MOCK_EMG" in " ".join(digital["command"])
+assert "rviz2 -d /prosthesis_ws/rviz/digital_twin.rviz" in " ".join(rviz["command"])
+assert "digital_twin" in rviz["depends_on"]
 
 for topic in (
     "/head/d435i_head/depth/color/points",

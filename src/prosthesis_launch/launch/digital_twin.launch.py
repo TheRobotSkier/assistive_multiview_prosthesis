@@ -12,11 +12,11 @@ Launches all nodes needed for a complete digital twin test:
  9. Cloud snapshot node      — freezes segmented cloud for RViz
 10. Twist propagation        — detects hand->object collision (active)
 11. Grasp preshaping service — C++/Rust FFI bridge
-12. Grasp proximity controller
+12. Position grasp controller — directly executes planned closures in the twin
 13. Pipeline manager         — state machine orchestrator
 14. Hand pose publisher      — reads TF, publishes /hand_pose
 15. Hand URDF (digital twin) — robot_state_publisher (wrist_link root, no wrist joint)
-16. RViz                     — digital_twin.rviz config
+16. Optional RViz            — digital_twin.rviz config
 17. Joint state publisher    — publishes default joint config (gui variant for manual control)
 
 Usage:
@@ -52,6 +52,8 @@ def _launch_setup(context, *args, **kwargs):
     camera_enabled = LaunchConfiguration("camera").perform(context).lower() == "true"
     launch_cameras_enabled = LaunchConfiguration("launch_cameras").perform(context).lower() == "true"
     gui_enabled = LaunchConfiguration("gui").perform(context).lower() == "true"
+    rviz_enabled = LaunchConfiguration("rviz").perform(context).lower() == "true"
+    mock_emg_enabled = LaunchConfiguration("mock_emg").perform(context).lower() == "true"
     config_file = LaunchConfiguration("config_file")
     inference_url = LaunchConfiguration("inference_url")
 
@@ -256,13 +258,19 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 12. Grasp Proximity Controller ────────────────────────────────────
+    # ── 12. Position Grasp Controller ─────────────────────────────────────
+    # The digital twin has no force feedback, so execute the planner's target
+    # closures directly on the same command topics that the Mia hand uses.
     nodes.append(
         Node(
-            package="grasp_preshaping",
-            executable="grasp_proximity_controller_node.py",
-            name="proximity_controller",
-            parameters=[{"config_file": config_file}],
+            package="pipeline_manager",
+            executable="digital_twin_position_grasp_controller",
+            name="digital_twin_position_grasp_controller",
+            parameters=[{
+                "closure_scale": 1.0,
+                "min_closure_amount": 0.1,
+                "open_on_idle": True,
+            }],
             output="screen",
         )
     )
@@ -277,6 +285,23 @@ def _launch_setup(context, *args, **kwargs):
             output="screen",
         )
     )
+
+    # ── 13b. Mock EMG publisher (triggers pipeline without real EMG band) ─
+    if mock_emg_enabled:
+        nodes.append(
+            Node(
+                package="pipeline_manager",
+                executable="mock_emg_publisher",
+                name="mock_emg_publisher",
+                parameters=[{
+                    "grasp_gesture": 1,     # POWER
+                    "release_gesture": 3,   # OPEN
+                    "grasp_duration": 8.0,
+                    "release_duration": 3.0,
+                }],
+                output="screen",
+            )
+        )
 
     # ── 14. Hand Pose Publisher ──────────────────────────────────────────
     nodes.append(
@@ -313,26 +338,30 @@ def _launch_setup(context, *args, **kwargs):
             package="robot_state_publisher",
             executable="robot_state_publisher",
             name="robot_state_publisher",
-            parameters=[{"robot_description": robot_description}],
+            parameters=[{
+                "robot_description": robot_description,
+                "publish_frequency": 10.0,
+            }],
             output="screen",
         )
     )
 
     # ── 16. RViz with digital_twin.rviz (delayed for camera init) ─────────
-    rviz_config = os.path.abspath(os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..", "..", "rviz", "digital_twin.rviz"
-    ))
-    # Delay RViz so camera frames exist before it opens (otherwise falls to 'map')
-    rviz = TimerAction(period=8.0, actions=[
-        Node(
-            package="rviz2",
-            executable="rviz2",
-            name="rviz2",
-            arguments=["-d", rviz_config],
-            output="screen",
-        )
-    ])
-    nodes.append(rviz)
+    if rviz_enabled:
+        rviz_config = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "..", "..", "rviz", "digital_twin.rviz"
+        ))
+        # Delay RViz so camera frames exist before it opens (otherwise falls to 'map')
+        rviz = TimerAction(period=8.0, actions=[
+            Node(
+                package="rviz2",
+                executable="rviz2",
+                name="rviz2",
+                arguments=["-d", rviz_config],
+                output="screen",
+            )
+        ])
+        nodes.append(rviz)
 
     # ── 17. Joint state publisher ────────────────────────────────────────
     # Command-driven by the same /.../commands topics used for hardware.
@@ -374,6 +403,16 @@ def generate_launch_description():
             "gui",
             default_value="false",
             description="Also launch joint_state_publisher_gui for manual hand control",
+        ),
+        DeclareLaunchArgument(
+            "rviz",
+            default_value="true",
+            description="Launch RViz from this launch file. Compose full-stack runs set this false and start host RViz separately.",
+        ),
+        DeclareLaunchArgument(
+            "mock_emg",
+            default_value="false",
+            description="Launch mock EMG publisher to trigger grasp pipeline without real EMG band",
         ),
         DeclareLaunchArgument(
             "config_file",

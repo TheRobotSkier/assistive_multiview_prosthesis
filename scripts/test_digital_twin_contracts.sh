@@ -17,6 +17,7 @@ fi
 
 python3 -m py_compile \
     "$WS_ROOT/src/pipeline_manager/pipeline_manager/digital_twin_joint_state_publisher.py" \
+    "$WS_ROOT/src/pipeline_manager/pipeline_manager/digital_twin_position_grasp_controller.py" \
     "$WS_ROOT/src/prosthesis_launch/launch/digital_twin.launch.py" \
     "$WS_ROOT/src/camera/camera/openvins_hand_tracker_node.py" \
     "$WS_ROOT/src/camera/camera/pointcloud_merger_node.py" \
@@ -53,6 +54,33 @@ assert '"openvins_hand_tracker_node"' in launch
 assert '"camera_frame": cam2_link_frame' in launch
 assert '"head_d435i_head_depth_optical_frame"' in launch
 assert '"arm_d435i_arm_link"' in launch
+assert 'DeclareLaunchArgument(\n            "rviz"' in launch
+assert 'DeclareLaunchArgument(\n            "mock_emg"' in launch
+assert 'executable="digital_twin_position_grasp_controller"' in launch
+assert 'executable="grasp_proximity_controller_node.py"' not in launch
+assert '"publish_frequency"' in launch
+assert 'executable="mock_emg_publisher"' in launch
+
+compose = (root / "docker/docker-compose.yml").read_text()
+assert "digital_twin_rviz:" in compose
+assert "rviz2 -d /prosthesis_ws/rviz/digital_twin.rviz" in compose
+assert "DT_MOCK_EMG" in compose
+assert "DT_CAMERA" in compose
+
+setup_py = (root / "src/pipeline_manager/setup.py").read_text()
+assert "mock_emg_publisher" in setup_py
+
+start_script = (root / "scripts/start_full_digital_twin_pipeline.sh").read_text()
+assert "digital_twin_rviz" in start_script
+assert "DT_MOCK_EMG" in start_script
+assert "DT_CAMERA" in start_script
+
+position_controller = (
+    root / "src/pipeline_manager/pipeline_manager/digital_twin_position_grasp_controller.py"
+).read_text()
+assert '"/grasp_preshaping/target_finger_closures"' in position_controller
+assert '"/thumb_pos_ff_controller/commands"' in position_controller
+assert 'STATE_RELEASING = 6' in position_controller
 
 merger = (root / "src/camera/camera/pointcloud_merger_node.py").read_text()
 assert "def _transform_to_target" in merger
@@ -66,6 +94,12 @@ assert "Fixed Frame: world" in rviz
 assert "Value: /head/d435i_head/depth/color/points" in rviz
 assert "Value: /arm/d435i_arm/depth/color/points" in rviz
 PY
+
+if ! command -v ros2 >/dev/null 2>&1; then
+    echo "ROS 2 CLI not available; skipped digital twin runtime topic check"
+    echo "Digital twin contracts OK"
+    exit 0
+fi
 
 ros2 run pipeline_manager digital_twin_joint_state_publisher >/tmp/digital_twin_joint_state_publisher.log 2>&1 &
 NODE_PID=$!

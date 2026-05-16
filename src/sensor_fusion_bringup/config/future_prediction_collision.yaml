@@ -1,0 +1,21 @@
+prediction:
+  enable_prediction: false
+  enable_collision_check: false
+  horizon_s: 1.0
+  dt_s: 0.02
+  hit_threshold_m: 0.05
+  min_points_near_hit: 3
+  odom_max_age_s: 0.1
+  cloud_max_age_s: 2.0
+  max_prediction_covariance_trace: 100.0
+  process_noise_linear_mps2_per_s: 0.1
+  process_noise_angular_radps2_per_s: 0.5
+  collision_geometry_type: "sphere"
+  collision_geometry_radius_m: 0.10
+  collision_geometry_frame: "arm_imu"
+  odom_topic: "/ov_msckf_arm/odomimu"
+  cloud_topic: "/arm/d435i_arm/points_marker_map"
+  trajectory_topic: "/prediction/future_trajectory"
+  click_topic: "/segmentation/click_positive"
+  voxel_leaf_m: 0.02
+  status_period_s: 1.0

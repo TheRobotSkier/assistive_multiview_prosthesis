@@ -121,7 +121,7 @@ services:
       [
         "/bin/bash",
         "-c",
-        "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=false",
+        "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch digital_twin.launch.py camera:=${DT_CAMERA:-true} gui:=${DT_GUI:-false} rviz:=false mock_emg:=${DT_MOCK_EMG:-false}",
       ]
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
@@ -134,6 +134,35 @@ services:
       - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
     depends_on:
       - segmentation
+    profiles:
+      - digital_twin
+    stdin_open: true
+    tty: true
+    privileged: true
+    userns_mode: "keep-id"
+
+  # ── Host RViz for the digital twin; separate from the pipeline container ──
+  digital_twin_rviz:
+    container_name: digital_twin_rviz
+    extends: prosthesis
+    command:
+      [
+        "/bin/bash",
+        "-c",
+        "source /prosthesis_ws/install/setup.bash && timeout ${HOST_CONTAINER_LIFETIME:-1800} rviz2 -d /prosthesis_ws/rviz/digital_twin.rviz",
+      ]
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml
+      - ROS_DOMAIN_ID=0
+      - XAUTHORITY=/tmp/.Xauthority
+    network_mode: host
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
+    depends_on:
+      - digital_twin
     profiles:
       - digital_twin
     stdin_open: true
