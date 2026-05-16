@@ -2,7 +2,7 @@
 
 Launches all nodes needed for a complete digital twin test:
 
- 1. Dual RealSense D435i cameras with IMU (or mock cloud publisher)
+ 1. Jetson RealSense camera topics, optional local RealSense launch, or mock cloud publisher
  2. Static TF: d435i_head_depth_optical_frame -> world (root)
  3. Pointcloud merger       — TF-transforms both clouds into cam1 frame, fuses to /fused_pointcloud
  4. Pointcloud relay         — /fused_pointcloud -> /segmentation/input_cloud
@@ -23,6 +23,7 @@ Launches all nodes needed for a complete digital twin test:
 Usage:
   ros2 launch prosthesis_launch digital_twin.launch.py
   ros2 launch prosthesis_launch digital_twin.launch.py gui:=true
+  ros2 launch prosthesis_launch digital_twin.launch.py camera:=true launch_cameras:=true
 """
 
 import os
@@ -50,6 +51,7 @@ from launch_ros.substitutions import FindPackageShare
 
 def _launch_setup(context, *args, **kwargs):
     camera_enabled = LaunchConfiguration("camera").perform(context).lower() == "true"
+    launch_cameras_enabled = LaunchConfiguration("launch_cameras").perform(context).lower() == "true"
     gui_enabled = LaunchConfiguration("gui").perform(context).lower() == "true"
     config_file = LaunchConfiguration("config_file")
     inference_url = LaunchConfiguration("inference_url")
@@ -74,7 +76,7 @@ def _launch_setup(context, *args, **kwargs):
     nodes = []
 
     # ── 1. Cloud source ────────────────────────────────────────────────────
-    if camera_enabled:
+    if camera_enabled and launch_cameras_enabled:
         camera_launch_path = os.path.join(
             get_package_share_directory("sensor_fusion_bringup"),
             "launch",
@@ -409,7 +411,12 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "camera",
             default_value="true",
-            description="Use real RealSense D435 cameras (default: true for digital twin)",
+            description="Use real RealSense camera topics from the Jetson (default: true for digital twin)",
+        ),
+        DeclareLaunchArgument(
+            "launch_cameras",
+            default_value="false",
+            description="Launch local RealSense drivers on the host instead of only subscribing to Jetson topics",
         ),
         DeclareLaunchArgument(
             "gui",

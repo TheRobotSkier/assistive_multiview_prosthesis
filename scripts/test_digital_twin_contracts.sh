@@ -37,6 +37,13 @@ for rel in (
 bridge = (root / "src/grasp_preshaping/nodes/preshaping_service_bridge_node.cpp").read_text()
 assert "create_publisher<geometry_msgs::msg::PoseStamped>" in bridge
 assert "target_pose.header.frame_id = \"world\"" in bridge
+
+launch = (root / "src/prosthesis_launch/launch/digital_twin.launch.py").read_text()
+assert 'LaunchConfiguration("launch_cameras")' in launch
+assert 'default_value="false"' in launch
+assert "if camera_enabled and launch_cameras_enabled:" in launch
+assert '"/head/d435i_head/depth/color/points"' in launch
+assert '"/arm/d435i_arm/depth/color/points"' in launch
 PY
 
 ros2 run pipeline_manager digital_twin_joint_state_publisher >/tmp/digital_twin_joint_state_publisher.log 2>&1 &
