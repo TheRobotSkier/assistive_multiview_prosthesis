@@ -27,6 +27,8 @@ OpenVINS odometry/TF outputs under:
 
 - `/ov_msckf_head`
 - `/ov_msckf_arm`
+- `/head/marker_pose`
+- `/arm/marker_pose`
 
 Marker pose correction still accepts fixed marker IDs `0,1`, so the visible
 ArUco marker ID `1` is part of the correction path.
@@ -60,7 +62,15 @@ Passed locally:
 
 ```bash
 bash scripts/test_final_camera_contracts.sh
+bash scripts/test_final_openvins_contracts.sh
 bash scripts/test_mixed_camera_contracts.sh
+```
+
+Runtime checks after Jetson/OpenVINS launch:
+
+```bash
+make check-final-topics
+make check-final-openvins
 ```
 
 The direct host run of `scripts/test_digital_twin_contracts.sh` requires `ros2`

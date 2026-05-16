@@ -8,7 +8,6 @@ aruco:
 frames:
   map_frame: marker_map
   # Frame published by the RealSense node for head camera (namespace=head, name=d435i_head).
-  # NOTE: camera is a D435 (not D435i) but the cameras container uses name 'd435i_head'.
   camera_frame: head_d435i_head_color_optical_frame
   detected_camera_frame: head_d435i_head_color_optical_frame
   # Must match the Phase 2 OpenVINS launch marker_target_frame / imu_frame_id.
@@ -17,9 +16,8 @@ frames:
 # OpenVINS/Kalibr camera-IMU calibration.
 # This gives the node camera intrinsics, distortion, and T_cam_imu.
 # Path is the container-internal path inside the openVINS overlay volume mount.
-# T_cam_imu is a manual estimate (near-identity) — external GY-91, not Kalibr-calibrated.
 calibration:
-  kalibr_imucam_chain: /ovins_overlay/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/head_d435_829212072207/kalibr_imucam_chain.yaml
+  kalibr_imucam_chain: /ovins_overlay/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/kalibr_imucam_chain.yaml
 
 topics:
   image: /head/d435i_head/color/image_raw
