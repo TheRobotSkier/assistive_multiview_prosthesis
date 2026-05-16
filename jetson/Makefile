@@ -53,6 +53,7 @@ cameras:
 		--ipc host \
 		--runtime nvidia \
 		--privileged \
+		--user root \
 		--group-add video \
 		--group-add plugdev \
 		--group-add dialout \
@@ -66,7 +67,7 @@ cameras:
 		-v /dev:/dev \
 		-v /run/udev:/run/udev:ro \
 		$(IMAGE) \
-		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_d435i.launch.py camera_config:=$(CAMERA_CONFIG)'
+		bash -lc 'source /opt/ros/jazzy/setup.bash; source /miahand_ws/install/setup.bash 2>/dev/null || true; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_d435i.launch.py camera_config:=$(CAMERA_CONFIG)'
 
 cameras-mixed:
 	$(MAKE) cameras CAMERA_CONFIG=mixed_d435_d435i_cameras.yaml
@@ -91,6 +92,7 @@ openvins:
 		--ipc host \
 		--runtime nvidia \
 		--privileged \
+		--user root \
 		--group-add video \
 		--group-add plugdev \
 		--group-add dialout \
@@ -103,7 +105,7 @@ openvins:
 		-v $(SFBP_SRC)/launch:$(OVINS_PKG_SHARE)/launch:ro \
 		-v $(SFBP_SRC)/scripts:$(OVINS_PKG_LIB):ro \
 		$(IMAGE) \
-		bash -c 'source /miahand_ws/install/setup.bash && source /ovins_overlay/install/local_setup.bash && timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_openvins_phase2.launch.py start_camera:=false rig_mode:=$(RIG_MODE)'
+		bash -lc 'set -e; source /opt/ros/jazzy/setup.bash; source /miahand_ws/install/setup.bash 2>/dev/null || true; for p in /ovins_overlay/install/*; do if [ -d "$$p/share" ]; then export AMENT_PREFIX_PATH="$$p:$${AMENT_PREFIX_PATH:-}"; export CMAKE_PREFIX_PATH="$$p:$${CMAKE_PREFIX_PATH:-}"; [ -d "$$p/lib" ] && export LD_LIBRARY_PATH="$$p/lib:$${LD_LIBRARY_PATH:-}"; fi; done; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_openvins_phase2.launch.py start_camera:=false rig_mode:=$(RIG_MODE)'
 
 openvins-mixed:
 	$(MAKE) openvins RIG_MODE=mixed_d435_d435i
@@ -129,6 +131,7 @@ imu-test:
 		--ipc host \
 		--runtime nvidia \
 		--privileged \
+		--user root \
 		--group-add video \
 		--group-add plugdev \
 		--group-add dialout \
@@ -142,7 +145,7 @@ imu-test:
 		-v /dev:/dev \
 		-v /run/udev:/run/udev:ro \
 		$(IMAGE) \
-		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup imu_test.launch.py'
+		bash -lc 'source /opt/ros/jazzy/setup.bash; source /miahand_ws/install/setup.bash 2>/dev/null || true; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup imu_test.launch.py'
 
 imu-test-stop:
 	$(SUDO) docker rm -f imu_test 2>/dev/null || true

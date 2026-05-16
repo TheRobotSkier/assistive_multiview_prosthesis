@@ -5,12 +5,14 @@ set -euo pipefail
 
 TIMEOUT="${TIMEOUT:-8}"
 
+set +u
 if [ -f /opt/ros/jazzy/setup.bash ]; then
     source /opt/ros/jazzy/setup.bash
 fi
 if [ -f /prosthesis_ws/install/setup.bash ]; then
     source /prosthesis_ws/install/setup.bash
 fi
+set -u
 
 require_topic_once() {
     local topic="$1"
