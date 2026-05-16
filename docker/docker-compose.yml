@@ -124,11 +124,14 @@ services:
         "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=false",
       ]
     environment:
-      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml
+      - ROS_DOMAIN_ID=0
       - XAUTHORITY=/tmp/.Xauthority
     network_mode: host
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
     depends_on:
       - segmentation
     profiles:
