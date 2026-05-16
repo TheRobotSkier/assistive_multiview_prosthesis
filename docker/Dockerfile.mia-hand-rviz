@@ -1,0 +1,27 @@
+FROM osrf/ros:jazzy-desktop
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ENV ROS_DOMAIN_ID=0
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ros-jazzy-joint-limits \
+        ros-jazzy-xacro \
+        ros-jazzy-joint-state-publisher-gui \
+        ros-jazzy-cyclonedds \
+        ros-jazzy-rmw-cyclonedds-cpp \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /mia_ws
+
+COPY src/mia_hand_description/ src/mia_hand_description/
+
+RUN . /opt/ros/jazzy/setup.sh \
+    && rosdep install --from-paths src/ --ignore-src -r -y --skip-keys='xacro joint_state_publisher_gui' \
+    && rm -rf /var/lib/apt/lists/* \
+    && colcon build --packages-select mia_hand_description
+
+RUN echo "source /opt/ros/jazzy/setup.bash" >> /root/.bashrc \
+    && echo "source /mia_ws/install/setup.bash" >> /root/.bashrc
+
+CMD ["/bin/bash", "-c", "source /mia_ws/install/setup.bash && ros2 launch mia_hand_description mia_hand_rviz_launch.py"]
