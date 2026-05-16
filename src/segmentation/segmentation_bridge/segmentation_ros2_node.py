@@ -31,6 +31,7 @@ not on periodic cloud republishes.
 """
 
 import base64
+import copy
 import threading
 
 import numpy as np
@@ -188,7 +189,7 @@ class SegmentationNode(Node):
         with self._lock:
             self._pos_clicks.clear()
             self._neg_clicks.clear()
-            header = self._cloud_header
+            header = copy.deepcopy(self._cloud_header)
         self.get_logger().info("Clicks reset.")
         # Publish an empty cloud to clear the RViz2 display
         if header is not None:
@@ -228,8 +229,14 @@ class SegmentationNode(Node):
             self.get_logger().error(f"Inference request failed: {exc}")
             return
 
+        if len(mask) != len(xyz):
+            self.get_logger().error(
+                f"Inference mask length mismatch: mask={len(mask)} cloud={len(xyz)}"
+            )
+            return
+
         fg_xyz = xyz[mask]
-        out_header = header
+        out_header = copy.deepcopy(header)
         out_header.stamp = self.get_clock().now().to_msg()
 
         if len(fg_xyz) == 0:
@@ -260,4 +267,3 @@ def main(args=None):
 
 if __name__ == "__main__":
     main()
-
