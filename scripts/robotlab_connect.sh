@@ -9,6 +9,8 @@ set -e
 JETSON_HOST="robotlab"
 JETSON_MAC="30:de:4b:c6:23:1f"
 HOST_ADDR="192.168.100.1/24"
+HOST_IP="192.168.100.1"
+JETSON_IP="${JETSON_IP:-192.168.100.2}"
 NM_PROFILE="ethernet-robotlab"
 
 # Fast path: already connected
@@ -45,13 +47,28 @@ else
     nmcli connection up "$NM_PROFILE"
 fi
 
-# Wait for link and try ping
-sleep 2
-if ping -c 1 -W 2 192.168.100.2 &>/dev/null; then
-    echo "Jetson reachable at 192.168.100.2"
+# Wait for link carrier before pinging.
+for _ in 1 2 3 4 5; do
+    CARRIER=$(cat "/sys/class/net/$IFACE/carrier" 2>/dev/null || echo 0)
+    if [ "$CARRIER" = "1" ]; then
+        break
+    fi
+    sleep 1
+done
+
+CARRIER=$(cat "/sys/class/net/$IFACE/carrier" 2>/dev/null || echo 0)
+if [ "$CARRIER" != "1" ]; then
+    echo "ERROR: Ethernet adapter $IFACE has no carrier."
+    echo "       Host IP is configured as $HOST_IP, but no physical link is detected."
+    echo "       Check Jetson power, adapter, and cable before retrying."
+    exit 1
+fi
+
+if ping -c 1 -W 2 "$JETSON_IP" &>/dev/null; then
+    echo "Jetson reachable at $JETSON_IP"
     exit 0
 fi
 
-echo "ERROR: Jetson at 192.168.100.2 not responding."
-echo "       Check that the cable is connected and Jetson is powered on."
+echo "ERROR: Jetson at $JETSON_IP not responding."
+echo "       Host $IFACE has carrier and $HOST_IP/24; check Jetson IP and firewall."
 exit 1
