@@ -2,7 +2,7 @@
 # Camera-IMU calibration for Intel RealSense D435 (serial 829212072207) at HEAD mount.
 # Copied from arm_d435_829212072207 calibration (same physical camera, different mount).
 # T_cam_imu is a manual estimate (near-identity) — external GY-91 IMU, not Kalibr-calibrated.
-# IMU topic: /cam1/data_raw (external GY-91 module)
+# IMU topic: /head/d435i_head/imu (external GY-91 module)
 # rostopic updated from /arm/d435_arm to /head/d435i_head to match cameras container naming.
 
 cam0:

@@ -1,0 +1,46 @@
+cameras:
+  # Temporary bench setup: D435 without onboard IMU, using external GY-91 on
+  # Jetson I2C bus 7. The camera_name intentionally remains d435i_head so the
+  # host-side topic and TF contracts stay compatible with the final rig.
+  head:
+    namespace: head
+    name: d435i_head
+    serial_no: "_829212072207"
+    mount_location: forehead
+    has_builtin_imu: false
+    external_imu:
+      enabled: true
+      topic: /head/d435i_head/imu
+      frame_id: head_imu
+      i2c_bus: 7
+      i2c_address: 0x68
+      publish_rate_hz: 200.0
+      # Deliberately conservative covariances for the temporary untrusted IMU.
+      accel_noise_std: 0.25
+      gyro_noise_std: 0.03
+
+  # Current available D435i. Override serial_no here if the attached unit is
+  # the other calibrated D435i.
+  arm:
+    namespace: arm
+    name: d435i_arm
+    serial_no: "_310622071850"
+    mount_location: prosthetic_arm
+    has_builtin_imu: true
+
+common:
+  pointcloud_enable: true
+  align_depth_enable: true
+  enable_gyro: true
+  enable_accel: true
+  unite_imu_method: 2
+  gyro_fps: "200"
+  accel_fps: "200"
+  # Conservative USB bandwidth settings for mixed bench testing.
+  depth_profile: "424x240x15"
+  color_profile: "640x480x30"
+  pointcloud_neon_param: "pointcloud__neon_.enable"
+  pointcloud_neon_value: true
+  pointcloud_neon_delay_sec: 6.0
+  pointcloud_neon_stream_filter_param: "pointcloud__neon_.stream_filter"
+  pointcloud_neon_stream_filter_value: 2

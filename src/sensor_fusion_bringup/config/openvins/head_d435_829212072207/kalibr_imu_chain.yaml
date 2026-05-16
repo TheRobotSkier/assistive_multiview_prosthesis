@@ -1,7 +1,7 @@
 %YAML:1.0
 # IMU calibration for external GY-91 module connected at HEAD mount.
 # Copied from arm_d435_829212072207 configuration.
-# rostopic: /cam1/data_raw  (external GY-91, 200 Hz)
+# rostopic: /head/d435i_head/imu  (external GY-91, 200 Hz)
 
 imu0:
   T_i_b:
@@ -10,12 +10,14 @@ imu0:
     - [0.0, 0.0, 1.0, 0.0]
     - [0.0, 0.0, 0.0, 1.0]
 
-  accelerometer_noise_density: 0.0162
-  accelerometer_random_walk: 1.05e-04
-  gyroscope_noise_density: 0.00096
-  gyroscope_random_walk: 4.07e-06
+  # Temporary mixed-camera bringup uses inflated noise so OpenVINS does not
+  # over-trust the uncalibrated external IMU.
+  accelerometer_noise_density: 0.08
+  accelerometer_random_walk: 0.005
+  gyroscope_noise_density: 0.01
+  gyroscope_random_walk: 0.0001
 
-  rostopic: /cam1/data_raw
+  rostopic: /head/d435i_head/imu
   time_offset: 0.0
   update_rate: 200
 

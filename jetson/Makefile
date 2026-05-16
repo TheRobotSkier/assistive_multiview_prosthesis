@@ -9,9 +9,14 @@ IMAGE     := docker-deployment-realsense_camera:latest
 REPO_ROOT := $(abspath $(CURDIR)/..)
 
 # Source files (single source of truth — live in src/ in the repo)
-CAM_CFG     := $(REPO_ROOT)/src/sensor_fusion_bringup/config/d435i_cameras.yaml
-LAUNCH_FILE := $(REPO_ROOT)/src/sensor_fusion_bringup/launch/dual_d435i.launch.py
+SFBP_SRC    := $(REPO_ROOT)/src/sensor_fusion_bringup
+CAM_CFG_DIR := $(SFBP_SRC)/config
+LAUNCH_DIR  := $(SFBP_SRC)/launch
+SCRIPT_DIR  := $(SFBP_SRC)/scripts
 CYCLONE_CFG := $(CURDIR)/config/cyclonedds_robotlab.xml
+
+CAMERA_CONFIG ?= mixed_d435_d435i_cameras.yaml
+RIG_MODE      ?= mixed_d435_d435i
 
 # Container lifetime limits (seconds). Adjust here to change all Jetson containers.
 # 7200 = 2 hours
@@ -27,18 +32,17 @@ IMU_SCRIPT_INSTALL := /miahand_ws/install/sensor_fusion_bringup/lib/sensor_fusio
 IMU_CFG_INSTALL    := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config
 
 # Install paths inside the cameras container
-CAM_CFG_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/d435i_cameras.yaml
-LAUNCH_INSTALL  := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/launch/dual_d435i.launch.py
+PKG_SHARE_INSTALL := /miahand_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup
+PKG_LIB_INSTALL   := /miahand_ws/install/sensor_fusion_bringup/lib/sensor_fusion_bringup
 
 # OpenVINS overlay and source paths
 OVINS_OVERLAY   := /home/robotlab/openvins_overlay/install_overlay
-SFBP_SRC        := $(REPO_ROOT)/src/sensor_fusion_bringup
 
 # Container paths for the openVINS overlay share (volume-mounted at runtime)
 OVINS_PKG_SHARE := /ovins_overlay/install/sensor_fusion_bringup/share/sensor_fusion_bringup
 OVINS_PKG_LIB   := /ovins_overlay/install/sensor_fusion_bringup/lib/sensor_fusion_bringup
 
-.PHONY: cameras cameras-stop cameras-logs openvins openvins-stop openvins-logs list-cameras imu-test imu-test-stop imu-test-logs
+.PHONY: cameras cameras-final cameras-mixed cameras-stop cameras-logs openvins openvins-final openvins-mixed openvins-stop openvins-logs list-cameras imu-test imu-test-stop imu-test-logs
 
 # ── Cameras container (depth + pointcloud for both cameras) ──────────────────
 cameras:
@@ -56,12 +60,19 @@ cameras:
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
 		-v $(CYCLONE_CFG):/tmp/cyclonedds_peer.xml:ro \
-		-v $(CAM_CFG):$(CAM_CFG_INSTALL):ro \
-		-v $(LAUNCH_FILE):$(LAUNCH_INSTALL):ro \
+		-v $(CAM_CFG_DIR):$(PKG_SHARE_INSTALL)/config:ro \
+		-v $(LAUNCH_DIR):$(PKG_SHARE_INSTALL)/launch:ro \
+		-v $(SCRIPT_DIR):$(PKG_LIB_INSTALL):ro \
 		-v /dev:/dev \
 		-v /run/udev:/run/udev:ro \
 		$(IMAGE) \
-		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_d435i.launch.py'
+		bash -c 'source /miahand_ws/install/setup.bash 2>/dev/null; source /opt/ros/jazzy/setup.bash; timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_d435i.launch.py camera_config:=$(CAMERA_CONFIG)'
+
+cameras-mixed:
+	$(MAKE) cameras CAMERA_CONFIG=mixed_d435_d435i_cameras.yaml
+
+cameras-final:
+	$(MAKE) cameras CAMERA_CONFIG=d435i_cameras.yaml
 
 cameras-stop:
 	$(SUDO) docker rm -f cameras_test 2>/dev/null || true
@@ -92,7 +103,13 @@ openvins:
 		-v $(SFBP_SRC)/launch:$(OVINS_PKG_SHARE)/launch:ro \
 		-v $(SFBP_SRC)/scripts:$(OVINS_PKG_LIB):ro \
 		$(IMAGE) \
-		bash -c 'source /miahand_ws/install/setup.bash && source /ovins_overlay/install/local_setup.bash && timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_openvins_phase2.launch.py start_camera:=false'
+		bash -c 'source /miahand_ws/install/setup.bash && source /ovins_overlay/install/local_setup.bash && timeout $(JETSON_CONTAINER_LIFETIME) ros2 launch sensor_fusion_bringup dual_openvins_phase2.launch.py start_camera:=false rig_mode:=$(RIG_MODE)'
+
+openvins-mixed:
+	$(MAKE) openvins RIG_MODE=mixed_d435_d435i
+
+openvins-final:
+	$(MAKE) openvins RIG_MODE=dual_d435i
 
 openvins-stop:
 	$(SUDO) docker rm -f openvins 2>/dev/null || true

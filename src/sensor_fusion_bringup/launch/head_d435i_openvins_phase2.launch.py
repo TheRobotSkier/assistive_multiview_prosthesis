@@ -1,12 +1,7 @@
-"""OpenVINS Phase 2 launch for HEAD D435 camera with external I2C IMU.
+"""OpenVINS Phase 2 launch for final HEAD D435i camera.
 
-Camera: Intel RealSense D435 at head mount.
-IMU:    External GY-91/MPU-compatible module on /head/d435i_head/imu.
-Camera name convention intentionally remains namespace=head, name=d435i_head
-so host-side topic contracts are the same as the final two-D435i rig.
-
-When start_camera:=false, only launches the OpenVINS estimator node (for use
-alongside the cameras container which already publishes the camera topics).
+Camera: Intel RealSense D435i at head mount.
+IMU:    D435i built-in, united at 200 Hz on /head/d435i_head/imu.
 """
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
@@ -28,12 +23,10 @@ def generate_launch_description():
         FindPackageShare("sensor_fusion_bringup"),
         "config",
         "openvins",
-        "head_d435_829212072207",
+        "head_d435i_336222071386",
         "estimator_config.yaml",
     ])
 
-    # D435 has no built-in IMU. The external IMU is started separately when
-    # start_external_imu:=true, or by dual_d435i.launch.py in mixed mode.
     head_camera = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(rs_launch),
         condition=IfCondition(LaunchConfiguration("start_camera")),
@@ -43,29 +36,15 @@ def generate_launch_description():
             "serial_no": LaunchConfiguration("head_serial_no"),
             "enable_color": "true",
             "rgb_camera.color_profile": "640x480x30",
-            "enable_gyro": "false",
-            "enable_accel": "false",
+            "enable_gyro": "true",
+            "enable_accel": "true",
+            "unite_imu_method": "2",
+            "gyro_fps": "200",
+            "accel_fps": "200",
             "enable_depth": "false",
             "pointcloud.enable": "false",
             "align_depth.enable": "false",
         }.items(),
-    )
-
-    external_imu = Node(
-        package="sensor_fusion_bringup",
-        executable="i2c_mpu9250_imu_node.py",
-        name="head_d435_external_imu",
-        output="screen",
-        condition=IfCondition(LaunchConfiguration("start_external_imu")),
-        parameters=[{
-            "bus": LaunchConfiguration("external_imu_bus"),
-            "address": 0x68,
-            "frame_id": "head_imu",
-            "topic": "/head/d435i_head/imu",
-            "publish_rate_hz": 200.0,
-            "accel_noise_std": 0.25,
-            "gyro_noise_std": 0.03,
-        }],
     )
 
     openvins_phase2 = Node(
@@ -109,32 +88,13 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument("verbosity", default_value="INFO"),
-        DeclareLaunchArgument(
-            "head_serial_no",
-            default_value="_829212072207",
-            description="D435 serial for the temporary external-IMU head camera.",
-        ),
+        DeclareLaunchArgument("head_serial_no", default_value="_336222071386"),
         DeclareLaunchArgument(
             "start_camera",
             default_value="true",
             description="Start the live head RealSense camera. Set false when cameras container is running.",
         ),
-        DeclareLaunchArgument(
-            "start_external_imu",
-            default_value="true",
-            description="Start the external I2C IMU publisher for standalone use.",
-        ),
-        DeclareLaunchArgument(
-            "external_imu_bus",
-            default_value="7",
-            description="Jetson I2C bus for the temporary head GY-91/MPU IMU.",
-        ),
-        DeclareLaunchArgument(
-            "use_sim_time",
-            default_value="false",
-            description="Use /clock, typically true during rosbag replay.",
-        ),
+        DeclareLaunchArgument("use_sim_time", default_value="false"),
         head_camera,
-        TimerAction(period=1.0, actions=[external_imu]),
         TimerAction(period=5.0, actions=[openvins_phase2]),
     ])

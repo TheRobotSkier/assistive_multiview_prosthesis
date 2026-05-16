@@ -17,7 +17,7 @@ frames:
 # This gives the node camera intrinsics, distortion, and T_cam_imu.
 # Path is the container-internal path inside the openVINS overlay volume mount.
 calibration:
-  kalibr_imucam_chain: /ovins_overlay/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/arm_d435i_841612071768/kalibr_imucam_chain.yaml
+  kalibr_imucam_chain: /ovins_overlay/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config/openvins/arm_d435i_310622071850/kalibr_imucam_chain.yaml
 
 topics:
   image: /arm/d435i_arm/color/image_raw

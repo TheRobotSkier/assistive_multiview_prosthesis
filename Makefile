@@ -17,7 +17,7 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-mixed jetson-cameras-final jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-mixed jetson-openvins-final jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -68,11 +68,11 @@ test-digital-twin:
 		echo "No running container found — start one first with 'make up-digital-twin' or 'make up-grasp-test'"
 
 test-digital-twin-contracts:
-	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) --profile test run --rm test bash /prosthesis_ws/scripts/test_digital_twin_contracts.sh
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile test build test && $(COMPOSE) --profile test run --rm test bash /prosthesis_ws/scripts/test_digital_twin_contracts.sh
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:
-	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) --profile test run --rm test
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile test build test && $(COMPOSE) --profile test run --rm test
 
 # ── Shell into running container ──────────────────────────────────────────
 shell:
@@ -213,7 +213,15 @@ jetson-sync: robotlab-connect
 # Sync → start cameras on Jetson → start RViz locally.
 # Commit your changes before running this.
 jetson-cameras: jetson-sync
-	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras"
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras-mixed"
+	$(MAKE) rviz-static
+
+jetson-cameras-mixed: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras-mixed"
+	$(MAKE) rviz-static
+
+jetson-cameras-final: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras-final"
 	$(MAKE) rviz-static
 
 jetson-cameras-stop: robotlab-connect
@@ -231,7 +239,15 @@ jetson-list-cameras: robotlab-connect
 # Requires the overlay to already be at /home/robotlab/openvins_overlay/install_overlay/
 # on the Jetson (rsynced separately — it is not in git).
 jetson-openvins: jetson-sync
-	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras && make openvins"
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras-mixed && make openvins-mixed"
+	$(MAKE) rviz-openvins
+
+jetson-openvins-mixed: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras-mixed && make openvins-mixed"
+	$(MAKE) rviz-openvins
+
+jetson-openvins-final: jetson-sync
+	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make cameras-final && make openvins-final"
 	$(MAKE) rviz-openvins
 
 jetson-openvins-stop: robotlab-connect
