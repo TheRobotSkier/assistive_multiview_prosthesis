@@ -80,7 +80,7 @@ stop-full-digital-twin:
 	bash scripts/stop_full_digital_twin_pipeline.sh
 
 check-full-pipeline:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin exec digital_twin bash /prosthesis_ws/scripts/check_full_pipeline_runtime.sh
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin exec -T digital_twin bash < ../scripts/check_full_pipeline_runtime.sh
 
 test-digital-twin:
 	@echo "=== Pointcloud Health Test ==="
