@@ -17,7 +17,7 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop check-ros-network check-final-topics check-final-openvins check-pipeline-timing check-mixed-topics jetson-setup jetson-sync jetson-cameras jetson-cameras-mixed jetson-cameras-final jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-mixed jetson-openvins-final jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin up-full-digital-twin stop-full-digital-twin check-full-pipeline test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop check-ros-network check-final-topics check-final-openvins check-pipeline-timing check-mixed-topics jetson-setup jetson-sync jetson-cameras jetson-cameras-mixed jetson-cameras-final jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-mixed jetson-openvins-final jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -60,6 +60,15 @@ down-digital-twin:
 
 logs-digital-twin:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin logs -f
+
+up-full-digital-twin:
+	bash scripts/start_full_digital_twin_pipeline.sh
+
+stop-full-digital-twin:
+	bash scripts/stop_full_digital_twin_pipeline.sh
+
+check-full-pipeline:
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec digital_twin bash /prosthesis_ws/scripts/check_full_pipeline_runtime.sh
 
 test-digital-twin:
 	@echo "=== Pointcloud Health Test ==="
