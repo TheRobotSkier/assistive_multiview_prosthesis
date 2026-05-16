@@ -35,8 +35,8 @@ require_topic_once "/fused_pointcloud" "sensor_msgs/msg/PointCloud2"
 
 require_topic_listed "/segmentation/object_cloud"
 require_topic_listed "/joint_states"
-require_topic_listed "/thumb_fle/commands"
-require_topic_listed "/index_fle/commands"
-require_topic_listed "/mrl_fle/commands"
+require_topic_listed "/thumb_pos_ff_controller/commands"
+require_topic_listed "/index_pos_ff_controller/commands"
+require_topic_listed "/mrl_pos_ff_controller/commands"
 
 echo "Full pipeline runtime topics OK"

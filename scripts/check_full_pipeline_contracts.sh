@@ -46,6 +46,9 @@ for topic in (
     "/fused_pointcloud",
     "/segmentation/object_cloud",
     "/joint_states",
+    "/thumb_pos_ff_controller/commands",
+    "/index_pos_ff_controller/commands",
+    "/mrl_pos_ff_controller/commands",
 ):
     assert topic in runtime
 
