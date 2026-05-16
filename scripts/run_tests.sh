@@ -50,6 +50,7 @@ run_test "launch"      "$SCRIPT_DIR/test_launch_syntax.sh"
 run_test "preshaping"  "$SCRIPT_DIR/test_preshaping_so.sh"
 run_test "nodes_start" "$SCRIPT_DIR/test_nodes_start.sh"
 run_test "twist_prop"  "$SCRIPT_DIR/test_twist_propagation.sh"
+run_test "digital_twin" "$SCRIPT_DIR/test_digital_twin_contracts.sh"
 
 echo ""
 echo "=========================================="

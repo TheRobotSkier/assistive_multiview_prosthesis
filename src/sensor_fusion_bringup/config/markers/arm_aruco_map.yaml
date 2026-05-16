@@ -122,3 +122,15 @@ markers:
       - [0.0, -1.0, 0.0, 0.0]
       - [0.0, 0.0, -1.0, 0.0]
       - [0.0, 0.0, 0.0, 1.0]
+  1:
+    frame_id: marker_1
+    size_m: 0.100
+
+    # Bench-test fallback: ID 1 is treated as the marker_map origin when it
+    # is the visible shared marker. Replace this with the measured transform
+    # if IDs 0 and 1 are used simultaneously as a rigid multi-marker map.
+    T_map_marker:
+      - [1.0, 0.0, 0.0, 0.0]
+      - [0.0, -1.0, 0.0, 0.0]
+      - [0.0, 0.0, -1.0, 0.0]
+      - [0.0, 0.0, 0.0, 1.0]

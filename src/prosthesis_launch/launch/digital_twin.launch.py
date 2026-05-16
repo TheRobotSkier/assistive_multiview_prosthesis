@@ -55,14 +55,16 @@ def _launch_setup(context, *args, **kwargs):
     inference_url = LaunchConfiguration("inference_url")
 
     if camera_enabled:
-        cloud_topic = "/head/d435i_head/depth/color/points"
+        scene_cloud_topic = "/fused_pointcloud"
+        relay_input_topic = "/fused_pointcloud"
         cam1_frame = "d435i_head_depth_optical_frame"
         cam1_link = "d435i_head_link"
         cam1_color_frame = "d435i_head_color_optical_frame"
         cam2_link_frame = "d435i_arm_link"
         cam2_color_frame = "d435i_arm_color_optical_frame"
     else:
-        cloud_topic = "/camera/depth/color/points"
+        scene_cloud_topic = "/camera/depth/color/points"
+        relay_input_topic = "/camera/depth/color/points"
         cam1_frame = "camera_depth_optical_frame"
         cam1_link = "camera_link"
         cam1_color_frame = "camera_color_optical_frame"
@@ -112,24 +114,24 @@ def _launch_setup(context, *args, **kwargs):
                 output="screen",
             )
         )
-        # Static identity world→wrist_link — keeps the TF chain connected
-        # at all timestamps so RViz can render cam2 pointclouds even without
-        # the ChArUco board. When ChArUco tracking is active, cam2_hand_tracker
-        # publishes dynamic TFs with newer timestamps that take precedence.
-        nodes.append(
-            Node(
-                package="tf2_ros",
-                executable="static_transform_publisher",
-                name="world_to_wrist_fallback_tf",
-                arguments=[
-                    "0.0", "0.0", "0.0",
-                    "0.0", "0.0", "0.0", "1.0",
-                    "world",
-                    "wrist_link",
-                ],
-                output="screen",
-            )
+
+    # Static identity world→wrist_link keeps the hand render and /hand_pose
+    # alive before camera tracking is available. When ChArUco tracking is
+    # active, cam2_hand_tracker publishes dynamic TFs with newer timestamps.
+    nodes.append(
+        Node(
+            package="tf2_ros",
+            executable="static_transform_publisher",
+            name="world_to_wrist_fallback_tf",
+            arguments=[
+                "0.0", "0.0", "0.0",
+                "0.0", "0.0", "0.0", "1.0",
+                "world",
+                "wrist_link",
+            ],
+            output="screen",
         )
+    )
 
     # ── 3. Pointcloud merger — TF-transforms cam2 into cam1 frame, merges ──
     # Replaces the old fuser which just relayed whichever fired last.
@@ -155,6 +157,10 @@ def _launch_setup(context, *args, **kwargs):
             package="camera",
             executable="pointcloud_relay_node",
             name="pointcloud_relay",
+            parameters=[{
+                "input_topic": relay_input_topic,
+                "output_topic": "/segmentation/input_cloud",
+            }],
             output="screen",
         )
     )
@@ -269,8 +275,8 @@ def _launch_setup(context, *args, **kwargs):
             name="twist_propagation",
             parameters=[
                 {
-                    "active": False,
-                    "input_cloud_topic": cloud_topic,
+                    "active": True,
+                    "input_cloud_topic": scene_cloud_topic,
                 }
             ],
             output="screen",
@@ -375,21 +381,22 @@ def _launch_setup(context, *args, **kwargs):
     nodes.append(rviz)
 
     # ── 17. Joint state publisher ────────────────────────────────────────
+    # Command-driven by the same /.../commands topics used for hardware.
+    nodes.append(
+        Node(
+            package="pipeline_manager",
+            executable="digital_twin_joint_state_publisher",
+            name="digital_twin_joint_state_publisher",
+            output="screen",
+        )
+    )
+
     if gui_enabled:
         nodes.append(
             Node(
                 package="joint_state_publisher_gui",
                 executable="joint_state_publisher_gui",
                 name="joint_state_publisher_gui",
-                output="screen",
-            )
-        )
-    else:
-        nodes.append(
-            Node(
-                package="joint_state_publisher",
-                executable="joint_state_publisher",
-                name="joint_state_publisher",
                 output="screen",
             )
         )
@@ -406,8 +413,8 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "gui",
-            default_value="true",
-            description="Launch joint_state_publisher_gui for manual hand control",
+            default_value="false",
+            description="Also launch joint_state_publisher_gui for manual hand control",
         ),
         DeclareLaunchArgument(
             "config_file",

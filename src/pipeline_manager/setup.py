@@ -22,6 +22,7 @@ setup(
             'pipeline_manager_node = pipeline_manager.pipeline_manager_node:main',
             'mock_cloud_publisher = pipeline_manager.mock_cloud_publisher:main',
             'hand_trajectory_publisher = pipeline_manager.hand_trajectory_publisher:main',
+            'digital_twin_joint_state_publisher = pipeline_manager.digital_twin_joint_state_publisher:main',
         ],
     },
 )

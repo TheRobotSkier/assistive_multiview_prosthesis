@@ -120,7 +120,7 @@ class PipelineManagerNode(Node):
         )
         self._history.append(transition)
         self.get_logger().info(
-            f'State: {old.name} -> {new.name} ({reason})')
+            f'State: {old.name} -> {new_state.name} ({reason})')
         self._publish_state()
         return True
 
@@ -146,17 +146,11 @@ class PipelineManagerNode(Node):
         if gesture == self._release_gesture:
             if self._state not in (State.IDLE, State.RELEASING):
                 self._transition(State.RELEASING, 'EMG: OPEN')
-                # Auto-transition to IDLE after a short delay
-                self.create_timer(1.0, lambda: self._transition(State.IDLE, 'Release complete'),
-                                  one_shot=True)  # type: ignore[arg-type]
             return
 
         # Grasp trigger gesture
         if gesture in self._grasp_gestures and self._state == State.IDLE:
             self._transition(State.SEGMENTING, f'EMG: gesture={gesture}')
-            # In a full pipeline, segmentation completion triggers PLANNING.
-            # For now, immediately call the compute service.
-            self._request_preshaping()
 
     def _on_emg_confidence(self, msg):
         # Could be used for gesture validation
@@ -170,11 +164,8 @@ class PipelineManagerNode(Node):
             return
         if msg.width * msg.height == 0:
             return
-        if self._grasp_type == 0:
-            self.get_logger().warn(
-                'Object cloud received but no grasp type set — staying in SEGMENTING')
-            return
         self._transition(State.PLANNING, 'Segmentation complete: object cloud received')
+        self._request_preshaping()
 
     def _request_preshaping(self):
         """Call the grasp preshaping compute service."""

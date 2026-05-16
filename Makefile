@@ -17,7 +17,7 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -67,9 +67,12 @@ test-digital-twin:
 		podman exec grasp_test bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
 		echo "No running container found — start one first with 'make up-digital-twin' or 'make up-grasp-test'"
 
+test-digital-twin-contracts:
+	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) --profile test run --rm test bash /prosthesis_ws/scripts/test_digital_twin_contracts.sh
+
 # ── Test ───────────────────────────────────────────────────────────────────
 test:
-	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) run --rm test
+	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) --profile test run --rm test
 
 # ── Shell into running container ──────────────────────────────────────────
 shell:
@@ -192,7 +195,7 @@ robotlab-connect:
 JETSON_HOST       := robotlab
 JETSON_DEPLOY_DIR := /home/robotlab/multiview_prosthesis
 JETSON_BARE_REPO  := /home/robotlab/multiview_prosthesis.git
-JETSON_BRANCH     := full_test_implementation
+JETSON_BRANCH     ?= $(shell git rev-parse --abbrev-ref HEAD)
 
 # One-time setup: creates bare repo + checkout hook on Jetson, adds git remote.
 jetson-setup: robotlab-connect
@@ -200,12 +203,12 @@ jetson-setup: robotlab-connect
 	ssh $(JETSON_HOST) 'mkdir -p $(JETSON_DEPLOY_DIR) && git init --bare $(JETSON_BARE_REPO)'
 	ssh $(JETSON_HOST) 'printf "#!/bin/bash\nGIT_WORK_TREE=$(JETSON_DEPLOY_DIR) git --git-dir=$(JETSON_BARE_REPO) checkout -f $(JETSON_BRANCH)\n" > $(JETSON_BARE_REPO)/hooks/post-receive && chmod +x $(JETSON_BARE_REPO)/hooks/post-receive'
 	git remote add jetson $(JETSON_HOST):$(JETSON_BARE_REPO) 2>/dev/null || git remote set-url jetson $(JETSON_HOST):$(JETSON_BARE_REPO)
-	git push jetson $(JETSON_BRANCH)
+	git push jetson HEAD:$(JETSON_BRANCH)
 	@echo "Jetson deploy ready. Use 'make jetson-sync' to push future changes."
 
 # Push committed changes on this branch to the Jetson (triggers checkout).
 jetson-sync: robotlab-connect
-	git push jetson $(JETSON_BRANCH)
+	git push jetson HEAD:$(JETSON_BRANCH)
 
 # Sync → start cameras on Jetson → start RViz locally.
 # Commit your changes before running this.
