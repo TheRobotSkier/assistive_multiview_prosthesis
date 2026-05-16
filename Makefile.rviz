@@ -1,16 +1,19 @@
-# Host-side RViz: view robotlab camera data via podman
+# Host-side RViz: view robotlab camera data via docker
 # Usage: make rviz
 # Connects to robotlab ROS network at 10.42.0.2 via CycloneDDS peer discovery
 
-.PHONY: rviz rviz-kill
+.PHONY: rviz rviz-kill mounts-viz mounts-viz-kill
 
 RVIZ_CONFIG := $(CURDIR)/rviz/robotlab_cameras.rviz
+MOUNTS_RVIZ := $(CURDIR)/rviz/camera_mounts.rviz
+MOUNTS_YAML := $(CURDIR)/src/sensor_fusion_bringup/config/camera_mounts.yaml
+MOUNTS_SCRIPT := $(CURDIR)/src/sensor_fusion_bringup/scripts/publish_camera_mounts.py
 DDS_CONFIG := $(CURDIR)/config/cyclonedds_peer.xml
 
 rviz:
 	@echo "Launching RViz for robotlab..."
 	@test -f $(RVIZ_CONFIG) || { echo "Missing $(RVIZ_CONFIG)"; exit 1; }
-	podman run --rm -d --name rviz-robotlab \
+	docker run --rm -d --name rviz-robotlab \
 		--network host \
 		-e DISPLAY=$(DISPLAY) \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
@@ -24,5 +27,52 @@ rviz:
 	@echo "RViz container started. Kill with: make rviz-kill"
 
 rviz-kill:
-	podman kill rviz-robotlab 2>/dev/null || true
-	podman rm rviz-robotlab 2>/dev/null || true
+	docker kill rviz-robotlab 2>/dev/null || true
+	docker rm rviz-robotlab 2>/dev/null || true
+
+# ── Camera mount visualization ─────────────────────────────────────────────
+# Run:  make mounts-viz                (all mounts with bounding boxes)
+#       make mounts-viz MOUNT=8_cm_cam_mount  (single mount)
+# Stop: make mounts-viz-kill
+MOUNT ?= all
+
+mounts-viz:
+	@echo "Publishing camera mount TFs ($(MOUNT)) and launching RViz..."
+	@test -f $(MOUNTS_RVIZ) || { echo "Missing $(MOUNTS_RVIZ)"; exit 1; }
+	@test -f $(MOUNTS_SCRIPT) || { echo "Missing $(MOUNTS_SCRIPT)"; exit 1; }
+	@xhost +local: >/dev/null 2>&1 || true
+	@if [ "$(MOUNT)" = "all" ]; then \
+		MODE="--all"; \
+		MSG="all mounts + bounding boxes"; \
+	else \
+		MODE="--mount $(MOUNT)"; \
+		MSG="mount $(MOUNT)"; \
+	fi; \
+	docker run --rm -d --name mounts-viz \
+		--network host \
+		-e DISPLAY=$(DISPLAY) \
+		-e ROS_DOMAIN_ID=0 \
+		-e XAUTHORITY=/tmp/.Xauthority \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $$HOME/.Xauthority:/tmp/.Xauthority:ro \
+		-v $(MOUNTS_RVIZ):/rviz_config.rviz:ro \
+		-v $(MOUNTS_SCRIPT):/tmp/publish_camera_mounts.py:ro \
+		-v $(MOUNTS_YAML):/tmp/camera_mounts.yaml:ro \
+		docker.io/osrf/ros:jazzy-desktop \
+		bash -c '\
+			source /opt/ros/jazzy/setup.bash && \
+			python3 /tmp/publish_camera_mounts.py '"$$MODE"' --config /tmp/camera_mounts.yaml & \
+			sleep 2 && \
+			rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3; \
+	if docker ps --filter name=mounts-viz --format '{{.Status}}' 2>/dev/null | grep -q Up; then \
+		echo "RViz running: $$MSG. Kill with: make -f Makefile.rviz mounts-viz-kill"; \
+	else \
+		echo "ERROR: Container failed."; \
+		docker logs mounts-viz 2>/dev/null || true; \
+		exit 1; \
+	fi
+
+mounts-viz-kill:
+	docker kill mounts-viz 2>/dev/null || true
+	docker rm mounts-viz 2>/dev/null || true
