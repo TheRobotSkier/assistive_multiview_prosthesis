@@ -47,11 +47,15 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, TransformS
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-from sensor_fusion_msgs.msg import MarkerPoseObservation
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Int32, String
 from std_srvs.srv import Trigger
 from tf2_ros import TransformBroadcaster
+
+try:
+    from sensor_fusion_msgs.msg import MarkerPoseObservation
+except (ImportError, AttributeError):
+    MarkerPoseObservation = None
 
 
 def T_inv(T: np.ndarray) -> np.ndarray:
@@ -760,7 +764,11 @@ class ArucoMarkerPoseNode(Node):
         self.camera_pose_raw_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_pose_raw", 10)
         self.camera_body_pose_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_body_pose", 10)
         self.imu_pose_pub = self.create_publisher(PoseWithCovarianceStamped, f"{self.output_prefix}/imu_pose", 10)
-        self.marker_observation_pub = self.create_publisher(MarkerPoseObservation, f"{self.output_prefix}/observation", 10)
+        self.marker_observation_pub = None
+        if MarkerPoseObservation is not None:
+            self.marker_observation_pub = self.create_publisher(MarkerPoseObservation, f"{self.output_prefix}/observation", 10)
+        else:
+            self.get_logger().warn("sensor_fusion_msgs/MarkerPoseObservation unavailable; publishing marker pose fallback only")
         self.corrected_odom_pub = self.create_publisher(Odometry, f"{self.output_prefix}/ov_corrected_odom", 20)
         self.marker_quality_pub = self.create_publisher(String, f"{self.output_prefix}/marker_quality", 10)
         self.active_marker_pub = self.create_publisher(Int32, f"{self.output_prefix}/active_marker_id", 10)
@@ -1199,6 +1207,8 @@ class ArucoMarkerPoseNode(Node):
         self.publish_tf(measurement.stamp, self.map_frame, f"{self.imu_frame}_from_marker", measurement.T_map_imu)
 
     def publish_marker_observation(self, measurement: MarkerMeasurement) -> None:
+        if self.marker_observation_pub is None or MarkerPoseObservation is None:
+            return
         msg = MarkerPoseObservation()
         msg.header.stamp = measurement.stamp
         msg.header.frame_id = self.map_frame
