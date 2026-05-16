@@ -29,11 +29,15 @@ class PointcloudMerger(Node):
         self.declare_parameter("cam2_topic", "/cam2/d435_2/depth/color/points")
         self.declare_parameter("output_topic", "/fused_pointcloud")
         self.declare_parameter("target_frame", "cam1camera_depth_optical_frame")
+        self.declare_parameter("use_cloud_timestamps", True)
+        self.declare_parameter("tf_timeout_s", 0.1)
 
         cam1_topic = self.get_parameter("cam1_topic").value
         cam2_topic = self.get_parameter("cam2_topic").value
         output_topic = self.get_parameter("output_topic").value
         self._target_frame = self.get_parameter("target_frame").value
+        self._use_cloud_timestamps = bool(self.get_parameter("use_cloud_timestamps").value)
+        self._tf_timeout = float(self.get_parameter("tf_timeout_s").value)
 
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
@@ -107,23 +111,30 @@ class PointcloudMerger(Node):
         if cloud.header.frame_id == self._target_frame:
             return cloud
         try:
+            stamp = self._lookup_time(cloud)
+            timeout = rclpy.duration.Duration(seconds=self._tf_timeout)
             if not self._tf_buffer.can_transform(
-                self._target_frame,
-                cloud.header.frame_id,
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.1),
+                self._target_frame, cloud.header.frame_id, stamp, timeout=timeout
             ):
                 return None
             transform = self._tf_buffer.lookup_transform(
                 self._target_frame,
                 cloud.header.frame_id,
-                rclpy.time.Time(),
+                stamp,
             )
             transformed = tf2_sensor_msgs.do_transform_cloud(cloud, transform)
             transformed.header.frame_id = self._target_frame
             return transformed
         except Exception:
             return None
+
+    def _lookup_time(self, cloud: PointCloud2) -> rclpy.time.Time:
+        if not self._use_cloud_timestamps:
+            return rclpy.time.Time()
+        stamp = cloud.header.stamp
+        if stamp.sec == 0 and stamp.nanosec == 0:
+            return rclpy.time.Time()
+        return rclpy.time.Time.from_msg(stamp)
 
     def _concat_clouds(self, clouds: list[PointCloud2]) -> PointCloud2 | None:
         """Concatenate raw byte data from multiple PointCloud2 messages."""

@@ -58,6 +58,8 @@ merger = (root / "src/camera/camera/pointcloud_merger_node.py").read_text()
 assert "def _transform_to_target" in merger
 assert "transformed = self._transform_to_target(cloud1)" in merger
 assert "transformed = self._transform_to_target(cloud2)" in merger
+assert "use_cloud_timestamps" in merger
+assert "Time.from_msg(stamp)" in merger
 
 rviz = (root / "rviz/digital_twin.rviz").read_text()
 assert "Fixed Frame: world" in rviz

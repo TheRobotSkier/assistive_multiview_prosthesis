@@ -17,7 +17,7 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop check-ros-network check-final-topics check-final-openvins check-mixed-topics jetson-setup jetson-sync jetson-cameras jetson-cameras-mixed jetson-cameras-final jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-mixed jetson-openvins-final jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop check-ros-network check-final-topics check-final-openvins check-pipeline-timing check-mixed-topics jetson-setup jetson-sync jetson-cameras jetson-cameras-mixed jetson-cameras-final jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-mixed jetson-openvins-final jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -187,6 +187,9 @@ check-final-topics:
 
 check-final-openvins:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile test run --rm test bash /prosthesis_ws/scripts/check_final_openvins_topics.sh
+
+check-pipeline-timing:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile test run --rm test bash /prosthesis_ws/scripts/check_pipeline_timing_topics.sh
 
 check-mixed-topics:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile test run --rm test bash /prosthesis_ws/scripts/check_mixed_jetson_topics.sh
