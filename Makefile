@@ -3,6 +3,8 @@
 
 COMPOSE_DIR := docker
 
+.DEFAULT_GOAL := help
+
 # Auto-detect compose command
 PODMAN_COMPOSE := $(shell which podman-compose 2>/dev/null)
 DOCKER_COMPOSE := $(shell which docker 2>/dev/null)
@@ -17,7 +19,17 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin up-full-digital-twin stop-full-digital-twin check-full-pipeline test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop check-ros-network check-final-topics check-final-openvins check-pipeline-timing check-mixed-topics jetson-setup jetson-sync jetson-cameras jetson-cameras-mixed jetson-cameras-final jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-mixed jetson-openvins-final jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+.PHONY: help build build-prosthesis build-segmentation rebuild up up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin up-full-digital-twin stop-full-digital-twin check-full-pipeline test-digital-twin test test-digital-twin-contracts shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop check-ros-network check-final-topics check-final-openvins check-pipeline-timing check-mixed-topics jetson-setup jetson-sync jetson-cameras jetson-cameras-mixed jetson-cameras-final jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-mixed jetson-openvins-final jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+
+help:
+	@printf "Main targets:\n"
+	@printf "  make up-full-digital-twin     Sync Jetson, start final cameras/OpenVINS, start host digital twin\n"
+	@printf "  make stop-full-digital-twin   Stop host digital twin and Jetson camera/OpenVINS containers\n"
+	@printf "  make check-full-pipeline      Runtime topic check after full system startup\n"
+	@printf "  make test                     Build and run smoke/contract tests\n"
+	@printf "  make robotlab-connect         Configure host Ethernet and verify Jetson reachability\n"
+	@printf "  make jetson-list-cameras      List RealSense devices on Jetson\n"
+	@printf "  make logs-digital-twin        Follow host digital-twin logs\n"
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
