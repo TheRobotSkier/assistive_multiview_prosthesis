@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libserial-dev \
         python3-pip \
+        python3-opencv \
         python3-scipy \
         python3-pytest \
         usbutils \

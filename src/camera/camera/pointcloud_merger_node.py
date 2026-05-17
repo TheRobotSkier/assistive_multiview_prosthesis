@@ -5,7 +5,7 @@ Strategy:
   1. Subscribe to both camera pointclouds
   2. Transform each cloud into target_frame via TF
   3. If TF available: merge transformed clouds by raw byte concatenation
-  4. If TF NOT available: fall back to cam1-only passthrough
+  4. If only one TF is available: publish that transformed cloud
 
 Publishes:
   /fused_pointcloud (sensor_msgs/PointCloud2)
@@ -29,8 +29,10 @@ class PointcloudMerger(Node):
         self.declare_parameter("cam2_topic", "/cam2/d435_2/depth/color/points")
         self.declare_parameter("output_topic", "/fused_pointcloud")
         self.declare_parameter("target_frame", "cam1camera_depth_optical_frame")
-        self.declare_parameter("use_cloud_timestamps", True)
+        self.declare_parameter("use_cloud_timestamps", False)
         self.declare_parameter("tf_timeout_s", 0.1)
+        self.declare_parameter("point_stride", 16)
+        self.declare_parameter("publish_rate_hz", 5.0)
 
         cam1_topic = self.get_parameter("cam1_topic").value
         cam2_topic = self.get_parameter("cam2_topic").value
@@ -38,6 +40,8 @@ class PointcloudMerger(Node):
         self._target_frame = self.get_parameter("target_frame").value
         self._use_cloud_timestamps = bool(self.get_parameter("use_cloud_timestamps").value)
         self._tf_timeout = float(self.get_parameter("tf_timeout_s").value)
+        self._point_stride = max(1, int(self.get_parameter("point_stride").value))
+        publish_rate = max(1.0, float(self.get_parameter("publish_rate_hz").value))
 
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
@@ -48,15 +52,17 @@ class PointcloudMerger(Node):
 
         self.create_subscription(PointCloud2, cam1_topic, self._cb_cam1, 10)
         self.create_subscription(PointCloud2, cam2_topic, self._cb_cam2, 10)
-        self.create_timer(1.0 / 15.0, self._merge_and_publish)
+        self.create_timer(1.0 / publish_rate, self._merge_and_publish)
 
         self._stats = {"cam1": 0, "cam2": 0, "merged": 0, "fallback": 0}
+        self._last_output_points = 0
         self.create_timer(10.0, self._log_stats)
         self._tf_ok = False
 
         self.get_logger().info(
             f"Merger: {cam1_topic} + {cam2_topic} -> {output_topic} "
-            f"(target_frame={self._target_frame})"
+            f"(target_frame={self._target_frame}, point_stride={self._point_stride}, "
+            f"publish_rate_hz={publish_rate:.1f})"
         )
 
     def _cb_cam1(self, msg: PointCloud2):
@@ -85,13 +91,16 @@ class PointcloudMerger(Node):
             if transformed is not None:
                 all_clouds.append(transformed)
 
-        if len(all_clouds) >= 2:
+        if all_clouds:
             merged = self._concat_clouds(all_clouds)
             if merged is not None:
                 merged.header.frame_id = self._target_frame
                 self._pub.publish(merged)
-                self._stats["merged"] += 1
-                if not self._tf_ok:
+                if len(all_clouds) >= 2:
+                    self._stats["merged"] += 1
+                else:
+                    self._stats["fallback"] += 1
+                if len(all_clouds) >= 2 and not self._tf_ok:
                     self._tf_ok = True
                     self.get_logger().info("TF chain connected — proper merge active")
                 return
@@ -105,9 +114,12 @@ class PointcloudMerger(Node):
                 throttle_duration_sec=5.0,
             )
         if cloud1 is not None:
-            self._pub.publish(cloud1)
+            fallback = self._downsample_cloud(cloud1)
+            self._last_output_points = int(fallback.width) * int(fallback.height)
+            self._pub.publish(fallback)
 
     def _transform_to_target(self, cloud: PointCloud2) -> PointCloud2 | None:
+        cloud = self._downsample_cloud(cloud)
         if cloud.header.frame_id == self._target_frame:
             return cloud
         try:
@@ -128,6 +140,41 @@ class PointcloudMerger(Node):
         except Exception:
             return None
 
+    def _downsample_cloud(self, cloud: PointCloud2) -> PointCloud2:
+        """Keep every Nth point before TF work to reduce CPU and RViz load."""
+        if self._point_stride <= 1:
+            return cloud
+        point_count = int(cloud.width) * int(cloud.height)
+        if point_count <= 1 or cloud.point_step <= 0:
+            return cloud
+
+        raw = memoryview(cloud.data)
+        sampled = bytearray()
+        row_step = int(cloud.row_step) if cloud.row_step else int(cloud.width) * int(cloud.point_step)
+        point_step = int(cloud.point_step)
+        width = int(cloud.width)
+        height = int(cloud.height)
+
+        for row in range(height):
+            row_offset = row * row_step
+            for col in range(0, width, self._point_stride):
+                offset = row_offset + col * point_step
+                end = offset + point_step
+                if end <= len(raw):
+                    sampled.extend(raw[offset:end])
+
+        out = PointCloud2()
+        out.header = cloud.header
+        out.height = 1
+        out.width = len(sampled) // point_step
+        out.fields = cloud.fields
+        out.is_bigendian = cloud.is_bigendian
+        out.point_step = point_step
+        out.row_step = len(sampled)
+        out.data = bytes(sampled)
+        out.is_dense = cloud.is_dense
+        return out
+
     def _lookup_time(self, cloud: PointCloud2) -> rclpy.time.Time:
         if not self._use_cloud_timestamps:
             return rclpy.time.Time()
@@ -139,6 +186,7 @@ class PointcloudMerger(Node):
     def _concat_clouds(self, clouds: list[PointCloud2]) -> PointCloud2 | None:
         """Concatenate raw byte data from multiple PointCloud2 messages."""
         if len(clouds) == 1:
+            self._last_output_points = int(clouds[0].width) * int(clouds[0].height)
             return clouds[0]
 
         # Verify field compatibility
@@ -167,12 +215,15 @@ class PointcloudMerger(Node):
         out.point_step = clouds[0].point_step
         out.data = bytes(raw)
         out.row_step = len(out.data)
+        out.is_dense = clouds[0].is_dense
+        self._last_output_points = total_points
         return out
 
     def _log_stats(self):
         self.get_logger().info(
             f"cam1: {self._stats['cam1']} | cam2: {self._stats['cam2']} | "
-            f"merged: {self._stats['merged']} | fallback: {self._stats['fallback']}"
+            f"merged: {self._stats['merged']} | fallback: {self._stats['fallback']} | "
+            f"last_output_points: {self._last_output_points}"
         )
 
 

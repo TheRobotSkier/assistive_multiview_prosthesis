@@ -13,11 +13,20 @@ cameras:
 common:
   pointcloud_enable: true
   align_depth_enable: true
+  enable_sync: true
   enable_gyro: true
   enable_accel: true
   unite_imu_method: 2
-  depth_profile: "640x480x30"
-  color_profile: "640x480x30"
+  # RealSense does not expose a 640x480x5 profile on these D435i units; 6 FPS
+  # is the closest supported low-rate profile, and the fused cloud is capped at
+  # 5 Hz downstream.
+  depth_profile: "640x480x6"
+  color_profile: "640x480x6"
+  pointcloud_allow_no_texture_points: true
+  pointcloud_stream_filter: 2
+  pointcloud_stream_index_filter: 0
+  decimation_filter_enable: true
+  decimation_filter_magnitude: 4
   pointcloud_neon_param: "pointcloud__neon_.enable"
   pointcloud_neon_value: true
   pointcloud_neon_delay_sec: 6.0

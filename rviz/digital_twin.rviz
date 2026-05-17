@@ -1,8 +1,6 @@
 Panels:
   - Class: rviz_common/Displays
     Name: Displays
-  - Class: rviz_common/Tools
-    Name: Tools
   - Class: rviz_common/Views
     Name: Views
 Visualization Manager:
@@ -63,8 +61,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /fused_pointcloud
-      Color Transformer: AxisColor
-      Axis: Z
+      Color Transformer: RGB8
       Size (m): 0.003
     - Class: rviz_default_plugins/PointCloud2
       Name: SegmentedCloud
@@ -73,11 +70,10 @@ Visualization Manager:
       Topic:
         Depth: 5
         History Policy: Keep Last
-        Durability Policy: Transient Local
+        Durability Policy: Volatile
         Reliability Policy: Reliable
         Value: /segmentation/object_cloud
-      Color Transformer: FlatColor
-      Color: 255; 100; 0
+      Color Transformer: RGB8
       Size (m): 0.005
     - Class: rviz_default_plugins/MarkerArray
       Name: SeedMarkers

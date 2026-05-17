@@ -10,6 +10,7 @@ import rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.time import Time
 from tf2_ros import TransformBroadcaster
 
 
@@ -21,6 +22,8 @@ class MarkerPoseOdometryBridge(Node):
         self.declare_parameter("odom_child_frame", "arm_imu")
         self.declare_parameter("tf_child_frame", "arm_d435i_arm_link")
         self.declare_parameter("publish_tf", True)
+        self.declare_parameter("publish_rate_hz", 15.0)
+        self.declare_parameter("max_cached_tf_age_s", 2.0)
 
         self._odom_child = self.get_parameter("odom_child_frame").value
         self._tf_child = self.get_parameter("tf_child_frame").value
@@ -30,9 +33,16 @@ class MarkerPoseOdometryBridge(Node):
 
         self._pub = self.create_publisher(Odometry, output_topic, 20)
         self._tf_pub = TransformBroadcaster(self)
+        self._latest_tf: TransformStamped | None = None
+        self._latest_tf_time: Time | None = None
+        self._max_cached_tf_age_s = float(self.get_parameter("max_cached_tf_age_s").value)
+        self._cache_expired_logged = False
         self.create_subscription(PoseWithCovarianceStamped, input_topic, self._cb, 20)
+        publish_rate = float(self.get_parameter("publish_rate_hz").value)
+        self.create_timer(1.0 / publish_rate, self._publish_latest_tf)
         self.get_logger().info(
-            f"Marker odom bridge: {input_topic} -> {output_topic}, TF child={self._tf_child}"
+            f"Marker odom bridge: {input_topic} -> {output_topic}, TF child={self._tf_child}, "
+            f"max_cached_tf_age_s={self._max_cached_tf_age_s:.1f}"
         )
 
     def _cb(self, msg: PoseWithCovarianceStamped):
@@ -57,6 +67,28 @@ class MarkerPoseOdometryBridge(Node):
         tf.transform.translation.y = msg.pose.pose.position.y
         tf.transform.translation.z = msg.pose.pose.position.z
         tf.transform.rotation = msg.pose.pose.orientation
+        self._latest_tf = tf
+        self._latest_tf_time = self.get_clock().now()
+        self._cache_expired_logged = False
+
+    def _publish_latest_tf(self):
+        if not self._publish_tf or self._latest_tf is None:
+            return
+        if self._latest_tf_time is not None:
+            age_s = (self.get_clock().now() - self._latest_tf_time).nanoseconds / 1e9
+            if age_s > self._max_cached_tf_age_s:
+                if not self._cache_expired_logged:
+                    self.get_logger().warn(
+                        f"Marker odom TF cache expired for {self._tf_child}; "
+                        f"last update age={age_s:.2f}s"
+                    )
+                    self._cache_expired_logged = True
+                return
+        tf = TransformStamped()
+        tf.header = self._latest_tf.header
+        tf.header.stamp = self.get_clock().now().to_msg()
+        tf.child_frame_id = self._latest_tf.child_frame_id
+        tf.transform = self._latest_tf.transform
         self._tf_pub.sendTransform(tf)
 
 

@@ -32,6 +32,7 @@ def _condition(expr) -> IfCondition:
 def generate_launch_description():
     pkg = FindPackageShare("sensor_fusion_bringup")
     use_fallback = LaunchConfiguration("use_marker_odometry_fallback")
+    marker_tf_max_age_s = LaunchConfiguration("marker_tf_max_age_s")
 
     head_openvins_mixed = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -100,7 +101,8 @@ def generate_launch_description():
             "input_pose_topic": "/head/marker_pose/imu_pose",
             "output_odom_topic": "/ov_msckf_head/odomimu",
             "odom_child_frame": "head_imu",
-            "tf_child_frame": "head_d435i_head_link",
+            "tf_child_frame": "d435i_head_link",
+            "max_cached_tf_age_s": marker_tf_max_age_s,
         }],
     )
 
@@ -114,7 +116,8 @@ def generate_launch_description():
             "input_pose_topic": "/arm/marker_pose/imu_pose",
             "output_odom_topic": "/ov_msckf_arm/odomimu",
             "odom_child_frame": "arm_imu",
-            "tf_child_frame": "arm_d435i_arm_link",
+            "tf_child_frame": "d435i_arm_link",
+            "max_cached_tf_age_s": marker_tf_max_age_s,
         }],
     )
 
@@ -144,6 +147,11 @@ def generate_launch_description():
             "use_marker_odometry_fallback",
             default_value="true",
             description="Use ArUco pose as OpenVINS-compatible odom when marker estimator binary is unavailable.",
+        ),
+        DeclareLaunchArgument(
+            "marker_tf_max_age_s",
+            default_value="2.0",
+            description="Seconds to keep publishing the last marker-derived camera TF after marker tracking drops.",
         ),
         head_openvins_mixed,
         head_openvins_d435i,

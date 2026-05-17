@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Static orchestration checks for final Jetson + host digital-twin pipeline.
+# Static orchestration checks for final x86 full digital-twin pipeline.
 
 set -euo pipefail
 
@@ -24,24 +24,40 @@ assert "scripts/start_full_digital_twin_pipeline.sh" in make
 assert "scripts/stop_full_digital_twin_pipeline.sh" in make
 assert "scripts/check_full_pipeline_runtime.sh" in make
 
-assert "make jetson-sync" in start
-assert "make cameras-final && make openvins-final" in start
 assert "--profile digital_twin" in start
-assert "segmentation digital_twin" in start
+assert "services=(segmentation digital_twin digital_twin_rviz)" in start
+assert "x86_cameras x86_openvins" in start
 assert "digital_twin_rviz" in start
 assert "xhost +local:" in start
-assert "SKIP_JETSON" in start
+assert "DT_PERCEPTION_BACKEND" in start
+assert "make jetson-sync" in start
+assert "make cameras-final && make openvins-final" in start
 
 assert "make openvins-stop && make cameras-stop" in stop
 assert "STOP_JETSON" in stop
 
+x86_cameras = compose["services"]["x86_cameras"]
+x86_openvins = compose["services"]["x86_openvins"]
 digital = compose["services"]["digital_twin"]
 rviz = compose["services"]["digital_twin_rviz"]
+assert "/dev:/dev" in x86_cameras["volumes"]
+assert "/run/udev:/run/udev:ro" in x86_cameras["volumes"]
+assert "../src/sensor_fusion_bringup/config:/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/config:ro" in x86_cameras["volumes"]
+assert "../src/sensor_fusion_bringup/launch:/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/launch:ro" in x86_cameras["volumes"]
+assert "../src/sensor_fusion_bringup/scripts:/prosthesis_ws/install/sensor_fusion_bringup/lib/sensor_fusion_bringup:ro" in x86_openvins["volumes"]
+assert "dual_d435i.launch.py" in " ".join(x86_cameras["command"])
+assert "enable_pointcloud_neon_fix:=${DT_ENABLE_POINTCLOUD_NEON_FIX:-false}" in " ".join(x86_cameras["command"])
+assert "dual_openvins_phase2.launch.py" in " ".join(x86_openvins["command"])
+assert "start_camera:=false" in " ".join(x86_openvins["command"])
+assert "use_marker_odometry_fallback" in " ".join(x86_openvins["command"])
+assert "marker_tf_max_age_s:=${DT_TF_CACHE_MAX_AGE_S:-2.0}" in " ".join(x86_openvins["command"])
+assert "x86_cameras" in x86_openvins["depends_on"]
 assert "segmentation" in digital["depends_on"]
 assert not digital.get("devices")
 assert any(v == "RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" for v in digital["environment"])
 assert "DT_CAMERA" in " ".join(digital["command"])
 assert "DT_MOCK_EMG" in " ".join(digital["command"])
+assert "tf_cache_max_age_s:=${DT_TF_CACHE_MAX_AGE_S:-2.0}" in " ".join(digital["command"])
 assert "rviz2 -d /prosthesis_ws/rviz/digital_twin.rviz" in " ".join(rviz["command"])
 assert "digital_twin" in rviz["depends_on"]
 

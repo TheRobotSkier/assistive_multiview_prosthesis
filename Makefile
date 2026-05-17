@@ -23,8 +23,8 @@ HOST_CONTAINER_LIFETIME := 1800
 
 help:
 	@printf "Main targets:\n"
-	@printf "  make up-full-digital-twin     Sync Jetson, start final cameras/OpenVINS, start host digital twin\n"
-	@printf "  make stop-full-digital-twin   Stop host digital twin and Jetson camera/OpenVINS containers\n"
+	@printf "  make up-full-digital-twin     Start x86 cameras/OpenVINS-compatible odometry and digital twin\n"
+	@printf "  make stop-full-digital-twin   Stop local full digital-twin containers\n"
 	@printf "  make check-full-pipeline      Runtime topic check after full system startup\n"
 	@printf "  make rviz-digital-twin        Start the host RViz digital-twin window\n"
 	@printf "  make test                     Build and run smoke/contract tests\n"

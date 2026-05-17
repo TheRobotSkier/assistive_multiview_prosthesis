@@ -68,9 +68,10 @@ def _parse_pointcloud2(msg: PointCloud2):
     xyz = np.column_stack([_extract_f32("x"), _extract_f32("y"), _extract_f32("z")])
 
     rgb = np.zeros((n, 3), dtype=np.float32)
-    if "rgb" in fields:
+    color_field = "rgb" if "rgb" in fields else "rgba" if "rgba" in fields else None
+    if color_field is not None:
         # PCL-style packed float32 encoding of 0x00RRGGBB
-        packed_int = _extract_f32("rgb").view(np.uint32)
+        packed_int = _extract_f32(color_field).view(np.uint32)
         rgb[:, 0] = ((packed_int >> 16) & 0xFF) / 255.0
         rgb[:, 1] = ((packed_int >> 8) & 0xFF) / 255.0
         rgb[:, 2] = (packed_int & 0xFF) / 255.0
@@ -78,22 +79,46 @@ def _parse_pointcloud2(msg: PointCloud2):
     return xyz.astype(np.float32), rgb
 
 
-def _build_pointcloud2(xyz: np.ndarray, header) -> PointCloud2:
-    """Build an XYZ-only PointCloud2 from an (N, 3) float32 array."""
+def _build_pointcloud2(xyz: np.ndarray, header, rgb: np.ndarray | None = None) -> PointCloud2:
+    """Build an XYZ or XYZRGB PointCloud2 from float32 arrays."""
     msg = PointCloud2()
     msg.header = header
     msg.height = 1
     msg.width = int(xyz.shape[0])
+    msg.is_bigendian = False
+    msg.is_dense = True
+
+    if rgb is None:
+        msg.fields = [
+            PointField(name="x", offset=0,  datatype=PointField.FLOAT32, count=1),
+            PointField(name="y", offset=4,  datatype=PointField.FLOAT32, count=1),
+            PointField(name="z", offset=8,  datatype=PointField.FLOAT32, count=1),
+        ]
+        msg.point_step = 12
+        msg.row_step = 12 * msg.width
+        msg.data = np.ascontiguousarray(xyz, dtype=np.float32).tobytes()
+        return msg
+
+    rgb_u8 = np.clip(rgb * 255.0, 0.0, 255.0).astype(np.uint32)
+    packed = ((rgb_u8[:, 0] & 0xFF) << 16) | ((rgb_u8[:, 1] & 0xFF) << 8) | (rgb_u8[:, 2] & 0xFF)
+
+    cloud = np.zeros(
+        msg.width,
+        dtype=[("x", "<f4"), ("y", "<f4"), ("z", "<f4"), ("rgb", "<f4")],
+    )
+    cloud["x"] = xyz[:, 0].astype(np.float32)
+    cloud["y"] = xyz[:, 1].astype(np.float32)
+    cloud["z"] = xyz[:, 2].astype(np.float32)
+    cloud["rgb"] = packed.view(np.float32)
     msg.fields = [
         PointField(name="x", offset=0,  datatype=PointField.FLOAT32, count=1),
         PointField(name="y", offset=4,  datatype=PointField.FLOAT32, count=1),
         PointField(name="z", offset=8,  datatype=PointField.FLOAT32, count=1),
+        PointField(name="rgb", offset=12, datatype=PointField.FLOAT32, count=1),
     ]
-    msg.is_bigendian = False
-    msg.point_step = 12
-    msg.row_step = 12 * msg.width
-    msg.is_dense = True
-    msg.data = np.ascontiguousarray(xyz, dtype=np.float32).tobytes()
+    msg.point_step = 16
+    msg.row_step = 16 * msg.width
+    msg.data = cloud.tobytes()
     return msg
 
 
@@ -236,15 +261,16 @@ class SegmentationNode(Node):
             return
 
         fg_xyz = xyz[mask]
+        fg_rgb = rgb[mask]
         out_header = copy.deepcopy(header)
         out_header.stamp = self.get_clock().now().to_msg()
 
         if len(fg_xyz) == 0:
             self.get_logger().warn("Segmentation returned no foreground points.")
-            self._pub.publish(_empty_pointcloud2(out_header))
+            self._pub.publish(_build_pointcloud2(fg_xyz, out_header, fg_rgb))
             return
 
-        cloud_msg = _build_pointcloud2(fg_xyz, out_header)
+        cloud_msg = _build_pointcloud2(fg_xyz, out_header, fg_rgb)
         self._pub.publish(cloud_msg)
         self.get_logger().info(
             f"Published segmented cloud: {len(fg_xyz)}/{len(xyz)} points.")

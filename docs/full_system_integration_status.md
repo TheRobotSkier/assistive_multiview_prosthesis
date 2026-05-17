@@ -2,11 +2,12 @@
 
 ## Current State
 
-The host-side digital-twin pipeline is wired for the final two-D435i Jetson
-setup:
+The full digital-twin pipeline is wired to run on this x86 machine with the
+final two-D435i setup:
 
-- Jetson publishes final camera topics and OpenVINS outputs.
-- Host fuses both pointclouds in `world`.
+- Local RealSense containers publish final camera topics and OpenVINS-compatible
+  outputs.
+- The digital twin fuses both pointclouds in `world`.
 - Collision prediction publishes segmentation clicks.
 - Segmentation output feeds grasp preshaping.
 - Grasp command topics drive the RViz hand model through `/joint_states`.
@@ -59,22 +60,17 @@ make check-full-pipeline
 
 Result: 14 passed, 0 failed.
 
-## Jetson Status
+## Runtime Status
 
-Deploy/sync is currently blocked before SSH because the direct Ethernet adapter
-has no physical carrier:
+The default `make up-full-digital-twin` path no longer requires Jetson SSH or
+Ethernet. It expects the two D435i cameras to be connected locally and visible
+through `/dev` inside the `x86_cameras` container.
 
-```text
-ERROR: Ethernet adapter enp0s13f0u2u2 has no carrier.
-Host IP is configured as 192.168.100.1, but no physical link is detected.
-```
-
-Once the link is up, run:
+Legacy Jetson perception is still available explicitly:
 
 ```bash
-make robotlab-connect
-make up-full-digital-twin
-make check-full-pipeline
+DT_PERCEPTION_BACKEND=jetson make up-full-digital-twin
+STOP_JETSON=1 make stop-full-digital-twin
 ```
 
 ## Rollback Points

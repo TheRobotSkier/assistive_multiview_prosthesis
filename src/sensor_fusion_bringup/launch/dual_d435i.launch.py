@@ -55,7 +55,17 @@ def _camera_actions(cam, common):
         "camera_namespace": cam["namespace"],
         "camera_name": cam["name"],
         "serial_no": cam["serial_no"],
+        "enable_depth": "true",
+        "enable_color": "true",
+        "enable_sync": _bool_str(common.get("enable_sync", True)),
         "pointcloud.enable": _bool_str(common["pointcloud_enable"]),
+        "pointcloud.allow_no_texture_points": _bool_str(
+            common.get("pointcloud_allow_no_texture_points", True)
+        ),
+        "pointcloud.stream_filter": str(common.get("pointcloud_stream_filter", 0)),
+        "pointcloud.stream_index_filter": str(common.get("pointcloud_stream_index_filter", 0)),
+        "decimation_filter.enable": _bool_str(common.get("decimation_filter_enable", True)),
+        "decimation_filter.filter_magnitude": str(common.get("decimation_filter_magnitude", 2)),
         "align_depth.enable": _bool_str(common["align_depth_enable"]),
         "depth_module.depth_profile": common["depth_profile"],
         "rgb_camera.color_profile": common["color_profile"],

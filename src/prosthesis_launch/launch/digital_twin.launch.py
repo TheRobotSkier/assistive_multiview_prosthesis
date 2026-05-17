@@ -56,6 +56,7 @@ def _launch_setup(context, *args, **kwargs):
     mock_emg_enabled = LaunchConfiguration("mock_emg").perform(context).lower() == "true"
     config_file = LaunchConfiguration("config_file")
     inference_url = LaunchConfiguration("inference_url")
+    tf_cache_max_age_s = LaunchConfiguration("tf_cache_max_age_s")
 
     world_frame = "world"
     marker_map_frame = "marker_map"
@@ -63,11 +64,11 @@ def _launch_setup(context, *args, **kwargs):
     if camera_enabled:
         scene_cloud_topic = "/fused_pointcloud"
         relay_input_topic = "/fused_pointcloud"
-        cam1_frame = "head_d435i_head_depth_optical_frame"
-        cam1_link = "head_d435i_head_link"
-        cam1_color_frame = "head_d435i_head_color_optical_frame"
-        cam2_link_frame = "arm_d435i_arm_link"
-        cam2_color_frame = "arm_d435i_arm_color_optical_frame"
+        cam1_frame = "d435i_head_depth_optical_frame"
+        cam1_link = "d435i_head_link"
+        cam1_color_frame = "d435i_head_color_optical_frame"
+        cam2_link_frame = "d435i_arm_link"
+        cam2_color_frame = "d435i_arm_color_optical_frame"
     else:
         scene_cloud_topic = "/camera/depth/color/points"
         relay_input_topic = "/camera/depth/color/points"
@@ -119,24 +120,47 @@ def _launch_setup(context, *args, **kwargs):
                 output="screen",
             )
         )
-
-    # Static identity world→wrist_link keeps the hand render and /hand_pose
-    # alive before camera tracking is available. When ChArUco tracking is
-    # active, cam2_hand_tracker publishes dynamic TFs with newer timestamps.
-    nodes.append(
-        Node(
-            package="tf2_ros",
-            executable="static_transform_publisher",
-            name="world_to_wrist_fallback_tf",
-            arguments=[
-                "0.0", "0.0", "0.0",
-                "0.0", "0.0", "0.0", "1.0",
-                world_frame,
-                "wrist_link",
-            ],
-            output="screen",
+        nodes.append(
+            Node(
+                package="camera",
+                executable="camera_tf_fallback_node",
+                name="camera_tf_fallback",
+                parameters=[{
+                    "marker_dropout_grace_s": tf_cache_max_age_s,
+                }],
+                output="screen",
+            )
         )
-    )
+        nodes.append(
+            Node(
+                package="camera",
+                executable="marker_camera_optical_tf_node",
+                name="marker_camera_optical_tf",
+                parameters=[{
+                    "max_cached_tf_age_s": tf_cache_max_age_s,
+                }],
+                output="screen",
+            )
+        )
+
+    # Static identity world->wrist_link is only for the mock/no-camera path.
+    # With real cameras, openvins_hand_tracker_node owns world->wrist_link so
+    # the digital hand moves with the arm-mounted camera.
+    if not camera_enabled:
+        nodes.append(
+            Node(
+                package="tf2_ros",
+                executable="static_transform_publisher",
+                name="world_to_wrist_fallback_tf",
+                arguments=[
+                    "0.0", "0.0", "0.0",
+                    "0.0", "0.0", "0.0", "1.0",
+                    world_frame,
+                    "wrist_link",
+                ],
+                output="screen",
+            )
+        )
 
     # ── 3. Pointcloud merger — TF-transforms both clouds into world ───────
     if camera_enabled:
@@ -150,6 +174,9 @@ def _launch_setup(context, *args, **kwargs):
                     "cam2_topic": "/arm/d435i_arm/depth/color/points",
                     "output_topic": "/fused_pointcloud",
                     "target_frame": world_frame,
+                    "use_cloud_timestamps": False,
+                    "point_stride": 16,
+                    "publish_rate_hz": 5.0,
                 }],
                 output="screen",
             )
@@ -208,6 +235,7 @@ def _launch_setup(context, *args, **kwargs):
                     "wrist_cam_pitch": 0.0,
                     "wrist_cam_yaw": 1.57,
                     "publish_rate": 15.0,
+                    "max_cached_tf_age_s": tf_cache_max_age_s,
                 }],
                 output="screen",
             )
@@ -261,6 +289,21 @@ def _launch_setup(context, *args, **kwargs):
     # ── 12. Position Grasp Controller ─────────────────────────────────────
     # The digital twin has no force feedback, so execute the planner's target
     # closures directly on the same command topics that the Mia hand uses.
+    nodes.append(
+        Node(
+            package="pipeline_manager",
+            executable="segmented_cloud_grasp_trigger",
+            name="segmented_cloud_grasp_trigger",
+            parameters=[{
+                "cloud_topic": "/segmentation/object_cloud",
+                "compute_service": "/grasp_preshaping/compute_grasp",
+                "min_points": 1,
+                "debounce_s": 1.0,
+            }],
+            output="screen",
+        )
+    )
+
     nodes.append(
         Node(
             package="pipeline_manager",
@@ -423,6 +466,11 @@ def generate_launch_description():
             "inference_url",
             default_value="http://127.0.0.1:5678",
             description="Segmentation inference server URL",
+        ),
+        DeclareLaunchArgument(
+            "tf_cache_max_age_s",
+            default_value="2.0",
+            description="Seconds to keep publishing the last good dynamic TF after marker tracking drops.",
         ),
         OpaqueFunction(function=_launch_setup),
     ])

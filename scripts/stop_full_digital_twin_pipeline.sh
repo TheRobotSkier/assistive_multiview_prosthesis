@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Stop host digital twin and, when reachable, final Jetson camera/OpenVINS stack.
+# Stop the local full digital-twin stack. If requested, also stop the legacy
+# Jetson camera/OpenVINS stack.
 
 set -euo pipefail
 
@@ -7,7 +8,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_DIR="$ROOT_DIR/docker"
 JETSON_HOST="${JETSON_HOST:-robotlab}"
 JETSON_DEPLOY_DIR="${JETSON_DEPLOY_DIR:-/home/robotlab/multiview_prosthesis}"
-STOP_JETSON="${STOP_JETSON:-1}"
+STOP_JETSON="${STOP_JETSON:-0}"
 
 if command -v podman-compose >/dev/null 2>&1; then
     COMPOSE=(podman-compose)

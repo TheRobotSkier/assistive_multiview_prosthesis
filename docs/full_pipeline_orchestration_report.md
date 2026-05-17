@@ -2,8 +2,8 @@
 
 ## Goal
 
-Run the final dual-D435i Jetson perception stack and the host digital-twin grasp
-stack with one command, while keeping physical hand hardware disabled.
+Run the final dual-D435i perception stack and the digital-twin grasp stack on
+one x86 machine with one command, while keeping physical hand hardware disabled.
 
 ## Commands
 
@@ -13,8 +13,9 @@ Start everything:
 make up-full-digital-twin
 ```
 
-This syncs committed code to the Jetson, starts final camera and OpenVINS
-containers there, then starts the host segmentation and digital-twin containers.
+This starts local camera, OpenVINS-compatible marker odometry, segmentation,
+digital-twin, and RViz containers. The RealSense cameras must be connected to
+this x86 machine.
 
 Stop everything:
 
@@ -36,19 +37,24 @@ bash scripts/check_full_pipeline_contracts.sh
 
 ## Interfaces
 
-Jetson publishes final camera and OpenVINS topics:
+The x86 perception containers publish the same final camera and
+OpenVINS-compatible topics used by the Jetson setup:
 
 - `/head/d435i_head/depth/color/points`
 - `/arm/d435i_arm/depth/color/points`
 - `/ov_msckf_head/odomimu`
 - `/ov_msckf_arm/odomimu`
 
-Host digital twin consumes those topics, fuses clouds into `/fused_pointcloud`,
+The digital twin consumes those topics, fuses clouds into `/fused_pointcloud`,
 runs segmentation and grasp planning, and renders the hand through
 `/joint_states`. No serial devices or hardware-control profile are used.
 
 ## Notes
 
-`SKIP_JETSON=1 make up-full-digital-twin` starts only the host side when the
-Jetson stack is already running. `STOP_JETSON=0 make stop-full-digital-twin`
-leaves the Jetson containers running.
+`DT_PERCEPTION_BACKEND=jetson make up-full-digital-twin` keeps the legacy
+Jetson perception path available for comparison.
+`DT_PERCEPTION_BACKEND=mock make up-full-digital-twin` starts the digital-twin
+stack without physical cameras.
+
+If the legacy Jetson backend was started, use
+`STOP_JETSON=1 make stop-full-digital-twin` to stop the Jetson containers too.

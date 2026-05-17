@@ -111,6 +111,7 @@ class OpenVinsHandTracker(Node):
         self.declare_parameter("wrist_cam_pitch", 0.0)
         self.declare_parameter("wrist_cam_yaw", 1.57)
         self.declare_parameter("publish_rate", 30.0)
+        self.declare_parameter("max_cached_tf_age_s", 2.0)
 
         self._world = self.get_parameter("world_frame").value
         self._camera = self.get_parameter("camera_frame").value
@@ -129,11 +130,15 @@ class OpenVinsHandTracker(Node):
         self._tf_listener = TransformListener(self._tf_buffer, self)
         self._tf_broadcaster = TransformBroadcaster(self)
         self._had_tf = False
+        self._max_cached_tf_age_s = float(self.get_parameter("max_cached_tf_age_s").value)
+        self._last_wrist_tf = None
+        self._last_wrist_tf_time = None
 
         rate = float(self.get_parameter("publish_rate").value)
         self.create_timer(1.0 / rate, self._tick)
         self.get_logger().info(
-            f"OpenVINS hand tracker: {self._world}->{self._camera} -> {self._wrist}"
+            f"OpenVINS hand tracker: {self._world}->{self._camera} -> {self._wrist}; "
+            f"max_cached_tf_age_s={self._max_cached_tf_age_s:.1f}"
         )
 
     def _tick(self):
@@ -145,6 +150,8 @@ class OpenVinsHandTracker(Node):
                 timeout=Duration(seconds=0.05),
             )
         except Exception:
+            if self._republish_cached_wrist_tf():
+                return
             if self._had_tf:
                 self.get_logger().warn("OpenVINS camera TF lost", throttle_duration_sec=5.0)
                 self._had_tf = False
@@ -159,9 +166,25 @@ class OpenVinsHandTracker(Node):
             self.get_clock().now().to_msg(),
         )
         self._tf_broadcaster.sendTransform(msg)
+        self._last_wrist_tf = msg
+        self._last_wrist_tf_time = self.get_clock().now()
         if not self._had_tf:
             self.get_logger().info("OpenVINS camera TF connected — hand follows arm camera")
             self._had_tf = True
+
+    def _republish_cached_wrist_tf(self):
+        if self._last_wrist_tf is None or self._last_wrist_tf_time is None:
+            return False
+        age_s = (self.get_clock().now() - self._last_wrist_tf_time).nanoseconds / 1e9
+        if age_s > self._max_cached_tf_age_s:
+            return False
+        msg = TransformStamped()
+        msg.header = self._last_wrist_tf.header
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.child_frame_id = self._last_wrist_tf.child_frame_id
+        msg.transform = self._last_wrist_tf.transform
+        self._tf_broadcaster.sendTransform(msg)
+        return True
 
 
 def main(args=None):
