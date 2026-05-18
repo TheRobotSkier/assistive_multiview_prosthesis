@@ -10,7 +10,7 @@ RVIZ_CONFIG="${RVIZ_CONFIG:-$REPO_ROOT/rviz/phase2_dual_openvins_head_preview.rv
 ROS_DOMAIN_ID_VALUE="${ROS_DOMAIN_ID:-0}"
 CONTAINER_PREFIX="${ROS2_HOST_CONTAINER_PREFIX:-ros2-jazzy-host}"
 HOST_XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
-read -r -a DOCKER_CMD <<< "${DOCKER_CMD:-docker}"
+read -r -a DOCKER_CMD <<< "${DOCKER_CMD:-podman}"
 
 usage() {
   cat <<'EOF'

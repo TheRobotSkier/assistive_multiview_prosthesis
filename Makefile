@@ -2,7 +2,7 @@
 # Works with podman-compose or docker compose (auto-detected)
 
 COMPOSE_DIR := docker
-DOCKER_CMD ?= docker
+DOCKER_CMD ?= podman
 
 # Auto-detect compose command
 PODMAN_COMPOSE := $(shell which podman-compose 2>/dev/null)

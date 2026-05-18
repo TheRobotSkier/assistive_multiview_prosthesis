@@ -390,6 +390,105 @@ Pointcloud data is large (~10-30 MB/s per camera). Ensure:
 
 ---
 
+## WSL2 Setup (Docker/Podman inside WSL)
+
+If the host PC runs **WSL2** with native podman (or Docker Engine), the physical Ethernet adapter belongs to Windows — WSL2 uses a virtual NAT by default and cannot reach `10.42.0.2`. You must enable **mirrored networking** so WSL2 shares the Windows host's network interfaces.
+
+### Prerequisites
+
+- Windows 11 (any build) or Windows 10 build 19044+
+- WSL 2.0+ (check with `wsl --version` from PowerShell)
+- Native podman or Docker Engine installed inside WSL2 (not Docker Desktop for Windows)
+
+### Step 1: Configure the Windows Ethernet adapter
+
+From an **elevated PowerShell** on Windows:
+
+```powershell
+# Option A: Use the provided script (interactive, lists adapters)
+powershell -ExecutionPolicy Bypass -File scripts\setup_jetson_ethernet.ps1
+
+# Option B: Manual one-liner (replace "Ethernet" with your adapter name)
+New-NetIPAddress -InterfaceAlias "Ethernet" -IPAddress 10.42.0.1 -PrefixLength 24
+```
+
+Verify from PowerShell: `ping 10.42.0.2`
+
+### Step 2: Enable WSL2 mirrored networking
+
+Create or edit `C:\Users\<YourUsername>\.wslconfig`:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
+Then restart WSL from PowerShell:
+
+```powershell
+wsl --shutdown
+```
+
+Reopen your WSL terminal. Verify that the Ethernet interface with `10.42.0.1` is now visible:
+
+```bash
+ip addr show | grep 10.42.0.1
+ping 10.42.0.2
+```
+
+### Step 3: SSH into the Jetson
+
+```bash
+# One-time: copy your SSH key to the Jetson
+ssh-copy-id robotlab@10.42.0.2
+
+# After that, use the shortcut (requires ~/.ssh/config entry)
+ssh robotlab
+```
+
+The SSH config entry (`~/.ssh/config`) should be:
+
+```
+Host robotlab
+    HostName 10.42.0.2
+    User robotlab
+    IdentityFile ~/.ssh/id_ed25519
+    StrictHostKeyChecking accept-new
+```
+
+### Step 4: ROS2 from podman container
+
+With mirrored networking active, `--network host` in podman gives the container access to the Windows Ethernet interface. The existing `config/cyclonedds_peer.xml` works as-is (it binds to `10.42.0.1`).
+
+```bash
+# Build the image (one-time)
+make build-jazzy-rviz
+
+# Verify connectivity
+make robotlab-connect
+
+# Start ROS2 shell
+make ros2-ethernet-shell
+
+# List topics from Jetson
+make ros2-topic-list
+
+# Launch RViz
+make rviz
+```
+
+### Troubleshooting (WSL2-specific)
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `ip addr` in WSL shows only `172.x.x.x` | Mirrored networking not active | Check `.wslconfig` exists and `wsl --shutdown` was run |
+| WSL sees `10.42.0.1` but can't ping Jetson | Windows firewall blocking | Run `New-NetFirewallRule -DisplayName "Jetson Ethernet" -Direction Inbound -Action Allow -Protocol Any -RemoteAddress 10.42.0.0/24` in elevated PowerShell |
+| Podman container can't reach Jetson | `--network host` not used | All `make` targets use `--network host` — don't override |
+| DNS breaks after enabling mirrored mode | Mirrored mode changes DNS resolution | Add `dnsTunneling=true` to `.wslconfig` under `[wsl2]`, or use `generateResolvConf=false` and manage `/etc/resolv.conf` manually |
+| CycloneDDS can't bind to `10.42.0.1` | Interface not visible inside container | Verify with `podman run --rm --network host localhost/ros2-jazzy-rviz ip addr` |
+
+---
+
 ## Key Lessons Learned
 
 | What was tried | Result |

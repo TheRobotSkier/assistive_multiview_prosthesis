@@ -8,6 +8,7 @@ ENV ROS_DOMAIN_ID=0
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-jazzy-cyclonedds \
         ros-jazzy-rmw-cyclonedds-cpp \
+        openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 CMD ["/bin/bash"]
