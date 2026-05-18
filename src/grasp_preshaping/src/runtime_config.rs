@@ -193,6 +193,47 @@ impl Default for RuntimeConfig {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Crate root resolver (runtime, Docker-compatible)
+// ─────────────────────────────────────────────────────────────────────────────
+
+static CRATE_ROOT: OnceLock<std::path::PathBuf> = OnceLock::new();
+
+/// Resolve the crate root directory at runtime.
+///
+/// Priority:
+/// 1. `GRASP_PRESHAPING_HOME` env var (set in Docker to `/prosthesis_ws/src/grasp_preshaping`)
+/// 2. Compile-time `CARGO_MANIFEST_DIR` — used only if the path actually exists on disk
+/// 3. Fallback: `CARGO_MANIFEST_DIR` even if it doesn't exist (last resort, preserves old behaviour)
+pub fn crate_root() -> &'static std::path::Path {
+    CRATE_ROOT.get_or_init(|| {
+        // 1. Explicit override (Docker, CI, etc.)
+        if let Ok(home) = std::env::var("GRASP_PRESHAPING_HOME") {
+            let p = std::path::PathBuf::from(home);
+            if p.is_dir() {
+                return p;
+            }
+            eprintln!(
+                "[runtime_config] GRASP_PRESHAPING_HOME={:?} is not a directory, falling back",
+                p
+            );
+        }
+
+        // 2. Compile-time path — use if it still exists (host / local dev)
+        let compile_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        if compile_dir.is_dir() {
+            return compile_dir.to_path_buf();
+        }
+
+        // 3. Last resort — return the compile-time path anyway
+        eprintln!(
+            "[runtime_config] CARGO_MANIFEST_DIR={:?} does not exist on disk, using as fallback",
+            compile_dir
+        );
+        compile_dir.to_path_buf()
+    })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Global singleton
 // ─────────────────────────────────────────────────────────────────────────────
 

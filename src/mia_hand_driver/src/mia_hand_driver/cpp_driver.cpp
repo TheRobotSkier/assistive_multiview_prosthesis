@@ -41,6 +41,11 @@ bool CppDriver::open_serial_port(std::string& port)
 
     serial_port_.SetBaudRate(LibSerial::BaudRate::BAUD_115200);
     serial_port_.FlushIOBuffers();
+
+    // Allow the FTDI USB-serial adapter time to settle before sending commands.
+    // Without this delay the first commands may time out (especially inside
+    // containers where USB passthrough adds latency).
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
   catch (std::exception& err)
   {
@@ -1282,10 +1287,11 @@ CppDriver::CppDriver():
 
 bool CppDriver::send_command(const std::string& cmd)
 {
+  std::lock_guard<std::mutex> lock(data_mtx_);
   bool success = true;
 
   /* If command format is valid, sending it to the hand.
-   */
+  */
   if ((18 == cmd.length()) && ('@' == cmd[0]) &&
       ('*' == cmd[16]) && ('\r' == cmd[17]))
   {
@@ -1310,14 +1316,14 @@ bool CppDriver::send_command(const std::string& cmd)
   {
     /* Reading ACK.
      */
-    try 
+    try
     {
       serial_port_.Read(rx_msg_, 17, 20);
     }
     catch (std::exception& err)
     {
       success = false;
-      strcpy(err_msg_, 
+      strcpy(err_msg_,
           "Timeout occurred before receiving command acknowledge from Mia Hand.");
       serial_port_.FlushInputBuffer();
     }

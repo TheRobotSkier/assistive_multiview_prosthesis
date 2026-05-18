@@ -2,15 +2,16 @@
 
 Launches the complete prosthesis pipeline:
   1. Mia Hand driver (serial)
-  2. Wrist Dynamixel driver
-  3. EMG bridge (MindRove)
-  4. Segmentation ROS bridge
-  5. Twist propagation target selector
-  6. Grasp preshaping service
-  7. Grasp proximity controller
-  8. Force controller
-  9. Pipeline manager (state machine)
-  10. RViz
+  2. Command bridge (forwards ros2_control topics to driver services)
+  3. Wrist Dynamixel driver
+  4. EMG bridge (MindRove)
+  5. Segmentation ROS bridge
+  6. Twist propagation target selector
+  7. Grasp preshaping service
+  8. Grasp proximity controller
+  9. Force controller
+  10. Pipeline manager (state machine)
+  11. RViz
 
 Usage:
   ros2 launch pipeline.launch.py
@@ -22,7 +23,15 @@ import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch_ros.substitutions import FindPackageShare
+
+
+# Default config path: workspace-root config/prosthesis_config.yaml
+_WORKSPACE_ROOT = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", ".."
+)
+DEFAULT_CONFIG = os.path.join(_WORKSPACE_ROOT, "config", "prosthesis_config.yaml")
 
 
 def generate_launch_description():
@@ -32,8 +41,8 @@ def generate_launch_description():
     )
     config_arg = DeclareLaunchArgument(
         "config_file",
-        default_value="",
-        description="Path to prosthesis_config.yaml (empty = package default)",
+        default_value=DEFAULT_CONFIG,
+        description="Path to prosthesis_config.yaml",
     )
     camera_arg = DeclareLaunchArgument(
         "camera", default_value="true", description="Launch RealSense camera"
@@ -47,7 +56,7 @@ def generate_launch_description():
         package="pipeline_manager",
         executable="pipeline_manager_node",
         name="pipeline_manager",
-        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -57,6 +66,16 @@ def generate_launch_description():
         executable="mia_hand_driver_node",
         name="mia_hand_driver",
         parameters=[{"serial_port": "/dev/ttyUSB0"}],
+        output="screen",
+    )
+
+    # Command Bridge — forwards *_pos_ff_controller/commands to driver services
+    # and republishes joint positions as /joint_states
+    command_bridge = Node(
+        package="command_bridge",
+        executable="command_bridge_node",
+        name="command_bridge",
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -92,7 +111,7 @@ def generate_launch_description():
         package="grasp_preshaping",
         executable="grasp_proximity_controller_node.py",
         name="proximity_controller",
-        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -101,6 +120,7 @@ def generate_launch_description():
         package="twist_propagation",
         executable="twist_propagation_node",
         name="twist_propagation",
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -109,7 +129,7 @@ def generate_launch_description():
         package="force_controller",
         executable="force_controller_node",
         name="force_controller",
-        parameters=[{"config_file": LaunchConfiguration("config_file")}],
+        parameters=[LaunchConfiguration("config_file")],
         output="screen",
     )
 
@@ -129,6 +149,8 @@ def generate_launch_description():
     # Assemble launch
     nodes = [
         pipeline_manager,
+        mia_hand_driver,
+        command_bridge,
         emg_bridge,
         segmentation_bridge,
         twist_propagation,
@@ -140,7 +162,6 @@ def generate_launch_description():
     # Conditional nodes - always included, can be toggled
     # (Launch system doesn't support true conditionals easily,
     #  so we include them and let the nodes handle missing hardware)
-    nodes.append(mia_hand_driver)
 
     # RViz - included by default
     nodes.append(rviz)

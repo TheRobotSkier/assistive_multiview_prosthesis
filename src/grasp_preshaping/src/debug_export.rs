@@ -290,8 +290,7 @@ pub fn export_npz(dump: &DebugDump, path: &Path) -> std::io::Result<()> {
 
 /// Generate a timestamped output path under the crate's `data/debug/` directory.
 pub fn debug_output_path() -> std::path::PathBuf {
-    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-    let base = std::path::Path::new(manifest_dir).join(crate::config::DEBUG_OUTPUT_DIR());
+    let base = crate::runtime_config::crate_root().join(crate::config::DEBUG_OUTPUT_DIR());
 
     let secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

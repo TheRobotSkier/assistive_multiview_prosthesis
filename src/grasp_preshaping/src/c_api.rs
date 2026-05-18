@@ -330,7 +330,10 @@ fn pointcloud_view_to_pointcloud(view: &PointCloudViewFFI) -> Result<PointCloud,
 }
 
 fn get_lut() -> &'static FingerLUT {
-    LUT.get_or_init(|| FingerLUT::load(concat!(env!("CARGO_MANIFEST_DIR"), "/data/finger_contact_lut.npz")))
+    LUT.get_or_init(|| {
+        let lut_path = crate::runtime_config::crate_root().join("data/finger_contact_lut.npz");
+        FingerLUT::load(lut_path.to_str().expect("LUT path is not valid UTF-8"))
+    })
 }
 
 fn get_prediction_config() -> &'static PredictionConfig {

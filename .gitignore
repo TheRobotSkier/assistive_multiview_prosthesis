@@ -1,8 +1,6 @@
 build/
 install/
 log/
-docker_ws/dev/mujoco/log/*
-!docker_ws/dev/mujoco/log/.gitkeep
 .env
 .vscode
 .github/
@@ -24,7 +22,6 @@ build/
 objs/
 dist/
 MinkowskiEngine.egg-info/
-docker_ws/dev/pc_segmentation/weights/weights_exp14_14.pth
 
 # ignore old files
 *.old.*
@@ -39,7 +36,6 @@ plans/
 .mcp.json
 
 # Debug data
-docker_ws/dev/grasp_preshaping/data/debug/
 *.ply
 *.bag
 # kilo code related
@@ -62,3 +58,6 @@ embeddeddolt/.lock
 generated_aruco_a4/
 embeddeddolt/
 backup/
+
+# Force logs
+tests/test2_hw_force_controller/results/

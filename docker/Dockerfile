@@ -31,6 +31,8 @@ ARG USER_GID=1000
 
 RUN if id -u ${USER_UID} >/dev/null 2>&1; then \
         EXISTING_USER=$(getent passwd ${USER_UID} | cut -d: -f1) && \
+        EXISTING_GROUP=$(getent group ${USER_GID} | cut -d: -f1) && \
+        groupmod -n prosthesis "$EXISTING_GROUP" 2>/dev/null || true && \
         usermod -l prosthesis -d /home/prosthesis -m "$EXISTING_USER" 2>/dev/null || true; \
     else \
         groupadd -g ${USER_GID} prosthesis 2>/dev/null || true && \
@@ -47,8 +49,10 @@ COPY src/ src/
 COPY config/ config/
 COPY rviz/ rviz/
 COPY scripts/ scripts/
+COPY tests/ tests/
 
 RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
+RUN chown -R ${USER_UID}:${USER_GID} tests/
 
 # Install ROS dependencies and build
 RUN . /opt/ros/jazzy/setup.sh \
@@ -62,6 +66,7 @@ ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ENV ROS_DOMAIN_ID=0
 ENV LD_LIBRARY_PATH="/prosthesis_ws/install/grasp_preshaping/lib:${LD_LIBRARY_PATH}"
 ENV GRASP_CONFIG_PATH="/prosthesis_ws/config/grasp_preshaping.yaml"
+ENV GRASP_PRESHAPING_HOME="/prosthesis_ws/src/grasp_preshaping"
 
 USER prosthesis
 

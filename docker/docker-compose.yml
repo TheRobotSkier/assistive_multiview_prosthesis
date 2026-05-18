@@ -1,14 +1,14 @@
 # Prosthesis — minimal Docker Compose
 # Usage:
-#   make up                        # mock hardware (default)
+#   make up                        # mock hardware (default, no devices)
 #   make up-hw                     # real hardware (USB devices mapped)
 #   make test                      # run smoke tests
 #   make build                     # build all images
 #
 # Or directly:
 #   podman-compose build
-#   podman-compose up              # mock
-#   podman-compose --profile hardware up
+#   podman-compose up                                       # mock
+#   podman-compose -f docker-compose.yml -f docker-compose.hw.yml up  # hardware
 
 services:
   # ── Main ROS 2 container ─────────────────────────────────────────────────
@@ -25,11 +25,14 @@ services:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
     network_mode: host
+    userns_mode: "keep-id"
     volumes:
       # X11 forwarding (works on Linux and WSL2 with WSLg)
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
     #    profiles:
     #      - mock, rviz, test
+      # Tests: bidirectional mount so results written in the container appear on host
+      - ../tests:/prosthesis_ws/tests:rw
     stdin_open: true
     tty: true
     privileged: true # LINUX ONLY
@@ -143,6 +146,7 @@ services:
     extends: prosthesis
     container_name: test
     user: "0:0"
+    image: prosthesis:latest
     environment:
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
       - ROS_DOMAIN_ID=0
@@ -151,3 +155,5 @@ services:
     profiles:
       - test
     network_mode: host
+    volumes:
+      - ../tests:/prosthesis_ws/tests:rw
