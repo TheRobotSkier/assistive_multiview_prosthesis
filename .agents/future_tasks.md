@@ -46,6 +46,17 @@ started, so `/ov_msckf_arm/dynamic_arm_update/status` had `0` messages. Before
 judging final active behavior, record a bag where arm odom, dynamic arm-pose
 observations, and OpenVINS dynamic update status overlap in time.
 
+Marker ID2 fixture update, 2026-05-19: the redesigned arm-mounted ID2 mount has
+now been calibrated and installed in
+`docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/arm_marker_extrinsics.yaml`.
+Source bag:
+`docker_ws/bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260519_113936`.
+The accepted offline result had `166` inliers, p95 translation residual
+`0.0104 m`, and p95 rotation residual `2.349 deg`. CAD old-to-new mount delta
+was consistent with the calibrated `T_armcam_marker` change. The user reports
+that the active live behavior appears to work; keep the normal active validation
+checks for formal acceptance.
+
 Current dynamic ID2 user docs:
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_parameters.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/dynamic_id2_arm_update_live_validation_commands.md`
@@ -53,12 +64,10 @@ Current dynamic ID2 user docs:
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/d435i_color_pointcloud_marker_map_validation.md`
 - `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_marker_id2_extrinsic_calibration_commands.md`
 
-Marker ID2 fixture note, 2026-05-13: the next physical ID2/arm-D435i fixture
-needs a redesign because the prosthesis can occlude the marker from the head
-camera. After the redesigned mount is ready, use the focused calibration command
-sheet above to record an observation-mode bag, update
-`config/markers/arm_marker_extrinsics.yaml`, then record an active validation
-bag with overlapping `/ov_msckf_arm/odomimu`,
+For any future physical ID2/arm-D435i mount change, use the focused calibration
+command sheet above to record an observation-mode bag, update
+`config/markers/arm_marker_extrinsics.yaml`, then record an active validation bag
+with overlapping `/ov_msckf_arm/odomimu`,
 `/arm/marker_pose/dynamic_arm_pose_observation`, and
 `/ov_msckf_arm/dynamic_arm_update/status`.
 

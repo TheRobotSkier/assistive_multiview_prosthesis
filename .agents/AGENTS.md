@@ -60,8 +60,12 @@ Dynamic ID2 arm workflow:
 - Before treating live dynamic ID2 reanchor as validated, require a bag where
   `/ov_msckf_arm/odomimu`, `/arm/marker_pose/dynamic_arm_pose_observation`, and
   `/ov_msckf_arm/dynamic_arm_update/status` overlap.
-- The next physical ID2 fixture needs redesign due to prosthesis occlusion; refresh
-  `config/markers/arm_marker_extrinsics.yaml` after the mount is final.
+- 2026-05-19: the redesigned arm-mounted ID2 fixture was calibrated from
+  `dynamic_id2_arm_update_live_20260519_113936` and installed in
+  `config/markers/arm_marker_extrinsics.yaml`. Result: `166` inliers, p95
+  translation residual `0.0104 m`, p95 rotation residual `2.349 deg`. CAD
+  old-to-new mount delta was consistent with the calibrated `T_armcam_marker`
+  delta; do not redo solely on geometry unless live validation shows trouble.
 
 D435i color pointcloud support:
 - Pointclouds are opt-in for the dynamic ID2 live workflow:

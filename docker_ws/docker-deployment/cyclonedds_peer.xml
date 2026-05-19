@@ -2,6 +2,8 @@
     <Domain Id="0">
         <General>
             <NetworkInterfaceAddress>10.42.0.2</NetworkInterfaceAddress>
+            <AllowMulticast>false</AllowMulticast>
+            <MulticastRecvNetworkInterfaceAddresses>none</MulticastRecvNetworkInterfaceAddresses>
         </General>
         <Discovery>
             <Peers>

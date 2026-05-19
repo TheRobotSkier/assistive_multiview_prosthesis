@@ -6,6 +6,15 @@ The one-command live workflow now defaults to `active` via
 which enables fixed ID0 updates/reanchor plus dynamic ID2 normal updates and
 guarded dynamic ID2 initial-lock/reanchor. Keep ID2 out of `marker_fixed_ids`.
 
+Calibration update, 2026-05-19: the redesigned physical arm-mounted ID2 fixture
+has been calibrated and installed in
+`config/markers/arm_marker_extrinsics.yaml`. Source bag:
+`dynamic_id2_arm_update_live_20260519_113936`. Result: `166` inliers, p95
+translation residual `0.0104 m`, and p95 rotation residual `2.349 deg`. CAD
+old-to-new mount delta was consistent with the calibrated `T_armcam_marker`
+delta. Future work should treat this as the current ID2 mount extrinsic unless
+active live validation shows repeated dynamic-update rejection.
+
 Latest validation caveat: `dynamic_id2_arm_update_live_20260513_125316`
 validated ID2 measurement production (`218` dynamic ID2 observations and `176`
 finite dynamic arm-pose observations), but it did not validate OpenVINS dynamic
@@ -14,11 +23,10 @@ began. Future validation must ensure `/ov_msckf_arm/odomimu`,
 `/arm/marker_pose/dynamic_arm_pose_observation`, and
 `/ov_msckf_arm/dynamic_arm_update/status` overlap in time.
 
-Fixture caveat: the next physical arm-mounted marker ID2 fixture needs redesign
-because the prosthesis can occlude ID2 from the head camera. Once the mount is
-final, refresh `config/markers/arm_marker_extrinsics.yaml` with
+Fixture note: for any future physical mount change, refresh
+`config/markers/arm_marker_extrinsics.yaml` with
 `docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_marker_id2_extrinsic_calibration_commands.md`
-before judging final active update/reanchor behavior.
+before judging active update/reanchor behavior.
 
 Use the prompt below only if the dynamic update needs replanning or major
 revision.

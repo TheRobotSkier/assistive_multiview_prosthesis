@@ -12,6 +12,79 @@ itself should be recorded in a safe observation mode. Do not judge dynamic ID2
 update/reanchor quality until this transform has been refreshed for the final
 fixture.
 
+## Latest Accepted Calibration
+
+The redesigned arm-mounted marker ID2 fixture was calibrated on 2026-05-19 and
+installed into:
+
+```text
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/arm_marker_extrinsics.yaml
+```
+
+Source bag:
+
+```text
+bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260519_113936
+```
+
+Temporary candidate/report directory:
+
+```text
+docker_ws/calibration/arm/d435i_310622071850/arm_marker_id2_candidate_20260519_113936/
+```
+
+Calibration summary:
+
+```text
+Raw image counts: head=2117, arm=2135
+Detection counts: head ID0=1980, head ID2=312, head ID0+ID2=312, arm ID0=1360
+Synchronized calibration samples: 167
+Inliers/outliers: 166 / 1
+Median translation residual: 0.0038 m
+P95 translation residual: 0.0104 m
+Median rotation residual: 1.005 deg
+P95 rotation residual: 2.349 deg
+```
+
+The generated frames are expected:
+
+```text
+marker_frame: arm_marker_2
+parent_camera_frame: arm_d435i_arm_color_optical_frame
+parent_imu_frame: arm_imu
+```
+
+CAD sanity check against the old mount was also consistent. The user measured
+the marker mount translation from the D435i bottom screw/tripod frame:
+
+```text
+Old screw-frame translation: x=-80.1 mm,  y=67.0 mm,  z=12.5 mm
+New screw-frame translation: x=-26.15 mm, y=122.5 mm, z=172.205 mm
+CAD delta: x=+53.95 mm, y=+55.50 mm, z=+159.705 mm
+```
+
+Using the approximate RealSense convention
+`optical_x=-screw_y`, `optical_y=-screw_z`, `optical_z=screw_x`, this predicts
+an optical-frame delta of roughly:
+
+```text
+expected from CAD: x=-55.50 mm, y=-159.705 mm, z=+53.95 mm
+```
+
+The calibration changed `T_armcam_marker` by:
+
+```text
+calibrated delta: x=-57.65 mm, y=-144.56 mm, z=+60.18 mm
+```
+
+The delta mismatch is about `16.5 mm`, which is plausible given the different
+CAD screw frame, color optical frame, physical marker placement, and observed
+calibration residuals. Do not redo the calibration based on this comparison
+alone. Redo only if active live validation shows unstable or repeatedly rejected
+dynamic ID2 updates.
+
+ID2 remains dynamic only. Do not add ID2 to `marker_fixed_ids`.
+
 ## What The Calibration Needs
 
 The offline calibration script detects markers from raw images in the bag. It

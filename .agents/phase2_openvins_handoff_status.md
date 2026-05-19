@@ -89,11 +89,17 @@ Focused ID2 arm-marker extrinsic calibration commands live here:
 docker_ws/multi_cam_localization/sensor_fusion_bringup/docs/arm_marker_id2_extrinsic_calibration_commands.md
 ```
 
-Physical fixture note, 2026-05-13: the next arm-mounted ID2 fixture needs a
-redesign because the prosthesis can occlude marker ID2 from the head camera.
-Once the updated design is ready, refresh
-`config/markers/arm_marker_extrinsics.yaml` using the focused calibration
-command sheet before judging final active dynamic ID2 update/reanchor behavior.
+Physical fixture update, 2026-05-19: the redesigned arm-mounted marker ID2
+fixture was calibrated from
+`bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260519_113936`
+and installed in `config/markers/arm_marker_extrinsics.yaml`. The offline solve
+used `167` synchronized samples with `166` inliers and `1` outlier; residuals
+were median translation `0.0038 m`, p95 translation `0.0104 m`, median rotation
+`1.005 deg`, and p95 rotation `2.349 deg`. A CAD old-to-new mount delta sanity
+check matched the calibrated `T_armcam_marker` change to about `16.5 mm`, which
+is plausible for the screw-frame to color-optical-frame comparison. Keep ID2 out
+of `marker_fixed_ids`. For any future mount change, rerun the focused
+calibration command sheet before judging dynamic ID2 active behavior.
 
 As of 2026-05-11, the Phase 2 head marker EKF path and the arm D435i Phase 2
 bringup have been committed and pushed. Latest local commit seen by Codex:
