@@ -383,7 +383,12 @@ class TestQuatMultiply:
         assert abs(result[3] - 1.0) < 1e-10
 
     def test_inverse(self):
-        q = (0.1, 0.2, 0.3, 0.9)
+        # Use a proper unit quaternion -- the conjugate trick only works on
+        # normalised quaternions.  (0.1, 0.2, 0.3, 0.9) has norm sqrt(0.95).
+        import math
+        raw = (0.1, 0.2, 0.3, 0.9)
+        n = math.sqrt(sum(c * c for c in raw))
+        q = tuple(c / n for c in raw)
         inv = (-q[0], -q[1], -q[2], q[3])
         result = _quat_multiply(q, inv)
         assert abs(result[3] - 1.0) < 1e-10

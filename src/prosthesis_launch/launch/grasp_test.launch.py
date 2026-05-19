@@ -24,6 +24,7 @@ Usage:
 """
 
 import os
+import yaml
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
@@ -45,12 +46,29 @@ from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
+def _load_twist_params_from_config(config_file_path):
+    """Load twist_propagation parameters from prosthesis_config.yaml."""
+    if config_file_path and os.path.exists(config_file_path):
+        with open(config_file_path, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        return dict(cfg.get("twist_propagation", {}).get("ros__parameters", {}))
+    return {}
+
+
+# Default config path: workspace-root config/prosthesis_config.yaml
+_WORKSPACE_ROOT = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", ".."
+)
+DEFAULT_CONFIG = os.path.join(_WORKSPACE_ROOT, "config", "prosthesis_config.yaml")
+
+
 def _launch_setup(context, *args, **kwargs):
     """Build node list based on camera/gui launch arguments."""
 
     camera_enabled = LaunchConfiguration("camera").perform(context).lower() == "true"
     gui_enabled = LaunchConfiguration("gui").perform(context).lower() == "true"
-    config_file = LaunchConfiguration("config_file")
+    config_file_raw = LaunchConfiguration("config_file").perform(context)
+    config_file = config_file_raw if config_file_raw else DEFAULT_CONFIG
 
     # Choose the correct cloud topic based on camera vs mock
     if camera_enabled:
@@ -107,17 +125,17 @@ def _launch_setup(context, *args, **kwargs):
     )
 
     # ── Twist propagation (active, targeting the scene cloud) ──────────
+    # Load full parameter set from config, overlay overrides.
+    twist_params = _load_twist_params_from_config(config_file)
+    twist_params["active"] = True
+    twist_params["input_cloud_topic"] = cloud_topic
+
     nodes.append(
         Node(
             package="twist_propagation",
             executable="twist_propagation_node",
             name="twist_propagation",
-            parameters=[
-                {
-                    "active": True,
-                    "input_cloud_topic": cloud_topic,
-                }
-            ],
+            parameters=[twist_params],
             output="screen",
         )
     )

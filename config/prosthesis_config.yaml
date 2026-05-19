@@ -95,12 +95,12 @@ proximity_controller:
 
 twist_propagation:
     ros__parameters:
-        cycle_delay_s: 0.5
+        cycle_delay_s: 0.1
         propagation_time_horizon_s: 2.0
         propagation_dt_s: 0.02
         hit_threshold_m: 0.05
         min_points_near_hit: 3
-        collision_geometry_radius_m: 0.10
+        collision_geometry_radius_m: 0.05
         twist_estimation_window: 5
         active: false
         input_cloud_topic: "/camera/depth/color/points"
@@ -242,12 +242,12 @@ hardware:
 # file with yaml.safe_load.  The ROS2 node section above is the source of
 # truth for runtime parameters.
 twist_propagation:
-    cycle_delay_s: 0.5
+    cycle_delay_s: 0.1
     propagation_time_horizon_s: 2.0
     propagation_dt_s: 0.02
     hit_threshold_m: 0.05
     min_points_near_hit: 3
-    collision_geometry_radius_m: 0.10
+    collision_geometry_radius_m: 0.05
     twist_estimation_window: 5
     active: false
     input_cloud_topic: "/camera/depth/color/points"

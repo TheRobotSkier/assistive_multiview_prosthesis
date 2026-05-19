@@ -14,20 +14,21 @@ A ROS 2 Jazzy system for EMG-controlled robotic hand grasping with real-time poi
 ┌──────────┐    cloud     ┌──────────────┐    segmented     ┌──────────────────┐
 │  Camera  │─────────────▶│ Segmentation │────────────────▶│ Grasp Preshaping │
 │  (D435)  │              │  (Minkowski) │                  │  (Rust pipeline) │
-└──────────┘              └──────────────┘                  └────────┬─────────┘
-                                                                     │ preshape + wrist + hand pose
-                                                                     ▼
-                                                          ┌──────────────────┐
-                                                          │ Pipeline Manager │
-                                                          │  (state machine) │
-                                                          └────────┬─────────┘
-                                                                   │
-                                              ┌────────────────────┼────────────────────┐
-                                              ▼                   ▼                    ▼
-                                      ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-                                      │ Wrist Driver │   │  Mia Hand    │   │   Force      │
-                                      │ (Dynamixel)  │   │  Driver      │   │  Controller  │
-                                      └──────────────┘   └──────────────┘   └──────────────┘
+└──────────┘              └──────┬───────┘                  └────────┬─────────┘
+     │                           │                                   │
+     │ cloud                     │ click_positive                    │ preshape + wrist + hand pose
+     ▼                           ▼                                   ▼
+┌──────────────────┐  ┌──────────────────┐                 ┌──────────────────┐
+│ Twist Propagation │  │ Pipeline Manager │                 │ Pipeline Manager │
+│  (collision det.) │  │  (state machine) │                 │  (state machine) │
+└──────────────────┘  └────────┬─────────┘                 └────────┬─────────┘
+                               │                                    │
+                                          ┌────────────────────┼────────────────────┐
+                                          ▼                   ▼                    ▼
+                                  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+                                  │ Wrist Driver │   │  Mia Hand    │   │   Force      │
+                                  │ (Dynamixel)  │   │  Driver      │   │  Controller  │
+                                  └──────────────┘   └──────────────┘   └──────────────┘
 ```
 
 **Pipeline flow:**
@@ -116,7 +117,8 @@ Config resolution order:
 | `mia_hand_msgs` | ROS msgs | Custom message/service/action definitions |
 | `mia_hand_ros2_control` | C++ | ros2-control hardware interface for Mia Hand |
 | `grasp_preshaping` | Rust/C++ | Grasp planning pipeline (TSDF + SMC optimization) |
-| `pipeline_manager` | Python | State machine: IDLE → SEGMENTING → APPROACHING → GRASPING → HOLDING → RELEASING |
+| `pipeline_manager` | Python | State machine: IDLE -> SEGMENTING -> APPROACHING -> GRASPING -> HOLDING -> RELEASING |
+| `twist_propagation` | Python | Predicts hand trajectory from pose stream, detects collisions with point cloud |
 | `force_controller` | Python | Force regulation for stable grasping |
 | `segmentation_bridge` | Python | ROS node bridging to segmentation inference server |
 | `emg_bridge` | Python | MindRove EMG classifier + ROS bridge |
@@ -213,6 +215,7 @@ multiview_prosthesis/
 │   ├── pipeline_manager/             # State machine orchestrator
 │   ├── prosthesis_launch/            # Top-level launch files
 │   ├── segmentation/                 # Segmentation + MinkowskiEngine
+│   ├── twist_propagation/            # Hand trajectory prediction + collision detection
 │   └── wrist_driver/                 # Dynamixel wrist driver
 └── plans/                            # Architecture and planning docs
 ```
@@ -273,44 +276,94 @@ ros2 run emg_bridge run_classifier
 
 Connect to the MindRove WiFi network first. The classifier publishes to `/emg/gesture_label`, `/emg/gesture_name`, `/emg/confidence`, and `/emg/proportional`.
 
+## Twist Propagation
 
-## Random Scratch Pad - Daniel
+The twist propagation node predicts the hand's future trajectory from a stream of hand poses and detects collisions with the point cloud. When a collision is predicted, it publishes a click point and triggers grasp preshaping.
 
-All code changes are done and the Rust .so has been rebuilt. The Docker image rebuild takes longer than my tool timeout, so you'll need to run this yourself in your terminal:
+### How it works
 
-make build && make up
+1. Subscribes to hand poses (`/hand_pose`) and the live point cloud (`/camera/depth/color/points`)
+2. Estimates the hand's twist (linear + angular velocity) from recent poses using an EMA-smoothed least-squares fit
+3. Propagates the hand pose forward in time (up to `propagation_time_horizon_s` seconds) in small steps (`propagation_dt_s`)
+4. At each step, checks if the propagated hand position is within the collision threshold of any point in the cloud
+5. On collision: publishes a click point (`/segmentation/click_positive`), waits for a segmented cloud, then calls the grasp preshaping service
+6. Publishes the estimated twist, predicted path, collision spheres, and hit markers for RViz visualization
 
-Then verify inside the container:
+### Launch commands
 
-make shell
-# Inside container:
-# 1. Verify the .so resolves paths correctly:
-strings /prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so | grep GRASP_PRESHAPING_HOME
+```bash
+# Standalone (with mock data sources)
+ros2 launch prosthesis_launch twist_propagation_test.launch.py
 
-# 2. Quick smoke test — load the library:
-python3 -c "import ctypes; so = ctypes.CDLL('/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so'); print('API version:', so.grasp_preshaping_api_version())"
+# Standalone (no mock data, expects external pose/cloud publishers)
+ros2 launch twist_propagation twist_propagation.launch.py
 
-# 3. Run the Tier B test (in a second shell after launching mock pipeline):
-python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py --method service
+# As part of the full pipeline
+ros2 launch prosthesis_launch pipeline.launch.py
+```
 
-ros2 launch prosthesis_launch mock.launch.py
+### Start/Stop control
 
-Maybe write something about udev symlinks at some point in here
+The node starts **inactive** by default. Activate it at runtime via ROS services:
 
-### New stuff
+```bash
+# Activate
+ros2 service call /twist_propagation/activate std_srvs/srv/Trigger
 
-1. Plug in the Ethernet cable between your PC and the Jetson
+# Deactivate
+ros2 service call /twist_propagation/deactivate std_srvs/srv/Trigger
 
-2. Run the PowerShell script from an elevated PowerShell on Windows:
-   powershell -ExecutionPolicy Bypass -File <path-to-script>\setup_jetson_ethernet.ps1
-   This sets 10.42.0.1/24 on the Ethernet adapter.
+# Check current state
+ros2 topic echo /twist_propagation/status --once
+```
 
-3. Restart WSL from PowerShell:
-   wsl --shutdown
-   Then reopen your WSL terminal. The .wslconfig with networkingMode=mirrored is already in place.
+Or launch with `active:=true` to start active immediately:
 
-4. Verify from WSL:
-   make robotlab-connect    # Should show [OK] for all checks
-   ssh-copy-id robotlab@10.42.0.2   # One-time key copy
-   ssh robotlab             # Should log in without password
-   make ros2-ethernet-shell # Test ROS2 connectivity
+```bash
+ros2 launch prosthesis_launch twist_propagation_test.launch.py active:=true
+```
+
+### Key parameters
+
+Parameters are configured in `src/twist_propagation/config/twist_propagation.yaml` and `config/prosthesis_config.yaml`.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `propagation_time_horizon_s` | 2.0 | How far into the future to predict (seconds) |
+| `propagation_dt_s` | 0.02 | Time step for each propagation step |
+| `hit_threshold_m` | 0.05 | Base distance threshold for collision detection |
+| `collision_geometry_radius_m` | 0.05 | Added to `hit_threshold_m` for effective collision radius |
+| `cycle_delay_s` | 0.1 | Time between propagation cycles |
+| `twist_estimation_window` | 5 | Number of recent poses used to estimate velocity |
+| `cloud_max_age_s` | 2.0 | Cloud is rejected if older than this |
+| `voxel_leaf_m` | 0.02 | Voxel size for cloud downsampling (0 to disable) |
+| `enable_covariance_propagation` | true | Truncate horizon when uncertainty exceeds threshold |
+
+### Topics
+
+**Inputs:**
+- `/hand_pose` (geometry_msgs/PoseStamped) -- tracked hand position
+- `/camera/depth/color/points` (sensor_msgs/PointCloud2) -- live depth cloud
+- `/segmentation/object_cloud` (sensor_msgs/PointCloud2) -- segmented object cloud
+
+**Outputs:**
+- `/hand_twist` (geometry_msgs/TwistStamped) -- estimated hand velocity
+- `/segmentation/click_positive` (geometry_msgs/PointStamped) -- predicted collision point
+- `/twist_propagation/status` (std_msgs/String) -- JSON status (active, state, reason)
+
+**Visualization (RViz):**
+- `/twist_propagation/predicted_path` (nav_msgs/Path)
+- `/twist_propagation/collision_spheres` (visualization_msgs/MarkerArray)
+- `/twist_propagation/hit_marker` (visualization_msgs/MarkerArray)
+- `/twist_propagation/trajectory_line` (visualization_msgs/MarkerArray)
+
+### Testing
+
+```bash
+# Unit tests (pure functions, no ROS needed)
+python3 -m pytest src/twist_propagation/test/test_twist_propagation.py -v
+
+# Integration test (requires node running in a separate terminal)
+ros2 launch prosthesis_launch twist_propagation_test.launch.py  # terminal 1
+python3 scripts/test_twist_propagation_integration.py            # terminal 2
+```

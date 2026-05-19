@@ -15,7 +15,7 @@ twist_propagation:
     # Increase collision_geometry_radius_m to detect collisions earlier.
     hit_threshold_m: 0.05
     min_points_near_hit: 3
-    collision_geometry_radius_m: 0.10
+    collision_geometry_radius_m: 0.05
 
     # ── Twist estimation ───────────────────────────────────────────────────
     twist_estimation_window: 5

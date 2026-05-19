@@ -29,12 +29,27 @@ Usage:
 """
 
 import os
+import yaml
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+
+
+def _load_twist_propagation_params():
+    """Load the canonical twist_propagation parameters from the package config."""
+    config_path = os.path.join(
+        get_package_share_directory("twist_propagation"),
+        "config",
+        "twist_propagation.yaml",
+    )
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
+        return dict(cfg.get("twist_propagation", {}).get("ros__parameters", {}))
+    return {}
 
 
 def _launch_setup(context, *args, **kwargs):
@@ -90,16 +105,18 @@ def _launch_setup(context, *args, **kwargs):
     )
 
     # ── 4. Twist propagation ─────────────────────────────────────────────
+    # Load full parameter set from the package config, overlay overrides.
+    twist_params = _load_twist_propagation_params()
+    twist_params["active"] = active == "true"
+    twist_params["input_cloud_topic"] = input_cloud_topic
+    twist_params["odom_topic"] = "/hand_odom"
+
     nodes.append(
         Node(
             package="twist_propagation",
             executable="twist_propagation_node",
             name="twist_propagation",
-            parameters=[{
-                "active": active == "true",
-                "input_cloud_topic": input_cloud_topic,
-                "odom_topic": "/hand_odom",
-            }],
+            parameters=[twist_params],
             output="screen",
         )
     )

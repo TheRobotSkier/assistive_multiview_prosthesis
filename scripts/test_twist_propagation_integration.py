@@ -312,10 +312,12 @@ def test_twist_published(harness: TestHarness):
     rclpy.spin_once(harness, timeout_sec=0.5)
     harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
                                  vx=0.2, n=10, dt=0.05)
-    # Spin to let messages propagate
-    rclpy.spin_once(harness, timeout_sec=1.0)
-    time.sleep(0.3)
-    rclpy.spin_once(harness, timeout_sec=1.0)
+    # Poll for twist messages -- the node's cycle runs every 0.1s so we need
+    # several spin iterations to give it time to process and publish.
+    for _ in range(40):
+        rclpy.spin_once(harness, timeout_sec=0.2)
+        if harness.twist_count > 0:
+            break
 
     if harness.twist_count > 0:
         _ok(f"twist messages published (count={harness.twist_count})")
@@ -340,12 +342,13 @@ def test_hit_detected(harness: TestHarness):
                                  vx=0.3, n=12, dt=0.05)
 
     # Wait for the cycle to run — use more iterations and longer spin
-    for _ in range(25):
-        rclpy.spin_once(harness, timeout_sec=0.3)
+    for _ in range(50):
+        rclpy.spin_once(harness, timeout_sec=0.2)
         if harness.click_count > 0:
             break
-    time.sleep(0.5)
-    rclpy.spin_once(harness, timeout_sec=0.5)
+    # Extra spins to collect any late messages
+    for _ in range(5):
+        rclpy.spin_once(harness, timeout_sec=0.2)
 
     if harness.click_count > 0:
         _ok(f"click_positive published (count={harness.click_count})")
@@ -363,8 +366,8 @@ def test_preshaping_called_after_seg_cloud(harness: TestHarness):
     harness.publish_seg_cloud()
 
     # Wait for preshaping to be called
-    for _ in range(40):
-        rclpy.spin_once(harness, timeout_sec=0.3)
+    for _ in range(60):
+        rclpy.spin_once(harness, timeout_sec=0.2)
         if harness.preshaping_called:
             break
 
@@ -410,8 +413,10 @@ def test_visualization_published(harness: TestHarness):
                                  vx=0.2, n=10, dt=0.05)
 
     # Wait for the cycle to run
-    for _ in range(15):
-        rclpy.spin_once(harness, timeout_sec=0.3)
+    for _ in range(40):
+        rclpy.spin_once(harness, timeout_sec=0.2)
+        if harness.path_count > 0:
+            break
 
     # Predicted path should be published
     if harness.path_count > 0:
@@ -448,8 +453,8 @@ def test_hit_marker_on_collision(harness: TestHarness):
     harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
                                  vx=0.3, n=12, dt=0.05)
 
-    for _ in range(25):
-        rclpy.spin_once(harness, timeout_sec=0.3)
+    for _ in range(50):
+        rclpy.spin_once(harness, timeout_sec=0.2)
         if harness.hit_marker_count > 0 and harness.click_count > 0:
             break
 
