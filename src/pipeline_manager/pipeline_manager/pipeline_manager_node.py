@@ -227,9 +227,7 @@ class PipelineManagerNode(Node):
                 if self._latest_confidence >= self._release_confidence_threshold:
                     self._transition(State.RELEASING, 'EMG: OPEN')
                     self._deactivate_twist_propagation()
-                    # Auto-transition to IDLE after a short delay
-                    self.create_timer(1.0, lambda: self._transition(State.IDLE, 'Release complete'),
-                                      one_shot=True)  # type: ignore[arg-type]
+                    self._schedule_release_complete()
                 else:
                     self.get_logger().debug(
                         f'Release gesture ignored: confidence {self._latest_confidence:.2f} '
@@ -246,6 +244,16 @@ class PipelineManagerNode(Node):
             self._transition(State.SEGMENTING, f'EMG: gesture={gesture}')
             self._activate_twist_propagation()
             # Segmentation object cloud will trigger PLANNING
+
+    def _schedule_release_complete(self):
+        """Return to IDLE after release without relying on a one-shot timer API."""
+        timer_ref = {'timer': None}
+
+        def _complete_release():
+            self._transition(State.IDLE, 'Release complete')
+            timer_ref['timer'].cancel()
+
+        timer_ref['timer'] = self.create_timer(1.0, _complete_release)
 
     def _on_emg_confidence(self, msg: Float32):
         self._latest_confidence = msg.data

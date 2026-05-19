@@ -5,283 +5,351 @@ Launches the complete prosthesis pipeline:
    2. Command bridge (forwards ros2_control topics to driver services)
    3. Wrist Dynamixel driver
    4. EMG bridge (MindRove)
-   5. Pointcloud fusion (TF-transforms + merges Jetson camera clouds)
-   6. Pointcloud relay (fused -> segmentation input)
-   7. Odom-to-pose relay (OpenVINS odom -> /hand_pose)
-   8. Segmentation ROS bridge
-   9. Twist propagation target selector
-  10. Grasp preshaping service
-  11. Grasp proximity controller
-  12. Force controller
-  13. Pipeline manager (state machine)
-  14. RViz
+   5. Haptic bridge and controller
+   6. Pointcloud fusion (TF-transforms + merges Jetson camera clouds)
+   7. Pointcloud relay (fused -> segmentation input)
+   8. Odom-to-pose relay (OpenVINS odom -> /hand_pose)
+   9. Segmentation ROS bridge
+  10. Twist propagation target selector
+  11. Grasp preshaping service
+  12. Grasp proximity controller
+  13. Force controller
+  14. Pipeline manager (state machine)
+  15. RViz
 
 Usage:
-  ros2 launch pipeline.launch.py
-  ros2 launch pipeline.launch.py rviz:=false
-  ros2 launch pipeline.launch.py config_file:=/path/to/config.yaml
+  ros2 launch prosthesis_launch pipeline.launch.py
+  ros2 launch prosthesis_launch pipeline.launch.py rviz:=false
+  ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false
 """
 
 import os
+
+import yaml
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.substitutions import FindPackageShare
 
 
-# Default config path: workspace-root config/prosthesis_config.yaml
-_WORKSPACE_ROOT = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", ".."
+# Launch files run from the installed package share path, while the dev
+# container bind-mounts runtime config at /prosthesis_ws/config.
+DEFAULT_CONFIG = os.environ.get(
+    "PROSTHESIS_CONFIG",
+    "/prosthesis_ws/config/prosthesis_config.yaml",
 )
-DEFAULT_CONFIG = os.path.join(_WORKSPACE_ROOT, "config", "prosthesis_config.yaml")
+DEFAULT_RVIZ_CONFIG = os.environ.get(
+    "PROSTHESIS_RVIZ_CONFIG",
+    "/prosthesis_ws/rviz/prosthesis.rviz",
+)
 
 
-def generate_launch_description():
-    # Launch arguments
-    rviz_arg = DeclareLaunchArgument(
-        "rviz", default_value="true", description="Launch RViz"
-    )
-    config_arg = DeclareLaunchArgument(
-        "config_file",
-        default_value=DEFAULT_CONFIG,
-        description="Path to prosthesis_config.yaml",
-    )
-    camera_arg = DeclareLaunchArgument(
-        "camera", default_value="true", description="Launch RealSense camera"
-    )
-    mia_hand_arg = DeclareLaunchArgument(
-        "mia_hand", default_value="true", description="Launch Mia Hand driver"
-    )
-    mia_serial_port_arg = DeclareLaunchArgument(
-        "mia_serial_port",
-        default_value=os.environ.get("MIA_SERIAL_PORT", "/dev/ttyUSB0"),
-        description="Mia Hand serial port device",
-    )
-    wrist_serial_port_arg = DeclareLaunchArgument(
-        "wrist_serial_port",
-        default_value=os.environ.get("WRIST_SERIAL_PORT", "/dev/ttyUSB0"),
-        description="Wrist Dynamixel serial port device",
-    )
-    target_frame_arg = DeclareLaunchArgument(
-        "target_frame",
-        default_value="marker_map",
-        description="Target frame for fused pointcloud (OpenVINS map frame).",
-    )
-    odom_topic_arg = DeclareLaunchArgument(
-        "odom_topic",
-        default_value="/ov_msckf_arm/odomimu",
-        description="OpenVINS odometry topic for hand pose estimation.",
-    )
-    cam1_topic_arg = DeclareLaunchArgument(
-        "cam1_topic",
-        default_value="/head/d435i/head/depth/color/points",
-        description="Pointcloud topic from head RealSense D435i.",
-    )
-    cam2_topic_arg = DeclareLaunchArgument(
-        "cam2_topic",
-        default_value="/arm/d435i/arm/depth/color/points",
-        description="Pointcloud topic from arm RealSense D435i.",
-    )
-    arm_frame_arg = DeclareLaunchArgument(
-        "arm_frame",
-        default_value="arm_d435i_arm_depth_frame",
-        description="Arm camera depth frame for hand/arm bbox removal.",
-    )
+def _as_bool(context, name: str) -> bool:
+    value = LaunchConfiguration(name).perform(context).lower()
+    return value in ("1", "true", "yes", "on")
 
-    # Perception bridge parameters — wired from launch args
-    cam1_topic_val = LaunchConfiguration("cam1_topic")
-    cam2_topic_val = LaunchConfiguration("cam2_topic")
-    arm_frame_val = LaunchConfiguration("arm_frame")
+
+def _load_config(path: str) -> dict:
+    with open(path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def _node_params(config: dict, node_name: str) -> dict:
+    """Return only the parameters for one node from the mixed central config.
+
+    config/prosthesis_config.yaml also contains flat reference sections, so it
+    cannot be passed directly to ROS as a params file.
+    """
+    section = config.get(node_name, {})
+    if not isinstance(section, dict):
+        return {}
+    ros_params = section.get("ros__parameters")
+    if isinstance(ros_params, dict):
+        return dict(ros_params)
+    return dict(section)
+
+
+def _launch_setup(context, *args, **kwargs):
+    config_file = LaunchConfiguration("config_file").perform(context)
+    config = _load_config(config_file)
+
+    target_frame = LaunchConfiguration("target_frame").perform(context)
+    odom_topic = LaunchConfiguration("odom_topic").perform(context)
+    cam1_topic = LaunchConfiguration("cam1_topic").perform(context)
+    cam2_topic = LaunchConfiguration("cam2_topic").perform(context)
+    arm_frame = LaunchConfiguration("arm_frame").perform(context)
+    mia_serial_port = LaunchConfiguration("mia_serial_port").perform(context)
+    wrist_serial_port = LaunchConfiguration("wrist_serial_port").perform(context)
+    haptic_bt_addr = LaunchConfiguration("haptic_bt_addr1").perform(context)
+    inference_url = LaunchConfiguration("inference_url").perform(context)
+
+    nodes = []
 
     # Pipeline Manager - state machine orchestrator
-    pipeline_manager = Node(
-        package="pipeline_manager",
-        executable="pipeline_manager_node",
-        name="pipeline_manager",
-        parameters=[LaunchConfiguration("config_file")],
-        output="screen",
+    nodes.append(
+        Node(
+            package="pipeline_manager",
+            executable="pipeline_manager_node",
+            name="pipeline_manager",
+            parameters=[_node_params(config, "pipeline_manager")],
+            output="screen",
+        )
     )
 
-    # Mia Hand Driver
-    mia_hand_driver = Node(
-        package="mia_hand_driver",
-        executable="mia_hand_driver_node",
-        name="mia_hand_driver",
-        parameters=[{"serial_port": LaunchConfiguration("mia_serial_port")}],
-        output="screen",
-    )
+    if _as_bool(context, "mia_hand"):
+        nodes.extend(
+            [
+                Node(
+                    package="mia_hand_driver",
+                    executable="mia_hand_driver_node",
+                    name="mia_hand_driver",
+                    parameters=[{"serial_port": mia_serial_port}],
+                    output="screen",
+                ),
+                Node(
+                    package="command_bridge",
+                    executable="command_bridge_node",
+                    name="command_bridge",
+                    parameters=[_node_params(config, "command_bridge")],
+                    output="screen",
+                ),
+            ]
+        )
 
-    # Wrist Dynamixel Driver
-    wrist_driver = Node(
-        package="wrist_driver",
-        executable="wrist_driver_node",
-        name="wrist_driver",
-        parameters=[
-            LaunchConfiguration("config_file"),
-            {"port": LaunchConfiguration("wrist_serial_port")},
-        ],
-        output="screen",
-    )
+    if _as_bool(context, "wrist"):
+        hardware = config.get("hardware", {}) if isinstance(config.get("hardware", {}), dict) else {}
+        nodes.append(
+            Node(
+                package="wrist_driver",
+                executable="wrist_driver_node",
+                name="wrist_driver",
+                parameters=[
+                    {
+                        "port": wrist_serial_port,
+                        "baudrate": hardware.get("wrist_baudrate", 57600),
+                        "motor_id": hardware.get("wrist_motor_id", 1),
+                    }
+                ],
+                output="screen",
+            )
+        )
 
-    # Command Bridge — forwards *_pos_ff_controller/commands to driver services
-    # and republishes joint positions as /joint_states
-    command_bridge = Node(
-        package="command_bridge",
-        executable="command_bridge_node",
-        name="command_bridge",
-        parameters=[LaunchConfiguration("config_file")],
-        output="screen",
-    )
+    if _as_bool(context, "emg"):
+        nodes.append(
+            Node(
+                package="emg_bridge",
+                executable="run_classifier",
+                name="emg_bridge",
+                output="screen",
+            )
+        )
 
-    # EMG Bridge - MindRove gesture classifier
-    emg_bridge = Node(
-        package="emg_bridge",
-        executable="run_classifier",
-        name="emg_bridge",
-        output="screen",
-    )
+    if _as_bool(context, "haptic"):
+        nodes.extend(
+            [
+                Node(
+                    package="haptic_bridge",
+                    executable="bridge_node",
+                    name="haptic_bridge",
+                    additional_env={"HAPTIC_BT_ADDR1": haptic_bt_addr},
+                    output="screen",
+                ),
+                Node(
+                    package="haptic_bridge",
+                    executable="haptic_controller_node",
+                    name="haptic_controller",
+                    parameters=[_node_params(config, "haptic_controller")],
+                    output="screen",
+                ),
+            ]
+        )
 
-    # Pointcloud Fusion — TF-transforms both Jetson clouds, merges, filters
-    pointcloud_fusion = Node(
-        package="pointcloud_fusion",
-        executable="pointcloud_fusion_node",
-        name="pointcloud_fusion",
-        parameters=[{
-            "target_frame": LaunchConfiguration("target_frame"),
-            "cam1_topic": cam1_topic_val,
-            "cam2_topic": cam2_topic_val,
-            "arm_frame": arm_frame_val,
-            "max_distance": 2.0,
-            "voxel_size": 0.005,
-            "bbox_min": [-0.30, -0.10, -0.10],
-            "bbox_max": [0.22, 0.10, 0.12],
-            "enable_downsampling": True,
-            "enable_distance_filter": True,
-            "enable_hand_removal": True,
-        }],
-        output="screen",
-    )
-
-    # Pointcloud Relay — /fused_pointcloud -> /segmentation/input_cloud
-    pointcloud_relay = Node(
-        package="camera",
-        executable="pointcloud_relay_node",
-        name="pointcloud_relay",
-        output="screen",
-    )
-
-    # Odom-to-Pose Relay — OpenVINS odom -> /hand_pose, /hand_twist, /hand_odom
-    odom_to_pose_relay = Node(
-        package="camera",
-        executable="odom_to_pose_relay",
-        name="odom_to_pose_relay",
-        parameters=[{
-            "odom_topic": LaunchConfiguration("odom_topic"),
-            "pose_topic": "/hand_pose",
-            "twist_topic": "/hand_twist",
-            "odom_out": "/hand_odom",
-        }],
-        output="screen",
-        arguments=["--ros-args", "--log-level", "warn"],
-    )
+    if _as_bool(context, "camera"):
+        fusion_params = _node_params(config, "pointcloud_fusion")
+        fusion_params.update(
+            {
+                "target_frame": target_frame,
+                "cam1_topic": cam1_topic,
+                "cam2_topic": cam2_topic,
+                "arm_frame": arm_frame,
+            }
+        )
+        nodes.extend(
+            [
+                Node(
+                    package="pointcloud_fusion",
+                    executable="pointcloud_fusion_node",
+                    name="pointcloud_fusion",
+                    parameters=[fusion_params],
+                    output="screen",
+                ),
+                Node(
+                    package="camera",
+                    executable="pointcloud_relay_node",
+                    name="pointcloud_relay",
+                    output="screen",
+                ),
+                Node(
+                    package="camera",
+                    executable="odom_to_pose_relay",
+                    name="odom_to_pose_relay",
+                    parameters=[
+                        {
+                            "odom_topic": odom_topic,
+                            "pose_topic": "/hand_pose",
+                            "twist_topic": "/hand_twist",
+                            "odom_out": "/hand_odom",
+                        }
+                    ],
+                    output="screen",
+                    arguments=["--ros-args", "--log-level", "warn"],
+                ),
+            ]
+        )
 
     # Segmentation ROS bridge (talks to inference server over HTTP)
-    segmentation_bridge = Node(
-        package="segmentation_bridge",
-        executable="segmentation_ros2_node",
-        name="segmentation_bridge",
-        parameters=[{
-            "inference_url": "http://127.0.0.1:5678",
-        }],
-        output="screen",
-    )
-
-    # Grasp Preshaping Service (C++ bridge to Rust .so)
-    preshaping_service = Node(
-        package="grasp_preshaping",
-        executable="preshaping_service_bridge_node",
-        name="preshaping_service",
-        output="screen",
-    )
-
-    # Grasp Proximity Controller
-    proximity_controller = Node(
-        package="grasp_preshaping",
-        executable="grasp_proximity_controller_node.py",
-        name="proximity_controller",
-        parameters=[LaunchConfiguration("config_file")],
-        output="screen",
+    nodes.append(
+        Node(
+            package="segmentation_bridge",
+            executable="segmentation_ros2_node",
+            name="segmentation_bridge",
+            parameters=[{"inference_url": inference_url}],
+            output="screen",
+        )
     )
 
     # Twist Propagation Target Selector
-    twist_propagation = Node(
-        package="twist_propagation",
-        executable="twist_propagation_node",
-        name="twist_propagation",
-        parameters=[LaunchConfiguration("config_file")],
-        output="screen",
+    nodes.append(
+        Node(
+            package="twist_propagation",
+            executable="twist_propagation_node",
+            name="twist_propagation",
+            parameters=[_node_params(config, "twist_propagation")],
+            output="screen",
+        )
     )
 
-    # Force Controller
-    force_controller = Node(
-        package="force_controller",
-        executable="force_controller_node",
-        name="force_controller",
-        parameters=[LaunchConfiguration("config_file")],
-        output="screen",
+    # Grasp Preshaping Service (C++ bridge to Rust .so)
+    nodes.append(
+        Node(
+            package="grasp_preshaping",
+            executable="preshaping_service_bridge_node",
+            name="preshaping_service",
+            output="screen",
+        )
     )
 
-    # RViz config - look in the rviz/ directory at workspace root
-    rviz_config = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..", "rviz", "prosthesis.rviz"
+    # Grasp Proximity Controller
+    nodes.append(
+        Node(
+            package="grasp_preshaping",
+            executable="grasp_proximity_controller_node.py",
+            name="proximity_controller",
+            parameters=[_node_params(config, "proximity_controller")],
+            output="screen",
+        )
     )
 
-    rviz = Node(
-        package="rviz2",
-        executable="rviz2",
-        name="rviz2",
-        arguments=["-d", rviz_config],
-        output="screen",
-    )
+    if _as_bool(context, "mia_hand"):
+        nodes.append(
+            Node(
+                package="force_controller",
+                executable="force_controller_node",
+                name="force_controller",
+                parameters=[_node_params(config, "force_controller")],
+                output="screen",
+            )
+        )
 
-    # Assemble launch
-    nodes = [
-        pipeline_manager,
-        mia_hand_driver,
-        command_bridge,
-        wrist_driver,
-        emg_bridge,
-        pointcloud_fusion,
-        pointcloud_relay,
-        odom_to_pose_relay,
-        segmentation_bridge,
-        twist_propagation,
-        preshaping_service,
-        proximity_controller,
-        force_controller,
-    ]
+    if _as_bool(context, "rviz"):
+        nodes.append(
+            Node(
+                package="rviz2",
+                executable="rviz2",
+                name="rviz2",
+                arguments=["-d", DEFAULT_RVIZ_CONFIG],
+                output="screen",
+            )
+        )
 
-    # Conditional nodes - always included, can be toggled
-    # (Launch system doesn't support true conditionals easily,
-    #  so we include them and let the nodes handle missing hardware)
+    return nodes
 
-    # RViz - included by default
-    nodes.append(rviz)
 
+def generate_launch_description():
     return LaunchDescription(
         [
-            rviz_arg,
-            config_arg,
-            camera_arg,
-            mia_hand_arg,
-            mia_serial_port_arg,
-            wrist_serial_port_arg,
-            target_frame_arg,
-            odom_topic_arg,
-            cam1_topic_arg,
-            cam2_topic_arg,
-            arm_frame_arg,
+            DeclareLaunchArgument(
+                "rviz", default_value="true", description="Launch RViz"
+            ),
+            DeclareLaunchArgument(
+                "config_file",
+                default_value=DEFAULT_CONFIG,
+                description="Path to prosthesis_config.yaml",
+            ),
+            DeclareLaunchArgument(
+                "camera",
+                default_value="true",
+                description="Launch host perception bridge nodes for Jetson camera topics",
+            ),
+            DeclareLaunchArgument(
+                "mia_hand",
+                default_value="true",
+                description="Launch Mia Hand driver and force controller",
+            ),
+            DeclareLaunchArgument(
+                "wrist", default_value="true", description="Launch wrist Dynamixel driver"
+            ),
+            DeclareLaunchArgument(
+                "emg", default_value="true", description="Launch EMG classifier bridge"
+            ),
+            DeclareLaunchArgument(
+                "haptic", default_value="true", description="Launch haptic bridge and controller"
+            ),
+            DeclareLaunchArgument(
+                "haptic_bt_addr1",
+                default_value=os.environ.get("HAPTIC_BT_ADDR1", "842E1409E14E"),
+                description="Bluetooth address for the Vibro8 haptic band",
+            ),
+            DeclareLaunchArgument(
+                "mia_serial_port",
+                default_value=os.environ.get("MIA_SERIAL_PORT", "/dev/ttyUSB0"),
+                description="Mia Hand serial port device",
+            ),
+            DeclareLaunchArgument(
+                "wrist_serial_port",
+                default_value=os.environ.get("WRIST_SERIAL_PORT", "/dev/ttyUSB0"),
+                description="Wrist Dynamixel serial port device",
+            ),
+            DeclareLaunchArgument(
+                "target_frame",
+                default_value="marker_map",
+                description="Target frame for fused pointcloud (OpenVINS map frame).",
+            ),
+            DeclareLaunchArgument(
+                "odom_topic",
+                default_value="/ov_msckf_arm/odomimu",
+                description="OpenVINS odometry topic for hand pose estimation.",
+            ),
+            DeclareLaunchArgument(
+                "cam1_topic",
+                default_value="/head/d435i_head/depth/color/points",
+                description="Pointcloud topic from head RealSense D435i.",
+            ),
+            DeclareLaunchArgument(
+                "cam2_topic",
+                default_value="/arm/d435i_arm/depth/color/points",
+                description="Pointcloud topic from arm RealSense D435i.",
+            ),
+            DeclareLaunchArgument(
+                "arm_frame",
+                default_value="arm_d435i_arm_depth_frame",
+                description="Arm camera depth frame for hand/arm bbox removal.",
+            ),
+            DeclareLaunchArgument(
+                "inference_url",
+                default_value="http://127.0.0.1:5678",
+                description="Segmentation inference server URL.",
+            ),
+            OpaqueFunction(function=_launch_setup),
         ]
-        + nodes
     )
