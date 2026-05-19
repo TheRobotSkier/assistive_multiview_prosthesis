@@ -174,7 +174,18 @@ def _launch_setup(context, *args, **kwargs):
                 "arm_frame": arm_frame,
             }
         )
-        nodes.extend(
+        camera_nodes = []
+        if _as_bool(context, "camera_tf_bridge"):
+            camera_nodes.append(
+                Node(
+                    package="camera",
+                    executable="openvins_realsense_tf_bridge_node",
+                    name="openvins_realsense_tf_bridge",
+                    parameters=[_node_params(config, "openvins_realsense_tf_bridge")],
+                    output="screen",
+                )
+            )
+        camera_nodes.extend(
             [
                 Node(
                     package="pointcloud_fusion",
@@ -206,6 +217,7 @@ def _launch_setup(context, *args, **kwargs):
                 ),
             ]
         )
+        nodes.extend(camera_nodes)
 
     # Segmentation ROS bridge (talks to inference server over HTTP)
     nodes.append(
@@ -235,6 +247,7 @@ def _launch_setup(context, *args, **kwargs):
             package="grasp_preshaping",
             executable="preshaping_service_bridge_node",
             name="preshaping_service",
+            parameters=[_node_params(config, "preshaping_service")],
             output="screen",
         )
     )
@@ -290,6 +303,11 @@ def generate_launch_description():
                 "camera",
                 default_value="true",
                 description="Launch host perception bridge nodes for Jetson camera topics",
+            ),
+            DeclareLaunchArgument(
+                "camera_tf_bridge",
+                default_value="true",
+                description="Bridge OpenVINS camera frames into the RealSense TF trees.",
             ),
             DeclareLaunchArgument(
                 "mia_hand",

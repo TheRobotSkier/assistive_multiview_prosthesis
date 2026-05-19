@@ -106,6 +106,29 @@ proximity_controller:
         wrist_accel_deg_s2: 180.0
         control_rate_hz: 10.0
 
+preshaping_service:
+    ros__parameters:
+        hand_pose_topic: "/hand_pose"
+        hand_twist_topic: "/hand_twist"
+        cloud_topic: "/segmentation/object_cloud"
+        thumb_cmd_topic: "/thumb_pos_ff_controller/commands"
+        index_cmd_topic: "/index_pos_ff_controller/commands"
+        mrl_cmd_topic: "/mrl_pos_ff_controller/commands"
+        wrist_pose_topic: "/grasp_preshaping/wrist_pose"
+        target_hand_pose_topic: "/grasp_preshaping/target_hand_pose"
+        target_closures_topic: "/grasp_preshaping/target_finger_closures"
+        grasp_type_topic: "/grasp_preshaping/grasp_type"
+        compute_service: "/grasp_preshaping/compute_grasp"
+        camera_lookup_target_frame: "marker_map"
+        camera_frames:
+            [
+                "head_d435i_head_depth_optical_frame",
+                "arm_d435i_arm_depth_optical_frame",
+            ]
+        min_closure_amount: 0.1
+        preshaping_closure_fraction: 0.3
+        publish_initial_commands: false
+
 pointcloud_fusion:
     ros__parameters:
         target_frame: "marker_map"
@@ -119,6 +142,28 @@ pointcloud_fusion:
         enable_downsampling: true
         enable_distance_filter: true
         enable_hand_removal: true
+
+openvins_realsense_tf_bridge:
+    ros__parameters:
+        camera_names: ["head", "arm"]
+        parent_frames: ["head_cam0", "arm_cam0"]
+        link_frames: ["head_d435i_head_link", "arm_d435i_arm_link"]
+        # These marker/OpenVINS frames represent camera body/link poses in marker_map.
+        # The bridge republishes them under the real RealSense link frame names.
+        anchor_frames:
+            [
+                "head_d435i_head_color_optical_frame_body_display",
+                "arm_d435i_arm_color_optical_frame_body_display",
+            ]
+        anchor_frame_modes: ["link", "link"]
+        fallback_optical_frames:
+            [
+                "head_d435i_head_depth_optical_frame",
+                "arm_d435i_arm_depth_optical_frame",
+            ]
+        publish_rate_hz: 15.0
+        tf_lookup_timeout_s: 0.05
+        fallback_to_optical_assumption: true
 
 twist_propagation:
     ros__parameters:
@@ -210,6 +255,28 @@ frames:
     hand: "hand_link"
     camera_front: "camera_front_depth"
     camera_wrist: "camera_wrist"
+    target: "marker_map"
+    head_openvins_camera: "head_cam0"
+    arm_openvins_camera: "arm_cam0"
+    head_realsense_link: "head_d435i_head_link"
+    arm_realsense_link: "arm_d435i_arm_link"
+    head_depth_optical: "head_d435i_head_depth_optical_frame"
+    arm_depth_optical: "arm_d435i_arm_depth_optical_frame"
+
+# ── Camera TF Bridge ─────────────────────────────────────────────────────────
+camera_tf_bridge:
+    parent_frames: ["head_cam0", "arm_cam0"]
+    link_frames: ["head_d435i_head_link", "arm_d435i_arm_link"]
+    anchor_frames:
+        [
+            "head_d435i_head_color_optical_frame_body_display",
+            "arm_d435i_arm_color_optical_frame_body_display",
+        ]
+    fallback_optical_frames:
+        [
+            "head_d435i_head_depth_optical_frame",
+            "arm_d435i_arm_depth_optical_frame",
+        ]
 
 # ── EMG ───────────────────────────────────────────────────────────────────────
 emg:
@@ -230,8 +297,14 @@ segmentation:
 # ── Grasp Preshaping ─────────────────────────────────────────────────────────
 preshaping:
     min_closure_amount: 0.1
-    preshaping_closure_fraction: 1.0
-    camera_frames: ["camera_front_depth", "camera_wrist"]
+    preshaping_closure_fraction: 0.3
+    publish_initial_commands: false
+    camera_lookup_target_frame: "marker_map"
+    camera_frames:
+        [
+            "head_d435i_head_depth_optical_frame",
+            "arm_d435i_arm_depth_optical_frame",
+        ]
 
 # ── Proximity Execution ──────────────────────────────────────────────────────
 execution:
