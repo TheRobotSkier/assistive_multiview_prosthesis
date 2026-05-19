@@ -274,23 +274,6 @@ ros2 run emg_bridge run_classifier
 Connect to the MindRove WiFi network first. The classifier publishes to `/emg/gesture_label`, `/emg/gesture_name`, `/emg/confidence`, and `/emg/proportional`.
 
 
-## Stuff
-
-1. Plug in the Ethernet cable between your PC and the Jetson
-
-2. Run the PowerShell script from an elevated PowerShell on Windows:
-   powershell -ExecutionPolicy Bypass -File <path-to-script>\setup_jetson_ethernet.ps1
-   This sets 10.42.0.1/24 on the Ethernet adapter.
-
-3. Restart WSL from PowerShell:
-   wsl --shutdown
-   Then reopen your WSL terminal. The .wslconfig with networkingMode=mirrored is already in place.
-
-4. Verify from WSL:
-   make robotlab-connect    # Should show [OK] for all checks
-   ssh-copy-id robotlab@10.42.0.2   # One-time key copy
-   ssh robotlab             # Should log in without password
-   make ros2-ethernet-shell # Test ROS2 connectivity
 ## Random Scratch Pad - Daniel
 
 All code changes are done and the Rust .so has been rebuilt. The Docker image rebuild takes longer than my tool timeout, so you'll need to run this yourself in your terminal:
@@ -313,3 +296,21 @@ python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py --method 
 ros2 launch prosthesis_launch mock.launch.py
 
 Maybe write something about udev symlinks at some point in here
+
+### New stuff
+
+1. Plug in the Ethernet cable between your PC and the Jetson
+
+2. Run the PowerShell script from an elevated PowerShell on Windows:
+   powershell -ExecutionPolicy Bypass -File <path-to-script>\setup_jetson_ethernet.ps1
+   This sets 10.42.0.1/24 on the Ethernet adapter.
+
+3. Restart WSL from PowerShell:
+   wsl --shutdown
+   Then reopen your WSL terminal. The .wslconfig with networkingMode=mirrored is already in place.
+
+4. Verify from WSL:
+   make robotlab-connect    # Should show [OK] for all checks
+   ssh-copy-id robotlab@10.42.0.2   # One-time key copy
+   ssh robotlab             # Should log in without password
+   make ros2-ethernet-shell # Test ROS2 connectivity

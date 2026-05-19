@@ -31,9 +31,11 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 from geometry_msgs.msg import PoseStamped, PointStamped, TwistStamped, Vector3
+from nav_msgs.msg import Path
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
+from visualization_msgs.msg import Marker, MarkerArray
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -120,6 +122,10 @@ class TestHarness(Node):
         self._twist_msgs: list[TwistStamped] = []
         self._click_msgs: list[PointStamped] = []
         self._status_msgs: list[String] = []
+        self._path_msgs: list[Path] = []
+        self._sphere_marker_msgs: list[MarkerArray] = []
+        self._hit_marker_msgs: list[Marker] = []
+        self._trajectory_marker_msgs: list[Marker] = []
 
         self.create_subscription(
             TwistStamped, "/hand_twist",
@@ -130,6 +136,20 @@ class TestHarness(Node):
         self.create_subscription(
             String, "/twist_propagation/status",
             lambda m: self._status_msgs.append(m), 10)
+
+        # Visualization topic subscribers
+        self.create_subscription(
+            Path, "/twist_propagation/predicted_path",
+            lambda m: self._path_msgs.append(m), 10)
+        self.create_subscription(
+            MarkerArray, "/twist_propagation/collision_spheres",
+            lambda m: self._sphere_marker_msgs.append(m), 10)
+        self.create_subscription(
+            Marker, "/twist_propagation/hit_marker",
+            lambda m: self._hit_marker_msgs.append(m), 10)
+        self.create_subscription(
+            Marker, "/twist_propagation/trajectory_line",
+            lambda m: self._trajectory_marker_msgs.append(m), 10)
 
         # ── Service clients ────────────────────────────────────────────────
         self._activate_cli = self.create_client(Trigger, "/twist_propagation/activate")
@@ -161,6 +181,10 @@ class TestHarness(Node):
         self._twist_msgs.clear()
         self._click_msgs.clear()
         self._status_msgs.clear()
+        self._path_msgs.clear()
+        self._sphere_marker_msgs.clear()
+        self._hit_marker_msgs.clear()
+        self._trajectory_marker_msgs.clear()
         self._preshaping_called.clear()
         self._preshaping_call_count = 0
 
@@ -230,6 +254,26 @@ class TestHarness(Node):
     @property
     def preshaping_count(self) -> int:
         return self._preshaping_call_count
+
+    @property
+    def path_count(self) -> int:
+        return len(self._path_msgs)
+
+    @property
+    def sphere_marker_count(self) -> int:
+        return len(self._sphere_marker_msgs)
+
+    @property
+    def trajectory_marker_count(self) -> int:
+        return len(self._trajectory_marker_msgs)
+
+    @property
+    def hit_marker_count(self) -> int:
+        return len(self._hit_marker_msgs)
+
+    @property
+    def latest_path(self) -> Path | None:
+        return self._path_msgs[-1] if self._path_msgs else None
 
 
 # ---------------------------------------------------------------------------
@@ -356,6 +400,68 @@ def test_deactivation(harness: TestHarness):
               f"got {harness.click_count} clicks")
 
 
+def test_visualization_published(harness: TestHarness):
+    """Verify that visualization topics are published during propagation."""
+    harness.clear()
+    harness.activate()
+    harness.publish_cloud_with_target(target_x=0.6, target_y=0.0, target_z=0.5)
+    rclpy.spin_once(harness, timeout_sec=0.5)
+    harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
+                                 vx=0.2, n=10, dt=0.05)
+
+    # Wait for the cycle to run
+    for _ in range(15):
+        rclpy.spin_once(harness, timeout_sec=0.3)
+
+    # Predicted path should be published
+    if harness.path_count > 0:
+        _ok(f"predicted_path published (count={harness.path_count})")
+        path = harness.latest_path
+        if path is not None and len(path.poses) > 0:
+            _ok(f"predicted_path has {len(path.poses)} poses")
+        else:
+            _fail("predicted_path has poses", "path is empty")
+    else:
+        _fail("predicted_path published", "no messages received")
+
+    # Collision spheres should be published
+    if harness.sphere_marker_count > 0:
+        _ok(f"collision_spheres published (count={harness.sphere_marker_count})")
+    else:
+        _fail("collision_spheres published", "no messages received")
+
+    # Trajectory line should be published
+    if harness.trajectory_marker_count > 0:
+        _ok(f"trajectory_line published (count={harness.trajectory_marker_count})")
+    else:
+        _fail("trajectory_line published", "no messages received")
+
+    harness.deactivate()
+    rclpy.spin_once(harness, timeout_sec=0.5)
+
+
+def test_hit_marker_on_collision(harness: TestHarness):
+    """Verify that hit_marker is published when a collision is detected."""
+    harness.clear()
+    harness.activate()
+    harness.publish_cloud_with_target(target_x=0.6, target_y=0.0, target_z=0.5)
+    harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
+                                 vx=0.3, n=12, dt=0.05)
+
+    for _ in range(25):
+        rclpy.spin_once(harness, timeout_sec=0.3)
+        if harness.hit_marker_count > 0 and harness.click_count > 0:
+            break
+
+    if harness.hit_marker_count > 0:
+        _ok(f"hit_marker published on collision (count={harness.hit_marker_count})")
+    else:
+        _fail("hit_marker published on collision", "no messages received")
+
+    harness.deactivate()
+    rclpy.spin_once(harness, timeout_sec=0.5)
+
+
 def test_no_hit_without_cloud(harness: TestHarness):
     """With no cloud (stale cloud should be too old), no click should be published."""
     harness.clear()
@@ -421,6 +527,8 @@ def main():
         test_twist_published(harness)
         test_hit_detected(harness)
         test_preshaping_called_after_seg_cloud(harness)
+        test_visualization_published(harness)
+        test_hit_marker_on_collision(harness)
         test_deactivation(harness)
         test_no_hit_without_cloud(harness)
     except Exception as exc:

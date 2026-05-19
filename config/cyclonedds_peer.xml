@@ -1,7 +1,11 @@
 <CycloneDDS>
   <Domain Id="0">
     <General>
-      <NetworkInterfaceAddress>10.42.0.1</NetworkInterfaceAddress>
+      <Interfaces>
+        <NetworkInterface address="10.42.0.1" />
+      </Interfaces>
+      <AllowMulticast>false</AllowMulticast>
+      <MulticastRecvNetworkInterfaceAddresses>none</MulticastRecvNetworkInterfaceAddresses>
     </General>
     <Discovery>
       <Peers>

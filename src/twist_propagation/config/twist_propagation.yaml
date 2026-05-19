@@ -1,0 +1,54 @@
+# Twist Propagation Node Configuration
+#
+# All parameters with defaults.  Override via launch arguments, CLI,
+# or a separate overlay YAML.
+
+twist_propagation:
+  ros__parameters:
+    # ── Core propagation ───────────────────────────────────────────────────
+    cycle_delay_s: 0.1
+    propagation_time_horizon_s: 2.0
+    propagation_dt_s: 0.02
+
+    # ── Collision geometry ─────────────────────────────────────────────────
+    # The effective collision threshold is hit_threshold_m + collision_geometry_radius_m.
+    # Increase collision_geometry_radius_m to detect collisions earlier.
+    hit_threshold_m: 0.05
+    min_points_near_hit: 3
+    collision_geometry_radius_m: 0.10
+
+    # ── Twist estimation ───────────────────────────────────────────────────
+    twist_estimation_window: 5
+
+    # ── Activation ─────────────────────────────────────────────────────────
+    active: false
+
+    # ── Topic names ────────────────────────────────────────────────────────
+    input_cloud_topic: "/camera/depth/color/points"
+    segmented_cloud_topic: "/segmentation/object_cloud"
+    hand_pose_topic: "/hand_pose"
+    odom_topic: ""  # optional: nav_msgs/Odometry for covariance
+    click_positive_topic: "/segmentation/click_positive"
+    hand_twist_topic: "/hand_twist"
+
+    # ── Service names ──────────────────────────────────────────────────────
+    compute_grasp_service: "/grasp_preshaping/compute_grasp"
+    activate_service: "/twist_propagation/activate"
+    deactivate_service: "/twist_propagation/deactivate"
+
+    # ── Timeouts / staleness ───────────────────────────────────────────────
+    segmentation_timeout_s: 5.0
+    cloud_max_age_s: 2.0
+    pose_max_age_s: 1.0
+
+    # ── Voxel downsampling ─────────────────────────────────────────────────
+    # Set to 0 to disable.  Smaller values = denser cloud = slower KDTree.
+    voxel_leaf_m: 0.02
+
+    # ── Covariance / uncertainty ───────────────────────────────────────────
+    # If enabled, prediction horizon is truncated when uncertainty exceeds
+    # max_prediction_covariance_trace.
+    max_prediction_covariance_trace: 100.0
+    process_noise_linear_mps2_per_s: 0.1
+    process_noise_angular_radps2_per_s: 0.5
+    enable_covariance_propagation: true

@@ -6,6 +6,7 @@ log/
 .github/
 agent.md
 .agents/
+rapport/
 # ignore rust files
 target/
 Cargo.lock

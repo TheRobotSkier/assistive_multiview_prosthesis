@@ -7,9 +7,9 @@ intersects a cluster of points within a configurable threshold, triggers
 segmentation and then grasp preshaping.
 
 Internal state machine:
-  IDLE                     – active, running propagation each cycle
-  WAITING_FOR_SEGMENTATION – click published, waiting for segmented cloud
-  WAITING_FOR_PRESHAPING   – segmented cloud received, preshaping called
+  IDLE                     -- active, running propagation each cycle
+  WAITING_FOR_SEGMENTATION -- click published, waiting for segmented cloud
+  WAITING_FOR_PRESHAPING   -- segmented cloud received, preshaping called
 
 Topics
 ------
@@ -20,7 +20,7 @@ Subscribe:
   /camera/depth/color/points  sensor_msgs/PointCloud2
       Raw scene point cloud for propagation intersection checks.
   /segmentation/object_cloud  sensor_msgs/PointCloud2
-      Segmented cloud output — watched to know when segmentation completes.
+      Segmented cloud output -- watched to know when segmentation completes.
 
 Publish:
   /hand_twist               geometry_msgs/TwistStamped
@@ -29,6 +29,16 @@ Publish:
       Hit point sent to the segmentation node to trigger inference.
   /twist_propagation/status    std_msgs/String
       JSON status string for monitoring / debugging.
+  /twist_propagation/predicted_path  nav_msgs/Path
+      Predicted future trajectory as a path for RViz visualization.
+  /twist_propagation/current_pose   geometry_msgs/PoseStamped
+      Current hand pose in the cloud frame.
+  /twist_propagation/collision_spheres  visualization_msgs/MarkerArray
+      Semi-transparent spheres along the predicted path showing collision geometry.
+  /twist_propagation/hit_marker  visualization_msgs/Marker
+      Persistent green sphere at the predicted collision point.
+  /twist_propagation/trajectory_line  visualization_msgs/Marker
+      Line strip connecting predicted positions, color-coded by collision state.
 
 Services:
   /twist_propagation/activate    std_srvs/Trigger
@@ -51,7 +61,7 @@ import numpy as np
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, DurabilityPolicy
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy, HistoryPolicy
 
 from geometry_msgs.msg import (
     PoseStamped,
@@ -59,9 +69,11 @@ from geometry_msgs.msg import (
     TwistStamped,
     Vector3,
 )
+from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import PointCloud2, PointField
-from std_msgs.msg import String
+from std_msgs.msg import String, ColorRGBA
 from std_srvs.srv import Trigger
+from visualization_msgs.msg import Marker, MarkerArray
 
 from scipy.spatial import KDTree
 
@@ -74,7 +86,7 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers -- pure functions, testable without rclpy
 # ---------------------------------------------------------------------------
 
 def _parse_xyz(cloud_msg: PointCloud2) -> np.ndarray | None:
@@ -98,6 +110,21 @@ def _parse_xyz(cloud_msg: PointCloud2) -> np.ndarray | None:
     # Filter NaN / Inf
     mask = np.isfinite(xyz).all(axis=1)
     return xyz[mask]
+
+
+def _voxel_downsample(xyz: np.ndarray, leaf_m: float) -> np.ndarray:
+    """Downsample an (N, 3) point array by keeping one point per voxel cube.
+
+    Each voxel is a cube of side ``leaf_m`` metres.  Points falling in the
+    same voxel are collapsed to the first point encountered (deterministic
+    because ``np.unique`` with ``return_index=True`` is used).
+    """
+    if leaf_m <= 0.0 or len(xyz) == 0:
+        return xyz
+    inv_leaf = 1.0 / leaf_m
+    voxel_indices = np.floor(xyz * inv_leaf).astype(np.int64)
+    _, unique_idx = np.unique(voxel_indices, axis=0, return_index=True)
+    return xyz[unique_idx]
 
 
 def _quat_multiply(q0: tuple, q1: tuple) -> tuple:
@@ -179,6 +206,119 @@ def _propagate_pose(
     return (npx, npy, npz, nqx, nqy, nqz, nqw)
 
 
+# -- Covariance helpers (ported from future_pose_prediction_collision_node) --
+
+def _build_initial_covariance_from_pose_buf(
+    pose_buf: deque,
+    process_noise_linear_mps2_per_s: float,
+    process_noise_angular_radps2_per_s: float,
+) -> np.ndarray:
+    """Build a 12x12 initial state covariance from a pose buffer.
+
+    The state vector is [px, py, pz, qx, qy, qz, vx, vy, vz, wx, wy, wz]
+    (position + orientation euler + linear vel + angular vel).
+
+    Position covariance is estimated from the scatter of the pose buffer.
+    Velocity covariance uses the process noise as a floor.
+    Orientation covariance is set to a conservative default since we don't
+    track full orientation uncertainty from PoseStamped alone.
+    """
+    P = np.zeros((12, 12), dtype=np.float64)
+
+    if len(pose_buf) >= 3:
+        positions = np.array([(b[1], b[2], b[3]) for b in pose_buf])
+        pos_cov = np.cov(positions.T) if len(positions) > 1 else np.eye(3) * 0.01
+        P[0:3, 0:3] = pos_cov
+    else:
+        P[0:3, 0:3] = np.eye(3) * 0.01
+
+    # Conservative orientation uncertainty
+    P[3:6, 3:6] = np.eye(3) * 0.01
+
+    # Velocity covariance: use process noise as floor
+    sigma_v_sq = process_noise_linear_mps2_per_s
+    sigma_w_sq = process_noise_angular_radps2_per_s
+    P[6:9, 6:9] = np.eye(3) * sigma_v_sq
+    P[9:12, 9:12] = np.eye(3) * sigma_w_sq
+
+    return P
+
+
+def _build_initial_covariance_from_odom(
+    odom_msg: Odometry,
+    process_noise_linear_mps2_per_s: float,
+    process_noise_angular_radps2_per_s: float,
+) -> np.ndarray:
+    """Build a 12x12 initial state covariance from an Odometry message.
+
+    Uses the actual pose and twist covariance from the odometry, with the
+    process noise as a floor for the twist covariance.
+    """
+    pose_cov = np.array(odom_msg.pose.covariance, dtype=np.float64).reshape(6, 6)
+    twist_cov_raw = np.array(odom_msg.twist.covariance, dtype=np.float64).reshape(6, 6)
+
+    sigma_v_sq = process_noise_linear_mps2_per_s
+    sigma_w_sq = process_noise_angular_radps2_per_s
+    noise_floor = np.diag([sigma_v_sq, sigma_v_sq, sigma_v_sq,
+                           sigma_w_sq, sigma_w_sq, sigma_w_sq])
+    twist_cov = np.maximum(twist_cov_raw, noise_floor)
+
+    P = np.zeros((12, 12), dtype=np.float64)
+    P[0:3, 0:3] = pose_cov[0:3, 0:3]
+    P[3:6, 3:6] = pose_cov[3:6, 3:6]
+    P[6:9, 6:9] = twist_cov[0:3, 0:3]
+    P[9:12, 9:12] = twist_cov[3:6, 3:6]
+    return P
+
+
+def _propagate_covariance(
+    P: np.ndarray,
+    dt: float,
+    sigma_v_sq: float,
+    sigma_w_sq: float,
+) -> np.ndarray:
+    """Propagate a 12x12 state covariance forward by dt.
+
+    State: [px, py, pz, qx, qy, qz, vx, vy, vz, wx, wy, wz]
+    Uses a linearised constant-velocity model.
+    """
+    F = np.eye(12, dtype=np.float64)
+    F[0, 6] = dt
+    F[1, 7] = dt
+    F[2, 8] = dt
+    F[3, 9] = dt
+    F[4, 10] = dt
+    F[5, 11] = dt
+
+    Q = np.zeros((12, 12), dtype=np.float64)
+    Q[6, 6] = dt * sigma_v_sq
+    Q[7, 7] = dt * sigma_v_sq
+    Q[8, 8] = dt * sigma_v_sq
+    Q[9, 9] = dt * sigma_w_sq
+    Q[10, 10] = dt * sigma_w_sq
+    Q[11, 11] = dt * sigma_w_sq
+
+    return F @ P @ F.T + Q
+
+
+def _is_odom_initialized(odom_msg: Odometry) -> bool:
+    """Check whether an Odometry message has valid, initialized data."""
+    p = odom_msg.pose.pose.position
+    o = odom_msg.pose.pose.orientation
+    t = odom_msg.twist.twist
+    for v in [p.x, p.y, p.z,
+              o.x, o.y, o.z, o.w,
+              t.linear.x, t.linear.y, t.linear.z,
+              t.angular.x, t.angular.y, t.angular.z]:
+        if not math.isfinite(v):
+            return False
+    cov = odom_msg.pose.covariance
+    pose_cov_trace = sum(cov[i * 6 + i] for i in range(6))
+    if pose_cov_trace <= 0.0:
+        return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Internal state enum
 # ---------------------------------------------------------------------------
@@ -199,32 +339,68 @@ class TwistPropagationNode(Node):
         super().__init__("twist_propagation")
 
         # ── Parameters ─────────────────────────────────────────────────────
+        # Core propagation
         self.declare_parameter("cycle_delay_s", 0.1)
         self.declare_parameter("propagation_time_horizon_s", 2.0)
         self.declare_parameter("propagation_dt_s", 0.02)
+
+        # Collision geometry
         self.declare_parameter("hit_threshold_m", 0.05)
         self.declare_parameter("min_points_near_hit", 3)
+        self.declare_parameter("collision_geometry_radius_m", 0.10)
+
+        # Twist estimation
         self.declare_parameter("twist_estimation_window", 5)
+
+        # Activation
         self.declare_parameter("active", False)
+
+        # Topic names
         self.declare_parameter("input_cloud_topic", "/camera/depth/color/points")
         self.declare_parameter("segmented_cloud_topic", "/segmentation/object_cloud")
         self.declare_parameter("hand_pose_topic", "/hand_pose")
+        self.declare_parameter("odom_topic", "")  # optional: nav_msgs/Odometry
         self.declare_parameter("click_positive_topic", "/segmentation/click_positive")
         self.declare_parameter("hand_twist_topic", "/hand_twist")
+
+        # Service names
         self.declare_parameter("compute_grasp_service", "/grasp_preshaping/compute_grasp")
         self.declare_parameter("activate_service", "/twist_propagation/activate")
         self.declare_parameter("deactivate_service", "/twist_propagation/deactivate")
+
+        # Timeouts / staleness
         self.declare_parameter("segmentation_timeout_s", 5.0)
         self.declare_parameter("cloud_max_age_s", 2.0)
+        self.declare_parameter("pose_max_age_s", 1.0)
 
+        # Voxel downsampling
+        self.declare_parameter("voxel_leaf_m", 0.02)
+
+        # Covariance / uncertainty
+        self.declare_parameter("max_prediction_covariance_trace", 100.0)
+        self.declare_parameter("process_noise_linear_mps2_per_s", 0.1)
+        self.declare_parameter("process_noise_angular_radps2_per_s", 0.5)
+        self.declare_parameter("enable_covariance_propagation", True)
+
+        # ── Read parameters ────────────────────────────────────────────────
         self._cycle_delay = self.get_parameter("cycle_delay_s").value
         self._horizon = self.get_parameter("propagation_time_horizon_s").value
         self._dt = self.get_parameter("propagation_dt_s").value
         self._hit_thresh = self.get_parameter("hit_threshold_m").value
         self._min_points = self.get_parameter("min_points_near_hit").value
+        self._collision_radius = self.get_parameter("collision_geometry_radius_m").value
         self._twist_window = self.get_parameter("twist_estimation_window").value
         self._seg_timeout = self.get_parameter("segmentation_timeout_s").value
         self._cloud_max_age = self.get_parameter("cloud_max_age_s").value
+        self._pose_max_age = self.get_parameter("pose_max_age_s").value
+        self._voxel_leaf = self.get_parameter("voxel_leaf_m").value
+        self._max_cov_trace = self.get_parameter("max_prediction_covariance_trace").value
+        self._sigma_v_sq = self.get_parameter("process_noise_linear_mps2_per_s").value
+        self._sigma_w_sq = self.get_parameter("process_noise_angular_radps2_per_s").value
+        self._enable_cov = self.get_parameter("enable_covariance_propagation").value
+
+        # Effective collision threshold: hit_threshold + collision_radius
+        self._effective_hit_thresh = self._hit_thresh + self._collision_radius
 
         # ── State ──────────────────────────────────────────────────────────
         self._active: bool = self.get_parameter("active").value
@@ -232,7 +408,7 @@ class TwistPropagationNode(Node):
         self._lock = threading.Lock()
 
         # Pose buffer: deque of (timestamp_s, px, py, pz, qx, qy, qz, qw, frame_id)
-        self._pose_buf: deque[tuple] = deque(maxlen=max(self._twist_window + 1, 2))
+        self._pose_buf: deque[tuple] = deque(maxlen=max(self._twist_window + 2, 2))
 
         # Latest estimated twist (linear vx,vy,vz; angular wx,wy,wz)
         self._twist: tuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
@@ -243,10 +419,18 @@ class TwistPropagationNode(Node):
         self._cloud_frame: str = ""
         self._cloud_kdtree: KDTree | None = None
 
+        # Odometry (optional, for covariance)
+        self._latest_odom: Odometry | None = None
+
         # Segmented cloud tracking
         self._seg_cloud_stamp: float = 0.0
         self._seg_cloud_stamp_at_trigger: float = 0.0
         self._seg_trigger_time: float = 0.0
+
+        # Marker ID counters for RViz visualization
+        self._sphere_marker_ns = "collision_spheres"
+        self._hit_marker_ns = "hit_marker"
+        self._trajectory_line_ns = "trajectory_line"
 
         # ── TF2 ────────────────────────────────────────────────────────────
         self._tf_buffer = None
@@ -259,10 +443,22 @@ class TwistPropagationNode(Node):
         hand_pose_topic = self.get_parameter("hand_pose_topic").value
         input_cloud_topic = self.get_parameter("input_cloud_topic").value
         seg_cloud_topic = self.get_parameter("segmented_cloud_topic").value
+        odom_topic = self.get_parameter("odom_topic").value
 
         self.create_subscription(PoseStamped, hand_pose_topic, self._on_hand_pose, 10)
-        self.create_subscription(PointCloud2, input_cloud_topic, self._on_input_cloud, 10)
-        self.create_subscription(PointCloud2, seg_cloud_topic, self._on_segmented_cloud, 10)
+
+        # BEST_EFFORT — camera / Jetson publishers typically use BEST_EFFORT QoS
+        best_effort = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=5,
+        )
+        self.create_subscription(PointCloud2, input_cloud_topic, self._on_input_cloud, best_effort)
+        self.create_subscription(PointCloud2, seg_cloud_topic, self._on_segmented_cloud, best_effort)
+
+        # Optional odometry subscription for covariance data
+        if odom_topic:
+            self.create_subscription(Odometry, odom_topic, self._on_odom, 10)
 
         # ── Publishers ─────────────────────────────────────────────────────
         twist_topic = self.get_parameter("hand_twist_topic").value
@@ -274,6 +470,18 @@ class TwistPropagationNode(Node):
             PointStamped, click_topic, 10)
         self._status_pub = self.create_publisher(
             String, "/twist_propagation/status", 10)
+
+        # Visualization publishers
+        self._path_pub = self.create_publisher(
+            Path, "/twist_propagation/predicted_path", 10)
+        self._current_pose_pub = self.create_publisher(
+            PoseStamped, "/twist_propagation/current_pose", 10)
+        self._sphere_markers_pub = self.create_publisher(
+            MarkerArray, "/twist_propagation/collision_spheres", 10)
+        self._hit_marker_pub = self.create_publisher(
+            Marker, "/twist_propagation/hit_marker", 10)
+        self._trajectory_line_pub = self.create_publisher(
+            Marker, "/twist_propagation/trajectory_line", 10)
 
         # ── Service servers ────────────────────────────────────────────────
         self.create_service(
@@ -297,9 +505,11 @@ class TwistPropagationNode(Node):
         self.create_timer(self._cycle_delay, self._cycle_callback)
 
         self.get_logger().info(
-            f"Twist propagation node started — active={self._active}, "
+            f"Twist propagation node started -- active={self._active}, "
             f"horizon={self._horizon}s, dt={self._dt}s, "
-            f"hit_thresh={self._hit_thresh}m"
+            f"hit_thresh={self._hit_thresh}m, "
+            f"collision_radius={self._collision_radius}m, "
+            f"effective_thresh={self._effective_hit_thresh}m"
         )
 
     # ── Service callbacks ──────────────────────────────────────────────────
@@ -322,6 +532,8 @@ class TwistPropagationNode(Node):
             self._pose_buf.clear()
             self._twist = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
             self._seg_trigger_time = 0.0
+        # Clear visualization markers
+        self._clear_all_markers()
         self.get_logger().info("Deactivated")
         resp.success = True
         resp.message = "twist_propagation deactivated"
@@ -341,10 +553,20 @@ class TwistPropagationNode(Node):
                 frame_id,
             ))
 
+    def _on_odom(self, msg: Odometry):
+        """Store the latest odometry for covariance initialization."""
+        with self._lock:
+            self._latest_odom = msg
+
     def _on_input_cloud(self, msg: PointCloud2):
         xyz = _parse_xyz(msg)
         if xyz is None or len(xyz) == 0:
             return
+
+        # Voxel downsample before storing
+        if self._voxel_leaf > 0.0:
+            xyz = _voxel_downsample(xyz, self._voxel_leaf)
+
         stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         with self._lock:
             self._cloud_xyz = xyz
@@ -454,10 +676,13 @@ class TwistPropagationNode(Node):
 
     # ── Propagation ────────────────────────────────────────────────────────
 
-    def _propagate_and_find_hit(self, pose: tuple, twist: tuple) -> tuple | None:
+    def _propagate_and_find_hit(
+        self, pose: tuple, twist: tuple
+    ) -> tuple | None:
         """Propagate the pose forward and check for cloud intersection.
 
         Returns (hit_x, hit_y, hit_z) in the cloud frame, or None.
+        Also populates self._last_predicted_positions for visualization.
         """
         tree = self._get_kdtree()
         if tree is None:
@@ -466,6 +691,21 @@ class TwistPropagationNode(Node):
         px, py, pz = pose[0], pose[1], pose[2]
         qx, qy, qz, qw = pose[3], pose[4], pose[5], pose[6]
         vx, vy, vz, wx, wy, wz = twist
+
+        # Build initial covariance if enabled
+        P = None
+        if self._enable_cov:
+            with self._lock:
+                odom = self._latest_odom
+            if odom is not None and _is_odom_initialized(odom):
+                P = _build_initial_covariance_from_odom(
+                    odom, self._sigma_v_sq, self._sigma_w_sq)
+            else:
+                P = _build_initial_covariance_from_pose_buf(
+                    self._pose_buf, self._sigma_v_sq, self._sigma_w_sq)
+
+        # Collect predicted positions for visualization
+        positions: list[tuple[float, float, float]] = []
 
         t = 0.0
         while t < self._horizon:
@@ -478,11 +718,26 @@ class TwistPropagationNode(Node):
             px, py, pz = result[0], result[1], result[2]
             qx, qy, qz, qw = result[3], result[4], result[5], result[6]
 
-            # Check distance to nearest cloud points
+            # Propagate covariance if enabled
+            if P is not None:
+                P = _propagate_covariance(P, self._dt, self._sigma_v_sq, self._sigma_w_sq)
+                cov_trace = float(np.trace(P))
+                if cov_trace > self._max_cov_trace:
+                    self.get_logger().debug(
+                        f"Covariance trace {cov_trace:.2f} exceeds max "
+                        f"{self._max_cov_trace} at t={t:.3f}s, truncating horizon"
+                    )
+                    break
+
+            positions.append((px, py, pz))
+
+            # Check distance to nearest cloud points (with collision radius)
             dists, _ = tree.query([px, py, pz], k=max(self._min_points, 1))
-            if np.max(dists[:self._min_points]) <= self._hit_thresh:
+            if np.max(dists[:self._min_points]) <= self._effective_hit_thresh:
+                self._last_predicted_positions = positions
                 return (px, py, pz)
 
+        self._last_predicted_positions = positions
         return None
 
     # ── TF transform helper ────────────────────────────────────────────────
@@ -521,6 +776,163 @@ class TwistPropagationNode(Node):
             )
             return (px, py, pz)
 
+    # ── Visualization helpers ──────────────────────────────────────────────
+
+    def _publish_predicted_path(self, positions: list[tuple[float, float, float]]):
+        """Publish predicted positions as a nav_msgs/Path for RViz."""
+        if not positions:
+            return
+        now = self.get_clock().now().to_msg()
+        path = Path()
+        path.header.stamp = now
+        path.header.frame_id = self._cloud_frame
+        for (px, py, pz) in positions:
+            ps = PoseStamped()
+            ps.header.stamp = now
+            ps.header.frame_id = self._cloud_frame
+            ps.pose.position.x = px
+            ps.pose.position.y = py
+            ps.pose.position.z = pz
+            ps.pose.orientation.w = 1.0
+            path.poses.append(ps)
+        self._path_pub.publish(path)
+
+    def _publish_current_pose(self, px: float, py: float, pz: float,
+                              qx: float, qy: float, qz: float, qw: float):
+        """Publish the current hand pose in the cloud frame."""
+        msg = PoseStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = self._cloud_frame
+        msg.pose.position.x = px
+        msg.pose.position.y = py
+        msg.pose.position.z = pz
+        msg.pose.orientation.x = qx
+        msg.pose.orientation.y = qy
+        msg.pose.orientation.z = qz
+        msg.pose.orientation.w = qw
+        self._current_pose_pub.publish(msg)
+
+    def _publish_collision_spheres(self, positions: list[tuple[float, float, float]]):
+        """Publish semi-transparent red spheres along the predicted path."""
+        now = self.get_clock().now().to_msg()
+        markers = MarkerArray()
+
+        # Delete previous markers
+        delete_marker = Marker()
+        delete_marker.header.stamp = now
+        delete_marker.header.frame_id = self._cloud_frame
+        delete_marker.ns = self._sphere_marker_ns
+        delete_marker.action = Marker.DELETEALL
+        markers.markers.append(delete_marker)
+
+        # Publish new spheres (subsample for performance: max 50 spheres)
+        step = max(1, len(positions) // 50)
+        for i in range(0, len(positions), step):
+            px, py, pz = positions[i]
+            m = Marker()
+            m.header.stamp = now
+            m.header.frame_id = self._cloud_frame
+            m.ns = self._sphere_marker_ns
+            m.id = i // step
+            m.type = Marker.SPHERE
+            m.action = Marker.ADD
+            m.pose.position.x = px
+            m.pose.position.y = py
+            m.pose.position.z = pz
+            m.pose.orientation.w = 1.0
+            m.scale.x = m.scale.y = m.scale.z = self._collision_radius * 2.0
+            m.color = ColorRGBA(r=1.0, g=0.3, b=0.3, a=0.2)
+            m.lifetime.sec = 0
+            m.lifetime.nanosec = int(self._cycle_delay * 1e9)
+            markers.markers.append(m)
+
+        self._sphere_markers_pub.publish(markers)
+
+    def _publish_hit_marker(self, hit_x: float, hit_y: float, hit_z: float):
+        """Publish a persistent green sphere at the collision point."""
+        m = Marker()
+        m.header.stamp = self.get_clock().now().to_msg()
+        m.header.frame_id = self._cloud_frame
+        m.ns = self._hit_marker_ns
+        m.id = 0
+        m.type = Marker.SPHERE
+        m.action = Marker.ADD
+        m.pose.position.x = hit_x
+        m.pose.position.y = hit_y
+        m.pose.position.z = hit_z
+        m.pose.orientation.w = 1.0
+        m.scale.x = m.scale.y = m.scale.z = 0.06  # 6cm sphere
+        m.color = ColorRGBA(r=0.0, g=1.0, b=0.2, a=0.9)
+        m.lifetime.sec = 2  # persist for 2 seconds
+        self._hit_marker_pub.publish(m)
+
+    def _publish_trajectory_line(
+        self, positions: list[tuple[float, float, float]], hit_found: bool
+    ):
+        """Publish a LINE_STRIP connecting predicted positions.
+
+        Color-coded: green if no hit, red if collision detected.
+        """
+        if not positions:
+            return
+        m = Marker()
+        m.header.stamp = self.get_clock().now().to_msg()
+        m.header.frame_id = self._cloud_frame
+        m.ns = self._trajectory_line_ns
+        m.id = 0
+        m.type = Marker.LINE_STRIP
+        m.action = Marker.ADD
+        m.pose.orientation.w = 1.0
+        m.scale.x = 0.01  # 1cm line width
+
+        if hit_found:
+            m.color = ColorRGBA(r=1.0, g=0.2, b=0.2, a=0.9)
+        else:
+            m.color = ColorRGBA(r=0.2, g=1.0, b=0.2, a=0.7)
+
+        m.lifetime.sec = 0
+        m.lifetime.nanosec = int(self._cycle_delay * 1e9)
+
+        for (px, py, pz) in positions:
+            from geometry_msgs.msg import Point
+            p = Point()
+            p.x = px
+            p.y = py
+            p.z = pz
+            m.points.append(p)
+
+        self._trajectory_line_pub.publish(m)
+
+    def _clear_all_markers(self):
+        """Clear all visualization markers."""
+        now = self.get_clock().now().to_msg()
+
+        # Clear collision spheres
+        ma = MarkerArray()
+        m = Marker()
+        m.header.stamp = now
+        m.header.frame_id = self._cloud_frame or "world"
+        m.ns = self._sphere_marker_ns
+        m.action = Marker.DELETEALL
+        ma.markers.append(m)
+        self._sphere_markers_pub.publish(ma)
+
+        # Clear hit marker
+        m2 = Marker()
+        m2.header.stamp = now
+        m2.header.frame_id = self._cloud_frame or "world"
+        m2.ns = self._hit_marker_ns
+        m2.action = Marker.DELETEALL
+        self._hit_marker_pub.publish(m2)
+
+        # Clear trajectory line
+        m3 = Marker()
+        m3.header.stamp = now
+        m3.header.frame_id = self._cloud_frame or "world"
+        m3.ns = self._trajectory_line_ns
+        m3.action = Marker.DELETEALL
+        self._trajectory_line_pub.publish(m3)
+
     # ── Status publishing ──────────────────────────────────────────────────
 
     def _publish_status(self, **kwargs):
@@ -548,11 +960,11 @@ class TwistPropagationNode(Node):
                 self._publish_status()
                 return
 
-            # ── State: WAITING_FOR_SEGMENTATION ────────────────────────────
+            # -- State: WAITING_FOR_SEGMENTATION ----------------------------
             if state == CycleState.WAITING_FOR_SEGMENTATION:
                 elapsed = time.time() - self._seg_trigger_time
                 if self._seg_cloud_stamp > self._seg_cloud_stamp_at_trigger:
-                    # New segmented cloud arrived — transition and call preshaping
+                    # New segmented cloud arrived -- transition and call preshaping
                     self.get_logger().info(
                         "Segmented cloud received, calling preshaping service"
                     )
@@ -571,16 +983,16 @@ class TwistPropagationNode(Node):
                     )
                 self._publish_status()
 
-            # ── State: WAITING_FOR_PRESHAPING ──────────────────────────────
+            # -- State: WAITING_FOR_PRESHAPING ------------------------------
             elif state == CycleState.WAITING_FOR_PRESHAPING:
-                # Just wait — the future callback will transition back to IDLE
+                # Just wait -- the future callback will transition back to IDLE
                 self._publish_status()
 
-            # ── State: IDLE — run propagation ──────────────────────────────
+            # -- State: IDLE -- run propagation -----------------------------
             else:
                 self._run_idle_cycle()
 
-        # ── Outside the lock: call preshaping service if needed ─────────────
+        # -- Outside the lock: call preshaping service if needed -------------
         if should_call_preshaping:
             self._call_preshaping_service()
 
@@ -604,6 +1016,16 @@ class TwistPropagationNode(Node):
             )
             return
 
+        # Check pose staleness
+        latest_pose_time = self._pose_buf[-1][0]
+        pose_age = now_s - latest_pose_time
+        if pose_age > self._pose_max_age:
+            self._publish_status(
+                reason="pose_too_old",
+                pose_age_s=round(pose_age, 2),
+            )
+            return
+
         # Estimate twist
         self._twist = self._estimate_twist()
 
@@ -615,14 +1037,26 @@ class TwistPropagationNode(Node):
         transformed = self._transform_pose_to_cloud_frame(px, py, pz, pose_frame)
         px_cloud, py_cloud, pz_cloud = transformed
 
+        # Publish current pose in cloud frame
+        self._publish_current_pose(px_cloud, py_cloud, pz_cloud, qx, qy, qz, qw)
+
         # Publish twist in the hand pose's frame
         self._publish_twist(self._twist, pose_frame)
 
         # Propagate and find hit (in cloud frame)
+        # Initialize the positions list that _propagate_and_find_hit will fill
+        self._last_predicted_positions: list[tuple[float, float, float]] = []
         hit = self._propagate_and_find_hit(
             (px_cloud, py_cloud, pz_cloud, qx, qy, qz, qw),
             self._twist,
         )
+
+        positions = self._last_predicted_positions
+
+        # Always publish visualization (even when no hit)
+        self._publish_predicted_path(positions)
+        self._publish_collision_spheres(positions)
+        self._publish_trajectory_line(positions, hit_found=hit is not None)
 
         if hit is not None:
             hit_x, hit_y, hit_z = hit
@@ -630,6 +1064,9 @@ class TwistPropagationNode(Node):
                 f"Hit found at ({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}) "
                 f"in frame '{self._cloud_frame}'"
             )
+
+            # Publish hit marker
+            self._publish_hit_marker(hit_x, hit_y, hit_z)
 
             # Publish click to trigger segmentation
             click = PointStamped()
@@ -647,14 +1084,16 @@ class TwistPropagationNode(Node):
 
             self._publish_status(
                 hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
+                num_predicted_poses=len(positions),
             )
         else:
-            # No hit — publish status with twist info
+            # No hit -- publish status with twist info
             vx, vy, vz, wx, wy, wz = self._twist
             lin_mag = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
             self._publish_status(
                 reason="no_hit",
                 twist_linear_mag=round(lin_mag, 4),
+                num_predicted_poses=len(positions),
             )
 
     # ── Preshaping service call ────────────────────────────────────────────

@@ -100,16 +100,24 @@ twist_propagation:
         propagation_dt_s: 0.02
         hit_threshold_m: 0.05
         min_points_near_hit: 3
+        collision_geometry_radius_m: 0.10
         twist_estimation_window: 5
         active: false
         input_cloud_topic: "/camera/depth/color/points"
         segmented_cloud_topic: "/segmentation/object_cloud"
         hand_pose_topic: "/hand_pose"
+        odom_topic: ""
         click_positive_topic: "/segmentation/click_positive"
         hand_twist_topic: "/hand_twist"
         compute_grasp_service: "/grasp_preshaping/compute_grasp"
         segmentation_timeout_s: 5.0
         cloud_max_age_s: 2.0
+        pose_max_age_s: 1.0
+        voxel_leaf_m: 0.02
+        max_prediction_covariance_trace: 100.0
+        process_noise_linear_mps2_per_s: 0.1
+        process_noise_angular_radps2_per_s: 0.5
+        enable_covariance_propagation: true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)
@@ -228,12 +236,18 @@ hardware:
     haptic_bt_addr1: "84:2E:14:09:E1:4E"
 
 # ── Twist Propagation ─────────────────────────────────────────────────────────
+# NOTE: The canonical parameter set is in
+#   src/twist_propagation/config/twist_propagation.yaml
+# This flat section is kept for test scripts and documentation that read this
+# file with yaml.safe_load.  The ROS2 node section above is the source of
+# truth for runtime parameters.
 twist_propagation:
     cycle_delay_s: 0.5
     propagation_time_horizon_s: 2.0
     propagation_dt_s: 0.02
     hit_threshold_m: 0.05
     min_points_near_hit: 3
+    collision_geometry_radius_m: 0.10
     twist_estimation_window: 5
     active: false
     input_cloud_topic: "/camera/depth/color/points"
@@ -244,3 +258,9 @@ twist_propagation:
     compute_grasp_service: "/grasp_preshaping/compute_grasp"
     segmentation_timeout_s: 5.0
     cloud_max_age_s: 2.0
+    pose_max_age_s: 1.0
+    voxel_leaf_m: 0.02
+    max_prediction_covariance_trace: 100.0
+    process_noise_linear_mps2_per_s: 0.1
+    process_noise_angular_radps2_per_s: 0.5
+    enable_covariance_propagation: true

@@ -74,4 +74,12 @@ USER prosthesis
 RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/prosthesis/.bashrc \
     && echo "source /prosthesis_ws/install/setup.bash" >> /home/prosthesis/.bashrc
 
+# Disable ROS2 CLI daemon — it hangs in rootless podman with --network host
+# because the XML-RPC localhost connection between daemon subprocess and
+# client times out. Must run as root to modify /opt/ros files.
+USER root
+RUN sed -i 's/use_daemon = not getattr(args, '\''no_daemon'\'', False)/use_daemon = False  # patched: daemon hangs in rootless podman/' \
+    /opt/ros/jazzy/lib/python3.12/site-packages/ros2cli/node/strategy.py
+USER prosthesis
+
 CMD ["/bin/bash"]
