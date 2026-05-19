@@ -59,6 +59,19 @@ up-prosthesis: dev
 up-hw:
 	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis
 
+# ── Tonight host validation gates ────────────────────────────────────────────
+# These run the in-container Makefile targets from the host checkout. They keep
+# hardware disabled unless the target name explicitly says otherwise.
+
+TONIGHT_TARGETS := tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates
+
+.PHONY: $(TONIGHT_TARGETS)
+
+tonight-segmentation-check tonight-grasp-check: segmentation
+
+$(TONIGHT_TARGETS): dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -lc 'make $@'
+
 # ── Test ───────────────────────────────────────────────────────────────────
 test:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) run --rm test

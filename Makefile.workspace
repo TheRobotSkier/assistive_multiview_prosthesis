@@ -15,9 +15,20 @@ ROS_SETUP := source /opt/ros/jazzy/setup.bash && source /prosthesis_ws/install/s
 # ── Package selector ─────────────────────────────────────────────────────────
 PKG ?=
 
+# ── Tonight validation defaults ──────────────────────────────────────────────
+TONIGHT_CONFIG ?= /prosthesis_ws/config/prosthesis_config.yaml
+TONIGHT_RAW_RATE_SECONDS ?= 8
+TONIGHT_CHECK_STARTUP_SECONDS ?= 8
+TONIGHT_TF_ECHO_SECONDS ?= 3
+TONIGHT_SAFE_LAUNCH_ARGS := rviz:=false mia_hand:=false wrist:=false emg:=false haptic:=false camera:=true config_file:=$(TONIGHT_CONFIG)
+TONIGHT_SAFE_PACKAGES := camera prosthesis_launch pointcloud_fusion segmentation_bridge twist_propagation grasp_preshaping pipeline_manager
+TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
+
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch tonight source
+.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates source
+
+tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
 help: ## Show this help message
 	@echo ""
@@ -85,17 +96,172 @@ grasp-test: ## Launch legacy grasp test mode
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch grasp_test.launch.py
 
-twist-test: ## Launch twist propagation test (Jetson camera)
+twist-test: ## Launch safe Jetson twist/fusion pipeline with TF bridge
 	@$(ROS_SETUP) && \
-	ros2 launch prosthesis_launch twist_propagation_test.launch.py
+	ros2 launch prosthesis_launch pipeline.launch.py $(TONIGHT_SAFE_LAUNCH_ARGS)
 
-twist-launch: ## Launch twist propagation
+twist-launch: ## Launch safe Jetson twist/fusion pipeline with TF bridge
 	@$(ROS_SETUP) && \
-	ros2 launch prosthesis_launch twist_propagation_test.launch.py
+	ros2 launch prosthesis_launch pipeline.launch.py $(TONIGHT_SAFE_LAUNCH_ARGS)
 
-tonight: ## One-command Jetson host perception pipeline
+tonight: tonight-fusion ## Build and launch safe tonight pipeline with TF bridge
+
+tonight-build: ## Build only packages needed for tonight validation
 	@$(ROS_SETUP) && \
-	ros2 launch prosthesis_launch twist_propagation_test.launch.py
+	cd /prosthesis_ws && \
+	colcon build --packages-select $(TONIGHT_SAFE_PACKAGES) --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+tonight-clean: ## Kill host-side tonight pipeline nodes left from an interrupted run
+	@echo "Stopping host-side tonight ROS nodes in this container..."
+	@pkill -f "[r]os2 launch prosthesis_launch pipeline.launch.py" || true
+	@pkill -f "[r]os2 launch prosthesis_launch tf_bridge.launch.py" || true
+	@pkill -f "[p]ipeline_manager_node" || true
+	@pkill -f "[o]penvins_realsense_tf_bridge_node" || true
+	@pkill -f "[p]ointcloud_fusion_node" || true
+	@pkill -f "[p]ointcloud_relay_node" || true
+	@pkill -f "[o]dom_to_pose_relay" || true
+	@pkill -f "[s]egmentation_ros2_node" || true
+	@pkill -f "[t]wist_propagation_node" || true
+	@pkill -f "[p]reshaping_service_bridge_node" || true
+	@pkill -f "[g]rasp_proximity_controller_node.py" || true
+	@echo "Remaining ROS nodes:"
+	@$(ROS_SETUP) && $(TONIGHT_ROS_QUIET) ros2 node list 2>/dev/null | sort || true
+
+tonight-raw-check: ## Gate 0: show Jetson raw clouds, OpenVINS odom, and frames
+	@$(ROS_SETUP) && \
+	set +e; \
+	echo ""; \
+	echo "Gate 0: Jetson topics visible on host"; \
+	$(TONIGHT_ROS_QUIET) ros2 topic list 2>/dev/null | sort | grep -E "d435i.*points|ov_msckf.*odomimu|/tf$$|/tf_static$$|segmentation|fused|hand_|twist" || true; \
+	echo ""; \
+	echo "Raw cloud headers:"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /head/d435i_head/depth/color/points --field header 2>/dev/null || echo "missing head raw cloud"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /arm/d435i_arm/depth/color/points --field header 2>/dev/null || echo "missing arm raw cloud"; \
+	echo ""; \
+	echo "Raw cloud rates, press Ctrl-C early if enough data is shown:"; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz /head/d435i_head/depth/color/points 2>/dev/null || true; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz /arm/d435i_arm/depth/color/points 2>/dev/null || true; \
+	echo ""; \
+	echo "OpenVINS odom headers:"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /ov_msckf/odomimu --field header 2>/dev/null || echo "missing head OpenVINS odom"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /ov_msckf_arm/odomimu --field header 2>/dev/null || echo "missing arm OpenVINS odom"
+
+tonight-imu-check: ## Side diagnostic: list and sample stationary RealSense IMU topics
+	@$(ROS_SETUP) && \
+	set +e; \
+	echo ""; \
+	echo "OpenVINS/RealSense IMU topics:"; \
+	$(TONIGHT_ROS_QUIET) ros2 topic list 2>/dev/null | sort | grep -Ei "imu|accel|gyro|ov_msckf" || true; \
+	echo ""; \
+	echo "Head combined IMU sample:"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /head/d435i_head/imu 2>/dev/null || echo "missing /head/d435i_head/imu"; \
+	echo ""; \
+	echo "Arm combined IMU sample:"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /arm/d435i_arm/imu 2>/dev/null || echo "missing /arm/d435i_arm/imu"; \
+	echo ""; \
+	echo "Combined IMU rates:"; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz /head/d435i_head/imu 2>/dev/null || true; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz /arm/d435i_arm/imu 2>/dev/null || true
+
+tonight-tf: ## Gate 1: run only the OpenVINS->RealSense TF bridge in foreground
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch tf_bridge.launch.py config_file:=$(TONIGHT_CONFIG)
+
+tonight-tf-check: ## Gate 1: start TF bridge temporarily and echo resolved camera TFs
+	@$(ROS_SETUP) && \
+	set +e; \
+	log_file=/tmp/tonight-tf-check.log; \
+	: > $$log_file; \
+	echo "Launch log: $$log_file"; \
+	ros2 launch prosthesis_launch tf_bridge.launch.py config_file:=$(TONIGHT_CONFIG) > $$log_file 2>&1 & \
+	bridge_pid=$$!; \
+	trap 'kill -INT $$bridge_pid 2>/dev/null; sleep 1; kill -TERM $$bridge_pid 2>/dev/null; pkill -TERM -f "[o]penvins_realsense_tf_bridge_node" 2>/dev/null; sleep 1; kill -KILL $$bridge_pid 2>/dev/null; pkill -KILL -f "[o]penvins_realsense_tf_bridge_node" 2>/dev/null; true' EXIT; \
+	sleep $(TONIGHT_CHECK_STARTUP_SECONDS); \
+	echo ""; \
+	echo "Gate 1: marker_map -> RealSense depth optical frames"; \
+	timeout $(TONIGHT_TF_ECHO_SECONDS)s ros2 run tf2_ros tf2_echo marker_map head_d435i_head_depth_optical_frame 2>/dev/null || true; \
+	timeout $(TONIGHT_TF_ECHO_SECONDS)s ros2 run tf2_ros tf2_echo marker_map arm_d435i_arm_depth_optical_frame 2>/dev/null || true
+
+tonight-fusion: ## Gate 2: run safe host pipeline in foreground for RViz monitoring
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch pipeline.launch.py $(TONIGHT_SAFE_LAUNCH_ARGS)
+
+tonight-fusion-check: ## Gate 2: start safe pipeline and probe fused/relayed clouds
+	@$(ROS_SETUP) && \
+	set +e; \
+	log_file=/tmp/tonight-fusion-check.log; \
+	: > $$log_file; \
+	echo "Launch log: $$log_file"; \
+	ros2 launch prosthesis_launch pipeline.launch.py $(TONIGHT_SAFE_LAUNCH_ARGS) > $$log_file 2>&1 & \
+	launch_pid=$$!; \
+	trap 'kill -INT $$launch_pid 2>/dev/null; pkill -TERM -P $$launch_pid 2>/dev/null; sleep 1; kill -TERM $$launch_pid 2>/dev/null; pkill -KILL -P $$launch_pid 2>/dev/null; sleep 1; kill -KILL $$launch_pid 2>/dev/null; true' EXIT; \
+	sleep $(TONIGHT_CHECK_STARTUP_SECONDS); \
+	echo ""; \
+	echo "Gate 2: fused cloud header and rate"; \
+	timeout 8s ros2 topic echo --once /fused_pointcloud --field header 2>/dev/null || echo "missing /fused_pointcloud"; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s ros2 topic hz /fused_pointcloud 2>/dev/null || true; \
+	echo ""; \
+	echo "Gate 3: fused cloud relay to segmentation input"; \
+	timeout 8s ros2 topic echo --once /segmentation/input_cloud --field header 2>/dev/null || echo "missing /segmentation/input_cloud"; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s ros2 topic hz /segmentation/input_cloud 2>/dev/null || true
+
+tonight-segmentation-check: ## Gate 3/4: click a fused point and wait for segmented object cloud
+	@$(ROS_SETUP) && \
+	set +e; \
+	log_file=/tmp/tonight-segmentation-check.log; \
+	: > $$log_file; \
+	echo "Launch log: $$log_file"; \
+	ros2 launch prosthesis_launch pipeline.launch.py $(TONIGHT_SAFE_LAUNCH_ARGS) > $$log_file 2>&1 & \
+	launch_pid=$$!; \
+	trap 'kill -INT $$launch_pid 2>/dev/null; pkill -TERM -P $$launch_pid 2>/dev/null; sleep 1; kill -TERM $$launch_pid 2>/dev/null; pkill -KILL -P $$launch_pid 2>/dev/null; sleep 1; kill -KILL $$launch_pid 2>/dev/null; true' EXIT; \
+	sleep $(TONIGHT_CHECK_STARTUP_SECONDS); \
+	python3 /prosthesis_ws/scripts/tonight_click_from_cloud.py \
+	  --cloud-topic /fused_pointcloud \
+	  --click-topic /segmentation/click_positive \
+	  --object-topic /segmentation/object_cloud \
+	  --timeout 25.0 2>> $$log_file
+
+tonight-twist-check: ## Gate 5: activate twist propagation and show status/click output
+	@$(ROS_SETUP) && \
+	set +e; \
+	log_file=/tmp/tonight-twist-check.log; \
+	: > $$log_file; \
+	echo "Launch log: $$log_file"; \
+	ros2 launch prosthesis_launch pipeline.launch.py $(TONIGHT_SAFE_LAUNCH_ARGS) > $$log_file 2>&1 & \
+	launch_pid=$$!; \
+	trap 'kill -INT $$launch_pid 2>/dev/null; pkill -TERM -P $$launch_pid 2>/dev/null; sleep 1; kill -TERM $$launch_pid 2>/dev/null; pkill -KILL -P $$launch_pid 2>/dev/null; sleep 1; kill -KILL $$launch_pid 2>/dev/null; true' EXIT; \
+	sleep $(TONIGHT_CHECK_STARTUP_SECONDS); \
+	echo ""; \
+	echo "Gate 5: activate twist propagation"; \
+	ros2 service call /twist_propagation/activate std_srvs/srv/Trigger '{}' 2>> $$log_file || true; \
+	timeout 10s ros2 topic echo --once /twist_propagation/status 2>/dev/null || true; \
+	echo ""; \
+	echo "If there is a hit, twist propagation publishes the segmentation click here:"; \
+	timeout 10s ros2 topic echo --once /segmentation/click_positive 2>/dev/null || true
+
+tonight-grasp-check: ## Gate 6: run segmentation click then call grasp service
+	@$(ROS_SETUP) && \
+	set +e; \
+	log_file=/tmp/tonight-grasp-check.log; \
+	: > $$log_file; \
+	echo "Launch log: $$log_file"; \
+	ros2 launch prosthesis_launch pipeline.launch.py $(TONIGHT_SAFE_LAUNCH_ARGS) > $$log_file 2>&1 & \
+	launch_pid=$$!; \
+	trap 'kill -INT $$launch_pid 2>/dev/null; pkill -TERM -P $$launch_pid 2>/dev/null; sleep 1; kill -TERM $$launch_pid 2>/dev/null; pkill -KILL -P $$launch_pid 2>/dev/null; sleep 1; kill -KILL $$launch_pid 2>/dev/null; true' EXIT; \
+	sleep $(TONIGHT_CHECK_STARTUP_SECONDS); \
+	python3 /prosthesis_ws/scripts/tonight_click_from_cloud.py \
+	  --cloud-topic /fused_pointcloud \
+	  --click-topic /segmentation/click_positive \
+	  --object-topic /segmentation/object_cloud \
+	  --timeout 25.0 2>> $$log_file || true; \
+	echo ""; \
+	echo "Gate 6: grasp preshaping service"; \
+	ros2 service call /grasp_preshaping/compute_grasp std_srvs/srv/Trigger '{}' 2>> $$log_file || true; \
+	timeout 5s ros2 topic echo --once /grasp_preshaping/target_hand_pose 2>/dev/null || true; \
+	timeout 5s ros2 topic echo --once /grasp_preshaping/target_finger_closures 2>/dev/null || true; \
+	timeout 5s ros2 topic echo --once /grasp_preshaping/grasp_type 2>/dev/null || true
+
+tonight-gates: tonight-raw-check tonight-tf-check tonight-fusion-check ## Run the non-invasive perception gates
 
 # ── Utility ──────────────────────────────────────────────────────────────────
 
