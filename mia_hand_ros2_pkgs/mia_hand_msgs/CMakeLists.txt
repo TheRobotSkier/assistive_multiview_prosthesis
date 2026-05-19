@@ -13,37 +13,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 
-set(msg_files
-  "msg/MotorData.msg"
-  "msg/JointData.msg"
-  "msg/ForceData.msg"
-)
-
-set(srv_files
-  "srv/Connect.srv"
-  "srv/GetMotorData.srv"
-  "srv/GetJointData.srv"
-  "srv/GetForceData.srv"
-  "srv/SetMotorSpeed.srv"
-  "srv/SetMotorTraj.srv"
-  "srv/SetJointSpeed.srv"
-  "srv/SetJointTraj.srv"
-  "srv/GetGraspReferences.srv"
-  "srv/SetGraspReferences.srv"
-  "srv/ExecuteGrasp.srv"
-)
-
-set(action_files
-  "action/MotorTraj.action"
-  "action/JointTraj.action"
-  "action/Grasp.action"
-)
-
 rosidl_generate_interfaces(${PROJECT_NAME}
-  ${msg_files}
-  ${srv_files}
-  ${action_files}
-
+  "msg/EmgData.msg"
   DEPENDENCIES std_msgs
 )
 

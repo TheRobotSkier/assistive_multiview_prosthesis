@@ -1,5 +1,0 @@
-int32 target_position
-int32 spe_for_percent
----
-bool success        # True, if trajectory setting was successful, false if not
-string err_message  # Error message, in case of failure

@@ -1,0 +1,122 @@
+# emg.yaml — EMG Armband Configuration (MindRove WiFi board)
+#
+# Loaded by both emg_node and emg_parser_node at startup.
+# Pass explicitly with the config_file launch argument, or let the nodes
+# find it automatically at /emg_ws/src/emg_armband/config/emg.yaml.
+#
+# ── Gesture labels (must match emg_classifier/config.py GESTURE_NAMES) ────────
+#   REST   (0) – relaxed, no contraction
+#   POWER  (1) – power / cylindrical grip
+#   PINCH  (2) – lateral pinch
+#   OPEN   (3) – hand open / extension
+#   POINT  (4) – index point / hook
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── emg_node (hardware interface) ─────────────────────────────────────────────
+emg_node:
+  # Directory containing classifier.pkl and prop_calibration.pkl.
+  # Bind-mounted into the container via docker-compose.yml.
+  model_dir: "/emg_ws/src/emg_armband/models/"
+
+  # Topic on which EmgData (proportional + gesture) is published
+  emg_data_topic: "/emg/data"
+
+  # Publishing rate in Hz — matches the WINDOW_STEP cadence (~10 Hz)
+  publish_rate: 10.0
+
+  # Confidence threshold: predictions below this value are mapped to REST
+  confidence_threshold: 0.55
+
+  # Majority-vote smoothing window in frames (1 = no smoothing)
+  smoothing_frames: 3
+
+# ── emg_parser_node (signal routing) ──────────────────────────────────────────
+emg_parser:
+  # Subscribe to raw EMG data (must match emg_node.emg_data_topic)
+  emg_data_topic: "/emg/data"
+
+  # Current gesture is always broadcast here as a std_msgs/String
+  gesture_topic: "/emg/gesture"
+
+  # ── per-gesture output routing ─────────────────────────────────────────────
+  # Each gesture maps to a list of outputs.
+  # Each output entry supports the following fields:
+  #
+  #   topic           (string,  required) – Float32 topic to publish on
+  #
+  #   ── Streaming (default) mode ──────────────────────────────────────────
+  #   threshold       (float,   default 0.0)   – minimum proportional value
+  #                   before anything is sent on this output
+  #
+  #   binary          (bool,    default false)  – if true, sends 1.0 when
+  #                   above threshold instead of the raw proportional value
+  #
+  #   send_zero       (bool,    default true)   – if true, sends 0.0 while
+  #                   below threshold; if false, nothing is sent below threshold
+  #
+  #   ── Edge-triggered mode ───────────────────────────────────────────────
+  #   send_on_change  (bool,    default false)  – when true, switches from
+  #                   streaming to edge-triggered mode: only publish on rising
+  #                   edge (inactive → active) or falling edge (active →
+  #                   inactive, if send_zero=true).  Useful for toggle or
+  #                   one-shot events (e.g. mode switches).
+  #
+  #   change_timeout  (float,   default 0.0 s)  – minimum seconds that must
+  #                   elapse after a rising-edge fire before another rising-edge
+  #                   fire is allowed.  Prevents rapid re-triggering when the
+  #                   user holds the gesture.  Only meaningful with
+  #                   send_on_change: true.
+  #
+  #   activation_count (int,    default 0)      – require this many consecutive
+  #                   above-threshold frames before the output is considered
+  #                   "active".  Acts as an extra debounce on top of the
+  #                   classifier smoother.  0 means no extra debounce.
+  #                   At 10 Hz: activation_count=3 → 300 ms hold required.
+  # ───────────────────────────────────────────────────────────────────────────
+
+  gestures:
+
+    # ── REST — no contraction ─────────────────────────────────────────────────
+    REST:
+      outputs: []
+
+    # ── POWER — power / cylindrical grip ─────────────────────────────────────
+    # Proportional grip velocity: proportional value drives speed.
+    POWER:
+      outputs:
+        - topic: "/mia_hand/grasp_velocity"
+          binary: false       # send the proportional value (scaled speed)
+          threshold: 0.05     # ignore noise below 5 %
+          send_zero: true     # keep sending 0.0 so the hand stops cleanly
+
+    # ── PINCH — lateral pinch ─────────────────────────────────────────────────
+    PINCH:
+      outputs:
+        - topic: "/mia_hand/pinch_velocity"
+          binary: false
+          threshold: 0.05
+          send_zero: true
+
+    # ── OPEN — hand open / extension ──────────────────────────────────────────
+    # Binary: trigger full open above threshold.
+    OPEN:
+      outputs:
+        - topic: "/mia_hand/open"
+          binary: true
+          threshold: 0.4
+          send_zero: true
+
+    # ── POINT — index point / hook ────────────────────────────────────────────
+    # Edge-triggered mode-switch: fires once per activation, with a 1.0 s
+    # cooldown so holding the gesture doesn't flood the topic.
+    # activation_count=3 means the user must hold the gesture for 3 frames
+    # (~300 ms at 10 Hz) before it counts — avoids transient mis-classifications.
+    POINT:
+      outputs:
+        - topic: "/mia_hand/mode_switch"
+          binary: true
+          threshold: 0.5
+          send_zero: false      # no 0.0 on falling edge — pure one-shot event
+          send_on_change: true  # fire only on rising edge
+          change_timeout: 1.0   # minimum 1 s between consecutive triggers
+          activation_count: 3   # hold for ~300 ms before activating

@@ -1,8 +1,0 @@
-float64 target_angle   # Target joint angle, in rad
-int32 spe_for_percent  # Trajectory speed/force percentage
----
-float64 angle       # Final joint angle, in rad
-string err_message  # Error message, in case of failure
----
-float64 current_angle  # Current joint angle, in rad
-int32 current_speed    # Current motor speed

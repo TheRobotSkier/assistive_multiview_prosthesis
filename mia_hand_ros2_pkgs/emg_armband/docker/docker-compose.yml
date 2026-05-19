@@ -1,0 +1,83 @@
+# EMG Armband — standalone Docker Compose (MindRove WiFi board)
+#
+# Run from this directory:
+#   docker compose up --build emg
+#
+# Data collection (records labelled sessions to data/):
+#   docker compose run --rm emg_collect
+#
+# Training (fits classifier on data/, saves models/ to models/):
+#   docker compose run --rm emg_train
+#
+# Standalone live classifier (no ROS, terminal display only):
+#   docker compose run --rm emg_run
+#
+# The container uses host networking so it joins the same ROS2 DDS domain as
+# every other host-networked container on the machine.
+
+x-emg-base: &emg-base
+  build:
+    # Context is mia_hand_ros2_pkgs/ so the Dockerfile can reach both
+    # mia_hand_msgs/ and emg_armband/.
+    context: ../..
+    dockerfile: emg_armband/docker/Dockerfile
+    args:
+      - USER_UID=${USER_UID:-1000}
+      - USER_GID=${USER_GID:-1000}
+  network_mode: "host"
+  tty: true
+  stdin_open: true
+  # Rootless Podman: preserve host UID mapping so bind-mounted files are
+  # owned by the current user.  Docker ignores this field harmlessly.
+  userns_mode: "keep-id"
+  volumes:
+    # Bind-mount models and data so files persist between container runs and
+    # survive image rebuilds.  Train once on the host, run forever in Docker.
+    - ../models:/emg_ws/src/emg_armband/models
+    - ../data:/emg_ws/src/emg_armband/data
+  environment:
+    RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
+    ROS_AUTOMATIC_DISCOVERY_RANGE: ${ROS_AUTOMATIC_DISCOVERY_RANGE:-LOCALHOST}
+
+services:
+
+  # ── ROS2 node — publishes /emg/data for the rest of the miahand stack ───────
+  emg:
+    <<: *emg-base
+    container_name: emg_armband
+    command: >
+      bash -c "
+        source /emg_ws/install/setup.bash &&
+        ros2 launch emg_armband emg_launch.py;
+        /bin/bash
+      "
+
+  # ── Data collection — records labelled EMG sessions to data/ ─────────────
+  emg_collect:
+    <<: *emg-base
+    container_name: emg_collect
+    command: ["python", "/emg_ws/install/emg_armband/lib/emg_armband/scripts/collect_data.py",
+              "--data-dir", "/emg_ws/src/emg_armband/data"]
+
+  # ── Training — fits classifier on data/, saves models/ ───────────────────
+  emg_train:
+    <<: *emg-base
+    container_name: emg_train
+    command: ["python", "/emg_ws/install/emg_armband/lib/emg_armband/scripts/train.py",
+              "--data-dir", "/emg_ws/src/emg_armband/data",
+              "--model-dir", "/emg_ws/src/emg_armband/models"]
+
+  # ── Standalone live classifier (no ROS, terminal display only) ────────────
+  emg_run:
+    <<: *emg-base
+    container_name: emg_run
+    command: ["python", "/emg_ws/install/emg_armband/lib/emg_armband/scripts/run_classifier.py",
+              "--model-dir", "/emg_ws/src/emg_armband/models"]
+
+  # ── Guided setup: collect → train → launch ROS node → live monitor ─────────
+  # Run once to personalise the classifier, then use the `emg` service normally.
+  #   docker compose run --rm emg_setup
+  emg_setup:
+    <<: *emg-base
+    container_name: emg_setup
+    command: ["bash", "/emg_ws/install/emg_armband/lib/emg_armband/scripts/setup.sh"]

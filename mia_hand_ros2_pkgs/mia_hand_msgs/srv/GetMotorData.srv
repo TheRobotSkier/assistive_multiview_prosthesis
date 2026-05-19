@@ -1,7 +1,0 @@
----
-int32 thumb_data  # Thumb motor data
-int32 index_data  # Index motor data
-int32 mrl_data    # Mrl motor data
-
-bool success        # True, if data reading was successful, false if not
-string err_message  # Error message, in case of failure

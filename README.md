@@ -1,41 +1,21 @@
-To set up docker:
+# MindRove EMG Armband — ROS 2 Integration
 
-FIRST:
-Check the docker-compose.yml, and comment out lines that have comments "#added LINUX" if you are not on a linux system. For reference, the compose should for Arch linux x86-64 with Wayland. I'm not sure if there are differences with ubuntu. The changes made are related to wayland/x11 functionality, so ubuntu Wayland should work the same, but no clue if WSL even includes x11/wayland.
+ROS 2 Jazzy driver and signal-routing stack for the **MindRove WiFi armband**.
 
-From the main directory (docker_miniproject):
-THEN RUN:
+## Packages
 
-echo -e "USER_UID=$(id -u $USER)\nUSER_GID=$(id -g $USER)" > mia_hand_ros2_pkgs/docker-deployment/.env
+| Package | Description |
+|---|---|
+| `mia_hand_ros2_pkgs/mia_hand_msgs` | `EmgData.msg` — gesture + proportional value |
+| `mia_hand_ros2_pkgs/emg_armband` | Hardware driver, ML inference, Docker |
 
-For Linux Wayland, also run:
+## Quick start
 
-echo "XAUTHORITY=${XAUTHORITY:-$HOME/.Xauthority}" >> mia_hand_ros2_pkgs/docker-deployment/.env
+```bash
+cd mia_hand_ros2_pkgs/emg_armband/docker
+docker compose run --rm emg_setup   # guided: collect → train → launch → monitor
+# or, after training:
+docker compose up --build emg        # launch ROS 2 nodes only
+```
 
-
-THEN cd to the docker-deployment directory:
-
-cd mia_hand_ros2_pkgs/docker-deployment
-
-THEN to build the simulation:
-
-scene=custom docker compose run --build --rm miahand_mujoco
-
-It will show a wrong simulation for some reason. So, use ctrl+c to stop the sim, type "exit" to leave the container shell, and then run the container again (without "--build"):
-
-scene=custom docker compose run --rm miahand_mujoco
-
-Now it should show the simulation with the hand and a red ball in front of it.
-
-THEN in a different terminal (also in docker-deployment folder), to start grasp script run:
-
-docker compose run --build --rm miahand_ros2
-
-and in the shell run:
-cd src/dev/grasp_preshaping && cargo run -r -- --mode ros --pointcloud-topic /segmented_object_cloud --pointcloud-scale 1.0 --iterations 1 --publish-commands --command-backend pos_ff
-
-cd src/dev/grasp_preshaping && cargo run -r -- --mode ros --publish-commands --command-backend pos_ff
-
-Multiview:
-The multiview system presumes launch on the Nvidia Jetson, and is not containerized-- This will be harder to set up to run on your own systems.
-For using the launch script in the multiview folder, change the directory path in the .sh file as: RVIZ_CONFIG.
+See **[`mia_hand_ros2_pkgs/emg_armband/README.md`](mia_hand_ros2_pkgs/emg_armband/README.md)** for full documentation.

@@ -1,5 +1,0 @@
-int32 close_percent    # Grasp closure percentage
-int32 spe_for_percent  # Grasp execution speed/force percent
----
-bool success        # True, if grasp started successfully, false if not
-string err_message  # Error message, in case of failure

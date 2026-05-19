@@ -1,4 +1,0 @@
-string serial_port_dev  # Serial port device name (e.g., "/dev/ttyUSB0")
----
-bool success    # True, if serial port opening was successful, false if not
-string message  # Informational message (e.g., for errors)

@@ -1,5 +1,0 @@
-float64 target_angle   # Target joint angle, in rad
-int32 spe_for_percent  # Trajectory speed/force percentage
----
-bool success        # True, if trajectory setting was successful, false if not
-string err_message  # Error message, in case of failure

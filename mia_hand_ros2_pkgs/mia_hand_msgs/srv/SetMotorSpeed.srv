@@ -1,5 +1,0 @@
-int32 target_speed         # Target speed, in the range [-99, 99]
-int32 max_current_percent  # Maximum current, in percentage
----
-bool success        # True, if speed setting was successful, false if not
-string err_message  # Error message, in case of failure

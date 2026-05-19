@@ -1,8 +1,0 @@
-int32 target_position
-int32 spe_for_percent
----
-int32 position
-string err_message  # Error message, in case of failure
----
-int32 current_position
-int32 current_speed

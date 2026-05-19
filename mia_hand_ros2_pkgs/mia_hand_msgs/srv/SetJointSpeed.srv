@@ -1,5 +1,0 @@
-float64 target_speed       # Target joint speed, in rad/s
-int32 max_current_percent  # Maximum motor current, in percentage
----
-bool success        # True, if target setting was successful, false if not
-string err_message  # Error message, in case of failure

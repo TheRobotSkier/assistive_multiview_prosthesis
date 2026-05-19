@@ -1,7 +1,0 @@
----
-float64 thumb_data  # Thumb joint data
-float64 index_data  # Index joint data
-float64 mrl_data    # Mrl joint data
-
-bool success        # True, if data reading was successful, false if not
-string err_message  # Error message, in case of failure
