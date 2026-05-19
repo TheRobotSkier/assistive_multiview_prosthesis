@@ -61,6 +61,7 @@ def _launch_setup(context, *args, **kwargs):
                 "odom_out": "/hand_odom",
             }],
             output="screen",
+            arguments=["--ros-args", "--log-level", "warn"],
         )
     )
 

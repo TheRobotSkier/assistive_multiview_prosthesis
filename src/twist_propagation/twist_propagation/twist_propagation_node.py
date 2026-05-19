@@ -347,7 +347,7 @@ class TwistPropagationNode(Node):
         # Collision geometry
         self.declare_parameter("hit_threshold_m", 0.05)
         self.declare_parameter("min_points_near_hit", 3)
-        self.declare_parameter("collision_geometry_radius_m", 0.10)
+        self.declare_parameter("collision_geometry_radius_m", 0.05)
 
         # Twist estimation
         self.declare_parameter("twist_estimation_window", 5)
@@ -405,7 +405,7 @@ class TwistPropagationNode(Node):
         # ── State ──────────────────────────────────────────────────────────
         self._active: bool = self.get_parameter("active").value
         self._cycle_state: CycleState = CycleState.IDLE
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # RLock: _run_idle_cycle -> _propagate_and_find_hit nests
 
         # Pose buffer: deque of (timestamp_s, px, py, pz, qx, qy, qz, qw, frame_id)
         self._pose_buf: deque[tuple] = deque(maxlen=max(self._twist_window + 2, 2))
@@ -479,9 +479,9 @@ class TwistPropagationNode(Node):
         self._sphere_markers_pub = self.create_publisher(
             MarkerArray, "/twist_propagation/collision_spheres", 10)
         self._hit_marker_pub = self.create_publisher(
-            Marker, "/twist_propagation/hit_marker", 10)
+            MarkerArray, "/twist_propagation/hit_marker", 10)
         self._trajectory_line_pub = self.create_publisher(
-            Marker, "/twist_propagation/trajectory_line", 10)
+            MarkerArray, "/twist_propagation/trajectory_line", 10)
 
         # ── Service servers ────────────────────────────────────────────────
         self.create_service(
@@ -735,7 +735,10 @@ class TwistPropagationNode(Node):
             dists, _ = tree.query([px, py, pz], k=max(self._min_points, 1))
             if np.max(dists[:self._min_points]) <= self._effective_hit_thresh:
                 self._last_predicted_positions = positions
-                return (px, py, pz)
+                # Return the nearest surface point, not the sphere center
+                _, nearest_idx = tree.query([px, py, pz], k=1)
+                idx = int(nearest_idx) if np.ndim(nearest_idx) == 0 else int(nearest_idx[0])
+                return tuple(self._cloud_xyz[idx].tolist())
 
         self._last_predicted_positions = positions
         return None
@@ -864,7 +867,9 @@ class TwistPropagationNode(Node):
         m.scale.x = m.scale.y = m.scale.z = 0.06  # 6cm sphere
         m.color = ColorRGBA(r=0.0, g=1.0, b=0.2, a=0.9)
         m.lifetime.sec = 2  # persist for 2 seconds
-        self._hit_marker_pub.publish(m)
+        ma = MarkerArray()
+        ma.markers.append(m)
+        self._hit_marker_pub.publish(ma)
 
     def _publish_trajectory_line(
         self, positions: list[tuple[float, float, float]], hit_found: bool
@@ -901,7 +906,9 @@ class TwistPropagationNode(Node):
             p.z = pz
             m.points.append(p)
 
-        self._trajectory_line_pub.publish(m)
+        ma = MarkerArray()
+        ma.markers.append(m)
+        self._trajectory_line_pub.publish(ma)
 
     def _clear_all_markers(self):
         """Clear all visualization markers."""
@@ -923,7 +930,9 @@ class TwistPropagationNode(Node):
         m2.header.frame_id = self._cloud_frame or "world"
         m2.ns = self._hit_marker_ns
         m2.action = Marker.DELETEALL
-        self._hit_marker_pub.publish(m2)
+        ma2 = MarkerArray()
+        ma2.markers.append(m2)
+        self._hit_marker_pub.publish(ma2)
 
         # Clear trajectory line
         m3 = Marker()
@@ -931,7 +940,9 @@ class TwistPropagationNode(Node):
         m3.header.frame_id = self._cloud_frame or "world"
         m3.ns = self._trajectory_line_ns
         m3.action = Marker.DELETEALL
-        self._trajectory_line_pub.publish(m3)
+        ma3 = MarkerArray()
+        ma3.markers.append(m3)
+        self._trajectory_line_pub.publish(ma3)
 
     # ── Status publishing ──────────────────────────────────────────────────
 
@@ -952,49 +963,55 @@ class TwistPropagationNode(Node):
         # The lock is released before any blocking operations (service calls).
         should_call_preshaping = False
 
-        with self._lock:
-            active = self._active
-            state = self._cycle_state
+        try:
+            with self._lock:
+                active = self._active
+                state = self._cycle_state
 
-            if not active:
-                self._publish_status()
-                return
+                if not active:
+                    self._publish_status()
+                    return
 
-            # -- State: WAITING_FOR_SEGMENTATION ----------------------------
-            if state == CycleState.WAITING_FOR_SEGMENTATION:
-                elapsed = time.time() - self._seg_trigger_time
-                if self._seg_cloud_stamp > self._seg_cloud_stamp_at_trigger:
-                    # New segmented cloud arrived -- transition and call preshaping
-                    self.get_logger().info(
-                        "Segmented cloud received, calling preshaping service"
-                    )
-                    self._cycle_state = CycleState.WAITING_FOR_PRESHAPING
-                    should_call_preshaping = True
-                elif elapsed > self._seg_timeout:
-                    self.get_logger().warn(
-                        f"Segmentation timeout ({elapsed:.1f}s), "
-                        "returning to IDLE"
-                    )
-                    self._cycle_state = CycleState.IDLE
-                    self._seg_trigger_time = 0.0
+                # -- State: WAITING_FOR_SEGMENTATION ----------------------------
+                if state == CycleState.WAITING_FOR_SEGMENTATION:
+                    elapsed = time.time() - self._seg_trigger_time
+                    if self._seg_cloud_stamp > self._seg_cloud_stamp_at_trigger:
+                        # New segmented cloud arrived -- transition and call preshaping
+                        self.get_logger().info(
+                            "Segmented cloud received, calling preshaping service"
+                        )
+                        self._cycle_state = CycleState.WAITING_FOR_PRESHAPING
+                        should_call_preshaping = True
+                    elif elapsed > self._seg_timeout:
+                        self.get_logger().warn(
+                            f"Segmentation timeout ({elapsed:.1f}s), "
+                            "returning to IDLE"
+                        )
+                        self._cycle_state = CycleState.IDLE
+                        self._seg_trigger_time = 0.0
+                    else:
+                        self.get_logger().debug(
+                            f"Waiting for segmentation ({elapsed:.1f}s)"
+                        )
+                    self._publish_status()
+
+                # -- State: WAITING_FOR_PRESHAPING ------------------------------
+                elif state == CycleState.WAITING_FOR_PRESHAPING:
+                    # Just wait -- the future callback will transition back to IDLE
+                    self._publish_status()
+
+                # -- State: IDLE -- run propagation -----------------------------
                 else:
-                    self.get_logger().debug(
-                        f"Waiting for segmentation ({elapsed:.1f}s)"
-                    )
-                self._publish_status()
+                    self._run_idle_cycle()
 
-            # -- State: WAITING_FOR_PRESHAPING ------------------------------
-            elif state == CycleState.WAITING_FOR_PRESHAPING:
-                # Just wait -- the future callback will transition back to IDLE
-                self._publish_status()
-
-            # -- State: IDLE -- run propagation -----------------------------
-            else:
-                self._run_idle_cycle()
-
-        # -- Outside the lock: call preshaping service if needed -------------
-        if should_call_preshaping:
-            self._call_preshaping_service()
+            # -- Outside the lock: call preshaping service if needed -------------
+            if should_call_preshaping:
+                self._call_preshaping_service()
+        except Exception as exc:
+            import traceback
+            self.get_logger().error(
+                f"EXCEPTION in _cycle_callback: {exc}\n{traceback.format_exc()}"
+            )
 
     def _run_idle_cycle(self):
         """Run one propagation cycle.  Called under self._lock."""

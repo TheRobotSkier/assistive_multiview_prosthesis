@@ -5,11 +5,15 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /PointCloud21
-        - /Path1
-        - /MarkerArray1
+        - /Scene PointCloud1
+        - /Predicted Path1
+        - /Current Hand Pose1
+        - /Collision Spheres1
+        - /Click Positive1
+        - /Hit Marker1
+        - /Trajectory Line1
       Splitter Ratio: 0.5
-    Tree Height: 822
+    Tree Height: 313
   - Class: rviz_common/Views
     Expanded:
       - /Current View1
@@ -19,7 +23,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: Scene PointCloud
 Visualization Manager:
   Class: ""
   Displays:
@@ -42,7 +46,7 @@ Visualization Manager:
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz_default_plugins/TF
-      Enabled: true
+      Enabled: false
       Filter (blacklist): ""
       Filter (whitelist): ""
       Frame Timeout: 15
@@ -56,12 +60,18 @@ Visualization Manager:
       Tree:
         {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: false
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
       Class: rviz_default_plugins/PointCloud2
       Color: 255; 255; 255
-      Color Transformer: FlatColor
+      Color Transformer: RGB8
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
@@ -74,11 +84,10 @@ Visualization Manager:
       Selectable: false
       Size (Pixels): 2
       Size (m): 0.009999999776482582
-      Style: Points
+      Style: Flat Squares
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Best Effort
         Value: /arm/d435i_arm/points_marker_map
@@ -93,8 +102,8 @@ Visualization Manager:
       Head Diameter: 0.07000000029802322
       Head Length: 0.07000000029802322
       Length: 0.30000001192092896
-      Line Style: Billboards
-      Line Width: 0.019999999552965164
+      Line Style: Lines
+      Line Width: 0.009999999776482582
       Name: Predicted Path
       Offset:
         X: 0
@@ -114,6 +123,8 @@ Visualization Manager:
         Value: /twist_propagation/predicted_path
       Value: true
     - Alpha: 1
+      Axes Length: 0.10000000149011612
+      Axes Radius: 0.009999999776482582
       Class: rviz_default_plugins/Pose
       Color: 255; 25; 0
       Enabled: true
@@ -122,14 +133,14 @@ Visualization Manager:
       Name: Current Hand Pose
       Shaft Length: 0.10000000149011612
       Shaft Radius: 0.009999999776482582
-      Shape: Arrow
+      Shape: Axes
       Topic:
         Depth: 5
         Durability Policy: Volatile
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /twist_propagation/current_pose
+        Value: /hand_pose
       Value: true
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
@@ -139,7 +150,6 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /twist_propagation/collision_spheres
@@ -167,7 +177,6 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /twist_propagation/hit_marker
@@ -180,7 +189,6 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /twist_propagation/trajectory_line
@@ -200,38 +208,43 @@ Visualization Manager:
     - Class: rviz_default_plugins/Measure
       Line color: 128; 128; 0
   Transformation:
-    Current: ""
+    Current:
+      Class: rviz_default_plugins/TF
   Value: true
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 3.5
+      Distance: 2.059903860092163
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0.5
+        X: 0.02928115800023079
+        Y: -0.18780513107776642
+        Z: 0.1540951430797577
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4
+      Pitch: 1.1197965145111084
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.14
+      Yaw: 4.8850016593933105
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1024
+  Height: 999
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: ""
-  Width: 1920
+  QMainWindow State: 000000ff00000000fd00000001000000000000038f00000391fc0200000003fb000000100044006900730070006c006100790073010000003b000001fe000000c700fffffffb0000000a00560069006500770073010000023f00000147000000a000fffffffb0000000800540069006d0065010000038c000000400000003700ffffff000003df0000039100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Time:
+    collapsed: false
+  Views:
+    collapsed: false
+  Width: 1908
   X: 0
   Y: 0

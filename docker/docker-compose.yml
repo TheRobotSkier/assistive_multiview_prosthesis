@@ -49,15 +49,6 @@ services:
         tty: true
         command: bash
 
-    # RVIZ test: just verifies that rviz gui can open in default prostehsis container
-    rviz:
-        container_name: rviz-test
-        image: prosthesis:latest
-        extends: prosthesis
-        command: rviz2
-        profiles:
-            - rviz
-
     # ── Hardware variant: same image with USB devices ────────────────────────
     prosthesis-hw:
         image: prosthesis:latest
