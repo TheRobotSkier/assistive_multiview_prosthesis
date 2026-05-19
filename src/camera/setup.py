@@ -19,6 +19,7 @@ setup(
             "pointcloud_merger_node = camera.pointcloud_merger_node:main",
             "cam2_hand_tracker_node = camera.cam2_hand_tracker_node:main",
             "odom_to_pose_relay = camera.odom_to_pose_relay:main",
+            "openvins_realsense_tf_bridge_node = camera.openvins_realsense_tf_bridge_node:main",
         ],
     },
     data_files=[

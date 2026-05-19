@@ -6,7 +6,11 @@
   <description>Minimal RealSense D435 camera launch configuration</description>
   <maintainer email="dev@multiview-prosthesis.org">multiview_prosthesis</maintainer>
   <license>MIT</license>
+  <depend>geometry_msgs</depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <depend>rclpy</depend>
   <depend>realsense2_camera</depend>
+  <depend>tf2_ros</depend>
   <depend>launch_ros</depend>
   <export>
     <build_type>ament_python</build_type>

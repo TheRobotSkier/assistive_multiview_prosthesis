@@ -75,6 +75,8 @@ public:
         "camera_front_depth",
         "camera_wrist"
       });
+    camera_lookup_target_frame_ =
+      declare_parameter<std::string>("camera_lookup_target_frame", "");
 
     // Configurable topic names
     const std::string hand_pose_topic =
@@ -296,13 +298,24 @@ private:
     request.cloud.data_ptr = cloud.data.data();
     request.cloud.data_len = cloud.data.size();
 
-    // Resolve camera positions from TF
+    // Resolve camera positions from TF in the same frame as the input cloud.
+    std::string camera_lookup_target_frame = camera_lookup_target_frame_;
+    if (camera_lookup_target_frame.empty()) {
+      camera_lookup_target_frame = cloud.header.frame_id;
+    }
+    if (camera_lookup_target_frame.empty()) {
+      camera_lookup_target_frame = pose.header.frame_id;
+    }
+    if (camera_lookup_target_frame.empty()) {
+      camera_lookup_target_frame = "world";
+    }
+
     uint32_t n_cameras = 0;
     for (const auto & frame : camera_frames_) {
       if (n_cameras >= 4) {break;}
       try {
         auto transform = tf_buffer_->lookupTransform(
-          "world", frame, tf2::TimePointZero);
+          camera_lookup_target_frame, frame, tf2::TimePointZero);
         request.cameras[n_cameras].x = static_cast<float>(
           transform.transform.translation.x);
         request.cameras[n_cameras].y = static_cast<float>(
@@ -313,8 +326,8 @@ private:
       } catch (const tf2::TransformException & ex) {
         RCLCPP_WARN(
           get_logger(),
-          "Could not lookup camera frame '%s': %s",
-          frame.c_str(), ex.what());
+          "Could not lookup camera frame '%s' in '%s': %s",
+          frame.c_str(), camera_lookup_target_frame.c_str(), ex.what());
       }
     }
 
@@ -345,8 +358,9 @@ private:
     RCLCPP_INFO(
       get_logger(),
       "Planner called with %u camera(s):"
-      " cam0=(%.3f,%.3f,%.3f)",
+      " target_frame=%s cam0=(%.3f,%.3f,%.3f)",
       n_cameras,
+      camera_lookup_target_frame.c_str(),
       n_cameras > 0 ? request.cameras[0].x : 0.0f,
       n_cameras > 0 ? request.cameras[0].y : 0.0f,
       n_cameras > 0 ? request.cameras[0].z : 0.0f);
@@ -504,6 +518,7 @@ private:
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::vector<std::string> camera_frames_;
+  std::string camera_lookup_target_frame_;
 
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr hand_pose_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr hand_twist_sub_;
