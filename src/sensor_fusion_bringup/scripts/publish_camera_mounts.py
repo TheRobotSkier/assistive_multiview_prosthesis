@@ -174,6 +174,7 @@ class CameraMountTFPublisher(Node):
 
     def _publish_single(self, data: dict, mount_name: str):
         tfs = self._build_shared_tfs(data)
+        tfs += self._build_grasp_contact_tf(data)
         tfs += self._build_bounding_box_tfs(data)
         tfs += self._build_mount_tfs(data, mount_name, f"_{mount_name}")
         self._broadcaster.sendTransform(tfs)
@@ -182,6 +183,7 @@ class CameraMountTFPublisher(Node):
 
     def _publish_all(self, data: dict):
         tfs = self._build_shared_tfs(data)
+        tfs += self._build_grasp_contact_tf(data)
         tfs += self._build_bounding_box_tfs(data)
         for name in data["mounts"]:
             tfs += self._build_mount_tfs(data, name, f"_{name}")
@@ -195,7 +197,16 @@ class CameraMountTFPublisher(Node):
         return [
             _make_tf(s, "world", "palm_frame",
                      0.0, 0.0, 0.0,
-                     0.0, 1.0, 0.0, 0.0),
+                     1.0, 0.0, 0.0, 0.0),
+        ]
+
+    def _build_grasp_contact_tf(self, data: dict) -> list[TransformStamped]:
+        s = self._stamp
+        gc = data["grasp_contact"]["palm_to_grasp_contact"]
+        return [
+            _make_tf(s, "palm_frame", "grasp_contact_frame",
+                     _t(gc, "x"), _t(gc, "y"), _t(gc, "z"),
+                     *_q(gc)),
         ]
 
     def _build_bounding_box_tfs(self, data: dict) -> list[TransformStamped]:

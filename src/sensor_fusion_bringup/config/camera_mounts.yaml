@@ -19,7 +19,8 @@
 # Transform chain:
 #   bottom_screw_frame -> camera_link (URDF, fixed)
 #   bottom_screw_frame -> palm_frame   (mount-specific, below)
-#   palm_frame -> bounding_box         (workspace, below)
+# palm_frame -> bounding_box         (workspace, below)
+# palm_frame -> grasp_contact        (grasp contact point, below)
 # ============================================================
 
 screw_to_link:
@@ -51,6 +52,19 @@ bounding_box:
       x: -0.22
       y: -0.34
       z: -0.32
+    rotation: identity
+    quaternion:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 1.0
+
+grasp_contact:
+  palm_to_grasp_contact:
+    translation:
+      x: 0.0
+      y: 0.13
+      z: 0.03
     rotation: identity
     quaternion:
     - 0.0
