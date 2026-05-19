@@ -8,7 +8,12 @@
   <license>MIT</license>
   <depend>pipeline_manager</depend>
   <depend>mia_hand_driver</depend>
+  <depend>command_bridge</depend>
+  <depend>wrist_driver</depend>
   <depend>emg_bridge</depend>
+  <depend>haptic_bridge</depend>
+  <depend>camera</depend>
+  <depend>pointcloud_fusion</depend>
   <depend>segmentation_bridge</depend>
   <depend>grasp_preshaping</depend>
   <depend>twist_propagation</depend>

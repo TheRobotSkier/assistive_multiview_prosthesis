@@ -153,6 +153,9 @@ class GraspProximityControllerNode(Node):
     def _on_current_hand_pose(self, msg: PoseStamped) -> None:
         self._current_hand_pose = msg
 
+    def _on_pipeline_state(self, msg: Int32) -> None:
+        self._pipeline_state = msg.data
+
     def _try_commit_plan(self) -> None:
         """Atomically commit buffered plan when all three parts have arrived."""
         if (self._buf_closures is not None
