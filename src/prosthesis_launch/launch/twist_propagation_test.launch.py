@@ -1,28 +1,31 @@
-"""Twist Propagation Test Launch — Jetson arm camera + pipeline nodes.
+"""Twist Propagation Test Launch — Jetson dual-camera fusion + pipeline nodes.
 
-Brings up everything needed to test twist propagation with a live camera
-streaming from the Jetson.  The camera itself runs on the Jetson; this file
-only starts the local pipeline nodes.
+Brings up everything needed to test twist propagation with dual cameras
+streaming from the Jetson.  The cameras + OpenVINS run on the Jetson; this
+file only starts the local pipeline nodes.
+
+Both camera point clouds are fused into a single cloud in the marker_map
+frame by the pointcloud_fusion_node, then filtered (distance, hand removal,
+voxel downsampling) before being consumed by segmentation and twist
+propagation.
 
 The arm camera's OpenVINS odometry (/ov_msckf_arm/odomimu) is relayed to
 /hand_pose so that moving the camera in real-time drives the twist estimation.
 
 Nodes started:
-  1. Odom-to-pose relay     — converts OpenVINS odom to /hand_pose + /hand_twist
-  2. Segmentation bridge    — HTTP inference client (input remapped to camera topic)
-  3. Grasp preshaping        — C++/Rust FFI bridge (called after segmentation)
-  4. Twist propagation       — active, listening to the camera pointcloud + odom
-  5. RViz                    — twist_propagation.rviz (fixed frame: marker_map)
+  1. Pointcloud fusion       — TF-transforms both clouds to marker_map, merges, filters
+  2. Pointcloud relay        — /fused_pointcloud -> /segmentation/input_cloud
+  3. Odom-to-pose relay      — converts OpenVINS odom to /hand_pose + /hand_twist
+  4. Segmentation bridge     — HTTP inference client (receives fused cloud via relay)
+  5. Grasp preshaping         — C++/Rust FFI bridge (called after segmentation)
+  6. Twist propagation        — active, listening to /fused_pointcloud + odom
+  7. RViz                     — twist_propagation.rviz (fixed frame: marker_map)
 
 NOT started (must be provided externally):
-  - Camera + OpenVINS nodes  — running on Jetson
+  - Camera + OpenVINS nodes   — running on Jetson
 
 Usage:
   ros2 launch prosthesis_launch twist_propagation_test.launch.py
-
-  # With a different cloud topic:
-  ros2 launch prosthesis_launch twist_propagation_test.launch.py \
-      input_cloud_topic:=/head/d435i_head/depth/color/points
 
   # Without RViz:
   ros2 launch prosthesis_launch twist_propagation_test.launch.py rviz:=false
@@ -53,7 +56,6 @@ def _load_twist_propagation_params():
 
 
 def _launch_setup(context, *args, **kwargs):
-    input_cloud_topic = LaunchConfiguration("input_cloud_topic").perform(context)
     odom_topic = LaunchConfiguration("odom_topic").perform(context)
     active = LaunchConfiguration("active").perform(context)
     inference_url = LaunchConfiguration("inference_url").perform(context)
@@ -61,7 +63,43 @@ def _launch_setup(context, *args, **kwargs):
 
     nodes = []
 
-    # ── 1. Odom-to-pose relay ────────────────────────────────────────────
+    # ── 1. Pointcloud fusion ─────────────────────────────────────────────
+    # Subscribes to both Jetson camera clouds, transforms them to marker_map
+    # frame via TF2 (provided by OpenVINS on the Jetson), merges, applies
+    # distance filtering, hand/arm bbox removal, and voxel downsampling.
+    nodes.append(
+        Node(
+            package="pointcloud_fusion",
+            executable="pointcloud_fusion_node",
+            name="pointcloud_fusion",
+            parameters=[{
+                "target_frame": "marker_map",
+                "cam1_topic": "/head/d435i/head/depth/color/points",
+                "cam2_topic": "/arm/d435i/arm/depth/color/points",
+                "arm_frame": "arm_d435i_arm_depth_frame",
+                "max_distance": 2.0,
+                "voxel_size": 0.005,
+                "bbox_min": [-0.30, -0.10, -0.10],
+                "bbox_max": [0.22, 0.10, 0.12],
+                "enable_downsampling": True,
+                "enable_distance_filter": True,
+                "enable_hand_removal": True,
+            }],
+            output="screen",
+        )
+    )
+
+    # ── 2. Pointcloud relay (fused -> segmentation input) ────────────────
+    nodes.append(
+        Node(
+            package="camera",
+            executable="pointcloud_relay_node",
+            name="pointcloud_relay",
+            output="screen",
+        )
+    )
+
+    # ── 3. Odom-to-pose relay ────────────────────────────────────────────
     # Converts the OpenVINS odometry stream into /hand_pose (PoseStamped),
     # /hand_twist (TwistStamped), and /hand_odom (full Odometry for covariance).
     nodes.append(
@@ -80,21 +118,20 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 2. Segmentation bridge ────────────────────────────────────────────
-    # Input cloud remapped from the default /segmentation/input_cloud to the
-    # actual camera topic coming from the Jetson.
+    # ── 4. Segmentation bridge ───────────────────────────────────────────
+    # Receives the fused cloud via /segmentation/input_cloud (provided by
+    # the pointcloud_relay_node). No remapping needed.
     nodes.append(
         Node(
             package="segmentation_bridge",
             executable="segmentation_ros2_node",
             name="segmentation_bridge",
-            remappings={("/segmentation/input_cloud", input_cloud_topic)},
             parameters=[{"inference_url": inference_url}],
             output="screen",
         )
     )
 
-    # ── 3. Grasp preshaping service ──────────────────────────────────────
+    # ── 5. Grasp preshaping service ──────────────────────────────────────
     nodes.append(
         Node(
             package="grasp_preshaping",
@@ -104,11 +141,11 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 4. Twist propagation ─────────────────────────────────────────────
+    # ── 6. Twist propagation ─────────────────────────────────────────────
     # Load full parameter set from the package config, overlay overrides.
     twist_params = _load_twist_propagation_params()
     twist_params["active"] = active == "true"
-    twist_params["input_cloud_topic"] = input_cloud_topic
+    twist_params["input_cloud_topic"] = "/fused_pointcloud"
     twist_params["odom_topic"] = "/hand_odom"
 
     nodes.append(
@@ -121,7 +158,7 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 5. RViz ──────────────────────────────────────────────────────────
+    # ── 7. RViz ──────────────────────────────────────────────────────────
     if rviz_enabled:
         # The rviz/ directory lives at /prosthesis_ws/rviz/ inside the container.
         # Use absolute path since rviz configs aren't part of any ROS package.
@@ -145,11 +182,6 @@ def _launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument(
-            "input_cloud_topic",
-            default_value="/arm/d435i_arm/points_marker_map",
-            description="Pointcloud topic from the Jetson camera.",
-        ),
         DeclareLaunchArgument(
             "odom_topic",
             default_value="/ov_msckf_arm/odomimu",

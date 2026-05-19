@@ -1,6 +1,14 @@
 # Prosthesis main container
 # Based on ROS Jazzy desktop — includes RViz, rqt, ros2-control, xacro, tf2-ros
-FROM docker.io/osrf/ros:jazzy-desktop
+#
+# Multi-stage build:
+#   base        — system deps, Python deps, user setup, rosdep (no source/build)
+#   production  — copies source + runs colcon build (used by test service)
+#
+# For development, the base image is used with source mounted as volumes.
+
+# ── Base stage: dependencies only ────────────────────────────────────────────
+FROM docker.io/osrf/ros:jazzy-desktop AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -44,22 +52,16 @@ RUN if id -u ${USER_UID} >/dev/null 2>&1; then \
 # ── Workspace ────────────────────────────────────────────────────────────────
 WORKDIR /prosthesis_ws
 
-# Copy everything — colcon will only build packages in src/
+# Install ROS dependencies from package.xml files (source needed for rosdep).
+# This layer is rebuilt when package.xml files change — rare compared to code changes.
 COPY src/ src/
-COPY config/ config/
-COPY rviz/ rviz/
-COPY scripts/ scripts/
-COPY tests/ tests/
-
-RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
-RUN chown -R ${USER_UID}:${USER_GID} tests/
-
-# Install ROS dependencies and build
 RUN . /opt/ros/jazzy/setup.sh \
     && apt-get update \
     && rosdep install --from-paths src/ --ignore-src -r -y \
-    && rm -rf /var/lib/apt/lists/* \
-    && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+    && rm -rf /var/lib/apt/lists/*
+
+# Remove the source copy — development mounts it as a volume.
+RUN rm -rf /prosthesis_ws/src
 
 # ── Runtime ──────────────────────────────────────────────────────────────────
 ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
@@ -70,9 +72,17 @@ ENV GRASP_PRESHAPING_HOME="/prosthesis_ws/src/grasp_preshaping"
 
 USER prosthesis
 
-# Source the workspace on shell entry
+# Source the workspace on shell entry (install/setup.bash may not exist yet
+# on first run with empty volumes — that's fine, it will after `make build`).
 RUN echo "source /opt/ros/jazzy/setup.bash" >> /home/prosthesis/.bashrc \
-    && echo "source /prosthesis_ws/install/setup.bash" >> /home/prosthesis/.bashrc
+    && echo 'if [ -f /prosthesis_ws/install/setup.bash ]; then source /prosthesis_ws/install/setup.bash; fi' >> /home/prosthesis/.bashrc
+
+# Auto-build on first shell entry if install/ is empty (fresh named volumes).
+RUN echo 'if [ ! -f /prosthesis_ws/install/setup.bash ] && [ -d /prosthesis_ws/src ]; then' >> /home/prosthesis/.bashrc \
+    && echo '    echo "First run — building workspace...";' >> /home/prosthesis/.bashrc \
+    && echo '    cd /prosthesis_ws && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release;' >> /home/prosthesis/.bashrc \
+    && echo '    source /prosthesis_ws/install/setup.bash;' >> /home/prosthesis/.bashrc \
+    && echo 'fi' >> /home/prosthesis/.bashrc
 
 # Disable ROS2 CLI daemon — it hangs in rootless podman with --network host
 # because the XML-RPC localhost connection between daemon subprocess and
@@ -83,3 +93,20 @@ RUN sed -i 's/use_daemon = not getattr(args, '\''no_daemon'\'', False)/use_daemo
 USER prosthesis
 
 CMD ["/bin/bash"]
+
+# ── Production stage: full build (used by test service) ──────────────────────
+FROM base AS production
+
+# Copy everything — colcon will only build packages in src/
+COPY src/ src/
+COPY config/ config/
+COPY rviz/ rviz/
+COPY scripts/ scripts/
+COPY tests/ tests/
+
+RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
+RUN chown -R ${USER_UID}:${USER_GID} tests/
+
+# Build all packages
+RUN . /opt/ros/jazzy/setup.sh \
+    && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release

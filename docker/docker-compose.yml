@@ -1,23 +1,33 @@
-# Prosthesis — minimal Docker Compose
-# Usage:
-#   make up                        # mock hardware (default, no devices)
-#   make up-hw                     # real hardware (USB devices mapped)
-#   make test                      # run smoke tests
-#   make build                     # build all images
+# Prosthesis — Docker Compose
 #
-# Or directly:
-#   podman-compose build
-#   podman-compose up                                       # mock
-#   podman-compose -f docker-compose.yml -f docker-compose.hw.yml up  # hardware
+# Development workflow:
+#   make dev              # start dev container (instant, source mounted as volumes)
+#   make shell            # shell into container
+#   make dev-shell        # start + shell in one command
+#
+# Inside the container (use the workspace Makefile):
+#   make                  # show all available targets
+#   make build            # colcon build (all packages)
+#   make build-pkg PKG=x  # incremental build
+#   make digital-twin     # launch digital twin
+#   make mock             # launch mock pipeline
+#
+# Other services:
+#   make segmentation     # start inference server
+#   make up-hw            # start with USB device mapping
+#   make test             # run smoke tests (builds production image)
 
 services:
-    # ── Main ROS 2 container ─────────────────────────────────────────────────
+    # ── Main ROS 2 development container ──────────────────────────────────────
+    # Uses the 'base' Dockerfile stage — no source copied, no colcon build.
+    # Source is mounted as bind volumes; build artifacts live in named volumes.
     prosthesis:
         container_name: prosthesis
         image: prosthesis:latest
         build:
             context: ..
             dockerfile: docker/Dockerfile
+            target: base
             args:
                 USER_UID: ${USER_UID:-1000}
                 USER_GID: ${USER_GID:-1000}
@@ -31,43 +41,23 @@ services:
         volumes:
             # X11 forwarding (works on Linux and WSL2 with WSLg)
             - /tmp/.X11-unix:/tmp/.X11-unix:rw
-            # CycloneDDS peer config for Jetson discovery (no effect if Jetson is offline)
+            # CycloneDDS peer config for Jetson discovery
             - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
-            #    profiles:
-            #      - mock, rviz, test
-            # Tests: bidirectional mount so results written in the container appear on host
+            # Source directories — bind-mounted for instant edit→build cycles
+            - ../src:/prosthesis_ws/src:rw
+            - ../config:/prosthesis_ws/config:rw
+            - ../rviz:/prosthesis_ws/rviz:rw
+            - ../scripts:/prosthesis_ws/scripts:rw
             - ../tests:/prosthesis_ws/tests:rw
+            # In-container Makefile
+            - ../Makefile.workspace:/prosthesis_ws/Makefile:ro
+            # Build artifacts — named volumes persist across container restarts
+            - prosthesis-build:/prosthesis_ws/build
+            - prosthesis-install:/prosthesis_ws/install
+            - prosthesis-log:/prosthesis_ws/log
         stdin_open: true
         tty: true
         privileged: true # LINUX ONLY
-
-    interactive:
-        container_name: interactive
-        image: prosthesis:latest
-        extends: prosthesis
-        stdin_open: true
-        tty: true
-        command: bash
-
-    # ── Hardware variant: same image with USB devices ────────────────────────
-    prosthesis-hw:
-        image: prosthesis:latest
-        extends: prosthesis
-        container_name: prosthesis-hw
-        runtime: nvidia
-        ipc: host
-        devices:
-            - ${MIA_SERIAL_PORT:-/dev/ttyUSB1}:/dev/ttyUSB1
-            - ${WRIST_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0
-        volumes:
-            - /tmp/.X11-unix:/tmp/.X11-unix:rw
-            - /dev:/dev
-            - /run/udev:/run/udev:ro
-        environment:
-            - CAM_HEAD_SERIAL=${CAM_HEAD_SERIAL:-}
-            - CAM_ARM_SERIAL=${CAM_ARM_SERIAL:-}
-        profiles:
-            - hardware
 
     # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
     segmentation:
@@ -80,73 +70,25 @@ services:
             - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
         volumes:
             - /tmp/.X11-unix:/tmp/.X11-unix:rw
+            # Persist model weights across container recreations (~200MB)
+            - segmentation-weights:/weights
         network_mode: host
         profiles:
             - segmentation
-            - grasp_test
-            - digital_twin
         privileged: true # LINUX ONLY
         userns_mode: "keep-id" # LINUX_ONLY
 
-    # ── Grasp test: runs grasp test launch file with camera & GUI ──────────────
-    grasp_test:
-        container_name: grasp_test
-        image: prosthesis:latest
-        extends: prosthesis
-        command:
-            [
-                "/bin/bash",
-                "-c",
-                "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch grasp_test.launch.py camera:=true gui:=true",
-            ]
-        environment:
-            - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-            - XAUTHORITY=/tmp/.Xauthority
-        network_mode: host
-        volumes:
-            # X11 forwarding (works on Linux and WSL2 with WSLg)
-            - /tmp/.X11-unix:/tmp/.X11-unix:rw
-        depends_on:
-            - segmentation
-        profiles:
-            - grasp_test
-        stdin_open: true
-        tty: true
-        privileged: true # LINUX ONLY
-        userns_mode: "keep-id" # LINUX_ONLY
-
-    # ── Digital twin: cameras -> pointcloud fuse -> segmentation -> preshaping -> proximity ──
-    digital_twin:
-        container_name: digital_twin
-        image: prosthesis:latest
-        extends: prosthesis
-        command:
-            [
-                "/bin/bash",
-                "-c",
-                "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=true",
-            ]
-        environment:
-            - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-            - XAUTHORITY=/tmp/.Xauthority
-        network_mode: host
-        volumes:
-            - /tmp/.X11-unix:/tmp/.X11-unix:rw
-        depends_on:
-            - segmentation
-        profiles:
-            - digital_twin
-        stdin_open: true
-        tty: true
-        privileged: true
-        userns_mode: "keep-id"
-
-    # ── Test runner: reuses prosthesis image, runs smoke tests, exits ────────
+    # ── Test runner: uses production image, runs smoke tests, exits ─────────
     test:
-        extends: prosthesis
         container_name: test
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile
+            target: production
+            args:
+                USER_UID: ${USER_UID:-1000}
+                USER_GID: ${USER_GID:-1000}
         user: "0:0"
-        image: prosthesis:latest
         environment:
             - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
             - ROS_DOMAIN_ID=0
@@ -157,3 +99,10 @@ services:
         network_mode: host
         volumes:
             - ../tests:/prosthesis_ws/tests:rw
+
+# ── Named volumes ────────────────────────────────────────────────────────────
+volumes:
+    prosthesis-build:
+    prosthesis-install:
+    prosthesis-log:
+    segmentation-weights:

@@ -1,7 +1,8 @@
-# Hardware override — used with:  podman-compose -f docker-compose.yml -f docker-compose.hw.yml up
+# Hardware overlay — adds USB device mappings to the prosthesis service.
 #
-# Adds USB device mappings and creates the /dev/ttyMiaHand symlink.
-# The Makefile target 'up-hw' uses this automatically.
+# Usage:  make up-hw
+# Behind the scenes:
+#   podman-compose -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis
 #
 # Only map devices that are actually connected.  Podman will refuse to start
 # the container if a mapped device does not exist on the host.
@@ -18,7 +19,3 @@ services:
     # (e.g. dialout) so the container user can access serial devices.
     group_add:
       - "keep-groups"
-    environment:
-      - DISPLAY=${DISPLAY:-:0}
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - ROS_DOMAIN_ID=0

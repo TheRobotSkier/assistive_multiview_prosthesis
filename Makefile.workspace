@@ -1,0 +1,99 @@
+# Prosthesis — in-container workspace Makefile
+# This file is mounted into the container at /prosthesis_ws/Makefile.
+# Run `make` inside the container to see available targets.
+#
+# ROS setup is handled automatically — no need to source setup.bash manually.
+
+.DEFAULT_GOAL := help
+
+# ── ROS setup wrapper ────────────────────────────────────────────────────────
+# make runs recipes in non-interactive subshells that don't source .bashrc,
+# so we explicitly source the ROS and workspace setup before every command.
+SHELL := /bin/bash
+ROS_SETUP := source /opt/ros/jazzy/setup.bash && source /prosthesis_ws/install/setup.bash 2>/dev/null || source /opt/ros/jazzy/setup.bash
+
+# ── Package selector ─────────────────────────────────────────────────────────
+PKG ?=
+
+# ── Targets ──────────────────────────────────────────────────────────────────
+
+.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch source
+
+help: ## Show this help message
+	@echo ""
+	@echo "Prosthesis Workspace Commands"
+	@echo "============================="
+	@echo ""
+	@echo "Usage: make <target>"
+	@echo ""
+	@printf "  %-22s %s\n" "TARGET" "DESCRIPTION"
+	@printf "  %-22s %s\n" "------" "-----------"
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+		awk -F ':.*?## ' '{printf "  %-22s %s\n", $$1, $$2}'
+	@echo ""
+	@echo "Variables:"
+	@printf "  %-22s %s\n" "PKG=<name>" "Package name for build-pkg target"
+	@echo ""
+
+build: ## Build all ROS packages (Release mode)
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+build-pkg: ## Build a single package (use: make build-pkg PKG=pipeline_manager)
+	@if [ -z "$(PKG)" ]; then \
+		echo "Usage: make build-pkg PKG=<package_name>"; \
+		exit 1; \
+	fi
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --packages-select $(PKG) --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+build-debug: ## Build all packages with debug symbols
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
+
+clean: ## Remove all build artifacts (build/, install/, log/)
+	rm -rf /prosthesis_ws/build /prosthesis_ws/install /prosthesis_ws/log
+	@echo "Build artifacts cleaned."
+
+test: ## Run the smoke test suite
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	bash scripts/run_tests.sh
+
+# ── Launch targets ───────────────────────────────────────────────────────────
+
+mock: ## Launch mock pipeline (no hardware needed)
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch mock.launch.py
+
+pipeline: ## Launch full hardware pipeline
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch pipeline.launch.py
+
+digital-twin: ## Launch digital twin with real cameras
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=true
+
+digital-twin-mock: ## Launch digital twin without cameras
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch digital_twin.launch.py camera:=false gui:=true
+
+grasp-test: ## Launch legacy grasp test mode
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch grasp_test.launch.py
+
+twist-test: ## Launch twist propagation test (Jetson camera)
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch twist_propagation_test.launch.py
+
+twist-launch: ## Launch twist propagation
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch twist_propagation_test.launch.py
+
+# ── Utility ──────────────────────────────────────────────────────────────────
+
+source: ## Print the source command for manual use
+	@echo "source /opt/ros/jazzy/setup.bash && source /prosthesis_ws/install/setup.bash"

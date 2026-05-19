@@ -18,7 +18,7 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation build-jazzy-rviz rebuild up up-prosthesis up-hw up-grasp-test down-grasp-test logs-grasp-test up-digital-twin down-digital-twin logs-digital-twin test-digital-twin test shell clean logs logs-cameras rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill
+.PHONY: build build-prosthesis build-segmentation build-jazzy-rviz rebuild dev dev-shell segmentation up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -36,43 +36,28 @@ build-jazzy-rviz:
 rebuild:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build --no-cache
 
-# ── Run ────────────────────────────────────────────────────────────────────
-up:
-	cd $(COMPOSE_DIR) && $(COMPOSE) up -d
+# ── Development ────────────────────────────────────────────────────────────
+# Primary workflow: make dev → make shell → (inside container) make build
 
-up-prosthesis:
-	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) up -d --force-recreate prosthesis
+dev:
+	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis
+
+dev-shell: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash
+
+segmentation:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile segmentation up -d segmentation
+
+down-segmentation:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile segmentation down
+
+# ── Run ────────────────────────────────────────────────────────────────────
+up: dev
+
+up-prosthesis: dev
 
 up-hw:
-	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml up -d --build --force-recreate
-
-# ── Grasp Test ──────────────────────────────────────────────────────────────
-up-grasp-test:
-	$(COMPOSE) rm -f grasp_test 2>/dev/null || true
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up grasp_test -d
-
-down-grasp-test:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test down
-
-logs-grasp-test:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test logs -f
-
-# ── Digital Twin ────────────────────────────────────────────────────────────
-up-digital-twin:
-	$(COMPOSE) rm -f digital_twin 2>/dev/null || true
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin up digital_twin -d
-
-down-digital-twin:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin down
-
-logs-digital-twin:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile digital_twin logs -f
-
-test-digital-twin:
-	@echo "=== Pointcloud Health Test ==="
-	podman exec digital_twin bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
-		podman exec grasp_test bash /prosthesis_ws/scripts/test_pointcloud_health.sh || \
-		echo "No running container found — start one first with 'make up-digital-twin' or 'make up-grasp-test'"
+	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:
@@ -89,12 +74,12 @@ down:
 clean:
 	cd $(COMPOSE_DIR) && $(COMPOSE) down --rmi local --volumes
 
+clean-volumes:
+	-$(DOCKER_CMD) volume rm prosthesis-build prosthesis-install prosthesis-log segmentation-weights 2>/dev/null || true
+	@echo "Named volumes removed. Next 'make dev' will trigger a fresh build."
+
 logs:
 	cd $(COMPOSE_DIR) && $(COMPOSE) logs -f
-
-# ── Camera logs (D435i — hardware profile) ────────────────────────────────
-logs-cameras:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile hardware logs -f prosthesis-hw
 
 # ── Robotlab RViz (view Jetson camera data on host via Ethernet) ──────
 ros2-ethernet-shell:
