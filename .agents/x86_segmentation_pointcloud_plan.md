@@ -50,6 +50,10 @@ If Jetson load becomes too high, move more work to x86:
   - `/arm/d435i_arm/depth/color/points`
 - Subscribe to `/tf` and `/tf_static` from the Jetson.
 - Transform each raw cloud into `marker_map` on the x86 PC.
+- Merge the transformed clouds on the x86 PC and range-filter distant points,
+  initially beyond `2.0 m`, without voxel downsampling or point subsampling.
+- Planning prompt for this offload path:
+  `.agents/x86_raw_pointcloud_marker_map_offload_prompt_2026-05-19.md`.
 
 ## Jetson Responsibilities
 

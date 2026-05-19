@@ -37,6 +37,13 @@ to remove points inside user-measured prosthesis bounding boxes, likely measured
 relative to the arm D435i camera, before future collision checking so the system
 does not report collisions with itself.
 
+Planned x86 raw pointcloud offload prompt:
+`.agents/x86_raw_pointcloud_marker_map_offload_prompt_2026-05-19.md`. The goal
+is to keep the Jetson focused on RealSense RGB/IMU, OpenVINS, marker updates,
+TF, and raw color pointcloud publication, while the x86 PC transforms raw head
+and arm pointclouds into `marker_map`, merges them, and removes points beyond a
+configurable range such as `2.0 m` without x86-side downsampling/subsampling.
+
 Important current caveat: the latest live ID2 measurement bag
 `dynamic_id2_arm_update_live_20260513_125316` validated the measurement path
 but not the OpenVINS update/reanchor path. It recorded `218` head dynamic ID2

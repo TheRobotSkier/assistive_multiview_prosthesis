@@ -26,6 +26,13 @@ The status topic reports alternating `published` and `rate_limited`, which is
 the expected behavior when raw pointclouds arrive faster than
 `pointcloud_max_rate_hz`.
 
+Latest Jetson offload update: raw RealSense pointcloud publishing is now split
+from the Jetson marker-map republishers. `enable_pointclouds:=true` starts raw
+depth/color pointcloud generation, while `enable_marker_map_pointclouds`
+controls whether the Jetson also starts the `points_marker_map` transform
+nodes. `pointcloud_decimation_enable` controls the RealSense decimation filter,
+so x86 offload tests can keep full raw point density on the Jetson.
+
 ## Implemented Changes
 
 ### Opt-In D435i Color Pointclouds
@@ -66,7 +73,7 @@ pointcloud.stream_index_filter: 0
 pointcloud.ordered_pc: false
 pointcloud.allow_no_texture_points: false
 align_depth.enable: false
-decimation_filter.enable: true
+decimation_filter.enable: true when pointcloud_decimation_enable:=true
 decimation_filter.filter_magnitude: 3
 clip_distance: 2.0
 enable_pointcloud_neon_fix: false
@@ -99,6 +106,14 @@ Transformed grasping topics:
 ```text
 /head/d435i_head/points_marker_map
 /arm/d435i_arm/points_marker_map
+```
+
+These transformed topics are published by Jetson-side republisher nodes only
+when both of these launch flags are true:
+
+```text
+enable_pointclouds:=true
+enable_marker_map_pointclouds:=true
 ```
 
 The transformed topics publish in:
@@ -145,6 +160,8 @@ Default pointcloud performance controls:
 pointcloud.max_rate_hz: 10.0
 pointcloud.voxel_leaf_m: 0.02
 pointcloud.max_range_m: 2.0
+pointcloud.enable_marker_map: true
+pointcloud.decimation_enable: true
 pointcloud.decimation_magnitude: 3
 pointcloud.require_marker_map_locked: false
 ```
@@ -330,7 +347,7 @@ docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd
 Then run the conservative pointcloud test:
 
 ```bash
-docker compose run --rm --name openvins_pc realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true start_preview:=false start_rviz:=false pointcloud_require_marker_map_locked:=false pointcloud_max_rate_hz:=8.0 pointcloud_voxel_leaf_m:=0.02 pointcloud_max_range_m:=2.0 pointcloud_decimation_magnitude:=3 enable_pointcloud_neon_fix:=false'
+docker compose run --rm --name openvins_pc realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=true start_preview:=false start_rviz:=false pointcloud_require_marker_map_locked:=false pointcloud_max_rate_hz:=8.0 pointcloud_voxel_leaf_m:=0.02 pointcloud_max_range_m:=2.0 pointcloud_decimation_enable:=true pointcloud_decimation_magnitude:=3 enable_pointcloud_neon_fix:=false'
 ```
 
 In another terminal, first confirm raw pointclouds are flowing:
@@ -389,8 +406,10 @@ The x86 segmentation-side plan is documented in:
 
 The recommended architecture is:
 
-- keep OpenVINS, marker-map TF, RealSense image/IMU, and the opt-in
-  `points_marker_map` republishers on the Jetson for now
+- keep OpenVINS, marker-map TF, RealSense image/IMU, fixed ID0 updates, and
+  dynamic ID2 updates/reanchor on the Jetson
+- for the x86 offload path, disable Jetson `points_marker_map` republishers and
+  publish only raw RealSense color pointclouds plus `/tf` and `/tf_static`
 - move segmentation, optional cloud merge, segmentation-specific crop/downsample,
   and any heavier grasp-input preparation to the x86 Ubuntu PC
 - publish the segmentation-ready pointcloud as `/segmentation/input_cloud` in
@@ -398,16 +417,28 @@ The recommended architecture is:
 - preserve the existing `/segmentation/click_positive` target for future hit
   or click commands
 
-For the first x86 integration, subscribe to the already validated Jetson topics:
+The official Jetson x86 raw-cloud offload command is:
 
-```text
-/head/d435i_head/points_marker_map
-/arm/d435i_arm/points_marker_map
+```bash
+docker compose run --rm --name openvins_pc realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=false pointcloud_decimation_enable:=false pointcloud_max_range_m:=0.0 start_preview:=false start_rviz:=false enable_pointcloud_neon_fix:=false'
 ```
 
-If Jetson CPU/EMC becomes too high, move the marker-map pointcloud transform
-and merge/downsample step to the x86 PC later by subscribing to raw RealSense
-pointclouds plus `/tf` and `/tf_static`.
+The x86 PC should subscribe to:
+
+```text
+/head/d435i_head/depth/color/points
+/arm/d435i_arm/depth/color/points
+/tf
+/tf_static
+```
+
+The Jetson-side transformed-cloud rollback/current mode remains:
+
+```bash
+docker compose run --rm --name openvins_pc realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=true'
+```
+
+No x86 transform/merge/range-filter node is implemented in this Jetson change.
 
 ## Commit Recommendation
 
@@ -420,7 +451,7 @@ git index/worktree view so only source/config/docs changes are committed.
 Suggested commit message after final validation:
 
 ```text
-Add Jetson-safe D435i marker-map pointcloud support
+Split raw D435i pointcloud publishing from Jetson marker-map republishers
 ```
 
 If splitting into multiple commits:

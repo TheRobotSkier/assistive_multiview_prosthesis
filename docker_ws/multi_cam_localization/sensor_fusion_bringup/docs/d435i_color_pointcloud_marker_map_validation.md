@@ -99,11 +99,24 @@ OpenVINS-only default, with pointcloud processing off:
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=false start_preview:=false start_rviz:=false'
 ```
 
-Grasping run, with 15 Hz depth/color pointclouds and marker-map republishers:
+Jetson marker-map grasping mode, with depth/color pointclouds and Jetson
+marker-map republishers:
 
 ```bash
-docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true'
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=true'
 ```
+
+X86 raw-cloud offload mode, with raw RealSense color pointclouds only on the
+Jetson and no Jetson marker-map pointcloud republishers:
+
+```bash
+docker compose run --rm --name openvins_pc realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=false pointcloud_decimation_enable:=false pointcloud_max_range_m:=0.0 start_preview:=false start_rviz:=false enable_pointcloud_neon_fix:=false'
+```
+
+In x86 raw-cloud offload mode the Jetson still runs RealSense RGB/IMU,
+modified OpenVINS, fixed ID0 updates, dynamic ID2 updates/reanchor, and TF. The
+x86 PC owns transform, merge, and range filtering of the raw clouds. No x86
+transform/merge node is implemented by this Jetson launch change.
 
 To compare the RealSense publication-order behavior, override the default
 explicitly:
@@ -123,13 +136,16 @@ The default dynamic-ID2 config uses conservative Jetson pointcloud settings:
 pointcloud_max_rate_hz:=10.0
 pointcloud_voxel_leaf_m:=0.02
 pointcloud_max_range_m:=2.0
+enable_marker_map_pointclouds:=true
+pointcloud_decimation_enable:=true
 pointcloud_decimation_magnitude:=3
 enable_pointcloud_neon_fix:=false
 ```
 
 These keep OpenVINS RGB at `640x480x30`, keep RealSense depth at
-`640x480x15`, clip depth/pointcloud data beyond 2 m, and publish transformed
-clouds at up to 10 Hz. For a denser test, override them explicitly:
+`640x480x15`, clip depth/pointcloud data beyond 2 m, decimate the raw
+RealSense pointclouds, and publish transformed clouds at up to 10 Hz. For a
+denser Jetson marker-map test, override them explicitly:
 
 ```bash
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true pointcloud_max_rate_hz:=15.0 pointcloud_voxel_leaf_m:=0.01 pointcloud_decimation_magnitude:=2'
@@ -157,15 +173,24 @@ depth frame timeouts during pointcloud testing. A non-positive
 `pointcloud_max_range_m` disables launch-level RealSense clipping by setting
 `clip_distance:=-2.0`; positive values are forwarded as the clip distance.
 
-By default, transformed pointclouds publish whenever TF to `marker_map` is
-available. To require an explicit OpenVINS marker-map lock before transformed
-clouds publish, add:
+By default, `enable_pointclouds:=true` starts raw RealSense pointcloud
+generation and `enable_marker_map_pointclouds:=true` starts the Jetson
+`pointcloud_to_frame_node` republishers. Set
+`enable_marker_map_pointclouds:=false` for x86 offload so the Jetson publishes
+raw pointclouds but does not transform, range-filter, voxel-filter, or
+republish them in `marker_map`.
+
+When Jetson marker-map republishers are enabled, transformed pointclouds publish
+whenever TF to `marker_map` is available. To require an explicit OpenVINS
+marker-map lock before transformed clouds publish, add:
 
 ```bash
 pointcloud_require_marker_map_locked:=true
 ```
 
-Record pointcloud topics only when needed:
+Record pointcloud topics only when needed. Raw pointcloud topics are recorded
+whenever `record_pointclouds:=true`; transformed `points_marker_map` topics are
+recorded only when `enable_marker_map_pointclouds:=true`:
 
 ```bash
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true record_bag:=true record_pointclouds:=true start_rviz:=false'
@@ -236,9 +261,10 @@ range when pointclouds are enabled:
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 param get /head/d435i_head clip_distance && ros2 param get /arm/d435i_arm clip_distance'
 ```
 
-Transformed grasping topics should publish whenever TF to `marker_map` is
-available. If `pointcloud_require_marker_map_locked:=true`, they publish only
-after marker-map lock:
+Transformed grasping topics should publish whenever
+`enable_marker_map_pointclouds:=true` and TF to `marker_map` is available. If
+`pointcloud_require_marker_map_locked:=true`, they publish only after
+marker-map lock:
 
 ```bash
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 topic hz /head/d435i_head/points_marker_map'
@@ -392,7 +418,10 @@ Expected fields are `x`, `y`, `z`, and `rgb`.
   `enable_pointclouds:=false`.
 - Raw pointcloud topics publish near 15 Hz or below when
   `enable_pointclouds:=true`.
-- `/head/d435i_head/points_marker_map` and
+- In x86 raw-cloud offload mode, no `points_to_marker_map` nodes are launched
+  on the Jetson, while raw pointcloud topics still publish in their original
+  optical frames.
+- In Jetson marker-map mode, `/head/d435i_head/points_marker_map` and
   `/arm/d435i_arm/points_marker_map` publish when TF to `marker_map` is
   available. The conservative Jetson default is up to 10 Hz; override
   `pointcloud_max_rate_hz:=15.0` only if OpenVINS timing remains stable.

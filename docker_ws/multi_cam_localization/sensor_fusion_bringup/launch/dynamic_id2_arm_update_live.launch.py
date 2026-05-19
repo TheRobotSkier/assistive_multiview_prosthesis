@@ -73,6 +73,12 @@ def _setup(context, *args, **kwargs):
     start_rviz = _as_bool(_arg_or_config(context, "start_rviz", launch_cfg.get("start_rviz", False)))
     record_bag = _as_bool(_arg_or_config(context, "record_bag", launch_cfg.get("record_bag", False)))
     enable_pointclouds = _as_bool(_arg_or_config(context, "enable_pointclouds", pointcloud_cfg.get("enable", False)))
+    enable_marker_map_pointclouds = _as_bool(
+        _arg_or_config(context, "enable_marker_map_pointclouds", pointcloud_cfg.get("enable_marker_map", enable_pointclouds))
+    )
+    pointcloud_decimation_enable = _as_bool(
+        _arg_or_config(context, "pointcloud_decimation_enable", pointcloud_cfg.get("decimation_enable", enable_pointclouds))
+    )
     record_pointclouds = _as_bool(_arg_or_config(context, "record_pointclouds", pointcloud_cfg.get("record", False)))
     use_sim_time = _as_bool(_arg_or_config(context, "use_sim_time", False))
     verbosity = str(_arg_or_config(context, "verbosity", launch_cfg.get("verbosity", "INFO")))
@@ -112,6 +118,8 @@ def _setup(context, *args, **kwargs):
                 "verbosity": verbosity,
                 "hold_back_imu_for_frames": str(hold_back_imu_for_frames).lower(),
                 "enable_pointclouds": str(enable_pointclouds).lower(),
+                "enable_marker_map_pointclouds": str(enable_marker_map_pointclouds).lower(),
+                "pointcloud_decimation_enable": str(pointcloud_decimation_enable).lower(),
                 "pointcloud_max_rate_hz": pointcloud_max_rate_hz,
                 "pointcloud_voxel_leaf_m": pointcloud_voxel_leaf_m,
                 "pointcloud_max_range_m": pointcloud_max_range_m,
@@ -128,6 +136,8 @@ def _setup(context, *args, **kwargs):
                 "verbosity": verbosity,
                 "hold_back_imu_for_frames": str(hold_back_imu_for_frames).lower(),
                 "enable_pointclouds": str(enable_pointclouds).lower(),
+                "enable_marker_map_pointclouds": str(enable_marker_map_pointclouds).lower(),
+                "pointcloud_decimation_enable": str(pointcloud_decimation_enable).lower(),
                 "pointcloud_max_rate_hz": pointcloud_max_rate_hz,
                 "pointcloud_voxel_leaf_m": pointcloud_voxel_leaf_m,
                 "pointcloud_max_range_m": pointcloud_max_range_m,
@@ -283,13 +293,18 @@ def _setup(context, *args, **kwargs):
             topics.extend(
                 [
                     "/head/d435i_head/depth/color/points",
-                    "/head/d435i_head/points_marker_map",
-                    "/head/d435i_head/points_marker_map/status",
                     "/arm/d435i_arm/depth/color/points",
-                    "/arm/d435i_arm/points_marker_map",
-                    "/arm/d435i_arm/points_marker_map/status",
                 ]
             )
+            if enable_marker_map_pointclouds:
+                topics.extend(
+                    [
+                        "/head/d435i_head/points_marker_map",
+                        "/head/d435i_head/points_marker_map/status",
+                        "/arm/d435i_arm/points_marker_map",
+                        "/arm/d435i_arm/points_marker_map/status",
+                    ]
+                )
         actions.append(
             ExecuteProcess(
                 cmd=["bash", "-lc", "mkdir -p bags/openvins_tests/phase2_live && ros2 bag record -o " + bag_path + " " + " ".join(topics)],
@@ -315,6 +330,8 @@ def generate_launch_description():
             DeclareLaunchArgument("start_rviz", default_value=""),
             DeclareLaunchArgument("record_bag", default_value=""),
             DeclareLaunchArgument("enable_pointclouds", default_value=""),
+            DeclareLaunchArgument("enable_marker_map_pointclouds", default_value=""),
+            DeclareLaunchArgument("pointcloud_decimation_enable", default_value=""),
             DeclareLaunchArgument("pointcloud_max_rate_hz", default_value=""),
             DeclareLaunchArgument("pointcloud_voxel_leaf_m", default_value=""),
             DeclareLaunchArgument("pointcloud_max_range_m", default_value=""),

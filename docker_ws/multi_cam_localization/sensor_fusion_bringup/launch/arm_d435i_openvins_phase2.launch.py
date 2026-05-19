@@ -16,6 +16,22 @@ def generate_launch_description():
         "estimator_config.yaml",
     ])
 
+    pointcloud_marker_map_enabled = PythonExpression([
+        "'",
+        LaunchConfiguration("enable_pointclouds"),
+        "'.lower() in ['true', '1', 'yes', 'on'] and '",
+        LaunchConfiguration("enable_marker_map_pointclouds"),
+        "'.lower() in ['true', '1', 'yes', 'on']",
+    ])
+
+    pointcloud_decimation_enabled = PythonExpression([
+        "'",
+        LaunchConfiguration("enable_pointclouds"),
+        "'.lower() in ['true', '1', 'yes', 'on'] and '",
+        LaunchConfiguration("pointcloud_decimation_enable"),
+        "'.lower() in ['true', '1', 'yes', 'on']",
+    ])
+
     arm_camera = Node(
         package="realsense2_camera",
         executable="realsense2_camera_node",
@@ -64,7 +80,7 @@ def generate_launch_description():
             "pointcloud__neon_.ordered_pc": False,
             "pointcloud__neon_.allow_no_texture_points": False,
             "align_depth.enable": False,
-            "decimation_filter.enable": ParameterValue(LaunchConfiguration("enable_pointclouds"), value_type=bool),
+            "decimation_filter.enable": ParameterValue(pointcloud_decimation_enabled, value_type=bool),
             "decimation_filter.filter_magnitude": ParameterValue(LaunchConfiguration("pointcloud_decimation_magnitude"), value_type=int),
         }],
     )
@@ -101,7 +117,7 @@ def generate_launch_description():
         executable="pointcloud_to_frame_node",
         name="arm_d435i_points_to_marker_map",
         output="screen",
-        condition=IfCondition(LaunchConfiguration("enable_pointclouds")),
+        condition=IfCondition(pointcloud_marker_map_enabled),
         parameters=[
             {"use_sim_time": LaunchConfiguration("use_sim_time")},
             {"input_topic": "/arm/d435i_arm/depth/color/points"},
@@ -298,7 +314,12 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "enable_pointclouds",
             default_value="false",
-            description="Enable 15 Hz depth/color pointclouds and marker_map republisher.",
+            description="Enable RealSense depth/color pointcloud generation. Marker-map republishing has a separate gate.",
+        ),
+        DeclareLaunchArgument(
+            "enable_marker_map_pointclouds",
+            default_value="true",
+            description="Start the Jetson marker_map pointcloud republisher when raw pointclouds are enabled.",
         ),
         DeclareLaunchArgument("pointcloud_max_rate_hz", default_value="10.0"),
         DeclareLaunchArgument("pointcloud_voxel_leaf_m", default_value="0.02"),
@@ -314,6 +335,11 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument("pointcloud_transform_timeout_s", default_value="0.02"),
         DeclareLaunchArgument("pointcloud_max_tf_age_s", default_value="0.50"),
+        DeclareLaunchArgument(
+            "pointcloud_decimation_enable",
+            default_value="true",
+            description="Enable the RealSense decimation filter when raw pointclouds are enabled.",
+        ),
         DeclareLaunchArgument("pointcloud_decimation_magnitude", default_value="3"),
         DeclareLaunchArgument(
             "enable_pointcloud_neon_fix",

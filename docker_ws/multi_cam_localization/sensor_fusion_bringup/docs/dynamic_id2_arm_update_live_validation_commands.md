@@ -105,11 +105,18 @@ sample matches within `max_head_pose_dt_s`, status reports `no_head_pose_match`.
 ## Optional Pointclouds
 
 Pointclouds are disabled by default so OpenVINS-only tests keep the calibrated
-30 Hz RGB input without extra depth processing load. Enable them only for
-grasping runs:
+30 Hz RGB input without extra depth processing load. Enable the full
+Jetson-side marker-map path only for grasping/RViz runs:
 
 ```bash
-docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true'
+docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=true'
+```
+
+For x86 raw-cloud offload testing, publish raw RealSense color pointclouds but
+do not start the Jetson marker-map republisher nodes:
+
+```bash
+docker compose run --rm --name openvins_pc realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=false pointcloud_decimation_enable:=false pointcloud_max_range_m:=0.0 start_preview:=false start_rviz:=false enable_pointcloud_neon_fix:=false'
 ```
 
 The stable grasping topics are:
@@ -126,8 +133,9 @@ they are in RealSense optical frames and may not have a direct TF chain to
 
 The Jetson RealSense pointcloud filter is enabled through startup parameters for
 both the plain `pointcloud.*` and Jetson `pointcloud__neon_.*` names. The
-top-level live launch also enables the delayed `pointcloud__neon_.enable` setter
-by default for pointcloud-enabled runs.
+delayed `pointcloud__neon_.enable` setter remains available as a legacy
+fallback, but it is disabled by default because startup parameters now enable
+raw pointclouds reliably.
 
 For Jetson stability, the default dynamic-ID2 pointcloud settings are now
 conservative:
@@ -136,8 +144,10 @@ conservative:
 pointcloud_max_rate_hz:=10.0
 pointcloud_voxel_leaf_m:=0.02
 pointcloud_max_range_m:=2.0
+enable_marker_map_pointclouds:=true
+pointcloud_decimation_enable:=true
 pointcloud_decimation_magnitude:=3
-enable_pointcloud_neon_fix:=true
+enable_pointcloud_neon_fix:=false
 ```
 
 If OpenVINS reports large timing delays or hits the propagator timing assert,
