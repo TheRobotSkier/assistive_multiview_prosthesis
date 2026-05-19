@@ -4,7 +4,7 @@ Launches all nodes needed for a complete digital twin test:
 
  1. Dual RealSense D435i cameras with IMU (or mock cloud publisher)
  2. Static TF: d435i_head_depth_optical_frame -> world (root)
- 3. Pointcloud merger       — TF-transforms both clouds into cam1 frame, fuses to /fused_pointcloud
+ 3. Pointcloud fusion        — TF-transforms both clouds to world frame, merges, filters, publishes /fused_pointcloud
  4. Pointcloud relay         — /fused_pointcloud -> /segmentation/input_cloud
  5. Segmentation ROS bridge  — HTTP inference client
  6. Click relay              — forwards RViz clicks to segmentation seeds
@@ -149,21 +149,30 @@ def _launch_setup(context, *args, **kwargs):
             )
         )
 
-    # ── 3. Pointcloud merger — TF-transforms cam2 into cam1 frame, merges ──
-    # Replaces the old fuser which just relayed whichever fired last.
+    # ── 3. Pointcloud fusion — TF-transforms both clouds to world, merges, filters ──
+    # Replaces the old pointcloud_merger_node which fused in cam1 frame.
+    # This node transforms BOTH clouds to world frame, applies distance filtering,
+    # hand/arm bbox removal, and voxel downsampling.
     if camera_enabled:
         nodes.append(
             Node(
-                package="camera",
-                executable="pointcloud_merger_node",
-                name="pointcloud_merger",
+                package='pointcloud_fusion',
+                executable='pointcloud_fusion_node',
+                name='pointcloud_fusion',
                 parameters=[{
-                    "cam1_topic": "/head/d435i_head/depth/color/points",
-                    "cam2_topic": "/arm/d435i_arm/depth/color/points",
-                    "output_topic": "/fused_pointcloud",
-                    "target_frame": cam1_frame,
+                    'target_frame': 'world',
+                    'cam1_topic': '/head/d435i_head/depth/color/points',
+                    'cam2_topic': '/arm/d435i_arm/depth/color/points',
+                    'arm_frame': 'wrist_link',
+                    'max_distance': 2.0,
+                    'voxel_size': 0.005,
+                    'bbox_min': [-0.30, -0.10, -0.10],
+                    'bbox_max': [0.22, 0.10, 0.12],
+                    'enable_downsampling': True,
+                    'enable_distance_filter': True,
+                    'enable_hand_removal': True,
                 }],
-                output="screen",
+                output='screen',
             )
         )
 
@@ -283,7 +292,7 @@ def _launch_setup(context, *args, **kwargs):
     # Load full parameter set from config, overlay overrides.
     twist_params = _load_twist_params_from_config(config_file)
     twist_params["active"] = False
-    twist_params["input_cloud_topic"] = cloud_topic
+    twist_params["input_cloud_topic"] = "/fused_pointcloud"
 
     nodes.append(
         Node(

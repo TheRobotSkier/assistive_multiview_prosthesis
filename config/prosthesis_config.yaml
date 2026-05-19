@@ -93,6 +93,20 @@ proximity_controller:
         wrist_accel_deg_s2: 180.0
         control_rate_hz: 10.0
 
+pointcloud_fusion:
+    ros__parameters:
+        target_frame: "world"
+        cam1_topic: "/head/d435i_head/depth/color/points"
+        cam2_topic: "/arm/d435i_arm/depth/color/points"
+        arm_frame: "wrist_link"
+        max_distance: 2.0
+        voxel_size: 0.005
+        bbox_min: [-0.30, -0.10, -0.10]
+        bbox_max: [0.22, 0.10, 0.12]
+        enable_downsampling: true
+        enable_distance_filter: true
+        enable_hand_removal: true
+
 twist_propagation:
     ros__parameters:
         cycle_delay_s: 0.1
@@ -103,7 +117,7 @@ twist_propagation:
         collision_geometry_radius_m: 0.05
         twist_estimation_window: 5
         active: false
-        input_cloud_topic: "/camera/depth/color/points"
+        input_cloud_topic: "/fused_pointcloud"
         segmented_cloud_topic: "/segmentation/object_cloud"
         hand_pose_topic: "/hand_pose"
         odom_topic: ""
@@ -250,9 +264,10 @@ twist_propagation:
     collision_geometry_radius_m: 0.05
     twist_estimation_window: 5
     active: false
-    input_cloud_topic: "/camera/depth/color/points"
+    input_cloud_topic: "/fused_pointcloud"
     segmented_cloud_topic: "/segmentation/object_cloud"
     hand_pose_topic: "/hand_pose"
+    odom_topic: ""
     click_positive_topic: "/segmentation/click_positive"
     hand_twist_topic: "/hand_twist"
     compute_grasp_service: "/grasp_preshaping/compute_grasp"
