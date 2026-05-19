@@ -33,6 +33,7 @@ from twist_propagation_node import (  # noqa: E402
     _build_initial_covariance_from_odom,
     _build_initial_covariance_from_pose_buf,
     _is_odom_initialized,
+    _should_retarget,
 )
 
 
@@ -395,3 +396,35 @@ class TestQuatMultiply:
         assert abs(result[0]) < 1e-10
         assert abs(result[1]) < 1e-10
         assert abs(result[2]) < 1e-10
+
+
+# -- Retarget policy tests --
+
+class TestShouldRetarget:
+
+    def test_no_current_target_accept(self):
+        hit = (1.0, 2.0, 3.0)
+        publish_click, publish_reset = _should_retarget(hit, None, 0.10)
+        assert publish_click is True
+        assert publish_reset is False
+
+    def test_nearby_target_discard(self):
+        current = (0.0, 0.0, 0.0)
+        hit = (0.05, 0.0, 0.0)
+        publish_click, publish_reset = _should_retarget(hit, current, 0.10)
+        assert publish_click is False
+        assert publish_reset is False
+
+    def test_far_target_accept_with_reset(self):
+        current = (0.0, 0.0, 0.0)
+        hit = (0.15, 0.0, 0.0)
+        publish_click, publish_reset = _should_retarget(hit, current, 0.10)
+        assert publish_click is True
+        assert publish_reset is True
+
+    def test_exactly_at_threshold_discard(self):
+        current = (0.0, 0.0, 0.0)
+        hit = (0.10, 0.0, 0.0)
+        publish_click, publish_reset = _should_retarget(hit, current, 0.10)
+        assert publish_click is False
+        assert publish_reset is False

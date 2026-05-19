@@ -13,6 +13,16 @@
 # ROS2 Node Parameter Sections (loaded by launch files)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+haptic_controller:
+    ros__parameters:
+        # Topic names
+        pipeline_state_topic: "/pipeline/state"
+        # Tuning
+        release_buzz_duration_s: 0.5
+        release_buzz_intensity: 60.0
+        force_max_raw: 500.0
+        force_stale_timeout_s: 1.0
+
 command_bridge:
     ros__parameters:
         # Topic names (from controllers)
@@ -65,10 +75,13 @@ pipeline_manager:
         grasp_type_topic: "/grasp_preshaping/grasp_type"
         force_status_topic: "/force_controller/status"
         compute_grasp_service: "/grasp_preshaping/compute_grasp"
+        twist_activate_service: "/twist_propagation/activate"
+        twist_deactivate_service: "/twist_propagation/deactivate"
         pipeline_state_topic: "/pipeline/state"
         pipeline_state_name_topic: "/pipeline/state_name"
         # Tuning
         confidence_threshold: 0.55
+        release_confidence_threshold: 0.30
         grasp_gestures: [1, 2, 4]
         release_gesture: 3
         state_publish_rate_hz: 5.0
@@ -95,10 +108,10 @@ proximity_controller:
 
 pointcloud_fusion:
     ros__parameters:
-        target_frame: "world"
+        target_frame: "marker_map"
         cam1_topic: "/head/d435i_head/depth/color/points"
         cam2_topic: "/arm/d435i_arm/depth/color/points"
-        arm_frame: "wrist_link"
+        arm_frame: "arm_d435i_arm_depth_frame"
         max_distance: 2.0
         voxel_size: 0.005
         bbox_min: [-0.30, -0.10, -0.10]
@@ -123,6 +136,8 @@ twist_propagation:
         odom_topic: ""
         click_positive_topic: "/segmentation/click_positive"
         hand_twist_topic: "/hand_twist"
+        segmentation_reset_topic: "/segmentation/reset"
+        segmentation_retarget_distance_m: 0.10
         compute_grasp_service: "/grasp_preshaping/compute_grasp"
         segmentation_timeout_s: 5.0
         cloud_max_age_s: 2.0
@@ -185,6 +200,10 @@ topics:
     force_controller_status: "/force_controller/status"
     joint_states: "/joint_states"
 
+    # Twist Propagation
+    twist_activate_service: "/twist_propagation/activate"
+    twist_deactivate_service: "/twist_propagation/deactivate"
+
 # ── TF Frames ─────────────────────────────────────────────────────────────────
 frames:
     world: "world"
@@ -241,6 +260,14 @@ force:
     force_filter_window: 5        # Moving-average window for force readings
     max_current_percent: 60.0     # Safety: max motor current as percentage (0-80)
 
+# ── Haptic ────────────────────────────────────────────────────────────────────
+haptic:
+    pipeline_state_topic: "/pipeline/state"
+    release_buzz_duration_s: 0.5
+    release_buzz_intensity: 60.0
+    force_max_raw: 500.0
+    force_stale_timeout_s: 1.0
+
 # ── Hardware ──────────────────────────────────────────────────────────────────
 hardware:
     mia_serial_port: "/dev/ttyUSB0"
@@ -270,6 +297,8 @@ twist_propagation:
     odom_topic: ""
     click_positive_topic: "/segmentation/click_positive"
     hand_twist_topic: "/hand_twist"
+    segmentation_reset_topic: "/segmentation/reset"
+    segmentation_retarget_distance_m: 0.10
     compute_grasp_service: "/grasp_preshaping/compute_grasp"
     segmentation_timeout_s: 5.0
     cloud_max_age_s: 2.0

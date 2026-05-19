@@ -17,7 +17,7 @@ PKG ?=
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch source
+.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch tonight source
 
 help: ## Show this help message
 	@echo ""
@@ -90,6 +90,10 @@ twist-test: ## Launch twist propagation test (Jetson camera)
 	ros2 launch prosthesis_launch twist_propagation_test.launch.py
 
 twist-launch: ## Launch twist propagation
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch twist_propagation_test.launch.py
+
+tonight: ## One-command Jetson host perception pipeline
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch twist_propagation_test.launch.py
 

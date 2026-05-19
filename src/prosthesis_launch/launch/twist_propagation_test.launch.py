@@ -60,6 +60,16 @@ def _launch_setup(context, *args, **kwargs):
     active = LaunchConfiguration("active").perform(context)
     inference_url = LaunchConfiguration("inference_url").perform(context)
     rviz_enabled = LaunchConfiguration("rviz").perform(context).lower() in ("true", "1", "yes")
+    use_marker_map = LaunchConfiguration("use_marker_map_clouds").perform(context).lower() in ("true", "1", "yes")
+    cam1_topic = LaunchConfiguration("cam1_topic").perform(context)
+    cam2_topic = LaunchConfiguration("cam2_topic").perform(context)
+    target_frame = LaunchConfiguration("target_frame").perform(context)
+    arm_frame = LaunchConfiguration("arm_frame").perform(context)
+
+    if use_marker_map:
+        cam1_topic = "/head/d435i_head/points_marker_map"
+        cam2_topic = "/arm/d435i_arm/points_marker_map"
+        target_frame = "marker_map"
 
     nodes = []
 
@@ -73,10 +83,10 @@ def _launch_setup(context, *args, **kwargs):
             executable="pointcloud_fusion_node",
             name="pointcloud_fusion",
             parameters=[{
-                "target_frame": "marker_map",
-                "cam1_topic": "/head/d435i/head/depth/color/points",
-                "cam2_topic": "/arm/d435i/arm/depth/color/points",
-                "arm_frame": "arm_d435i_arm_depth_frame",
+                "target_frame": target_frame,
+                "cam1_topic": cam1_topic,
+                "cam2_topic": cam2_topic,
+                "arm_frame": arm_frame,
                 "max_distance": 2.0,
                 "voxel_size": 0.005,
                 "bbox_min": [-0.30, -0.10, -0.10],
@@ -196,6 +206,31 @@ def generate_launch_description():
             "inference_url",
             default_value="http://127.0.0.1:5678",
             description="Segmentation inference server URL.",
+        ),
+        DeclareLaunchArgument(
+            "use_marker_map_clouds",
+            default_value="false",
+            description="Use pre-transformed marker_map pointclouds instead of raw depth/color/points.",
+        ),
+        DeclareLaunchArgument(
+            "cam1_topic",
+            default_value="/head/d435i_head/depth/color/points",
+            description="Camera 1 pointcloud topic.",
+        ),
+        DeclareLaunchArgument(
+            "cam2_topic",
+            default_value="/arm/d435i_arm/depth/color/points",
+            description="Camera 2 pointcloud topic.",
+        ),
+        DeclareLaunchArgument(
+            "target_frame",
+            default_value="marker_map",
+            description="Target frame for fused pointcloud.",
+        ),
+        DeclareLaunchArgument(
+            "arm_frame",
+            default_value="arm_d435i_arm_depth_frame",
+            description="Arm frame for distance filtering and bbox removal.",
         ),
         DeclareLaunchArgument(
             "rviz",

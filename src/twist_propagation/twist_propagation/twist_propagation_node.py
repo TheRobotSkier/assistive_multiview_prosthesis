@@ -71,7 +71,7 @@ from geometry_msgs.msg import (
 )
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import PointCloud2, PointField
-from std_msgs.msg import String, ColorRGBA
+from std_msgs.msg import String, ColorRGBA, Empty
 from std_srvs.srv import Trigger
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -319,6 +319,25 @@ def _is_odom_initialized(odom_msg: Odometry) -> bool:
     return True
 
 
+def _should_retarget(
+    hit: tuple[float, float, float],
+    current_target: tuple[float, float, float] | None,
+    retarget_distance_m: float,
+) -> tuple[bool, bool]:
+    """Decide whether to publish a click for the given hit.
+
+    Returns
+    -------
+    (publish_click, publish_reset_first)
+    """
+    if current_target is None:
+        return True, False
+    dist = math.sqrt(sum((h - c) ** 2 for h, c in zip(hit, current_target)))
+    if dist > retarget_distance_m:
+        return True, True
+    return False, False
+
+
 # ---------------------------------------------------------------------------
 # Internal state enum
 # ---------------------------------------------------------------------------
@@ -362,6 +381,10 @@ class TwistPropagationNode(Node):
         self.declare_parameter("odom_topic", "")  # optional: nav_msgs/Odometry
         self.declare_parameter("click_positive_topic", "/segmentation/click_positive")
         self.declare_parameter("hand_twist_topic", "/hand_twist")
+        self.declare_parameter("segmentation_reset_topic", "/segmentation/reset")
+
+        # Segmentation retarget policy
+        self.declare_parameter("segmentation_retarget_distance_m", 0.10)
 
         # Service names
         self.declare_parameter("compute_grasp_service", "/grasp_preshaping/compute_grasp")
@@ -398,6 +421,8 @@ class TwistPropagationNode(Node):
         self._sigma_v_sq = self.get_parameter("process_noise_linear_mps2_per_s").value
         self._sigma_w_sq = self.get_parameter("process_noise_angular_radps2_per_s").value
         self._enable_cov = self.get_parameter("enable_covariance_propagation").value
+        self._seg_reset_topic = self.get_parameter("segmentation_reset_topic").value
+        self._seg_retarget_distance = self.get_parameter("segmentation_retarget_distance_m").value
 
         # Effective collision threshold: hit_threshold + collision_radius
         self._effective_hit_thresh = self._hit_thresh + self._collision_radius
@@ -426,6 +451,9 @@ class TwistPropagationNode(Node):
         self._seg_cloud_stamp: float = 0.0
         self._seg_cloud_stamp_at_trigger: float = 0.0
         self._seg_trigger_time: float = 0.0
+
+        # Current accepted segmentation target (cloud frame)
+        self._current_segmentation_target: tuple[float, float, float] | None = None
 
         # Marker ID counters for RViz visualization
         self._sphere_marker_ns = "collision_spheres"
@@ -468,6 +496,8 @@ class TwistPropagationNode(Node):
             TwistStamped, twist_topic, 10)
         self._click_pub = self.create_publisher(
             PointStamped, click_topic, 10)
+        self._reset_pub = self.create_publisher(
+            Empty, self._seg_reset_topic, 10)
         self._status_pub = self.create_publisher(
             String, "/twist_propagation/status", 10)
 
@@ -532,6 +562,7 @@ class TwistPropagationNode(Node):
             self._pose_buf.clear()
             self._twist = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
             self._seg_trigger_time = 0.0
+            self._current_segmentation_target = None
         # Clear visualization markers
         self._clear_all_markers()
         self.get_logger().info("Deactivated")
@@ -989,6 +1020,7 @@ class TwistPropagationNode(Node):
                         )
                         self._cycle_state = CycleState.IDLE
                         self._seg_trigger_time = 0.0
+                        self._current_segmentation_target = None
                     else:
                         self.get_logger().debug(
                             f"Waiting for segmentation ({elapsed:.1f}s)"
@@ -1077,32 +1109,54 @@ class TwistPropagationNode(Node):
 
         if hit is not None:
             hit_x, hit_y, hit_z = hit
-            self.get_logger().info(
-                f"Hit found at ({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}) "
-                f"in frame '{self._cloud_frame}'"
+            publish_click, publish_reset = _should_retarget(
+                hit, self._current_segmentation_target, self._seg_retarget_distance
             )
 
-            # Publish hit marker
-            self._publish_hit_marker(hit_x, hit_y, hit_z)
+            if not publish_click:
+                self.get_logger().debug(
+                    f"Hit at ({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}) "
+                    f"discarded (within {self._seg_retarget_distance}m of current target)"
+                )
+                self._publish_status(
+                    reason="near_existing_target_discarded",
+                    hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
+                    current_target=[round(c, 4) for c in self._current_segmentation_target],
+                    num_predicted_poses=len(positions),
+                )
+            else:
+                self.get_logger().info(
+                    f"Hit found at ({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}) "
+                    f"in frame '{self._cloud_frame}'"
+                )
 
-            # Publish click to trigger segmentation
-            click = PointStamped()
-            click.header.stamp = self.get_clock().now().to_msg()
-            click.header.frame_id = self._cloud_frame
-            click.point.x = hit_x
-            click.point.y = hit_y
-            click.point.z = hit_z
-            self._click_pub.publish(click)
+                if publish_reset:
+                    self._reset_pub.publish(Empty())
+                    self.get_logger().info("Published segmentation reset (new object)")
 
-            # Transition to waiting for segmentation
-            self._seg_cloud_stamp_at_trigger = self._seg_cloud_stamp
-            self._seg_trigger_time = time.time()
-            self._cycle_state = CycleState.WAITING_FOR_SEGMENTATION
+                # Publish hit marker
+                self._publish_hit_marker(hit_x, hit_y, hit_z)
 
-            self._publish_status(
-                hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
-                num_predicted_poses=len(positions),
-            )
+                # Publish click to trigger segmentation
+                click = PointStamped()
+                click.header.stamp = self.get_clock().now().to_msg()
+                click.header.frame_id = self._cloud_frame
+                click.point.x = hit_x
+                click.point.y = hit_y
+                click.point.z = hit_z
+                self._click_pub.publish(click)
+
+                # Update current target and transition
+                self._current_segmentation_target = hit
+                self._seg_cloud_stamp_at_trigger = self._seg_cloud_stamp
+                self._seg_trigger_time = time.time()
+                self._cycle_state = CycleState.WAITING_FOR_SEGMENTATION
+
+                self._publish_status(
+                    hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
+                    num_predicted_poses=len(positions),
+                    reset_before_click=publish_reset,
+                )
         else:
             # No hit -- publish status with twist info
             vx, vy, vz, wx, wy, wz = self._twist

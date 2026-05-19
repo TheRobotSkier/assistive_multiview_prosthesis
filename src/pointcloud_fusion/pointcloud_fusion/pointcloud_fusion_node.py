@@ -202,10 +202,10 @@ class PointCloudFusionNode(Node):
         super().__init__("pointcloud_fusion")
 
         # ── Declare parameters ────────────────────────────────────────────
-        self.declare_parameter("target_frame", "world")
+        self.declare_parameter("target_frame", "marker_map")
         self.declare_parameter("cam1_topic", "/head/d435i_head/depth/color/points")
         self.declare_parameter("cam2_topic", "/arm/d435i_arm/depth/color/points")
-        self.declare_parameter("arm_frame", "wrist_link")
+        self.declare_parameter("arm_frame", "arm_d435i_arm_depth_frame")
         self.declare_parameter("max_distance", 2.0)
         self.declare_parameter("voxel_size", 0.005)
         self.declare_parameter("bbox_min", [-0.30, -0.10, -0.10])

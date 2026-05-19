@@ -30,6 +30,10 @@ twist_propagation:
     odom_topic: ""  # optional: nav_msgs/Odometry for covariance
     click_positive_topic: "/segmentation/click_positive"
     hand_twist_topic: "/hand_twist"
+    segmentation_reset_topic: "/segmentation/reset"
+
+    # ── Segmentation retarget policy ───────────────────────────────────────
+    segmentation_retarget_distance_m: 0.10
 
     # ── Service names ──────────────────────────────────────────────────────
     compute_grasp_service: "/grasp_preshaping/compute_grasp"
