@@ -247,9 +247,9 @@ class PointCloudFusionNode(Node):
             Marker, "/pointcloud_fusion/hand_removal_bbox", 1)
 
         # ── Subscriptions ─────────────────────────────────────────────────
-        # Use BEST_EFFORT QoS — RealSense publishers use BEST_EFFORT
+        # Use RELIABLE QoS — RealSense publishers use RELIABLE
         cloud_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
@@ -290,6 +290,7 @@ class PointCloudFusionNode(Node):
         self.create_timer(1.0, self._publish_bbox_marker)
 
         # ── Stats ─────────────────────────────────────────────────────────
+        self._stats_lock = threading.Lock()
         self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
                        "distance_removed": 0, "bbox_removed": 0,
                        "tf_fail": {}}
@@ -321,7 +322,11 @@ class PointCloudFusionNode(Node):
             self._cam2_stamp = self.get_clock().now()
 
     def _timer_merge(self):
-        """Process whichever clouds are fresh enough."""
+        """Process whichever clouds are fresh enough.
+
+        Runs processing in a background thread so the executor can continue
+        receiving cloud callbacks and TF updates without starvation.
+        """
         now = self.get_clock().now()
         with self._lock:
             c1, s1 = self._cam1_cloud, self._cam1_stamp
@@ -337,7 +342,9 @@ class PointCloudFusionNode(Node):
             if age <= self._cloud_max_age:
                 clouds.append(c2)
         if clouds:
-            self._process_clouds(clouds)
+            # Process in a daemon thread so the executor is not blocked.
+            t = threading.Thread(target=self._process_clouds, args=(clouds,), daemon=True)
+            t.start()
 
     # ── Core processing pipeline ─────────────────────────────────────────
 
@@ -357,7 +364,8 @@ class PointCloudFusionNode(Node):
                 transformed.append(tf2_sensor_msgs.do_transform_cloud(cloud, t))
             except Exception as exc:
                 frame = cloud.header.frame_id
-                self._stats["tf_fail"][frame] = self._stats["tf_fail"].get(frame, 0) + 1
+                with self._stats_lock:
+                    self._stats["tf_fail"][frame] = self._stats["tf_fail"].get(frame, 0) + 1
                 self.get_logger().warn(
                     f"TF transform failed for {frame}: {exc}",
                     throttle_duration_sec=10.0,
@@ -370,7 +378,8 @@ class PointCloudFusionNode(Node):
         if len(transformed) == 1:
             xyz_all, rgb_all = _parse_cloud(transformed[0])
             stamp = transformed[0].header.stamp
-            self._stats["cam1_only"] += 1
+            with self._stats_lock:
+                self._stats["cam1_only"] += 1
         else:
             # Verify field compatibility
             ref_fields = [(f.name, f.datatype, f.count) for f in transformed[0].fields]
@@ -398,7 +407,8 @@ class PointCloudFusionNode(Node):
             xyz_all = np.concatenate(parts_xyz, axis=0)
             rgb_all = np.concatenate(parts_rgb, axis=0)
             stamp = transformed[0].header.stamp
-            self._stats["dual"] += 1
+            with self._stats_lock:
+                self._stats["dual"] += 1
 
         if len(xyz_all) == 0:
             return
@@ -416,7 +426,8 @@ class PointCloudFusionNode(Node):
                 removed = len(xyz_all) - np.sum(mask)
                 xyz_all = xyz_all[mask]
                 rgb_all = rgb_all[mask]
-                self._stats["distance_removed"] += int(removed)
+                with self._stats_lock:
+                    self._stats["distance_removed"] += int(removed)
             else:
                 self.get_logger().warn(
                     f"Cannot look up {self._arm_frame} in {self._target_frame} "
@@ -438,7 +449,8 @@ class PointCloudFusionNode(Node):
                 removed = len(xyz_all) - np.sum(keep)
                 xyz_all = xyz_all[keep]
                 rgb_all = rgb_all[keep]
-                self._stats["bbox_removed"] += int(removed)
+                with self._stats_lock:
+                    self._stats["bbox_removed"] += int(removed)
             else:
                 self.get_logger().warn(
                     f"Cannot transform to {self._arm_frame} for bbox removal — skipping",
@@ -460,10 +472,16 @@ class PointCloudFusionNode(Node):
         if header is None:
             return
         header.frame_id = self._target_frame
+        # Stamp with host clock so downstream consumers (twist propagation,
+        # segmentation) see a fresh timestamp relative to their own clock.
+        # The original cloud stamp comes from the Jetson and can be seconds
+        # behind the host clock due to network transit + processing.
+        header.stamp = self.get_clock().now().to_msg()
 
         out_msg = _build_cloud(xyz_all, rgb_all, header)
         self._pub.publish(out_msg)
-        self._stats["published"] += 1
+        with self._stats_lock:
+            self._stats["published"] += 1
         self._last_publish_time = self.get_clock().now()
 
     # ── TF helpers ────────────────────────────────────────────────────────
@@ -513,7 +531,7 @@ class PointCloudFusionNode(Node):
         marker.color.b = 0.3
         marker.color.a = 0.3
 
-        marker.lifetime.sec = 2  # Expire if node dies
+        marker.lifetime.sec = 5  # Expire if node dies
 
         self._bbox_marker_pub.publish(marker)
 
@@ -521,23 +539,26 @@ class PointCloudFusionNode(Node):
 
     def _log_stats(self):
         now = self.get_clock().now()
+        with self._stats_lock:
+            stats_snapshot = dict(self._stats)
+            stats_snapshot["tf_fail"] = dict(self._stats["tf_fail"])
         since_last = (now - self._last_publish_time).nanoseconds / 1e9
         tf_fail_str = ""
-        if self._stats["tf_fail"]:
+        if stats_snapshot["tf_fail"]:
             tf_fail_str = " tf_fail={" + ", ".join(
-                f"{k}:{v}" for k, v in sorted(self._stats["tf_fail"].items())
+                f"{k}:{v}" for k, v in sorted(stats_snapshot["tf_fail"].items())
             ) + "}"
         self.get_logger().info(
-            f"Stats: published={self._stats['published']} "
-            f"(dual={self._stats['dual']}, cam1_only={self._stats['cam1_only']}) "
-            f"dist_removed={self._stats['distance_removed']} "
-            f"bbox_removed={self._stats['bbox_removed']}"
+            f"Stats: published={stats_snapshot['published']} "
+            f"(dual={stats_snapshot['dual']}, cam1_only={stats_snapshot['cam1_only']}) "
+            f"dist_removed={stats_snapshot['distance_removed']} "
+            f"bbox_removed={stats_snapshot['bbox_removed']}"
             f"{tf_fail_str}"
             f" last_publish_ago={since_last:.1f}s"
         )
 
         # Stall diagnostic: if nothing published this interval, explain why.
-        if self._stats["published"] == 0:
+        if stats_snapshot["published"] == 0:
             with self._lock:
                 c1, s1 = self._cam1_cloud, self._cam1_stamp
                 c2, s2 = self._cam2_cloud, self._cam2_stamp
@@ -576,9 +597,10 @@ class PointCloudFusionNode(Node):
             )
 
         # Reset per-interval counters
-        self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
-                       "distance_removed": 0, "bbox_removed": 0,
-                       "tf_fail": {}}
+        with self._stats_lock:
+            self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
+                           "distance_removed": 0, "bbox_removed": 0,
+                           "tf_fail": {}}
 
 
 # ---------------------------------------------------------------------------

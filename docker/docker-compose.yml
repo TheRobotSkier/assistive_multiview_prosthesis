@@ -55,9 +55,10 @@ services:
             - prosthesis-build:/prosthesis_ws/build
             - prosthesis-install:/prosthesis_ws/install
             - prosthesis-log:/prosthesis_ws/log
+        privileged: true # LINUX ONLY
+        ipc: host       # Share /dev/shm for RViz Qt GPU rendering
         stdin_open: true
         tty: true
-        privileged: true # LINUX ONLY
 
     # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
     segmentation:

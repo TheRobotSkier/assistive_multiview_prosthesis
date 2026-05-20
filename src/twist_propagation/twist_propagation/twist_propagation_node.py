@@ -475,14 +475,16 @@ class TwistPropagationNode(Node):
 
         self.create_subscription(PoseStamped, hand_pose_topic, self._on_hand_pose, 10)
 
-        # BEST_EFFORT — camera / Jetson publishers typically use BEST_EFFORT QoS
-        best_effort = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+        # RELIABLE — the fusion node publishes with RELIABLE QoS; the
+        # RealSense publishers on the Jetson also use RELIABLE, so this
+        # matches both paths.
+        cloud_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
             depth=5,
         )
-        self.create_subscription(PointCloud2, input_cloud_topic, self._on_input_cloud, best_effort)
-        self.create_subscription(PointCloud2, seg_cloud_topic, self._on_segmented_cloud, best_effort)
+        self.create_subscription(PointCloud2, input_cloud_topic, self._on_input_cloud, cloud_qos)
+        self.create_subscription(PointCloud2, seg_cloud_topic, self._on_segmented_cloud, cloud_qos)
 
         # Optional odometry subscription for covariance data
         if odom_topic:

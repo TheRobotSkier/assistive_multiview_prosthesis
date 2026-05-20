@@ -7,20 +7,21 @@ The Jetson camera stack publishes two useful but disconnected TF trees:
     head_d435i_head_link -> head_d435i_head_depth_frame -> ...
 
 PointCloud2 messages use the RealSense depth optical frames, while OpenVINS
-owns the marker_map tree. This node publishes the missing parent transform:
+owns the marker_map tree.  This node publishes the missing parent transform:
 
     head_cam0 -> head_d435i_head_link
     arm_cam0  -> arm_d435i_arm_link
 
-It prefers the marker/OpenVINS "body_display" frames when available because
-those encode the camera body pose in the marker_map tree. If those frames are
-not present yet, it falls back to the static RealSense optical->link transform.
+**Key insight**: OpenVINS uses the RealSense color camera as its tracking
+camera (cam0).  This means ``head_cam0`` and ``head_d435i_head_color_optical_frame``
+are the **same physical camera**.  The bridge edge ``cam0 -> link`` is therefore
+just the known RealSense extrinsic ``T(color_optical -> link)``, which is a
+static property of the D435i hardware.
 
-Since 2026-05-20: this node also broadcasts the full nominal D435/D435i static
-fan-out (depth/color/accel/gyro/imu + optical children) via both
-StaticTransformBroadcaster and the dynamic /tf topic. That makes the whole
-RealSense subtree reachable from marker_map even when the Jetson /tf_static
-messages do not cross the DDS network reliably.
+The node publishes this extrinsic directly from the RealSense static chain
+(no aruco marker detection needed).  It also broadcasts the full nominal
+D435/D435i static fan-out via both StaticTransformBroadcaster and the
+dynamic /tf topic.
 """
 
 from __future__ import annotations
@@ -181,6 +182,25 @@ class BridgeSpec:
     anchor_frame_mode: str
     fallback_optical_frame: str
 
+    @property
+    def color_optical_frame(self) -> str | None:
+        """Return the RealSense color_optical_frame.
+
+        If the anchor frame IS the color_optical_frame (e.g.
+        ``head_d435i_head_color_optical_frame``), return it directly.
+        Otherwise, strip known suffixes (``_from_marker``, ``_body_display``).
+        """
+        if not self.anchor_frame:
+            return None
+        # Direct match: anchor is already the color_optical_frame.
+        if "color_optical_frame" in self.anchor_frame and "_" not in self.anchor_frame.split("color_optical_frame", 1)[1]:
+            return self.anchor_frame
+        # Legacy: strip suffix.
+        for suffix in ("_from_marker", "_body_display"):
+            if self.anchor_frame.endswith(suffix):
+                return self.anchor_frame[: -len(suffix)]
+        return None
+
 
 class OpenVinsRealSenseTfBridge(Node):
     """Publishes the missing OpenVINS camera -> RealSense link transforms
@@ -197,8 +217,8 @@ class OpenVinsRealSenseTfBridge(Node):
         self.declare_parameter(
             "anchor_frames",
             [
-                "head_d435i_head_color_optical_frame_body_display",
-                "arm_d435i_arm_color_optical_frame_body_display",
+                "head_d435i_head_color_optical_frame_from_marker",
+                "arm_d435i_arm_color_optical_frame_from_marker",
             ],
         )
         self.declare_parameter("anchor_frame_modes", ["link", "link"])
@@ -210,16 +230,8 @@ class OpenVinsRealSenseTfBridge(Node):
             ],
         )
         self.declare_parameter("publish_rate_hz", 15.0)
-        self.declare_parameter("tf_lookup_timeout_s", 0.05)
-        self.declare_parameter("fallback_to_optical_assumption", True)
         self.declare_parameter("publish_nominal_static_chain", True)
 
-        self._timeout = Duration(
-            seconds=float(self.get_parameter("tf_lookup_timeout_s").value)
-        )
-        self._fallback_enabled = bool(
-            self.get_parameter("fallback_to_optical_assumption").value
-        )
         self._publish_nominal_static = bool(
             self.get_parameter("publish_nominal_static_chain").value
         )
@@ -231,11 +243,6 @@ class OpenVinsRealSenseTfBridge(Node):
         self._specs = self._load_specs()
         self._warned: set[str] = set()
         self._published_from: dict[str, str] = {}
-        # Cache last-good bridge matrices to avoid oscillation when the
-        # anchor frame (aruco body_display) appears and disappears.
-        self._last_good_matrix: dict[str, np.ndarray] = {}
-        self._last_good_stamp: dict[str, float] = {}
-        self._matrix_staleness_limit_s: float = 30.0
 
         # Pre-build the nominal static chain so we can send it efficiently.
         self._nominal_static_tfs: list[TransformStamped] = []
@@ -355,9 +362,8 @@ class OpenVinsRealSenseTfBridge(Node):
             if matrix is None:
                 self._warn_once(
                     spec.name,
-                    "waiting for TF inputs for "
-                    f"{spec.parent_frame}->{spec.link_frame} "
-                    f"(anchor={spec.anchor_frame}, fallback={spec.fallback_optical_frame})",
+                    f"waiting for color_optical->link extrinsic "
+                    f"for {spec.parent_frame}->{spec.link_frame}",
                 )
                 continue
 
@@ -367,6 +373,10 @@ class OpenVinsRealSenseTfBridge(Node):
                 child_frame=spec.link_frame,
                 stamp=stamp,
             )
+
+            # Always publish on /tf_static since this is a static extrinsic.
+            self._static_tf_broadcaster.sendTransform(tf_msg)
+            # Also publish on /tf for nodes with stale /tf_static caches.
             self._tf_broadcaster.sendTransform(tf_msg)
 
             if self._published_from.get(spec.name) != source:
@@ -379,58 +389,36 @@ class OpenVinsRealSenseTfBridge(Node):
     def _resolve_bridge_transform(
         self, spec: BridgeSpec
     ) -> tuple[np.ndarray | None, str]:
-        matrix, source = self._resolve_bridge_transform_live(spec)
+        """Resolve T(cam0 -> link) from the RealSense static chain.
+
+        Since OpenVINS uses the RealSense color camera as its tracking camera,
+        cam0 == color_optical_frame.  The bridge edge is simply:
+
+            T(cam0 -> link) = T(color_optical -> link)
+
+        This is a known static extrinsic from the D435i hardware calibration.
+        No aruco marker detection is needed.
+        """
+        color_optical = spec.color_optical_frame
+        if color_optical is None:
+            return None, ""
+
+        # Look up T(color_optical -> link) from the RealSense static chain.
+        # This is the extrinsic between the color camera and the RealSense body.
+        matrix = self._lookup_matrix(color_optical, spec.link_frame)
         if matrix is not None:
-            # Cache the good result.
-            self._last_good_matrix[spec.name] = matrix
-            self._last_good_stamp[spec.name] = self.get_clock().now().nanoseconds / 1e9
-            return matrix, source
+            return matrix, f"RealSense extrinsic {color_optical}->{spec.link_frame}"
 
-        # Live lookup failed — try the cached matrix if it's fresh enough.
-        cached = self._last_good_matrix.get(spec.name)
-        if cached is not None:
-            age = self.get_clock().now().nanoseconds / 1e9 - self._last_good_stamp[spec.name]
-            if age <= self._matrix_staleness_limit_s:
-                return cached, f"cached ({age:.1f}s ago)"
-            else:
-                self.get_logger().warn(
-                    f"{spec.name}: cached bridge transform is {age:.1f}s old "
-                    f"(limit={self._matrix_staleness_limit_s}s) — discarding",
-                    throttle_duration_sec=60.0,
-                )
-        return None, ""
-
-    def _resolve_bridge_transform_live(
-        self, spec: BridgeSpec
-    ) -> tuple[np.ndarray | None, str]:
-        if spec.anchor_frame:
-            parent_to_anchor = self._lookup_matrix(
-                spec.parent_frame, spec.anchor_frame
+        # Fallback: try depth_optical -> link (same rotation, no translation offset).
+        # Less accurate but works before the full static chain is available.
+        matrix = self._lookup_matrix(spec.fallback_optical_frame, spec.link_frame)
+        if matrix is not None:
+            return (
+                matrix,
+                f"RealSense extrinsic {spec.fallback_optical_frame}->{spec.link_frame} (approx)",
             )
-            if parent_to_anchor is not None:
-                if spec.anchor_frame_mode == "link":
-                    return parent_to_anchor, f"anchor {spec.anchor_frame} as link"
 
-                optical_to_link = self._lookup_matrix(
-                    spec.fallback_optical_frame, spec.link_frame
-                )
-                if optical_to_link is not None:
-                    return (
-                        parent_to_anchor @ optical_to_link,
-                        f"anchor {spec.anchor_frame} as optical + RealSense extrinsic",
-                    )
-
-        if not self._fallback_enabled:
-            return None, ""
-
-        optical_to_link = self._lookup_matrix(
-            spec.fallback_optical_frame, spec.link_frame
-        )
-        if optical_to_link is None:
-            return None, ""
-        return optical_to_link, (
-            f"fallback assuming {spec.parent_frame} == {spec.fallback_optical_frame}"
-        )
+        return None, ""
 
     def _warn_once(self, key: str, message: str):
         if key in self._warned:
@@ -441,30 +429,21 @@ class OpenVinsRealSenseTfBridge(Node):
         self.get_logger().warn(message)
 
     def _log_diagnostics(self):
-        """Periodically log which bridge transforms are still unresolved and why."""
+        """Periodically log which bridge transforms are still unresolved."""
         unresolved = []
         for spec in self._specs:
             if spec.name in self._published_from:
-                continue  # This camera is working.
-            # Check which part of the chain is missing.
-            parent_exists = self._lookup_matrix(spec.parent_frame, spec.parent_frame) is not None
-            anchor_exists = (
-                self._lookup_matrix(spec.parent_frame, spec.anchor_frame) is not None
-                if spec.anchor_frame else False
-            )
-            fallback_exists = (
-                self._lookup_matrix(spec.fallback_optical_frame, spec.link_frame) is not None
-            )
+                continue
+            color_optical = spec.color_optical_frame
             unresolved.append(
-                f"{spec.name}: parent={spec.parent_frame}(in_tf={parent_exists}), "
-                f"anchor={spec.anchor_frame}(resolves={anchor_exists}), "
-                f"fallback={spec.fallback_optical_frame}->{spec.link_frame}(resolves={fallback_exists})"
+                f"{spec.name}: color_optical={color_optical}, "
+                f"link={spec.link_frame}"
             )
         if unresolved:
             self.get_logger().warn(
-                "Unresolved bridge transforms: " + "; ".join(unresolved)
+                "Unresolved bridge transforms (waiting for RealSense static chain): "
+                + "; ".join(unresolved)
             )
-            self._resolve_fail_counts.clear()
 
 
 def main(args=None):
