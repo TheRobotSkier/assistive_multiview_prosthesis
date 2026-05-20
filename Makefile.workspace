@@ -263,6 +263,27 @@ tonight-grasp-check: ## Gate 6: run segmentation click then call grasp service
 
 tonight-gates: tonight-raw-check tonight-tf-check tonight-fusion-check ## Run the non-invasive perception gates
 
+tonight-tf-full-check: ## Gate 1b: verify every camera frame resolves from marker_map
+	@$(ROS_SETUP) && \
+	set +e; \
+	echo ""; \
+	echo "Gate 1b: all camera frames reachable from marker_map"; \
+	for FR in \
+	  head_d435i_head_link head_d435i_head_depth_frame head_d435i_head_depth_optical_frame \
+	  head_d435i_head_color_frame head_d435i_head_color_optical_frame \
+	  head_d435i_head_accel_frame head_d435i_head_accel_optical_frame \
+	  head_d435i_head_gyro_frame head_d435i_head_gyro_optical_frame \
+	  head_d435i_head_imu_frame head_d435i_head_imu_optical_frame \
+	  arm_d435i_arm_link arm_d435i_arm_depth_frame arm_d435i_arm_depth_optical_frame \
+	  arm_d435i_arm_color_frame arm_d435i_arm_color_optical_frame \
+	  arm_d435i_arm_accel_frame arm_d435i_arm_accel_optical_frame \
+	  arm_d435i_arm_gyro_frame arm_d435i_arm_gyro_optical_frame \
+	  arm_d435i_arm_imu_frame arm_d435i_arm_imu_optical_frame; do \
+	  timeout 2s ros2 run tf2_ros tf2_echo marker_map $$FR >/dev/null 2>&1 \
+	    && echo "OK   $$FR" \
+	    || echo "MISS $$FR"; \
+	done
+
 # ── Utility ──────────────────────────────────────────────────────────────────
 
 source: ## Print the source command for manual use

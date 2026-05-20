@@ -164,6 +164,7 @@ openvins_realsense_tf_bridge:
         publish_rate_hz: 15.0
         tf_lookup_timeout_s: 0.05
         fallback_to_optical_assumption: true
+        publish_nominal_static_chain: true
 
 twist_propagation:
     ros__parameters:

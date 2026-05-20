@@ -15,6 +15,12 @@ owns the marker_map tree. This node publishes the missing parent transform:
 It prefers the marker/OpenVINS "body_display" frames when available because
 those encode the camera body pose in the marker_map tree. If those frames are
 not present yet, it falls back to the static RealSense optical->link transform.
+
+Since 2026-05-20: this node also broadcasts the full nominal D435/D435i static
+fan-out (depth/color/accel/gyro/imu + optical children) via both
+StaticTransformBroadcaster and the dynamic /tf topic. That makes the whole
+RealSense subtree reachable from marker_map even when the Jetson /tf_static
+messages do not cross the DDS network reliably.
 """
 
 from __future__ import annotations
@@ -28,7 +34,7 @@ from geometry_msgs.msg import TransformStamped
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
-from tf2_ros import Buffer, TransformBroadcaster, TransformListener
+from tf2_ros import Buffer, StaticTransformBroadcaster, TransformBroadcaster, TransformListener
 
 
 def _quaternion_to_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
@@ -118,6 +124,54 @@ def _matrix_to_transform(
     return msg
 
 
+def _make_transform_from_xyz_rpy(
+    x: float, y: float, z: float,
+    roll: float, pitch: float, yaw: float,
+    parent_frame: str, child_frame: str, stamp,
+) -> TransformStamped:
+    """Build a TransformStamped from xyz and rpy (URDF convention: Rz*Ry*Rx)."""
+    cr, sr = math.cos(roll), math.sin(roll)
+    cp, sp = math.cos(pitch), math.sin(pitch)
+    cy, sy = math.cos(yaw), math.sin(yaw)
+
+    # R = Rz(yaw) * Ry(pitch) * Rx(roll)
+    R = np.array(
+        [
+            [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+            [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+            [-sp, cp * sr, cp * cr],
+        ],
+        dtype=np.float64,
+    )
+
+    T = np.eye(4, dtype=np.float64)
+    T[:3, :3] = R
+    T[:3, 3] = np.array([x, y, z], dtype=np.float64)
+
+    return _matrix_to_transform(T, parent_frame, child_frame, stamp)
+
+
+# Nominal D435/D435i extrinsics from realsense2_description URDF.
+# These are approximate (factory calibration overrides them on the device).
+# Format: (parent_suffix, child_suffix, x, y, z, roll, pitch, yaw)
+# All optical children share the same rpy(-pi/2, 0, -pi/2).
+_OPTICAL_RPY = (-math.pi / 2.0, 0.0, -math.pi / 2.0)
+_NOMINAL_STATIC_EDGES: list[tuple[str, str, float, float, float, float, float, float]] = [
+    # link -> sensor frames
+    ("link", "depth_frame", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    ("link", "color_frame", 0.0, 0.015, 0.0, 0.0, 0.0, 0.0),
+    ("link", "accel_frame", -0.01174, -0.00552, 0.0051, 0.0, 0.0, 0.0),
+    ("link", "gyro_frame", -0.01174, -0.00552, 0.0051, 0.0, 0.0, 0.0),
+    ("link", "imu_frame", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+    # sensor frames -> optical frames
+    ("depth_frame", "depth_optical_frame", 0.0, 0.0, 0.0, *_OPTICAL_RPY),
+    ("color_frame", "color_optical_frame", 0.0, 0.0, 0.0, *_OPTICAL_RPY),
+    ("accel_frame", "accel_optical_frame", 0.0, 0.0, 0.0, *_OPTICAL_RPY),
+    ("gyro_frame", "gyro_optical_frame", 0.0, 0.0, 0.0, *_OPTICAL_RPY),
+    ("imu_frame", "imu_optical_frame", 0.0, 0.0, 0.0, *_OPTICAL_RPY),
+]
+
+
 @dataclass(frozen=True)
 class BridgeSpec:
     name: str
@@ -129,7 +183,8 @@ class BridgeSpec:
 
 
 class OpenVinsRealSenseTfBridge(Node):
-    """Publishes the missing OpenVINS camera -> RealSense link transforms."""
+    """Publishes the missing OpenVINS camera -> RealSense link transforms
+    and the nominal RealSense static fan-out."""
 
     def __init__(self):
         super().__init__("openvins_realsense_tf_bridge")
@@ -157,6 +212,7 @@ class OpenVinsRealSenseTfBridge(Node):
         self.declare_parameter("publish_rate_hz", 15.0)
         self.declare_parameter("tf_lookup_timeout_s", 0.05)
         self.declare_parameter("fallback_to_optical_assumption", True)
+        self.declare_parameter("publish_nominal_static_chain", True)
 
         self._timeout = Duration(
             seconds=float(self.get_parameter("tf_lookup_timeout_s").value)
@@ -164,13 +220,22 @@ class OpenVinsRealSenseTfBridge(Node):
         self._fallback_enabled = bool(
             self.get_parameter("fallback_to_optical_assumption").value
         )
+        self._publish_nominal_static = bool(
+            self.get_parameter("publish_nominal_static_chain").value
+        )
 
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
         self._tf_broadcaster = TransformBroadcaster(self)
+        self._static_tf_broadcaster = StaticTransformBroadcaster(self)
         self._specs = self._load_specs()
         self._warned: set[str] = set()
         self._published_from: dict[str, str] = {}
+
+        # Pre-build the nominal static chain so we can send it efficiently.
+        self._nominal_static_tfs: list[TransformStamped] = []
+        if self._publish_nominal_static:
+            self._build_and_send_nominal_static_chain()
 
         rate = max(float(self.get_parameter("publish_rate_hz").value), 1.0)
         self.create_timer(1.0 / rate, self._publish_all)
@@ -178,7 +243,10 @@ class OpenVinsRealSenseTfBridge(Node):
         summary = ", ".join(
             f"{spec.parent_frame}->{spec.link_frame}" for spec in self._specs
         )
-        self.get_logger().info(f"OpenVINS/RealSense TF bridge active: {summary}")
+        self.get_logger().info(
+            f"OpenVINS/RealSense TF bridge active: {summary}. "
+            f"Static chain publishing={'ON' if self._publish_nominal_static else 'OFF'}"
+        )
 
     def _load_specs(self) -> list[BridgeSpec]:
         names = list(self.get_parameter("camera_names").value)
@@ -223,6 +291,34 @@ class OpenVinsRealSenseTfBridge(Node):
             )
         return specs
 
+    def _build_and_send_nominal_static_chain(self):
+        """Publish the nominal D435/D435i static fan-out once via /tf_static."""
+        stamp = self.get_clock().now().to_msg()
+        for spec in self._specs:
+            prefix = spec.link_frame
+            if not prefix.endswith("_link"):
+                self.get_logger().warn(
+                    f"link_frame {spec.link_frame!r} does not end with '_link'; "
+                    "skipping nominal static chain for this camera"
+                )
+                continue
+            base = prefix[:-5]  # strip trailing "_link"
+            for parent_suffix, child_suffix, x, y, z, roll, pitch, yaw in _NOMINAL_STATIC_EDGES:
+                parent = f"{base}_{parent_suffix}"
+                child = f"{base}_{child_suffix}"
+                tf_msg = _make_transform_from_xyz_rpy(
+                    x, y, z, roll, pitch, yaw,
+                    parent, child, stamp,
+                )
+                self._nominal_static_tfs.append(tf_msg)
+
+        if self._nominal_static_tfs:
+            self._static_tf_broadcaster.sendTransform(self._nominal_static_tfs)
+            self.get_logger().info(
+                f"Published nominal static chain: {len(self._nominal_static_tfs)} transforms "
+                f"({len(self._nominal_static_tfs) // len(self._specs)} per camera)"
+            )
+
     def _lookup_matrix(self, target_frame: str, source_frame: str) -> np.ndarray | None:
         try:
             tf_msg = self._tf_buffer.lookup_transform(
@@ -237,6 +333,14 @@ class OpenVinsRealSenseTfBridge(Node):
 
     def _publish_all(self):
         stamp = self.get_clock().now().to_msg()
+
+        # Re-broadcast nominal static chain on the dynamic /tf topic as a
+        # safety net for containers that missed the /tf_static latch.
+        if self._nominal_static_tfs:
+            for tf_msg in self._nominal_static_tfs:
+                tf_msg.header.stamp = stamp
+            self._tf_broadcaster.sendTransform(self._nominal_static_tfs)
+
         for spec in self._specs:
             matrix, source = self._resolve_bridge_transform(spec)
             if matrix is None:
