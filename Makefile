@@ -52,7 +52,8 @@ down-segmentation:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile segmentation down
 
 # ── Run ────────────────────────────────────────────────────────────────────
-up: dev
+up:
+	cd $(COMPOSE_DIR) && $(COMPOSE) up -d
 
 up-prosthesis: dev
 
