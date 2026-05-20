@@ -152,6 +152,8 @@ class CameraMountTFPublisher(Node):
         self._broadcaster = StaticTransformBroadcaster(self)
         self._marker_pub = self.create_publisher(
             Marker, "/camera_mounts/bounding_box", 10)
+        self._cam_marker_pub = self.create_publisher(
+            Marker, "/camera_mounts/cam_bounding_box", 10)
         self._stamp = self.get_clock().now().to_msg()
 
         data = yaml.safe_load(config_path.read_text())
@@ -166,16 +168,29 @@ class CameraMountTFPublisher(Node):
         self._bbox_marker.header.stamp = self.get_clock().now().to_msg()
         self._marker_pub.publish(self._bbox_marker)
 
+        if "cam_bounding_box_8cm" in data:
+            self._cam_bbox_marker = self._make_cam_bbox_marker(
+                data["cam_bounding_box_8cm"])
+            self._cam_bbox_marker.header.stamp = self.get_clock().now().to_msg()
+            self._cam_marker_pub.publish(self._cam_bbox_marker)
+        else:
+            self._cam_bbox_marker = None
+
         self._timer = self.create_timer(1.0, self._republish_marker)
 
     def _republish_marker(self):
         self._bbox_marker.header.stamp = self.get_clock().now().to_msg()
         self._marker_pub.publish(self._bbox_marker)
+        if self._cam_bbox_marker is not None:
+            self._cam_bbox_marker.header.stamp = self.get_clock().now().to_msg()
+            self._cam_marker_pub.publish(self._cam_bbox_marker)
 
     def _publish_single(self, data: dict, mount_name: str):
         tfs = self._build_shared_tfs(data)
         tfs += self._build_grasp_contact_tf(data)
         tfs += self._build_bounding_box_tfs(data)
+        if "cam_bounding_box_8cm" in data:
+            tfs += self._build_cam_bbox_tfs(data)
         tfs += self._build_mount_tfs(data, mount_name, f"_{mount_name}")
         self._broadcaster.sendTransform(tfs)
         self.get_logger().info(
@@ -185,6 +200,8 @@ class CameraMountTFPublisher(Node):
         tfs = self._build_shared_tfs(data)
         tfs += self._build_grasp_contact_tf(data)
         tfs += self._build_bounding_box_tfs(data)
+        if "cam_bounding_box_8cm" in data:
+            tfs += self._build_cam_bbox_tfs(data)
         for name in data["mounts"]:
             tfs += self._build_mount_tfs(data, name, f"_{name}")
         self._broadcaster.sendTransform(tfs)
@@ -222,6 +239,45 @@ class CameraMountTFPublisher(Node):
                             _t(co, "x"), _t(co, "y"), _t(co, "z"),
                             *_q(co)))
         return tfs
+
+    def _build_cam_bbox_tfs(self, data: dict) -> list[TransformStamped]:
+        s = self._stamp
+        cb = data["cam_bounding_box_8cm"]
+        screw_frame = "d435i_arm_bottom_screw_frame_8_cm_cam_mount"
+        tfs = []
+        for name, key in [("bbcam1_frame", "screw_to_bbcam1"),
+                          ("bbcam2_frame", "screw_to_bbcam2")]:
+            entry = cb[key]
+            tfs.append(_make_tf(s, screw_frame, name,
+                                _t(entry, "x"), _t(entry, "y"), _t(entry, "z"),
+                                *_q(entry)))
+        return tfs
+
+    def _make_cam_bbox_marker(self, cb_data: dict) -> Marker:
+        c1 = cb_data["screw_to_bbcam1"]["translation"]
+        c2 = cb_data["screw_to_bbcam2"]["translation"]
+        cx = (c1["x"] + c2["x"]) / 2.0
+        cy = (c1["y"] + c2["y"]) / 2.0
+        cz = (c1["z"] + c2["z"]) / 2.0
+        m = Marker()
+        m.header.frame_id = "d435i_arm_bottom_screw_frame_8_cm_cam_mount"
+        m.ns = "cam_bbox"
+        m.id = 0
+        m.type = Marker.CUBE
+        m.action = Marker.ADD
+        m.pose.position = Point(x=cx, y=cy, z=cz)
+        m.pose.orientation.x = 0.0
+        m.pose.orientation.y = 0.0
+        m.pose.orientation.z = 0.0
+        m.pose.orientation.w = 1.0
+        m.scale.x = abs(c2["x"] - c1["x"])
+        m.scale.y = abs(c2["y"] - c1["y"])
+        m.scale.z = abs(c2["z"] - c1["z"])
+        m.color.r = 1.0
+        m.color.g = 0.6
+        m.color.b = 0.0
+        m.color.a = 0.2
+        return m
 
     def _build_mount_tfs(self, data: dict, mount_name: str,
                          suffix: str) -> list[TransformStamped]:

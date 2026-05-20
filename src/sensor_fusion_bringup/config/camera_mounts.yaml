@@ -72,6 +72,30 @@ grasp_contact:
     - 0.0
     - 1.0
 
+cam_bounding_box_8cm:
+  screw_to_bbcam1:
+    translation:
+      x: 0.02
+      y: 0.05
+      z: 0.14
+    rotation: identity
+    quaternion:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 1.0
+  screw_to_bbcam2:
+    translation:
+      x: -0.035
+      y: -0.10
+      z: -0.01
+    rotation: identity
+    quaternion:
+    - 0.0
+    - 0.0
+    - 0.0
+    - 1.0
+
 mounts:
   5_cm_cam_mount:
     description: Camera mounted 5 cm above hand, vertical orientation
