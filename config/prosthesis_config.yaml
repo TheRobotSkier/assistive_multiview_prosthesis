@@ -80,9 +80,9 @@ pipeline_manager:
         pipeline_state_topic: "/pipeline/state"
         pipeline_state_name_topic: "/pipeline/state_name"
         # Tuning
-        confidence_threshold: 0.55
-        release_confidence_threshold: 0.30
-        grasp_gestures: [1, 2, 4]
+        confidence_threshold: 0.8
+        release_confidence_threshold: 0.8
+        grasp_gestures: [1]
         release_gesture: 3
         state_publish_rate_hz: 5.0
 
@@ -281,14 +281,12 @@ camera_tf_bridge:
 
 # ── EMG ───────────────────────────────────────────────────────────────────────
 emg:
-    confidence_threshold: 0.55
+    confidence_threshold: 0.8
     gesture_names: ["REST", "POWER", "PINCH", "OPEN", "POINT"]
     # Gesture to pipeline action mapping
     gesture_actions:
         POWER: "start_grasp"
-        PINCH: "start_grasp"
         OPEN: "release"
-        POINT: "start_grasp"
 
 # ── Segmentation ──────────────────────────────────────────────────────────────
 segmentation:

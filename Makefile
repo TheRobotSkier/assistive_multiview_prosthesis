@@ -18,7 +18,7 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
-.PHONY: build build-prosthesis build-segmentation build-jazzy-rviz rebuild dev dev-shell segmentation up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list
+.PHONY: build build-prosthesis build-segmentation build-jazzy-rviz rebuild dev dev-shell segmentation up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -269,6 +269,36 @@ rviz-openvins-kill:
 	-podman kill rviz-openvins 2>/dev/null
 	-podman rm rviz-openvins 2>/dev/null
 	@echo "Phase 2 RViz stopped."
+
+# ── Trajectory prediction RViz (predicted path, collision spheres, hit marker) ─
+rviz-twist-propagation:
+	@echo "Launching Trajectory Prediction RViz (twist_propagation visualisation)"
+	@test -f rviz/twist_propagation.rviz || { echo "Missing rviz/twist_propagation.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	xhost +
+	podman run --rm -d --name rviz-twist-propagation \
+		--network host \
+		--ipc host \
+		--device /dev/dri \
+		--userns=keep-id \
+		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
+		-v $(CURDIR)/rviz/twist_propagation.rviz:/rviz_config.rviz:ro \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "Trajectory Prediction RViz started. Kill with: make rviz-twist-propagation-kill"
+
+rviz-twist-propagation-kill:
+	-podman kill rviz-twist-propagation 2>/dev/null
+	-podman rm rviz-twist-propagation 2>/dev/null
+	@echo "Trajectory Prediction RViz stopped."
 
 # ── Jetson IMU dead reckoning test ────────────────────────────────────────────
 # Use jetson-imu-test-single or jetson-imu-test-dual depending on how many
