@@ -231,6 +231,11 @@ class OpenVinsRealSenseTfBridge(Node):
         self._specs = self._load_specs()
         self._warned: set[str] = set()
         self._published_from: dict[str, str] = {}
+        # Cache last-good bridge matrices to avoid oscillation when the
+        # anchor frame (aruco body_display) appears and disappears.
+        self._last_good_matrix: dict[str, np.ndarray] = {}
+        self._last_good_stamp: dict[str, float] = {}
+        self._matrix_staleness_limit_s: float = 30.0
 
         # Pre-build the nominal static chain so we can send it efficiently.
         self._nominal_static_tfs: list[TransformStamped] = []
@@ -239,6 +244,10 @@ class OpenVinsRealSenseTfBridge(Node):
 
         rate = max(float(self.get_parameter("publish_rate_hz").value), 1.0)
         self.create_timer(1.0 / rate, self._publish_all)
+
+        # Periodic diagnostic for unresolved bridge transforms.
+        self._resolve_fail_counts: dict[str, int] = {}
+        self.create_timer(10.0, self._log_diagnostics)
 
         summary = ", ".join(
             f"{spec.parent_frame}->{spec.link_frame}" for spec in self._specs
@@ -320,12 +329,12 @@ class OpenVinsRealSenseTfBridge(Node):
             )
 
     def _lookup_matrix(self, target_frame: str, source_frame: str) -> np.ndarray | None:
+        """Non-blocking TF lookup — returns 4x4 matrix or None."""
         try:
             tf_msg = self._tf_buffer.lookup_transform(
                 target_frame,
                 source_frame,
                 Time(),
-                timeout=self._timeout,
             )
             return _transform_to_matrix(tf_msg)
         except Exception:
@@ -370,6 +379,30 @@ class OpenVinsRealSenseTfBridge(Node):
     def _resolve_bridge_transform(
         self, spec: BridgeSpec
     ) -> tuple[np.ndarray | None, str]:
+        matrix, source = self._resolve_bridge_transform_live(spec)
+        if matrix is not None:
+            # Cache the good result.
+            self._last_good_matrix[spec.name] = matrix
+            self._last_good_stamp[spec.name] = self.get_clock().now().nanoseconds / 1e9
+            return matrix, source
+
+        # Live lookup failed — try the cached matrix if it's fresh enough.
+        cached = self._last_good_matrix.get(spec.name)
+        if cached is not None:
+            age = self.get_clock().now().nanoseconds / 1e9 - self._last_good_stamp[spec.name]
+            if age <= self._matrix_staleness_limit_s:
+                return cached, f"cached ({age:.1f}s ago)"
+            else:
+                self.get_logger().warn(
+                    f"{spec.name}: cached bridge transform is {age:.1f}s old "
+                    f"(limit={self._matrix_staleness_limit_s}s) — discarding",
+                    throttle_duration_sec=60.0,
+                )
+        return None, ""
+
+    def _resolve_bridge_transform_live(
+        self, spec: BridgeSpec
+    ) -> tuple[np.ndarray | None, str]:
         if spec.anchor_frame:
             parent_to_anchor = self._lookup_matrix(
                 spec.parent_frame, spec.anchor_frame
@@ -401,9 +434,37 @@ class OpenVinsRealSenseTfBridge(Node):
 
     def _warn_once(self, key: str, message: str):
         if key in self._warned:
+            # Track repeated failures for periodic diagnostics.
+            self._resolve_fail_counts[key] = self._resolve_fail_counts.get(key, 0) + 1
             return
         self._warned.add(key)
         self.get_logger().warn(message)
+
+    def _log_diagnostics(self):
+        """Periodically log which bridge transforms are still unresolved and why."""
+        unresolved = []
+        for spec in self._specs:
+            if spec.name in self._published_from:
+                continue  # This camera is working.
+            # Check which part of the chain is missing.
+            parent_exists = self._lookup_matrix(spec.parent_frame, spec.parent_frame) is not None
+            anchor_exists = (
+                self._lookup_matrix(spec.parent_frame, spec.anchor_frame) is not None
+                if spec.anchor_frame else False
+            )
+            fallback_exists = (
+                self._lookup_matrix(spec.fallback_optical_frame, spec.link_frame) is not None
+            )
+            unresolved.append(
+                f"{spec.name}: parent={spec.parent_frame}(in_tf={parent_exists}), "
+                f"anchor={spec.anchor_frame}(resolves={anchor_exists}), "
+                f"fallback={spec.fallback_optical_frame}->{spec.link_frame}(resolves={fallback_exists})"
+            )
+        if unresolved:
+            self.get_logger().warn(
+                "Unresolved bridge transforms: " + "; ".join(unresolved)
+            )
+            self._resolve_fail_counts.clear()
 
 
 def main(args=None):

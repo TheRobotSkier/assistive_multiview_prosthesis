@@ -215,6 +215,9 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("enable_hand_removal", True)
         self.declare_parameter("output_topic", "/fused_pointcloud")
         self.declare_parameter("sync_tolerance_s", 0.1)
+        self.declare_parameter("require_both_cameras", False)
+        self.declare_parameter("fallback_merge_rate_hz", 15.0)
+        self.declare_parameter("cloud_max_age_s", 0.5)
 
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
@@ -230,6 +233,9 @@ class PointCloudFusionNode(Node):
         cam2_topic = self.get_parameter("cam2_topic").value
         output_topic = self.get_parameter("output_topic").value
         sync_tol = self.get_parameter("sync_tolerance_s").value
+        self._require_both = self.get_parameter("require_both_cameras").value
+        fallback_rate = max(float(self.get_parameter("fallback_merge_rate_hz").value), 1.0)
+        self._cloud_max_age = float(self.get_parameter("cloud_max_age_s").value)
 
         # ── TF2 ───────────────────────────────────────────────────────────
         self._tf_buffer = tf2_ros.Buffer()
@@ -248,34 +254,46 @@ class PointCloudFusionNode(Node):
             depth=1,
         )
 
-        if _HAS_MSG_FILTERS:
+        # Always set up individual subscriptions for the fallback timer merge.
+        self._cam1_cloud = None
+        self._cam2_cloud = None
+        self._cam1_stamp = None
+        self._cam2_stamp = None
+        self._lock = threading.Lock()
+        self.create_subscription(
+            PointCloud2, cam1_topic, self._cb_cam1, cloud_qos)
+        self.create_subscription(
+            PointCloud2, cam2_topic, self._cb_cam2, cloud_qos)
+
+        if _HAS_MSG_FILTERS and self._require_both:
+            # Synchronizer-only mode: require both clouds to arrive together.
             sub1 = message_filters.Subscriber(self, PointCloud2, cam1_topic, qos_profile=cloud_qos)
             sub2 = message_filters.Subscriber(self, PointCloud2, cam2_topic, qos_profile=cloud_qos)
             self._sync = ApproximateTimeSynchronizer(
                 [sub1, sub2], queue_size=5, slop=sync_tol)
             self._sync.registerCallback(self._synced_callback)
+            self._fallback_timer = None
             self.get_logger().info(
-                f"Using ApproximateTimeSynchronizer (tolerance={sync_tol}s)")
+                f"Using ApproximateTimeSynchronizer (tolerance={sync_tol}s, require_both=True)")
         else:
-            # Fallback: subscribe individually, process latest of each
-            self._cam1_cloud = None
-            self._cam2_cloud = None
-            self._lock = threading.Lock()
-            self.create_subscription(
-                PointCloud2, cam1_topic, self._cb_cam1, cloud_qos)
-            self.create_subscription(
-                PointCloud2, cam2_topic, self._cb_cam2, cloud_qos)
-            self.create_timer(1.0 / 15.0, self._timer_merge)
+            # Fallback timer merge: process whichever clouds are fresh.
             self._sync = None
+            self._fallback_timer = self.create_timer(
+                1.0 / fallback_rate, self._timer_merge)
+            mode_desc = "require_both=True but message_filters unavailable" \
+                if self._require_both else "require_both=False"
             self.get_logger().info(
-                "message_filters unavailable — using timer-based merge fallback")
+                f"Using timer-based merge ({mode_desc}, "
+                f"rate={fallback_rate}Hz, max_age={self._cloud_max_age}s)")
 
         # ── BBox visualization timer ──────────────────────────────────────
         self.create_timer(1.0, self._publish_bbox_marker)
 
         # ── Stats ─────────────────────────────────────────────────────────
         self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
-                       "distance_removed": 0, "bbox_removed": 0}
+                       "distance_removed": 0, "bbox_removed": 0,
+                       "tf_fail": {}}
+        self._last_publish_time = self.get_clock().now()
         self.create_timer(10.0, self._log_stats)
 
         self.get_logger().info(
@@ -295,20 +313,29 @@ class PointCloudFusionNode(Node):
     def _cb_cam1(self, msg: PointCloud2):
         with self._lock:
             self._cam1_cloud = msg
+            self._cam1_stamp = self.get_clock().now()
 
     def _cb_cam2(self, msg: PointCloud2):
         with self._lock:
             self._cam2_cloud = msg
+            self._cam2_stamp = self.get_clock().now()
 
     def _timer_merge(self):
+        """Process whichever clouds are fresh enough."""
+        now = self.get_clock().now()
         with self._lock:
-            c1 = self._cam1_cloud
-            c2 = self._cam2_cloud
+            c1, s1 = self._cam1_cloud, self._cam1_stamp
+            c2, s2 = self._cam2_cloud, self._cam2_stamp
+
         clouds = []
-        if c1 is not None:
-            clouds.append(c1)
-        if c2 is not None:
-            clouds.append(c2)
+        if c1 is not None and s1 is not None:
+            age = (now - s1).nanoseconds / 1e9
+            if age <= self._cloud_max_age:
+                clouds.append(c1)
+        if c2 is not None and s2 is not None:
+            age = (now - s2).nanoseconds / 1e9
+            if age <= self._cloud_max_age:
+                clouds.append(c2)
         if clouds:
             self._process_clouds(clouds)
 
@@ -323,25 +350,17 @@ class PointCloudFusionNode(Node):
                 transformed.append(cloud)
                 continue
             try:
-                if self._tf_buffer.can_transform(
+                t = self._tf_buffer.lookup_transform(
                     self._target_frame, cloud.header.frame_id,
                     rclpy.time.Time(),
-                    timeout=rclpy.duration.Duration(seconds=0.05),
-                ):
-                    t = self._tf_buffer.lookup_transform(
-                        self._target_frame, cloud.header.frame_id,
-                        rclpy.time.Time(),
-                    )
-                    transformed.append(tf2_sensor_msgs.do_transform_cloud(cloud, t))
-                else:
-                    self.get_logger().warn(
-                        f"TF not available: {cloud.header.frame_id} -> {self._target_frame}",
-                        throttle_duration_sec=5.0,
-                    )
+                )
+                transformed.append(tf2_sensor_msgs.do_transform_cloud(cloud, t))
             except Exception as exc:
+                frame = cloud.header.frame_id
+                self._stats["tf_fail"][frame] = self._stats["tf_fail"].get(frame, 0) + 1
                 self.get_logger().warn(
-                    f"TF transform failed for {cloud.header.frame_id}: {exc}",
-                    throttle_duration_sec=5.0,
+                    f"TF transform failed for {frame}: {exc}",
+                    throttle_duration_sec=10.0,
                 )
 
         if not transformed:
@@ -445,6 +464,7 @@ class PointCloudFusionNode(Node):
         out_msg = _build_cloud(xyz_all, rgb_all, header)
         self._pub.publish(out_msg)
         self._stats["published"] += 1
+        self._last_publish_time = self.get_clock().now()
 
     # ── TF helpers ────────────────────────────────────────────────────────
 
@@ -500,12 +520,65 @@ class PointCloudFusionNode(Node):
     # ── Stats logging ─────────────────────────────────────────────────────
 
     def _log_stats(self):
+        now = self.get_clock().now()
+        since_last = (now - self._last_publish_time).nanoseconds / 1e9
+        tf_fail_str = ""
+        if self._stats["tf_fail"]:
+            tf_fail_str = " tf_fail={" + ", ".join(
+                f"{k}:{v}" for k, v in sorted(self._stats["tf_fail"].items())
+            ) + "}"
         self.get_logger().info(
             f"Stats: published={self._stats['published']} "
             f"(dual={self._stats['dual']}, cam1_only={self._stats['cam1_only']}) "
             f"dist_removed={self._stats['distance_removed']} "
             f"bbox_removed={self._stats['bbox_removed']}"
+            f"{tf_fail_str}"
+            f" last_publish_ago={since_last:.1f}s"
         )
+
+        # Stall diagnostic: if nothing published this interval, explain why.
+        if self._stats["published"] == 0:
+            with self._lock:
+                c1, s1 = self._cam1_cloud, self._cam1_stamp
+                c2, s2 = self._cam2_cloud, self._cam2_stamp
+
+            c1_age = (now - s1).nanoseconds / 1e9 if s1 else None
+            c2_age = (now - s2).nanoseconds / 1e9 if s2 else None
+
+            parts = []
+            if c1 is None or c1_age is None or c1_age > self._cloud_max_age:
+                parts.append(f"cam1: no cloud"
+                             if c1 is None or c1_age is None
+                             else f"cam1: stale ({c1_age:.1f}s)")
+            else:
+                parts.append(f"cam1: fresh ({c1_age:.2f}s)")
+                # Cloud is fresh but TF failed — diagnose which chain link is missing
+                try:
+                    self._tf_buffer.lookup_transform(
+                        self._target_frame, c1.header.frame_id, rclpy.time.Time())
+                except Exception as e:
+                    parts.append(f"cam1 TF: {e}")
+
+            if c2 is None or c2_age is None or c2_age > self._cloud_max_age:
+                parts.append(f"cam2: no cloud"
+                             if c2 is None or c2_age is None
+                             else f"cam2: stale ({c2_age:.1f}s)")
+            else:
+                parts.append(f"cam2: fresh ({c2_age:.2f}s)")
+                try:
+                    self._tf_buffer.lookup_transform(
+                        self._target_frame, c2.header.frame_id, rclpy.time.Time())
+                except Exception as e:
+                    parts.append(f"cam2 TF: {e}")
+
+            self.get_logger().warn(
+                f"Stall diagnostic (no publish for {since_last:.0f}s): {'; '.join(parts)}"
+            )
+
+        # Reset per-interval counters
+        self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
+                       "distance_removed": 0, "bbox_removed": 0,
+                       "tf_fail": {}}
 
 
 # ---------------------------------------------------------------------------
