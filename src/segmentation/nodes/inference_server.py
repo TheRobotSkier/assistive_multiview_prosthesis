@@ -6,10 +6,13 @@ Runs under Python 3.8 (required by MinkowskiEngine + PyTorch 1.12).
 Exposes two endpoints:
   GET  /health   → {"status": "ok"}
   POST /segment  → accepts base64-encoded xyz/rgb arrays + click lists,
-                   returns binary per-point mask {"mask": [0, 1, ...]}
+                    returns binary per-point mask {"mask": [0, 1, ...]}
 
 The model is loaded once at startup; subsequent requests share the loaded weights.
 All requests are processed single-threaded to avoid torch/ME concurrency issues.
+
+GPU support: CUDA is used automatically if available at runtime, otherwise
+falls back to CPU transparently.
 """
 
 import sys
@@ -32,8 +35,10 @@ from interactive_adaptation.interactive_adaptation import InteractiveSegmentatio
 WEIGHTS_PATH = os.environ.get("WEIGHTS_PATH", "/weights/weights_exp14_14.pth")
 PORT = int(os.environ.get("INFERENCE_SERVER_PORT", "5678"))
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"[inference_server] Detected device: {device}", flush=True)
+
 print(f"[inference_server] Loading model from {WEIGHTS_PATH} ...", flush=True)
-device = torch.device("cpu")
 _inseg = InteractiveSegmentationModel(pretraining_weights=WEIGHTS_PATH)
 _model = _inseg.create_model(device, _inseg.pretraining_weights_file)
 _model.eval()
@@ -82,16 +87,19 @@ def segment():
 
     # feats: (N, 5) = [R, G, B, pos_click, neg_click]
     feats = np.column_stack([rgb, pos_mask, neg_mask]).astype(np.float32)
-    feats_tensor = torch.from_numpy(feats).float()
+    feats_tensor = torch.from_numpy(feats).float().to(device)
 
     with torch.no_grad():
         pred, _ = _inseg.prediction(feats_tensor, xyz, _model, device)
+
+    # Move to CPU for post-processing (click masks live on CPU as numpy arrays)
+    pred = pred.cpu()
 
     # Enforce click constraints: clicked points are definitively fg/bg
     pred[pos_mask > 0.5] = 1
     pred[neg_mask > 0.5] = 0
 
-    mask = pred.cpu().numpy().astype(np.int32).tolist()
+    mask = pred.numpy().astype(np.int32).tolist()
     return jsonify({"mask": mask})
 
 
