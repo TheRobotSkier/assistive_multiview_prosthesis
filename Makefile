@@ -304,40 +304,54 @@ robotlab-connect:
 	@test -f $(ROBOTLAB_CONNECT_SCRIPT) || { echo "Missing $(ROBOTLAB_CONNECT_SCRIPT)"; exit 1; }
 	@$(ROBOTLAB_CONNECT_SCRIPT)
 
-# ── Clock sync (chrony) between host and Jetson ──────────────────────────
+# ── Clock sync between host and Jetson ────────────────────────────────────
 # Prevents TF2 "extrapolation into the past" errors caused by clock skew.
-# Requires: chrony installed on both machines, SSH access to Jetson.
 #
-# timesync         — configure and start chrony on both sides
-# timesync-check   — verify clocks are in sync
-# timesync-host    — configure chrony on host only (no Jetson access needed)
+# WSL2 cannot run an NTP server (chrony can't bind UDP 123), so we use a
+# two-step approach:
+#   1. One-shot SSH date sync (sets Jetson clock to host clock immediately)
+#   2. Chrony on the Jetson for ongoing drift correction (if NTP becomes
+#      available later, e.g. when running on bare metal)
+#
+# timesync         — one-shot sync + configure chrony on Jetson
+# timesync-check   — compare clocks and show offset
+# timesync-host    — configure chrony on host only (for bare-metal setups)
 
 timesync: robotlab-connect
-	@echo "Configuring chrony on host..."
-	@which chronyd >/dev/null 2>&1 || { echo "ERROR: chrony not installed on host. Install with: sudo apt install chrony"; exit 1; }
-	sudo cp config/chrony-host.conf /etc/chrony/chrony.conf
-	sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || { echo "WARNING: Could not restart chronyd on host"; }
-	@echo "Configuring chrony on Jetson..."
-	ssh $(JETSON_HOST) 'which chronyd >/dev/null 2>&1 || (echo robotlab | sudo -S apt install -y chrony); echo robotlab | sudo -S tee /etc/chrony/chrony.conf > /dev/null' < config/chrony-jetson.conf
-	ssh $(JETSON_HOST) 'echo robotlab | sudo -S systemctl restart chronyd 2>/dev/null || echo robotlab | sudo -S systemctl restart chrony 2>/dev/null || echo "WARNING: Could not restart chronyd on Jetson"'
-	@echo "Chrony configured on both sides. Use 'make timesync-check' to verify."
+	@echo "=== One-shot clock sync (host -> Jetson) ==="
+	@HOST_TIME="$$(date -u '+%Y-%m-%d %H:%M:%S')" && \
+		echo "Host time:  $${HOST_TIME} UTC" && \
+		echo "Jetson before: $$(ssh $(JETSON_HOST) date)" && \
+		ssh $(JETSON_HOST) "echo robotlab | sudo -S date -s '$${HOST_TIME}'" 2>/dev/null && \
+		echo "Jetson after:  $$(ssh $(JETSON_HOST) date)"
+	@echo ""
+	@echo "=== Configuring chrony on Jetson for ongoing drift correction ==="
+	ssh $(JETSON_HOST) 'which chronyd >/dev/null 2>&1 || (echo robotlab | sudo -S apt install -y chrony); echo robotlab | sudo -S systemctl stop systemd-timesyncd 2>/dev/null; echo robotlab | sudo -S systemctl disable systemd-timesyncd 2>/dev/null'
+	scp config/chrony-jetson.conf $(JETSON_HOST):/tmp/chrony-jetson.conf
+	ssh $(JETSON_HOST) 'echo robotlab | sudo -S cp /tmp/chrony-jetson.conf /etc/chrony/chrony.conf && rm /tmp/chrony-jetson.conf'
+	-ssh $(JETSON_HOST) 'echo robotlab | sudo -S systemctl restart chronyd 2>/dev/null || echo robotlab | sudo -S systemctl restart chrony 2>/dev/null'
+	@echo "Clock sync complete. Use 'make timesync-check' to verify."
 
 timesync-host:
 	@echo "Configuring chrony on host only (Jetson not configured)..."
+	@echo "NOTE: On WSL2, chrony cannot serve NTP. Use 'make timesync' for SSH-based sync."
 	@which chronyd >/dev/null 2>&1 || { echo "ERROR: chrony not installed on host. Install with: sudo apt install chrony"; exit 1; }
+	-sudo systemctl stop systemd-timesyncd 2>/dev/null
+	-sudo systemctl disable systemd-timesyncd 2>/dev/null
 	sudo cp config/chrony-host.conf /etc/chrony/chrony.conf
+	@grep -q 'SYNC_IN_CONTAINER="yes"' /etc/default/chrony 2>/dev/null || sudo sed -i 's/^SYNC_IN_CONTAINER=.*/SYNC_IN_CONTAINER="yes"/' /etc/default/chrony 2>/dev/null || echo 'SYNC_IN_CONTAINER="yes"' | sudo tee -a /etc/default/chrony > /dev/null
 	sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || { echo "WARNING: Could not restart chronyd"; }
-	@echo "Host chrony configured. The Jetson will sync to this machine if it has chrony with server 10.42.0.1."
+	@echo "Host chrony configured. On bare metal, the Jetson can sync to this machine."
 
 timesync-check: robotlab-connect
-	@echo "Host chrony sources:"
-	@chronyc sources 2>/dev/null || echo "chronyc not available on host"
+	@echo "=== Clock comparison ==="
+	@echo "Host time:   $$(date)"
+	@echo "Jetson time: $$(ssh $(JETSON_HOST) date)"
 	@echo ""
-	@echo "Jetson chrony sources:"
-	@ssh $(JETSON_HOST) 'chronyc sources 2>/dev/null || echo "chronyc not available on Jetson"'
+	@echo "=== Jetson chrony status ==="
+	@ssh $(JETSON_HOST) 'chronyc sources 2>/dev/null || echo "  chronyc not available on Jetson"'
 	@echo ""
-	@echo "Clock offset (host → Jetson):"
-	@ssh $(JETSON_HOST) 'chronyc tracking 2>/dev/null | grep "Last offset" || echo "chrony tracking not available"'
+	@ssh $(JETSON_HOST) 'chronyc tracking 2>/dev/null | grep -E "(Reference|Stratum|Last offset|RMS offset)" || echo "  chrony tracking not available on Jetson"'
 
 # ── Jetson deploy (git-push based sync over Ethernet) ────────────────────
 # JETSON_HOST must be reachable via SSH (see ~/.ssh/config for 'robotlab').

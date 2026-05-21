@@ -465,6 +465,14 @@ class TwistPropagationNode(Node):
         self.declare_parameter("click_min_radius_m", 0.005)
         self.declare_parameter("click_random_seed", 42)
 
+        # Delay between detecting a new segmented cloud and calling the
+        # preshaping service.  Gives the preshaping bridge time to receive
+        # the same cloud via its own subscription before the service call
+        # arrives.  Without this delay the bridge may still hold the previous
+        # (empty/reset) cloud, causing a "PointCloud data pointer is null"
+        # error.
+        self.declare_parameter("preshaping_call_delay_s", 0.15)
+
         # ── Read parameters ────────────────────────────────────────────────
         self._cycle_delay = self.get_parameter("cycle_delay_s").value
         self._horizon = self.get_parameter("propagation_time_horizon_s").value
@@ -498,6 +506,7 @@ class TwistPropagationNode(Node):
         self._click_radius = float(self.get_parameter("click_radius_m").value)
         self._click_min_radius = float(self.get_parameter("click_min_radius_m").value)
         self._click_random_seed = int(self.get_parameter("click_random_seed").value)
+        self._preshaping_call_delay = float(self.get_parameter("preshaping_call_delay_s").value)
 
         # Validation
         if self._click_count < 0:
@@ -539,6 +548,7 @@ class TwistPropagationNode(Node):
         self._seg_cloud_stamp: float = 0.0
         self._seg_cloud_stamp_at_trigger: float = 0.0
         self._seg_trigger_time: float = 0.0
+        self._preshaping_call_timer = None  # one-shot timer for delayed preshaping call
 
         # Current accepted segmentation target (cloud frame)
         self._current_segmentation_target: tuple[float, float, float] | None = None
@@ -698,6 +708,12 @@ class TwistPropagationNode(Node):
             self._cloud_kdtree = None
 
     def _on_segmented_cloud(self, msg: PointCloud2):
+        # Skip empty clouds — the segmentation node publishes an empty cloud on
+        # reset to clear RViz2, and we must not treat that as a valid result.
+        # An empty cloud would trigger premature preshaping with a null data
+        # pointer in the preshaping bridge.
+        if msg.width * msg.height == 0:
+            return
         stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         with self._lock:
             self._seg_cloud_stamp = stamp
@@ -1145,7 +1161,7 @@ class TwistPropagationNode(Node):
 
             # -- Outside the lock: call preshaping service if needed -------------
             if should_call_preshaping:
-                self._call_preshaping_service()
+                self._schedule_preshaping_call()
         except Exception as exc:
             import traceback
             self.get_logger().error(
@@ -1322,6 +1338,31 @@ class TwistPropagationNode(Node):
             )
 
     # ── Preshaping service call ────────────────────────────────────────────
+
+    def _schedule_preshaping_call(self):
+        """Call the preshaping service after a short delay.
+
+        The delay (``preshaping_call_delay_s``) gives the preshaping bridge
+        time to receive the segmented cloud via its own subscription before
+        the service call arrives.  Without this delay the bridge may still
+        hold the previous (empty/reset) cloud.
+        """
+        if self._preshaping_call_delay <= 0.0:
+            self._call_preshaping_service()
+            return
+
+        if self._preshaping_call_timer is not None:
+            self._preshaping_call_timer.cancel()
+        self._preshaping_call_timer = self.create_timer(
+            self._preshaping_call_delay, self._on_preshaping_delay_expired
+        )
+
+    def _on_preshaping_delay_expired(self):
+        """One-shot timer callback: call the preshaping service."""
+        if self._preshaping_call_timer is not None:
+            self._preshaping_call_timer.cancel()
+            self._preshaping_call_timer = None
+        self._call_preshaping_service()
 
     def _call_preshaping_service(self):
         """Call the preshaping service.  NOT called under self._lock."""

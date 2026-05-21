@@ -207,6 +207,7 @@ twist_propagation:
         # Computed from camera_mounts.yaml for 8_cm_cam_mount:
         #   cam0 -> link (RealSense extrinsic) -> screw -> palm -> grasp_contact
         propagation_origin_offset: [0.1543, -0.1485, 0.1352]
+        preshaping_call_delay_s: 0.15
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)
@@ -406,3 +407,8 @@ twist_propagation:
     click_radius_m: 0.03
     click_min_radius_m: 0.005
     click_random_seed: 42
+
+    # Delay between detecting a new segmented cloud and calling the
+    # preshaping service (seconds).  Gives the preshaping bridge time to
+    # receive the cloud via its own subscription.  Set to 0 to disable.
+    preshaping_call_delay_s: 0.15

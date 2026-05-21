@@ -190,23 +190,26 @@ class CameraMountTFPublisher(Node):
         # Marker republish timer (for RViz latch)
         self._marker_timer = self.create_timer(1.0, self._republish_marker)
 
-        # TF liveness timer — re-sends static TFs on /tf at 1 Hz to work
+        # TF liveness timer — re-sends static TFs on /tf at 10 Hz to work
         # around CycloneDDS /tf_static latch unreliability with late-joining
-        # nodes.  Same pattern as the OpenVINS bridge.
-        self._liveness_timer = self.create_timer(1.0, self._liveness_tick)
+        # nodes.  10 Hz ensures camera mount frames are always fresh for the
+        # fusion node (15 Hz) and bbox removal transforms.  Same pattern as
+        # the OpenVINS bridge.
+        self._liveness_timer = self.create_timer(0.1, self._liveness_tick)
 
         mode = f"pipeline (root={link_frame})" if link_frame else "standalone (root=world)"
         self.get_logger().info(
             f"Camera mount TF publisher started in {mode} mode "
-            f"({len(self._tfs)} TFs, 1 Hz liveness)")
+            f"({len(self._tfs)} TFs, 10 Hz liveness)")
 
     def _liveness_tick(self):
-        """Re-send all camera mount TFs on /tf at 1 Hz.
+        """Re-send all camera mount TFs on /tf at 10 Hz.
 
         Works around CycloneDDS /tf_static latch unreliability — late-joining
         nodes that missed the initial TRANSIENT_LOCAL delivery can pick up the
-        transforms from the dynamic /tf topic.  Same pattern as the OpenVINS
-        bridge's liveness timer.
+        transforms from the dynamic /tf topic.  10 Hz ensures the camera mount
+        frames are always fresh for the pointcloud fusion node's bbox removal
+        step, which runs at 15 Hz.
         """
         if not self._tfs:
             return

@@ -172,26 +172,13 @@ def _voxel_downsample(xyz: np.ndarray, rgb_packed: np.ndarray, voxel_size: float
     return xyz_out, rgb_out
 
 
-def _transform_points_to_frame(xyz: np.ndarray, tf_buffer, target_frame: str,
-                                source_frame: str, stamp) -> np.ndarray | None:
-    """Transform an (N,3) xyz array from source_frame to target_frame using TF2.
-
-    Returns transformed (N,3) float32 or None if TF lookup fails.
-    """
-    try:
-        t = tf_buffer.lookup_transform(target_frame, source_frame, stamp)
-    except Exception:
-        return None
-
-    tx = t.transform.translation.x
-    ty = t.transform.translation.y
-    tz = t.transform.translation.z
+def _extract_rotation_translation(t) -> tuple[np.ndarray, np.ndarray]:
+    """Extract rotation matrix (3,3) and translation vector (3,) from a TF2 transform."""
     qx = t.transform.rotation.x
     qy = t.transform.rotation.y
     qz = t.transform.rotation.z
     qw = t.transform.rotation.w
 
-    # Quaternion to rotation matrix
     r00 = 1 - 2*(qy*qy + qz*qz)
     r01 = 2*(qx*qy - qz*qw)
     r02 = 2*(qx*qz + qy*qw)
@@ -205,8 +192,26 @@ def _transform_points_to_frame(xyz: np.ndarray, tf_buffer, target_frame: str,
     R = np.array([[r00, r01, r02],
                    [r10, r11, r12],
                    [r20, r21, r22]], dtype=np.float64)
-    t_vec = np.array([tx, ty, tz], dtype=np.float64)
+    t_vec = np.array([
+        t.transform.translation.x,
+        t.transform.translation.y,
+        t.transform.translation.z,
+    ], dtype=np.float64)
+    return R, t_vec
 
+
+def _transform_points_to_frame(xyz: np.ndarray, tf_buffer, target_frame: str,
+                                source_frame: str, stamp) -> np.ndarray | None:
+    """Transform an (N,3) xyz array from source_frame to target_frame using TF2.
+
+    Returns transformed (N,3) float32 or None if TF lookup fails.
+    """
+    try:
+        t = tf_buffer.lookup_transform(target_frame, source_frame, stamp)
+    except Exception:
+        return None
+
+    R, t_vec = _extract_rotation_translation(t)
     transformed = (xyz.astype(np.float64) @ R.T) + t_vec
     return transformed.astype(np.float32)
 
@@ -240,6 +245,8 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("cloud_max_age_s", 0.5)
         self.declare_parameter("mounts_config_path", "")
         self.declare_parameter("active_mount", "8_cm_cam_mount")
+        self.declare_parameter("bbox_fallback_mode", "cache")  # skip | cache | conservative
+        self.declare_parameter("bbox_cache_max_age_s", 2.0)
 
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
@@ -258,6 +265,9 @@ class PointCloudFusionNode(Node):
         self._require_both = self.get_parameter("require_both_cameras").value
         fallback_rate = max(float(self.get_parameter("fallback_merge_rate_hz").value), 1.0)
         self._cloud_max_age = float(self.get_parameter("cloud_max_age_s").value)
+        self._bbox_fallback_mode = self.get_parameter("bbox_fallback_mode").value
+        self._bbox_cache_max_age = float(
+            self.get_parameter("bbox_cache_max_age_s").value)
 
         # ── Load pruning boxes from camera_mounts.yaml or fall back to params ─
         mounts_config = self.get_parameter("mounts_config_path").value
@@ -331,15 +341,29 @@ class PointCloudFusionNode(Node):
         self._stats_lock = threading.Lock()
         self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
                        "distance_removed": 0, "bbox_removed": 0,
+                       "bbox_skipped": 0, "bbox_cache_hits": 0,
                        "tf_fail": {}}
         self._last_publish_time = self.get_clock().now()
         self.create_timer(10.0, self._log_stats)
+
+        # ── Bbox transform cache ───────────────────────────────────────────
+        # Caches the most recent successful transform for each pruning box
+        # frame as (R, t_vec, timestamp_ns). Used when fresh TF lookup fails
+        # and bbox_fallback_mode == "cache".
+        self._bbox_transform_cache: dict[str, tuple] = {}  # frame -> (R, t_vec, cache_time_ns)
+
+        # ── Bbox health tracking ───────────────────────────────────────────
+        self._bbox_attempts = 0
+        self._bbox_successes = 0
+        self._bbox_health_window_start = self.get_clock().now()
+        self.create_timer(30.0, self._check_bbox_health)
 
         self.get_logger().info(
             f"Pointcloud fusion: {cam1_topic} + {cam2_topic} -> {output_topic} "
             f"(target_frame={self._target_frame}, arm_frame={self._arm_frame}, "
             f"max_dist={self._max_distance}m, voxel={self._voxel_size}m, "
-            f"pruning_boxes={len(self._pruning_boxes)})"
+            f"pruning_boxes={len(self._pruning_boxes)}, "
+            f"bbox_fallback={self._bbox_fallback_mode})"
         )
 
     # ── Synced callback (message_filters) ────────────────────────────────
@@ -479,12 +503,28 @@ class PointCloudFusionNode(Node):
 
         # ── Step 4: Hand/arm bbox removal (multiple pruning boxes) ─────
         if self._enable_hand_removal:
+            # Use a recent-but-not-zero timestamp for bbox TF lookups.
+            # rclpy.time.Time() (= zero) means "latest", but can cause
+            # extrapolation-into-the-past errors when the TF buffer only has
+            # data starting slightly after the requested time.  A 100ms offset
+            # gives the buffer a safe margin while still being recent enough.
+            lookup_stamp = (self.get_clock().now()
+                            - rclpy.duration.Duration(seconds=0.1))
+
             for frame, bbox_min, bbox_max in self._pruning_boxes:
-                xyz_box = _transform_points_to_frame(
-                    xyz_all, self._tf_buffer, frame,
-                    self._target_frame, rclpy.time.Time(),
-                )
-                if xyz_box is not None:
+                self._bbox_attempts += 1
+
+                # Try instant (non-blocking) TF lookup; falls back to cache
+                transform_result = self._lookup_bbox_transform(
+                    frame, lookup_stamp, xyz_all)
+
+                if transform_result is not None:
+                    R, t_vec, xyz_box = transform_result
+                    # Cache the successful transform
+                    cache_time = self.get_clock().now().nanoseconds
+                    self._bbox_transform_cache[frame] = (R, t_vec, cache_time)
+                    self._bbox_successes += 1
+
                     keep = _bbox_filter(xyz_box, bbox_min, bbox_max)
                     removed = len(xyz_all) - np.sum(keep)
                     xyz_all = xyz_all[keep]
@@ -492,10 +532,13 @@ class PointCloudFusionNode(Node):
                     with self._stats_lock:
                         self._stats["bbox_removed"] += int(removed)
                 else:
-                    self.get_logger().warn(
-                        f"Cannot transform to {frame} for bbox removal — skipping",
-                        throttle_duration_sec=5.0,
-                    )
+                    # Fresh lookup failed — apply fallback strategy
+                    handled = self._bbox_fallback(
+                        frame, bbox_min, bbox_max,
+                        xyz_all, rgb_all, lookup_stamp)
+                    if handled is not None:
+                        xyz_all, rgb_all = handled[0], handled[1]
+                    # else: bbox_skipped already counted in _bbox_fallback
 
         if len(xyz_all) == 0:
             return
@@ -523,6 +566,105 @@ class PointCloudFusionNode(Node):
         with self._stats_lock:
             self._stats["published"] += 1
         self._last_publish_time = self.get_clock().now()
+
+    def _lookup_bbox_transform(self, frame: str, stamp, xyz_all: np.ndarray):
+        """Try to look up the transform for a bbox pruning box.
+
+        Returns (R, t_vec, xyz_box) on success, or None if lookup fails.
+        Uses a zero timeout (instant, non-blocking) to avoid adding latency
+        to the fusion pipeline.  The cache fallback in _bbox_fallback handles
+        the case where the transform is not yet in the buffer.
+        """
+        try:
+            t = self._tf_buffer.lookup_transform(
+                frame, self._target_frame, stamp,
+                timeout=rclpy.duration.Duration(seconds=0),
+            )
+        except Exception:
+            return None
+
+        R, t_vec = _extract_rotation_translation(t)
+        xyz_box = (xyz_all.astype(np.float64) @ R.T) + t_vec
+        return R, t_vec, xyz_box.astype(np.float32)
+
+    def _bbox_fallback(self, frame: str, bbox_min, bbox_max,
+                       xyz_all, rgb_all, lookup_stamp):
+        """Handle bbox removal when fresh TF lookup fails.
+
+        Returns (xyz_all, rgb_all) if fallback was applied, or None if
+        the pruning box was skipped entirely.
+        """
+        with self._stats_lock:
+            self._stats["bbox_skipped"] += 1
+
+        if self._bbox_fallback_mode == "cache":
+            cached = self._bbox_transform_cache.get(frame)
+            if cached is not None:
+                R, t_vec, cache_time_ns = cached
+                age_s = (self.get_clock().now().nanoseconds - cache_time_ns) / 1e9
+                if age_s <= self._bbox_cache_max_age:
+                    # Apply cached transform
+                    xyz_box = (xyz_all.astype(np.float64) @ R.T) + t_vec
+                    xyz_box = xyz_box.astype(np.float32)
+                    keep = _bbox_filter(xyz_box, bbox_min, bbox_max)
+                    removed = len(xyz_all) - np.sum(keep)
+                    xyz_all = xyz_all[keep]
+                    rgb_all = rgb_all[keep]
+                    with self._stats_lock:
+                        self._stats["bbox_removed"] += int(removed)
+                        self._stats["bbox_cache_hits"] += 1
+                    self.get_logger().warn(
+                        f"Using cached transform for {frame} "
+                        f"(age={age_s:.2f}s) — fresh lookup failed",
+                        throttle_duration_sec=5.0)
+                    return xyz_all, rgb_all
+                else:
+                    self.get_logger().warn(
+                        f"Cannot transform to {frame} for bbox removal — "
+                        f"cached transform too old ({age_s:.1f}s > "
+                        f"{self._bbox_cache_max_age}s), skipping",
+                        throttle_duration_sec=5.0)
+                    return None
+            # No cache available
+            self.get_logger().warn(
+                f"Cannot transform to {frame} for bbox removal — "
+                f"no cached transform available, skipping",
+                throttle_duration_sec=5.0)
+            return None
+
+        elif self._bbox_fallback_mode == "conservative":
+            # Don't publish if bbox removal can't run — safest option.
+            # Return empty arrays to signal the caller to abort.
+            self.get_logger().warn(
+                f"Cannot transform to {frame} for bbox removal — "
+                f"conservative mode: dropping fused cloud",
+                throttle_duration_sec=5.0)
+            return np.zeros((0, 3), dtype=np.float32), rgb_all[:0]
+
+        else:  # "skip" mode (original behavior)
+            self.get_logger().warn(
+                f"Cannot transform to {frame} for bbox removal — skipping",
+                throttle_duration_sec=5.0)
+            return None
+
+    def _check_bbox_health(self):
+        """Log an ERROR if bbox removal success rate is too low over a 30s window."""
+        now = self.get_clock().now()
+        elapsed = (now - self._bbox_health_window_start).nanoseconds / 1e9
+        if self._bbox_attempts > 0 and elapsed >= 25.0:
+            success_rate = self._bbox_successes / self._bbox_attempts
+            if success_rate < 0.9:
+                self.get_logger().error(
+                    f"Bbox removal success rate is {success_rate:.0%} over "
+                    f"{elapsed:.0f}s ({self._bbox_successes}/"
+                    f"{self._bbox_attempts} attempts). "
+                    f"Fused cloud quality is degraded — hand/arm may not be "
+                    f"filtered. Check TF tree connectivity for pruning box frames."
+                )
+            # Reset window
+            self._bbox_attempts = 0
+            self._bbox_successes = 0
+            self._bbox_health_window_start = now
 
     # ── TF helpers ────────────────────────────────────────────────────────
 
@@ -645,6 +787,8 @@ class PointCloudFusionNode(Node):
             f"(dual={stats_snapshot['dual']}, cam1_only={stats_snapshot['cam1_only']}) "
             f"dist_removed={stats_snapshot['distance_removed']} "
             f"bbox_removed={stats_snapshot['bbox_removed']}"
+            f" bbox_skipped={stats_snapshot['bbox_skipped']}"
+            f" bbox_cache_hits={stats_snapshot['bbox_cache_hits']}"
             f"{tf_fail_str}"
             f" last_publish_ago={since_last:.1f}s"
         )
@@ -692,6 +836,7 @@ class PointCloudFusionNode(Node):
         with self._stats_lock:
             self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
                            "distance_removed": 0, "bbox_removed": 0,
+                           "bbox_skipped": 0, "bbox_cache_hits": 0,
                            "tf_fail": {}}
 
 

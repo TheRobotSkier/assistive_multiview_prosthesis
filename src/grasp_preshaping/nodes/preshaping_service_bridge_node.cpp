@@ -259,6 +259,19 @@ private:
         return true;
       }
 
+      // Reject empty / reset clouds early with a clear message instead of
+      // letting a null data pointer reach the Rust FFI layer.
+      if (latest_cloud_.width * latest_cloud_.height == 0) {
+        response->success = false;
+        response->message = "Point cloud is empty (0 points) — segmentation may still be in progress";
+        return true;
+      }
+      if (latest_cloud_.data.empty()) {
+        response->success = false;
+        response->message = "Point cloud data buffer is empty — segmentation may still be in progress";
+        return true;
+      }
+
       pose = latest_pose_;
       twist = latest_twist_;
       cloud = latest_cloud_;
