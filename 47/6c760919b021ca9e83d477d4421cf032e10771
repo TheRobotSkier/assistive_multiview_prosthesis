@@ -1,0 +1,54 @@
+src/grasp_preshaping/nodes/grasp_proximity_controller_node.py
+  s_efb00b1ef54c14::t_f0c2c21e890e1b 140-144
+  s_efb00b1ef54c14::t_22e861e6e15e70 70,75
+  s_efb00b1ef54c14::t_4f903657a6a565 24-29
+  s_efb00b1ef54c14::t_e96fd6270ad872 20-22
+  s_efb00b1ef54c14::t_2166c0fdc2fb51 194
+  s_efb00b1ef54c14::t_b5f3ee48d5b325 82
+  s_efb00b1ef54c14::t_15f3988ff9842f 84-89
+  s_efb00b1ef54c14::t_4d4d22d924c71b 235-237
+  s_efb00b1ef54c14::t_033e103675036b 171
+  s_efb00b1ef54c14::t_5b263c42469035 255-288
+src/grasp_preshaping/nodes/preshaping_service_bridge_node.cpp
+  s_efb00b1ef54c14::t_1cc0fb85dc544f 466-467
+  s_efb00b1ef54c14::t_55796b701e726e 526
+  s_efb00b1ef54c14::t_6661ac22d4562c 465,468-474
+  s_efb00b1ef54c14::t_c9ac6cc6f729c8 536
+  s_efb00b1ef54c14::t_917ed6c2ce13c3 98
+  s_efb00b1ef54c14::t_03cdf219a1f89e 143
+  s_efb00b1ef54c14::t_53e558ca792d1f 99
+src/twist_propagation/twist_propagation/twist_propagation_node.py
+  s_efb00b1ef54c14::t_a193ae7ed0e208 1090-1124,1128-1129
+  s_efb00b1ef54c14::t_9045488bdd4e00 444
+  s_efb00b1ef54c14::t_06b15d907898a3 1021,1023,1025
+  s_efb00b1ef54c14::t_27ff8e149180aa 173-188
+  s_efb00b1ef54c14::t_1899e2836d3174 409-410
+src/segmentation/segmentation_bridge/segmentation_ros2_node.py
+  s_efb00b1ef54c14::t_a6f69e6d0aa3fe 173-177,184-188
+  s_efb00b1ef54c14::t_7691b74d798cb3 146,158-160
+tests/launch/test_trajectory_grasp.launch.py
+  s_efb00b1ef54c14::t_0c5ad40e48c4b9 1-16,18-21,25,29-63
+  s_efb00b1ef54c14::t_83b4723a29c782 17,22-24,26-28
+src/pipeline_manager/pipeline_manager/pipeline_manager_node.py
+  s_efb00b1ef54c14::t_5b5ec134815bf7 96
+  s_efb00b1ef54c14::t_5b4a1dcecd6495 246
+  s_efb00b1ef54c14::t_66490d37de3f4f 271-278
+tests/launch/mock_data_publisher.py
+  s_efb00b1ef54c14::t_c507eaa84b91c5 1-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "476c760919b021ca9e83d477d4421cf032e10771",
+  "prompts": {},
+  "sessions": {
+    "s_efb00b1ef54c14": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5abe647ffef1bV1bCUlmoSN7",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
