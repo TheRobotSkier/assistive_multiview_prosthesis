@@ -1,0 +1,29 @@
+tests/launch/test_trajectory_grasp.launch.py
+  s_95c3bfa668897f::t_c6ba24bd176d92 1-63
+tests/launch/mock_data_publisher.py
+  s_95c3bfa668897f::t_c6ba24bd176d92 1-100
+src/grasp_preshaping/nodes/grasp_proximity_controller_node.py
+  s_95c3bfa668897f::t_c6ba24bd176d92 20-29,70,75,82-89,140-144,171,194,235-237,255-288
+src/segmentation/segmentation_bridge/segmentation_ros2_node.py
+  s_95c3bfa668897f::t_c6ba24bd176d92 146,158-160,173-177,184-188
+src/grasp_preshaping/nodes/preshaping_service_bridge_node.cpp
+  s_95c3bfa668897f::t_c6ba24bd176d92 98-99,143,465-474,526,536
+src/twist_propagation/twist_propagation/twist_propagation_node.py
+  s_95c3bfa668897f::t_c6ba24bd176d92 174-189,410-412,445,1038,1040,1042,1107-1141,1145-1146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "a2ec735a07fa0953e91d879ef0288a531de93c24",
+  "prompts": {},
+  "sessions": {
+    "s_95c3bfa668897f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4773878ffe9xE0CjDOxcM5KX",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
