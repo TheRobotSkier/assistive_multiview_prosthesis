@@ -1,6 +1,17 @@
-# EMG-Driven Velocity-Based Force Grasp Test Configuration
+# Mode-Based EMG-Driven Velocity Force Grasp Test Configuration
+#
+# Gesture IDs (from emg_bridge/config.py):
+#   REST=0, POWER=1, PINCH=2, OPEN=3, POINT=4
+#
+# Each mode defines a set of functions.  Each function has:
+#   gesture_id              — which EMG gesture triggers it (null/None = disabled)
+#   confidence_threshold    — minimum /emg/confidence to trigger
+#   hold_time_s             — how long the gesture must be held before triggering
+#   velocity                — action velocity (rad/s for fingers, deg/s for wrist)
+#
+# If gesture_id is null, the function is disabled in that mode.
 
-# ---- Velocity Profile ----
+# ---- Shared Grasp Parameters ----
 closing_velocity_start: 0.3
 closing_velocity_end: 0.1
 decay_steps: 5
@@ -18,23 +29,111 @@ force_thresholds:
 
 relaxed_wait_s: 2
 
-# ---- EMG Parameters ----
+# ---- EMG Topic Names ----
 emg_gesture_topic: "/emg/gesture_label"
 emg_confidence_topic: "/emg/confidence"
 emg_proportional_topic: "/emg/proportional"
 
-# Gesture IDs: REST=0, POWER=1, PINCH=2, OPEN=3, POINT=4
-emg_grasp_trigger_gesture: 1
-emg_release_gesture: 3
-emg_grasp_confidence_threshold: 0.7
-gesture_hold_timeout_s: 1.0
-
-# ---- Wrist Control (optional) ----
-wrist_control_enabled: false
+# ---- Wrist Control ----
+wrist_control_enabled: true
 wrist_cmd_topic: "/wrist/set_position"
-wrist_gesture_map:
-  0: 0.0
-  1: 0.0
-  2: 15.0
-  3: -15.0
-  4: 0.0
+wrist_accel_deg_s2: 180.0
+
+# ============================================================================
+# MODE DEFINITIONS
+# ============================================================================
+
+modes:
+  # ------------------------------------------------------------------------
+  # MODE: moving
+  #   Hand is open/relaxed.  Wrist can be positioned.  Grasp can be started.
+  # ------------------------------------------------------------------------
+  moving:
+    # Wrist positive rotation (e.g. flexion)
+    wrist_pos:
+      gesture_id: 2               # PINCH
+      confidence_threshold: 0.7
+      hold_time_s: 0.5
+      velocity: 10.0              # deg/s
+
+    # Wrist negative rotation (e.g. extension)
+    wrist_neg:
+      gesture_id: 3               # OPEN
+      confidence_threshold: 0.7
+      hold_time_s: 0.5
+      velocity: -10.0             # deg/s
+
+    # Activate grasp → transition to grasping mode
+    grasp_activate:
+      gesture_id: 1               # POWER
+      confidence_threshold: 0.8
+      hold_time_s: 1.0
+      velocity: null              # not applicable
+
+  # ------------------------------------------------------------------------
+  # MODE: grasping
+  #   Fingers are closing with velocity ramp.  Wrist can still be adjusted.
+  #   Grasp can be cancelled (returns to moving).
+  # ------------------------------------------------------------------------
+  grasping:
+    # Cancel grasp, open hand, return to moving mode
+    grasp_release:
+      gesture_id: 3               # OPEN
+      confidence_threshold: 0.7
+      hold_time_s: 0.5
+      velocity: null
+
+    # Wrist positive rotation
+    wrist_pos:
+      gesture_id: 2               # PINCH
+      confidence_threshold: 0.7
+      hold_time_s: 0.5
+      velocity: 10.0              # deg/s
+
+    # Wrist negative rotation — DISABLED in grasping mode
+    wrist_neg:
+      gesture_id: null
+      confidence_threshold: null
+      hold_time_s: null
+      velocity: null
+
+  # ------------------------------------------------------------------------
+  # MODE: holding
+  #   Contact has been made.  Grasp force can be adjusted.
+  #   Wrist can be repositioned slowly.  Grasp can be released.
+  # ------------------------------------------------------------------------
+  holding:
+    # Increase holding force (small additional closure)
+    force_inc:
+      gesture_id: 1               # POWER
+      confidence_threshold: 0.7
+      hold_time_s: 0.3
+      velocity: 0.05              # rad/s closing
+
+    # Decrease holding force (small opening)
+    force_dec:
+      gesture_id: 3               # OPEN
+      confidence_threshold: 0.7
+      hold_time_s: 0.3
+      velocity: -0.05             # rad/s opening
+
+    # Release grasp, open hand, return to moving mode
+    grasp_release:
+      gesture_id: 0               # REST
+      confidence_threshold: 0.8
+      hold_time_s: 1.5
+      velocity: null
+
+    # Wrist positive rotation — slower in holding for safety
+    wrist_pos:
+      gesture_id: 2               # PINCH
+      confidence_threshold: 0.7
+      hold_time_s: 0.5
+      velocity: 5.0               # deg/s
+
+    # Wrist negative rotation — DISABLED in holding mode
+    wrist_neg:
+      gesture_id: null
+      confidence_threshold: null
+      hold_time_s: null
+      velocity: null
