@@ -84,6 +84,7 @@ def _launch_setup(context, *args, **kwargs):
     camera_mount = LaunchConfiguration("camera_mount").perform(context)
     mounts_config = LaunchConfiguration("mounts_config").perform(context)
     mounts_link_frame = LaunchConfiguration("mounts_link_frame").perform(context)
+    tf_diagnostics = LaunchConfiguration("tf_diagnostics").perform(context)
 
     nodes = []
 
@@ -219,6 +220,40 @@ def _launch_setup(context, *args, **kwargs):
                         output="screen",
                     )
                 )
+            else:
+                print(f"[pipeline] WARNING: camera mount TF publisher script not found "
+                      f"(tried source-tree and installed layouts). "
+                      f"mounts_config={mounts_config!r}, mounts_script={mounts_script!r}. "
+                      f"Camera mount TFs (palm_frame, grasp_contact_frame, etc.) will NOT "
+                      f"be published. Rebuild prosthesis_launch and sensor_fusion_bringup.")
+        # TF pipeline diagnostics — logs clear one-line summaries of which TF
+        # chains are healthy vs. disconnected (OpenVINS vs. camera mounts).
+        if _as_bool(context, "tf_diagnostics"):
+            diag_script = os.path.join(
+                os.path.dirname(__file__), "..", "..", "..",
+                "src", "sensor_fusion_bringup", "scripts",
+                "tf_pipeline_diagnostics.py")
+            if not os.path.isfile(diag_script):
+                import ament_index_python
+                try:
+                    share = ament_index_python.get_package_share_directory(
+                        "sensor_fusion_bringup")
+                    diag_script = os.path.join(share, "scripts",
+                                               "tf_pipeline_diagnostics.py")
+                except Exception:
+                    diag_script = ""
+            if diag_script and os.path.isfile(diag_script):
+                camera_nodes.append(
+                    ExecuteProcess(
+                        cmd=["python3", diag_script],
+                        name="tf_pipeline_diagnostics",
+                        output="screen",
+                    )
+                )
+            else:
+                print(f"[pipeline] WARNING: TF diagnostics script not found "
+                      f"(tried source-tree and installed layouts). "
+                      f"diag_script={diag_script!r}.")
         camera_nodes.extend(
             [
                 Node(
@@ -412,6 +447,12 @@ def generate_launch_description():
                 "inference_url",
                 default_value="http://127.0.0.1:5678",
                 description="Segmentation inference server URL.",
+            ),
+            DeclareLaunchArgument(
+                "tf_diagnostics",
+                default_value="true",
+                description="Launch lightweight TF diagnostics node that logs "
+                            "OpenVINS and camera-mount chain health.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]

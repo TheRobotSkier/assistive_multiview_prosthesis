@@ -111,6 +111,11 @@ RUN pip install --no-cache-dir \
         transforms3d \
         matplotlib \
         flask
+# Fix typing_extensions/dash incompatibility: open3d pulls in dash>=2.0 which
+# requires typing_extensions>=4.6 (uses _tx.Generic).  The PyTorch base image
+# ships typing_extensions 4.4.0 which lacks this, causing:
+#   AttributeError: module 'typing_extensions' has no attribute 'Generic'
+RUN pip install --no-cache-dir "typing_extensions>=4.6"
 
 # Clone InterObject3D (pinned to a known-good commit)
 RUN git clone https://github.com/theodorakontogianni/InterObject3D /app && \
@@ -125,7 +130,7 @@ COPY nodes/inference_server.py /nodes/inference_server.py
 # Downloaded at runtime by the entrypoint script if not present.
 # Pre-create dir with world-writable permissions (userns_mode: keep-id maps non-root).
 RUN mkdir -p /weights && chmod 777 /weights
-ARG DOWNLOAD_WEIGHTS=0
+ARG DOWNLOAD_WEIGHTS=1
 RUN if [ "${DOWNLOAD_WEIGHTS}" = "1" ]; then \
         wget -q \
           https://omnomnom.vision.rwth-aachen.de/data/3d_inter_obj_seg/scannet_official/weights/weights_exp14_14.pth \

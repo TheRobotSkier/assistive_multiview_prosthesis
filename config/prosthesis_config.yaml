@@ -167,6 +167,11 @@ openvins_realsense_tf_bridge:
                 "arm_d435i_arm_depth_optical_frame",
             ]
         publish_rate_hz: 10.0
+        # Liveness re-sends bridge edges on /tf to work around CycloneDDS
+        # /tf_static latch unreliability.  2 Hz keeps the bridge edges
+        # available for the fusion node (15 Hz, 0.5s cloud max age) while
+        # being much cheaper than the startup rate.
+        liveness_rate_hz: 2.0
         publish_nominal_static_chain: true
 
 twist_propagation:

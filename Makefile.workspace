@@ -86,7 +86,9 @@ pipeline: ## Launch full hardware pipeline
 
 camera-test: ## Temp to test visual piline untill segmentation
 	@$(ROS_SETUP) && \
-	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml
+	cd /prosthesis_ws && \
+	colcon build --packages-select prosthesis_launch sensor_fusion_bringup --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
 
 digital-twin: ## Launch digital twin with real cameras
 	@$(ROS_SETUP) && \

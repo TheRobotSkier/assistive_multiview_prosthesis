@@ -54,7 +54,16 @@ COMPOSE_SEGMENTATION_CPU := -f docker-compose.yml
 COMPOSE_SEGMENTATION_CUDA := -f docker-compose.yml -f docker-compose.segmentation.cuda.yml
 COMPOSE_SEGMENTATION_CUDA_PODMAN := -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml
 
-.PHONY: build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config
+# Select the correct GPU runtime compose override based on the detected backend.
+# DOCKER_CMD is always set correctly (by explicit selection or auto-detect),
+# unlike CONTAINER_BACKEND which is only set when explicitly provided.
+ifeq ($(DOCKER_CMD),podman)
+  COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA_PODMAN)
+else
+  COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
+endif
+
+.PHONY: build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -88,14 +97,19 @@ dev-shell: dev
 # Segmentation services (explicit backend variants)
 # Use the appropriate compose override based on detected backend for CUDA GPU support.
 segmentation-cuda:
-ifeq ($(CONTAINER_BACKEND),podman)
-	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA_PODMAN) --profile segmentation-cuda up -d segmentation-cuda
+ifeq ($(DOCKER_CMD),podman)
+	@test -f /var/run/cdi/nvidia.yaml || { echo "Regenerating NVIDIA CDI spec..."; sudo nvidia-ctk cdi generate --output=/var/run/cdi/nvidia.yaml; }
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_CUDA_RUNTIME) up -d segmentation-cuda
 else
-	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA) --profile segmentation-cuda up -d segmentation-cuda
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_CUDA_RUNTIME) --profile segmentation-cuda up -d segmentation-cuda
 endif
 
 segmentation-cpu:
+ifeq ($(DOCKER_CMD),podman)
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CPU) up -d segmentation-cpu
+else
 	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CPU) --profile segmentation-cpu up -d segmentation-cpu
+endif
 
 # Legacy alias: starts the CUDA variant (preserves existing behavior)
 segmentation: segmentation-cuda
@@ -105,7 +119,12 @@ down-segmentation:
 
 # ── Run ────────────────────────────────────────────────────────────────────
 up:
-	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA) up -d prosthesis segmentation-cuda
+ifeq ($(DOCKER_CMD),podman)
+	@test -f /var/run/cdi/nvidia.yaml || { echo "Regenerating NVIDIA CDI spec..."; sudo nvidia-ctk cdi generate --output=/var/run/cdi/nvidia.yaml; }
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_CUDA_RUNTIME) up -d prosthesis segmentation-cuda
+else
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_CUDA_RUNTIME) --profile segmentation-cuda up -d prosthesis segmentation-cuda
+endif
 
 up-prosthesis: dev
 
@@ -147,6 +166,20 @@ clean-volumes:
 logs:
 	cd $(COMPOSE_DIR) && $(COMPOSE) logs -f
 
+# ── Segmentation diagnostics ──────────────────────────────────────────────
+segmentation-status:
+	@echo "=== Segmentation container status ==="
+	@$(DOCKER_CMD) ps -a --filter name=segmentation --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || echo "No segmentation containers found."
+	@echo ""
+	@echo "=== Health check ==="
+	@curl -sf http://127.0.0.1:5678/health && echo "" || echo "Inference server NOT reachable on port 5678"
+	@echo ""
+	@echo "=== Weights volume ==="
+	@$(DOCKER_CMD) volume inspect segmentation-weights --format '{{.Mountpoint}} ({{.CreatedAt}})' 2>/dev/null || echo "Volume 'segmentation-weights' not found."
+
+segmentation-logs:
+	@$(DOCKER_CMD) logs --tail 100 -f $$( $(DOCKER_CMD) ps -a --filter name=segmentation --format "{{.Names}}" | head -1 ) 2>/dev/null || echo "No segmentation container found."
+
 # ── Validation ────────────────────────────────────────────────────────────
 # Backend matrix validation for segmentation container config and health.
 
@@ -160,7 +193,7 @@ validate-segmentation-config:
 	@grep -q "profiles:" docker/docker-compose.yml && grep -q "segmentation-cuda" docker/docker-compose.yml || { echo "FAIL: segmentation-cuda profile missing"; exit 1; }
 	@cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA) --profile segmentation-cuda config >/dev/null || { echo "FAIL: CUDA compose config invalid"; exit 1; }
 	@echo "CUDA config OK"
-ifeq ($(CONTAINER_BACKEND),podman)
+ifeq ($(DOCKER_CMD),podman)
 	@echo "--- CUDA config (Podman) ---"
 	@cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA_PODMAN) --profile segmentation-cuda config >/dev/null || { echo "FAIL: Podman CUDA compose config invalid"; exit 1; }
 	@echo "Podman CUDA config OK"
@@ -270,6 +303,41 @@ ROBOTLAB_CONNECT_SCRIPT := scripts/robotlab_connect.sh
 robotlab-connect:
 	@test -f $(ROBOTLAB_CONNECT_SCRIPT) || { echo "Missing $(ROBOTLAB_CONNECT_SCRIPT)"; exit 1; }
 	@$(ROBOTLAB_CONNECT_SCRIPT)
+
+# ── Clock sync (chrony) between host and Jetson ──────────────────────────
+# Prevents TF2 "extrapolation into the past" errors caused by clock skew.
+# Requires: chrony installed on both machines, SSH access to Jetson.
+#
+# timesync         — configure and start chrony on both sides
+# timesync-check   — verify clocks are in sync
+# timesync-host    — configure chrony on host only (no Jetson access needed)
+
+timesync: robotlab-connect
+	@echo "Configuring chrony on host..."
+	@which chronyd >/dev/null 2>&1 || { echo "ERROR: chrony not installed on host. Install with: sudo apt install chrony"; exit 1; }
+	sudo cp config/chrony-host.conf /etc/chrony/chrony.conf
+	sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || { echo "WARNING: Could not restart chronyd on host"; }
+	@echo "Configuring chrony on Jetson..."
+	ssh $(JETSON_HOST) 'which chronyd >/dev/null 2>&1 || (echo robotlab | sudo -S apt install -y chrony); echo robotlab | sudo -S tee /etc/chrony/chrony.conf > /dev/null' < config/chrony-jetson.conf
+	ssh $(JETSON_HOST) 'echo robotlab | sudo -S systemctl restart chronyd 2>/dev/null || echo robotlab | sudo -S systemctl restart chrony 2>/dev/null || echo "WARNING: Could not restart chronyd on Jetson"'
+	@echo "Chrony configured on both sides. Use 'make timesync-check' to verify."
+
+timesync-host:
+	@echo "Configuring chrony on host only (Jetson not configured)..."
+	@which chronyd >/dev/null 2>&1 || { echo "ERROR: chrony not installed on host. Install with: sudo apt install chrony"; exit 1; }
+	sudo cp config/chrony-host.conf /etc/chrony/chrony.conf
+	sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || { echo "WARNING: Could not restart chronyd"; }
+	@echo "Host chrony configured. The Jetson will sync to this machine if it has chrony with server 10.42.0.1."
+
+timesync-check: robotlab-connect
+	@echo "Host chrony sources:"
+	@chronyc sources 2>/dev/null || echo "chronyc not available on host"
+	@echo ""
+	@echo "Jetson chrony sources:"
+	@ssh $(JETSON_HOST) 'chronyc sources 2>/dev/null || echo "chronyc not available on Jetson"'
+	@echo ""
+	@echo "Clock offset (host → Jetson):"
+	@ssh $(JETSON_HOST) 'chronyc tracking 2>/dev/null | grep "Last offset" || echo "chrony tracking not available"'
 
 # ── Jetson deploy (git-push based sync over Ethernet) ────────────────────
 # JETSON_HOST must be reachable via SSH (see ~/.ssh/config for 'robotlab').

@@ -128,7 +128,7 @@ def _voxel_downsample(xyz: np.ndarray, rgb_packed: np.ndarray, voxel_size: float
     """Voxel grid downsampling. Returns (xyz_down, rgb_down) with one centroid per voxel.
 
     xyz:         (N, 3) float32
-    rgb_packed:  (N,) uint32
+    rgb_packed:  (N,) uint32  — 0x00RRGGBB encoding
     voxel_size:  side length of each voxel cube in metres
     """
     if voxel_size <= 0.0 or len(xyz) == 0:
@@ -142,15 +142,33 @@ def _voxel_downsample(xyz: np.ndarray, rgb_packed: np.ndarray, voxel_size: float
 
     n_voxels = len(unique_idx)
     summed_xyz = np.zeros((n_voxels, 3), dtype=np.float64)
-    summed_rgb = np.zeros(n_voxels, dtype=np.uint64)
     counts = np.zeros(n_voxels, dtype=np.int32)
 
     np.add.at(summed_xyz, inverse, xyz.astype(np.float64))
-    np.add.at(summed_rgb, inverse, rgb_packed.astype(np.uint64))
     np.add.at(counts, inverse, 1)
 
     xyz_out = (summed_xyz / counts[:, None]).astype(np.float32)
-    rgb_out = (summed_rgb / counts.astype(np.uint64)).astype(np.uint32)
+
+    # Per-channel RGB averaging to avoid carry propagation between channels
+    # when averaging packed 0x00RRGGBB integers.
+    r_ch = ((rgb_packed >> 16) & 0xFF).astype(np.uint64)
+    g_ch = ((rgb_packed >> 8) & 0xFF).astype(np.uint64)
+    b_ch = (rgb_packed & 0xFF).astype(np.uint64)
+
+    summed_r = np.zeros(n_voxels, dtype=np.uint64)
+    summed_g = np.zeros(n_voxels, dtype=np.uint64)
+    summed_b = np.zeros(n_voxels, dtype=np.uint64)
+
+    np.add.at(summed_r, inverse, r_ch)
+    np.add.at(summed_g, inverse, g_ch)
+    np.add.at(summed_b, inverse, b_ch)
+
+    counts_u64 = counts.astype(np.uint64)
+    avg_r = (summed_r / counts_u64).astype(np.uint32)
+    avg_g = (summed_g / counts_u64).astype(np.uint32)
+    avg_b = (summed_b / counts_u64).astype(np.uint32)
+
+    rgb_out = (avg_r << 16) | (avg_g << 8) | avg_b
     return xyz_out, rgb_out
 
 

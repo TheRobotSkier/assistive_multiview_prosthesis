@@ -15,3 +15,6 @@ __pycache__/
 # Git
 .git/
 .gitignore
+
+# Rosbags
+rosbags/

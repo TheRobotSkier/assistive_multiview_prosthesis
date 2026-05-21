@@ -63,10 +63,19 @@ diagnostics = {
 print(f"[inference_server] Diagnostics: {json.dumps(diagnostics)}", flush=True)
 
 print(f"[inference_server] Loading model from {WEIGHTS_PATH} ...", flush=True)
-_inseg = InteractiveSegmentationModel(pretraining_weights=WEIGHTS_PATH)
-_model = _inseg.create_model(device, _inseg.pretraining_weights_file)
-_model.eval()
-print("[inference_server] Model ready.", flush=True)
+_model_ready = False
+try:
+    _inseg = InteractiveSegmentationModel(pretraining_weights=WEIGHTS_PATH)
+    _model = _inseg.create_model(device, _inseg.pretraining_weights_file)
+    _model.eval()
+    _model_ready = True
+    print("[inference_server] Model ready.", flush=True)
+except Exception as e:
+    print(f"[inference_server] FATAL: Model loading failed: {e}", flush=True)
+    import traceback
+    traceback.print_exc()
+    # Keep _model_ready = False so /health reports the failure
+    # and /segment returns a clear error instead of crashing.
 
 app = Flask(__name__)
 
@@ -89,7 +98,8 @@ def _build_click_mask(xyz: np.ndarray, clicks: list, cubeedge: float) -> np.ndar
 def health():
     """Return runtime diagnostics suitable for smoke-test assertions."""
     return jsonify({
-        "status": "ok",
+        "status": "ok" if _model_ready else "model_not_loaded",
+        "model_ready": _model_ready,
         **diagnostics,
     })
 
@@ -108,6 +118,9 @@ def segment():
 
     pos_clicks = data.get("positive_clicks", [])
     neg_clicks = data.get("negative_clicks", [])
+    if not _model_ready:
+        return jsonify({"error": "Model not loaded — check container logs for loading errors"}), 503
+
     cubeedge = float(data.get("cubeedge", 0.05))
 
     pos_mask = _build_click_mask(xyz, pos_clicks, cubeedge)

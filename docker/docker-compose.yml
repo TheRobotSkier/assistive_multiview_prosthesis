@@ -50,6 +50,8 @@ services:
             - /tmp/.X11-unix:/tmp/.X11-unix:rw
             # CycloneDDS peer config for Jetson discovery
             - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
+            # Chrony config for clock sync with Jetson
+            - ../config/chrony-host.conf:/tmp/chrony-host.conf:ro
             # Source directories — bind-mounted for instant edit→build cycles
             - ../src:/prosthesis_ws/src:rw
             - ../config:/prosthesis_ws/config:rw
@@ -82,17 +84,18 @@ services:
             - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
             - NVIDIA_VISIBLE_DEVICES=all
             - NVIDIA_DRIVER_CAPABILITIES=all
+        command: ["/bin/bash", "-c", "exec python /nodes/inference_server.py"]
         volumes:
             - /tmp/.X11-unix:/tmp/.X11-unix:rw
             # Persist model weights across container recreations (~200MB)
-            - segmentation-weights:/weights
+            - ${HOME}/prosthesis_data/weights:/weights:rw
         network_mode: host
         healthcheck:
             test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')"]
             interval: 10s
             timeout: 5s
             retries: 5
-            start_period: 30s
+            start_period: 120s
         profiles:
             - segmentation-cuda
         privileged: true # LINUX ONLY
@@ -111,17 +114,18 @@ services:
                 BACKEND: cpu
         environment:
             - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
+        command: ["/bin/bash", "-c", "exec python /nodes/inference_server.py"]
         volumes:
             - /tmp/.X11-unix:/tmp/.X11-unix:rw
             # Persist model weights across container recreations (~200MB)
-            - segmentation-weights:/weights
+            - ${HOME}/prosthesis_data/weights:/weights:rw
         network_mode: host
         healthcheck:
             test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')"]
             interval: 10s
             timeout: 5s
             retries: 5
-            start_period: 30s
+            start_period: 120s
         profiles:
             - segmentation-cpu
         privileged: true # LINUX ONLY
@@ -155,4 +159,4 @@ volumes:
     prosthesis-build:
     prosthesis-install:
     prosthesis-log:
-    segmentation-weights:
+

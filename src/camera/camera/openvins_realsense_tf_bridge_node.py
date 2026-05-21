@@ -22,9 +22,9 @@ The node publishes this extrinsic directly from the RealSense static chain
 (no aruco marker detection needed).  It also broadcasts the full nominal
 D435/D435i static fan-out via StaticTransformBroadcaster once at startup.
 
-A slow liveness timer (~0.2 Hz) re-sends only the bridge-edge transforms on
-/tf as a workaround for CycloneDDS /tf_static latch unreliability with
-late-joining nodes.
+A liveness timer (default 2 Hz, configurable via liveness_rate_hz) re-sends
+only the bridge-edge transforms on /tf as a workaround for CycloneDDS
+/tf_static latch unreliability with late-joining nodes.
 """
 
 from __future__ import annotations
@@ -233,6 +233,7 @@ class OpenVinsRealSenseTfBridge(Node):
             ],
         )
         self.declare_parameter("publish_rate_hz", 15.0)
+        self.declare_parameter("liveness_rate_hz", 2.0)
         self.declare_parameter("publish_nominal_static_chain", True)
 
         self._publish_nominal_static = bool(
@@ -257,7 +258,13 @@ class OpenVinsRealSenseTfBridge(Node):
         rate = max(float(self.get_parameter("publish_rate_hz").value), 1.0)
         self._startup_timer = self.create_timer(1.0 / rate, self._startup_tick)
 
-        # Phase 2: slow liveness timer (created after startup completes).
+        # Phase 2: liveness timer (created after startup completes).
+        # Re-sends bridge-edge transforms on /tf to work around CycloneDDS
+        # /tf_static latch unreliability.  2 Hz is a good default — fast
+        # enough for the fusion node (15 Hz, 0.5s cloud max age) while
+        # still much cheaper than the startup rate.
+        self._liveness_rate = max(
+            float(self.get_parameter("liveness_rate_hz").value), 0.1)
         self._liveness_timer = None
 
         # Periodic diagnostic for unresolved bridge transforms.
@@ -402,18 +409,21 @@ class OpenVinsRealSenseTfBridge(Node):
         if all_resolved and self._startup_timer is not None:
             self.get_logger().info(
                 f"All {len(self._specs)} bridge transform(s) resolved — "
-                "switching to liveness mode (0.2 Hz)"
+                f"switching to liveness mode ({self._liveness_rate} Hz)"
             )
             self._startup_timer.cancel()
             self._startup_timer = None
-            self._liveness_timer = self.create_timer(5.0, self._liveness_tick)
+            self._liveness_timer = self.create_timer(
+                1.0 / self._liveness_rate, self._liveness_tick)
 
     def _liveness_tick(self):
-        """Phase 2: re-send only the bridge-edge transforms on /tf at ~0.2 Hz.
+        """Phase 2: re-send only the bridge-edge transforms on /tf.
 
         This is a workaround for CycloneDDS /tf_static latch unreliability.
         Late-joining nodes that missed the /tf_static latch can pick up the
         bridge edges from the dynamic /tf topic.
+
+        Rate is controlled by the liveness_rate_hz parameter (default 2 Hz).
         """
         if not self._bridge_tfs:
             return

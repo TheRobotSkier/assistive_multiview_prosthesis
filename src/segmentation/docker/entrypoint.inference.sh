@@ -9,7 +9,14 @@ if [ ! -f "$WEIGHTS_PATH" ]; then
     echo "[inference-entrypoint] Weights not found at $WEIGHTS_PATH — downloading..."
     mkdir -p "$(dirname "$WEIGHTS_PATH")"
     wget -q --show-progress "$WEIGHTS_URL" -O "$WEIGHTS_PATH"
-    echo "[inference-entrypoint] Weights downloaded."
+    if [ ! -s "$WEIGHTS_PATH" ]; then
+        echo "[inference-entrypoint] ERROR: Weights download failed (file is empty or missing)" >&2
+        exit 1
+    fi
+    echo "[inference-entrypoint] Weights downloaded ($(du -h "$WEIGHTS_PATH" | cut -f1))."
+else
+    echo "[inference-entrypoint] Weights found at $WEIGHTS_PATH ($(du -h "$WEIGHTS_PATH" | cut -f1))."
 fi
 
+echo "[inference-entrypoint] Starting inference server..."
 exec "$@"

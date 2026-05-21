@@ -39,6 +39,7 @@ import yaml
 from geometry_msgs.msg import Point, Quaternion, TransformStamped
 from rclpy.node import Node
 from std_msgs.msg import ColorRGBA
+from tf2_ros import TransformBroadcaster
 from tf2_ros.static_transform_broadcaster import StaticTransformBroadcaster
 from visualization_msgs.msg import Marker
 
@@ -157,7 +158,9 @@ class CameraMountTFPublisher(Node):
                  publish_all: bool = False, link_frame: str = ""):
         super().__init__("camera_mount_tf_publisher")
         self._link_frame = link_frame
-        self._broadcaster = StaticTransformBroadcaster(self)
+        self._static_broadcaster = StaticTransformBroadcaster(self)
+        self._dynamic_broadcaster = TransformBroadcaster(self)
+        self._tfs: list[TransformStamped] = []
         self._marker_pub = self.create_publisher(
             Marker, "/camera_mounts/bounding_box", 10)
         self._cam_marker_pub = self.create_publisher(
@@ -184,10 +187,33 @@ class CameraMountTFPublisher(Node):
         else:
             self._cam_bbox_marker = None
 
-        self._timer = self.create_timer(1.0, self._republish_marker)
+        # Marker republish timer (for RViz latch)
+        self._marker_timer = self.create_timer(1.0, self._republish_marker)
+
+        # TF liveness timer — re-sends static TFs on /tf at 1 Hz to work
+        # around CycloneDDS /tf_static latch unreliability with late-joining
+        # nodes.  Same pattern as the OpenVINS bridge.
+        self._liveness_timer = self.create_timer(1.0, self._liveness_tick)
 
         mode = f"pipeline (root={link_frame})" if link_frame else "standalone (root=world)"
-        self.get_logger().info(f"Camera mount TF publisher started in {mode} mode")
+        self.get_logger().info(
+            f"Camera mount TF publisher started in {mode} mode "
+            f"({len(self._tfs)} TFs, 1 Hz liveness)")
+
+    def _liveness_tick(self):
+        """Re-send all camera mount TFs on /tf at 1 Hz.
+
+        Works around CycloneDDS /tf_static latch unreliability — late-joining
+        nodes that missed the initial TRANSIENT_LOCAL delivery can pick up the
+        transforms from the dynamic /tf topic.  Same pattern as the OpenVINS
+        bridge's liveness timer.
+        """
+        if not self._tfs:
+            return
+        stamp = self.get_clock().now().to_msg()
+        for tf_msg in self._tfs:
+            tf_msg.header.stamp = stamp
+        self._dynamic_broadcaster.sendTransform(self._tfs)
 
     def _republish_marker(self):
         self._bbox_marker.header.stamp = self.get_clock().now().to_msg()
@@ -206,9 +232,13 @@ class CameraMountTFPublisher(Node):
         tfs += self._build_bounding_box_tfs(data)
         if "cam_bounding_box_8cm" in data:
             tfs += self._build_cam_bbox_tfs(data)
-        self._broadcaster.sendTransform(tfs)
+        self._tfs = tfs
+        # Publish on /tf_static (correct DDS semantics) AND /tf (immediate
+        # availability for nodes that are already running).
+        self._static_broadcaster.sendTransform(tfs)
+        self._dynamic_broadcaster.sendTransform(tfs)
         self.get_logger().info(
-            f"Published TF tree for mount '{mount_name}' + bounding box")
+            f"Published TF tree for mount '{mount_name}' + bounding box ({len(tfs)} TFs)")
 
     def _publish_all(self, data: dict):
         if self._link_frame:
@@ -224,10 +254,14 @@ class CameraMountTFPublisher(Node):
             tfs += self._build_cam_bbox_tfs(data)
         for name in data["mounts"]:
             tfs += self._build_mount_tfs(data, name, f"_{name}")
-        self._broadcaster.sendTransform(tfs)
+        self._tfs = tfs
+        # Publish on /tf_static (correct DDS semantics) AND /tf (immediate
+        # availability for nodes that are already running).
+        self._static_broadcaster.sendTransform(tfs)
+        self._dynamic_broadcaster.sendTransform(tfs)
         names = ", ".join(data["mounts"].keys())
         self.get_logger().info(
-            f"Published all mounts ({names})")
+            f"Published all mounts ({names}) ({len(tfs)} TFs)")
 
     def _build_standalone_root(self, data: dict) -> list[TransformStamped]:
         """Standalone mode: world -> palm_frame (identity, for RViz visualization)."""
@@ -235,7 +269,7 @@ class CameraMountTFPublisher(Node):
         return [
             _make_tf(s, "world", "palm_frame",
                      0.0, 0.0, 0.0,
-                     1.0, 0.0, 0.0, 0.0),
+                     0.0, 0.0, 0.0, 1.0),
         ]
 
     def _build_pipeline_root(self, data: dict, mount_name: str) -> list[TransformStamped]:
@@ -249,11 +283,11 @@ class CameraMountTFPublisher(Node):
         screw_frame = f"d435i_arm_bottom_screw_frame_{mount_name}"
         sl = data["screw_to_link"]
         # arm_d435i_arm_link -> screw_frame = inverse of screw_to_link
-        # screw_to_link has identity rotation, so inverse is just negated translation
+        tx, ty, tz, qx, qy, qz, qw = _invert_transform(
+            sl["translation"], sl["quaternion"])
         return [
             _make_tf(s, self._link_frame, screw_frame,
-                     -_t(sl, "x"), -_t(sl, "y"), -_t(sl, "z"),
-                     0.0, 0.0, 0.0, 1.0),
+                     tx, ty, tz, qx, qy, qz, qw),
         ]
 
     def _build_grasp_contact_tf(self, data: dict) -> list[TransformStamped]:
