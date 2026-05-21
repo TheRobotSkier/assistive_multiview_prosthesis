@@ -54,7 +54,7 @@ COMPOSE_SEGMENTATION_CPU := -f docker-compose.yml
 COMPOSE_SEGMENTATION_CUDA := -f docker-compose.yml -f docker-compose.segmentation.cuda.yml
 COMPOSE_SEGMENTATION_CUDA_PODMAN := -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp print-force
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -461,3 +461,46 @@ rviz-imu-test-kill:
 	-podman kill rviz-imu-test 2>/dev/null
 	-podman rm rviz-imu-test 2>/dev/null
 	@echo "IMU test RViz stopped."
+
+# ── Grasp Test ──────────────────────────────────────────────────────────────
+up-grasp-test:
+	$(COMPOSE) rm -f grasp_test 2>/dev/null || true
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up grasp_test -d
+
+down-grasp-test:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test down
+
+logs-grasp-test:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test logs -f
+
+print-force:
+	@echo "=== MIA Hand Force Monitor ==="
+	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
+	@test -f scripts/print_force.sh || { echo "Missing scripts/print_force.sh"; exit 1; }
+	-podman rm -f mia-force-print 2>/dev/null
+	podman run --rm -it --name mia-force-print \
+		--network host \
+		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-e MIA_PORT=/dev/ttyUSB0 \
+		prosthesis:latest \
+		bash /prosthesis_ws/scripts/print_force.sh
+
+test-static-grasp:
+	@echo "=== MIA Hand Static Grasp Test ==="
+	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
+	@test -f scripts/static_grasp_test.sh || { echo "Missing scripts/static_grasp_test.sh"; exit 1; }
+	@test -f config/static_grasp_test.yaml || { echo "Missing config/static_grasp_test.yaml"; exit 1; }
+	-podman rm -f mia-static-grasp 2>/dev/null
+	podman run --rm -it --name mia-static-grasp \
+		--network host \
+		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-e MIA_PORT=/dev/ttyUSB0 \
+		-e GRASP_TEST_CONFIG=/prosthesis_ws/config/static_grasp_test.yaml \
+		prosthesis:latest \
+		python3 /prosthesis_ws/scripts/static_grasp_test.sh

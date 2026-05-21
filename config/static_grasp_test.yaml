@@ -1,0 +1,33 @@
+# Velocity-Based Force-Aware Static Grasp Test Configuration
+
+# ---- Velocity Profile ----
+# Starting velocity (rad/s) — the hand closes at this speed initially
+closing_velocity_start: 0.3
+
+# Ending velocity (rad/s) — after decay steps, the hand closes slowly at this speed
+closing_velocity_end: 0.1
+
+# Number of discrete steps to decay from closing_velocity_start to closing_velocity_end
+# Velocity changes linearly: v_start → v_end over N steps
+decay_steps: 5
+
+# Time between velocity step changes (seconds)
+# Total decay ramp duration = decay_steps * step_interval_s
+step_interval_s: 0.2
+
+# Maximum position (radians) — if ANY finger reaches this, assume no object and stop
+# The hand range is ~0.0 (open) to ~3.0 (fully closed)
+stop_positions:
+  j_thumb_fle: 1.5
+  j_index_fle: 1.5
+  j_mrl_fle:   1.5
+
+# Force threshold (raw ADC units) — if ANY finger exceeds this, contact = stop ALL fingers
+# Idle forces on our hardware: thumb~215, index~208, mrl~260
+force_thresholds:
+  j_thumb_fle: 300
+  j_index_fle: 300
+  j_mrl_fle:   300
+
+# Time to wait after resetting to relaxed position (seconds)
+relaxed_wait_s: 2

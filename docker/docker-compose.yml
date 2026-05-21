@@ -164,6 +164,26 @@ services:
         stdin_open: true
         tty: true
 
+    # ── Grasp test: runs EMG grasp test with all controllers available ─────────
+    grasp_test:
+        container_name: grasp_test
+        extends: prosthesis
+        command:
+            [
+                "/bin/bash",
+                "-c",
+                "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch emg_grasp_test.launch.py",
+            ]
+        environment:
+            - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+        network_mode: host
+        profiles:
+            - grasp_test
+        stdin_open: true
+        tty: true
+        privileged: true
+        userns_mode: "keep-id"
+
     # ── Test runner: uses production image, builds + runs smoke tests, exits ────
     test:
         container_name: test
