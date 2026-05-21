@@ -17,8 +17,16 @@ import math
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Pose, PoseStamped
-from std_msgs.msg import Float64, Float64MultiArray, Int32
+from rclpy.qos import QoSProfile, DurabilityPolicy
+from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Bool, Float64, Float64MultiArray, Int32
+
+try:
+    from tf2_ros import Buffer, TransformListener
+    import tf2_geometry_msgs  # noqa: F401
+    _HAS_TF2 = True
+except ImportError:
+    _HAS_TF2 = False
 
 
 class GraspProximityControllerNode(Node):
@@ -59,18 +67,26 @@ class GraspProximityControllerNode(Node):
         # Planned outputs from the preshaping bridge (set atomically when all arrive)
         self._planned_closures: list[float] | None = None    # [thumb, index, mrl]
         self._planned_wrist_deg: float | None = None         # scalar wrist rotation (deg)
-        self._planned_hand_frame: Pose | None = None         # hand pose in world frame
+        self._planned_hand_frame: PoseStamped | None = None  # hand pose in world frame
 
         # Intermediate buffers — filled by individual topic callbacks
         self._buf_closures: list[float] | None = None
         self._buf_wrist_deg: float | None = None
-        self._buf_hand_frame: Pose | None = None
+        self._buf_hand_frame: PoseStamped | None = None
 
         # Current hand pose
         self._current_hand_pose: PoseStamped | None = None
 
         # Hysteresis state: True = currently in "near" mode
         self._is_near: bool = False
+        self._near_zone_published: bool = False
+
+        # TF2
+        self._tf_buffer = None
+        self._tf_listener = None
+        if _HAS_TF2:
+            self._tf_buffer = Buffer()
+            self._tf_listener = TransformListener(self._tf_buffer, self)
 
         # ── Subscriptions ─────────────────────────────────────────────────────
         self.create_subscription(
@@ -121,6 +137,11 @@ class GraspProximityControllerNode(Node):
         self._wrist_pub = self.create_publisher(
             Float64MultiArray, self.get_parameter('wrist_cmd_topic').value, 10)
 
+        # Near-zone notification (latched, depth=1) for pipeline_manager APPROACHING->GRASPING
+        self._near_zone_pub = self.create_publisher(
+            Bool, '/proximity/near_zone_entered',
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+
         # ── Control timer ─────────────────────────────────────────────────────
         self.create_timer(1.0 / rate, self._control_loop)
 
@@ -147,7 +168,7 @@ class GraspProximityControllerNode(Node):
         self._try_commit_plan()
 
     def _on_planned_hand_frame(self, msg: PoseStamped) -> None:
-        self._buf_hand_frame = msg.pose
+        self._buf_hand_frame = msg
         self._try_commit_plan()
 
     def _on_current_hand_pose(self, msg: PoseStamped) -> None:
@@ -170,6 +191,7 @@ class GraspProximityControllerNode(Node):
             self._buf_hand_frame = None
             # Reset hysteresis so the new plan re-evaluates proximity
             self._is_near = False
+            self._near_zone_published = False
             self.get_logger().info(
                 f'New plan committed — closures={self._planned_closures}, '
                 f'wrist={self._planned_wrist_deg:.1f}\u00b0'
@@ -210,6 +232,9 @@ class GraspProximityControllerNode(Node):
                 self.get_logger().info(
                     f'Entered near zone (dist={dist:.3f} m < enter={self._enter_thresh:.3f} m)'
                 )
+                if not self._near_zone_published:
+                    self._near_zone_pub.publish(Bool(data=True))
+                    self._near_zone_published = True
 
         thumb, index, mrl = self._planned_closures
 
@@ -227,11 +252,40 @@ class GraspProximityControllerNode(Node):
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _euclidean_distance(a: PoseStamped, b: Pose) -> float:
-        dx = a.pose.position.x - b.position.x
-        dy = a.pose.position.y - b.position.y
-        dz = a.pose.position.z - b.position.z
+    def _euclidean_distance(self, a: PoseStamped, b: PoseStamped) -> float:
+        """Compute Euclidean distance between two poses in a common frame.
+
+        Uses TF2 to transform both poses into the same frame when possible.
+        Falls back to direct comparison with a WARN log if TF2 is unavailable
+        or the transform fails.
+        """
+        frame_a = a.header.frame_id
+        frame_b = b.header.frame_id
+
+        if frame_a and frame_b and frame_a != frame_b and _HAS_TF2 and self._tf_buffer is not None:
+            try:
+                a_in_b = self._tf_buffer.transform(
+                    a, frame_b,
+                    timeout=rclpy.duration.Duration(seconds=0.5),
+                )
+                dx = a_in_b.pose.position.x - b.pose.position.x
+                dy = a_in_b.pose.position.y - b.pose.position.y
+                dz = a_in_b.pose.position.z - b.pose.position.z
+                return math.sqrt(dx * dx + dy * dy + dz * dz)
+            except Exception as exc:
+                self.get_logger().warn(
+                    f"TF transform from '{frame_a}' to '{frame_b}' failed: {exc}. "
+                    "Falling back to raw Euclidean distance."
+                )
+        elif frame_a and frame_b and frame_a != frame_b:
+            self.get_logger().warn(
+                f"Frame mismatch ('{frame_a}' vs '{frame_b}') but TF2 unavailable. "
+                "Falling back to raw Euclidean distance."
+            )
+
+        dx = a.pose.position.x - b.pose.position.x
+        dy = a.pose.position.y - b.pose.position.y
+        dz = a.pose.position.z - b.pose.position.z
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
     def _floor_closure(self, planned: float) -> float:
