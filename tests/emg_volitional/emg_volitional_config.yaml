@@ -1,0 +1,28 @@
+# EMG Volitional Hand Controller Configuration
+
+# ---- EMG Topics ----
+emg_gesture_topic: "/emg/gesture_label"
+emg_confidence_topic: "/emg/confidence"
+emg_proportional_topic: "/emg/proportional"
+
+# ---- Gesture-to-Velocity Mapping ----
+# Gesture IDs: REST=0, POWER=1, PINCH=2, OPEN=3, POINT=4
+# Positive velocity = closing (finger flexion)
+# Negative velocity = opening (finger extension)
+# Zero velocity = stop
+gesture_velocities:
+  0: 0.0
+  1: 0.3
+  2: 0.15
+  3: -0.3
+  4: 0.0
+
+confidence_threshold: 0.55
+
+position_limits:
+  min: 0.0
+  max: 3.0
+
+command_rate_hz: 20.0
+
+emergency_stop_gesture: 0
