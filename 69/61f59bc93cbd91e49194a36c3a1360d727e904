@@ -1,0 +1,22 @@
+tests/emg_grasp/emg_grasp_node.py
+  s_76b359966caa59::t_168bd5561a124a 221-227,229,232-236,240-241,243,247
+  s_76b359966caa59::t_7aeffdf50d6d85 32,34-65,68-69,80-83
+tests/emg_grasp/test_emg_grasp_modes.py
+  s_76b359966caa59::t_27771938195c76 32,36-37,39-44,46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "6961f59bc93cbd91e49194a36c3a1360d727e904",
+  "prompts": {},
+  "sessions": {
+    "s_76b359966caa59": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4140226ffeaqH5YP95xm23zz",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
