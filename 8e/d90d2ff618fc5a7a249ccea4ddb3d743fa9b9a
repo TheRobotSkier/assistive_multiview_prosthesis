@@ -1,0 +1,42 @@
+src/force_controller/force_controller/force_controller_node.py
+  s_a5f6c0f3050f52::t_1eaa1aa6e64ae2 323-327
+  s_a5f6c0f3050f52::t_371132b3b9f86c 530,532-536
+  s_a5f6c0f3050f52::t_7e6e48f931a8b6 487-493
+  s_a5f6c0f3050f52::t_691500d2311ef1 158-159
+  s_a5f6c0f3050f52::t_f7f99fb1388d85 407-421
+  s_a5f6c0f3050f52::t_1f09c565ef4ff5 129-130
+  s_a5f6c0f3050f52::t_524d84a2971196 304,310-316
+src/prosthesis_launch/launch/pipeline.launch.py
+  s_a5f6c0f3050f52::t_98a753e810ed61 86-95
+src/haptic_band/haptic_bridge/haptic_controller_node.py
+  s_a5f6c0f3050f52::t_a71616318127a1 175,177-178,181-188
+  s_a5f6c0f3050f52::t_6d31ccd1c3e3a1 6,8,17-18,21
+  s_a5f6c0f3050f52::t_ab1182e78439e1 152-159
+  s_a5f6c0f3050f52::t_524d3a8bc2c7bb 65-73,80-88,97-101,110-111,115,118-119
+  s_a5f6c0f3050f52::t_0004d157501538 190-200,205-211,213-231,233-234
+src/haptic_band/haptic_bridge/bridge_node.py
+  s_a5f6c0f3050f52::t_c451a9e5bb7147 25-26
+  s_a5f6c0f3050f52::t_23c24801afe4b8 191-204
+  s_a5f6c0f3050f52::t_afa8111111afa2 170-178
+docker/docker-compose.yml
+  s_a5f6c0f3050f52::t_fb14c265530798 92-132
+src/command_bridge/command_bridge/command_bridge_node.py
+  s_a5f6c0f3050f52::t_2968dfd303b653 127-131
+  s_a5f6c0f3050f52::t_bcedf0ed7e49d2 143-153,155,176-218
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "8ed90d2ff618fc5a7a249ccea4ddb3d743fa9b9a",
+  "prompts": {},
+  "sessions": {
+    "s_a5f6c0f3050f52": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5ab585effehJZhOWSY2MOwrA",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
