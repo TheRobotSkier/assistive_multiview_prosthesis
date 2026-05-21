@@ -9,6 +9,14 @@ For the shorter future-facing command sheet used when a new physical ID2 mount
 changes the arm-camera transform, see
 `arm_marker_id2_extrinsic_calibration_commands.md`.
 
+Current accepted arm-marker extrinsic: the replacement ID2 mount was calibrated
+on 2026-05-21 from
+`dynamic_id2_arm_update_live_20260521_144725` and installed in
+`config/markers/arm_marker_extrinsics.yaml`. That calibration produced `561`
+inliers, p95 translation residual `0.0118 m`, and p95 rotation residual
+`3.888 deg`. Older bags/results below are retained as historical validation
+evidence and should not be treated as the current checked-in extrinsic.
+
 Expected split:
 
 ```text

@@ -53,6 +53,15 @@ Current validated context:
   - `/head/d435i_head/depth/color/points`
   - `/arm/d435i_arm/depth/color/points`
 - Common output frame must be `marker_map`.
+- 2026-05-19 follow-up: generic raw cloud consumers should not assume direct TF
+  from `marker_map` to `*_d435i_*_depth_optical_frame`. Use the composed
+  transform path through `head_cam0`/`arm_cam0`, as in
+  `x86_raw_pointcloud_marker_map.launch.py` and `pointcloud_to_frame_node`.
+- 2026-05-19 follow-up: the canonical raw topic names use underscores:
+  `/head/d435i_head/depth/color/points` and
+  `/arm/d435i_arm/depth/color/points`. Slash-style names such as
+  `/head/d435i/head/depth/color/points` are wrong unless a separate relay
+  explicitly publishes them.
 - Current transformed pointcloud status topics use `published` and
   `rate_limited`; rate limiting is normal.
 - The current pointcloud transform node is:
@@ -209,4 +218,3 @@ Deliverable for this planning turn:
   - rollback flags
   - suggested commit checkpoints/messages
 ```
-

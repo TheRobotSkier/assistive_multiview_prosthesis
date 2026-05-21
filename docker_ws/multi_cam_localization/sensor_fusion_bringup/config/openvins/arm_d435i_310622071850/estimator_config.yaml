@@ -7,9 +7,12 @@ integration: "rk4" # discrete, rk4, analytical (if rk4 or analytical used then a
 use_stereo: false # mono RGB D435i arm camera
 max_cameras: 1 # one RGB camera
 
-calib_cam_extrinsics: false # use offline Kalibr camera-IMU calibration for initial bringup
-calib_cam_intrinsics: false # use offline Kalibr intrinsics for initial bringup
-calib_cam_timeoffset: false # use offline Kalibr time offset for initial bringup
+# calib_cam_extrinsics: false # use offline Kalibr camera-IMU calibration for initial bringup
+calib_cam_extrinsics: true
+# calib_cam_intrinsics: false # use offline Kalibr intrinsics for initial bringup
+calib_cam_intrinsics: true
+# calib_cam_timeoffset: false # use offline Kalibr time offset for initial bringup
+calib_cam_timeoffset: true
 calib_imu_intrinsics: false # if imu intrinsics should be calibrated (rotation and skew-scale matrix)
 calib_imu_g_sensitivity: false # if gyroscope gravity sensitivity (Tg) should be calibrated
 
@@ -38,7 +41,8 @@ zupt_only_at_beginning: false
 # ==================================================================
 
 init_window_time: 2.0 # how many seconds to collect initialization information
-init_imu_thresh: 0.35 # tuned for D435i bringup; original rs_d455 value was 1.5
+# init_imu_thresh: 0.35 # tuned for D435i bringup; original rs_d455 value was 1.5
+init_imu_thresh: 1.5
 init_max_disparity: 10.0 # original rs_d455 visual disparity threshold
 init_max_features: 50 # how many features to track during initialization (saves on computation)
 

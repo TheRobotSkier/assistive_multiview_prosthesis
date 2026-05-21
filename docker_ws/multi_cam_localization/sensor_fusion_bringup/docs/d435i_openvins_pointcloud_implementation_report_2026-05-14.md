@@ -325,6 +325,9 @@ Validated:
   profile
 - no ID2 was added to `marker_fixed_ids`
 - fixed ID0 and dynamic ID2 topic separation was preserved
+- 2026-05-21 replacement ID2 mount calibration was installed from
+  `dynamic_id2_arm_update_live_20260521_144725` with `561` inliers, p95
+  translation residual `0.0118 m`, and p95 rotation residual `3.888 deg`
 
 Remaining validation before deeper follow-up work:
 
@@ -431,6 +434,64 @@ The x86 PC should subscribe to:
 /tf
 /tf_static
 ```
+
+2026-05-19 follow-up: a live graph showed an external `/pointcloud_fusion`
+subscriber using the wrong raw names:
+
+```text
+/head/d435i/head/depth/color/points
+/arm/d435i/arm/depth/color/points
+```
+
+Those topics had subscribers only and no publishers. The RealSense publishers
+use the canonical underscore camera names:
+
+```text
+/head/d435i_head/depth/color/points
+/arm/d435i_arm/depth/color/points
+```
+
+If `/pointcloud_fusion` is used directly, set:
+
+```yaml
+cam1_topic: /head/d435i_head/depth/color/points
+cam2_topic: /arm/d435i_arm/depth/color/points
+```
+
+Important TF caveat: OpenVINS publishes the marker-map camera chains:
+
+```text
+marker_map -> head_imu -> head_cam0
+marker_map -> arm_imu  -> arm_cam0
+```
+
+The raw RealSense pointcloud headers are in the RealSense depth optical frames,
+for example `head_d435i_head_depth_optical_frame` and
+`arm_d435i_arm_depth_optical_frame`. Those frames are not necessarily connected
+directly to `marker_map` in the global TF tree because the RealSense driver owns
+its own optical-frame tree while OpenVINS owns `*_cam0`. The validated
+`pointcloud_to_frame_node` composes this internally by treating `*_cam0` as the
+corresponding color optical camera pose, then applying the RealSense
+color-to-depth optical transform.
+
+For x86/offboard raw-cloud transform work, the new launch entrypoint is:
+
+```bash
+ros2 launch sensor_fusion_bringup x86_raw_pointcloud_marker_map.launch.py
+```
+
+Run it on the x86 side after launching the Jetson with
+`enable_marker_map_pointclouds:=false`. It subscribes to the canonical raw
+topics above, uses `/tf` and `/tf_static`, and republishes:
+
+```text
+/head/d435i_head/points_marker_map
+/arm/d435i_arm/points_marker_map
+```
+
+with `header.frame_id: marker_map`. Its defaults keep full point density on the
+x86 side: no rate limiting, no voxel downsampling, and no range filter unless
+those launch arguments are explicitly set.
 
 The Jetson-side transformed-cloud rollback/current mode remains:
 

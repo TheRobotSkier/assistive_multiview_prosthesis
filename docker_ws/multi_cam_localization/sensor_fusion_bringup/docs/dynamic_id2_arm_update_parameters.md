@@ -9,14 +9,13 @@ docker_ws/multi_cam_localization/sensor_fusion_bringup/config/dynamic_id2_arm_up
 Dynamic ID2 is separate from the fixed ID0 marker-map path. Keep head and arm
 `marker_fixed_ids` at `"0"`.
 
-Current arm-marker extrinsic status: the redesigned arm-mounted marker ID2
-fixture was calibrated on 2026-05-19 from
-`dynamic_id2_arm_update_live_20260519_113936` and installed in
-`config/markers/arm_marker_extrinsics.yaml`. The accepted calibration had `166`
-inliers, p95 translation residual `0.0104 m`, and p95 rotation residual
-`2.349 deg`. The CAD delta sanity check was consistent with the calibrated
-`T_armcam_marker` change. Keep using the focused command sheet for future mount
-changes:
+Current arm-marker extrinsic status: the replacement arm-mounted marker ID2
+fixture was calibrated on 2026-05-21 from
+`dynamic_id2_arm_update_live_20260521_144725` and installed in
+`config/markers/arm_marker_extrinsics.yaml`. The accepted calibration had `561`
+inliers, p95 translation residual `0.0118 m`, and p95 rotation residual
+`3.888 deg`. It supersedes the 2026-05-19 calibration after the previous marker
+mount broke. Keep using the focused command sheet for future mount changes:
 `docs/arm_marker_id2_extrinsic_calibration_commands.md`.
 
 The single live workflow now defaults to `active`: fixed ID0 updates and

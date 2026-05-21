@@ -49,7 +49,10 @@ If Jetson load becomes too high, move more work to x86:
   - `/head/d435i_head/depth/color/points`
   - `/arm/d435i_arm/depth/color/points`
 - Subscribe to `/tf` and `/tf_static` from the Jetson.
-- Transform each raw cloud into `marker_map` on the x86 PC.
+- Transform each raw cloud into `marker_map` on the x86 PC. Do not assume the
+  raw depth optical frames are globally connected to `marker_map`; the helper
+  launch `x86_raw_pointcloud_marker_map.launch.py` uses the validated composed
+  lookup through `head_cam0`/`arm_cam0` and the RealSense optical-frame TF.
 - Merge the transformed clouds on the x86 PC and range-filter distant points,
   initially beyond `2.0 m`, without voxel downsampling or point subsampling.
 - Planning prompt for this offload path:

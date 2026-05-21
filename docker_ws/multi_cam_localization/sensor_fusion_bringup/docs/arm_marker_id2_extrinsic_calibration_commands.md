@@ -14,7 +14,7 @@ fixture.
 
 ## Latest Accepted Calibration
 
-The redesigned arm-mounted marker ID2 fixture was calibrated on 2026-05-19 and
+The replacement arm-mounted marker ID2 fixture was calibrated on 2026-05-21 and
 installed into:
 
 ```text
@@ -24,26 +24,27 @@ docker_ws/multi_cam_localization/sensor_fusion_bringup/config/markers/arm_marker
 Source bag:
 
 ```text
-bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260519_113936
+bags/openvins_tests/phase2_live/dynamic_id2_arm_update_live_20260521_144725
 ```
 
 Temporary candidate/report directory:
 
 ```text
-docker_ws/calibration/arm/d435i_310622071850/arm_marker_id2_candidate_20260519_113936/
+docker_ws/calibration/arm/d435i_310622071850/arm_marker_id2_candidate_20260521_144725/
 ```
 
 Calibration summary:
 
 ```text
-Raw image counts: head=2117, arm=2135
-Detection counts: head ID0=1980, head ID2=312, head ID0+ID2=312, arm ID0=1360
-Synchronized calibration samples: 167
-Inliers/outliers: 166 / 1
-Median translation residual: 0.0038 m
-P95 translation residual: 0.0104 m
-Median rotation residual: 1.005 deg
-P95 rotation residual: 2.349 deg
+Bag duration: 120.006 s
+Raw image counts: head=2760, arm=3180
+Detection counts: head ID0=2649, head ID2=1025, head ID0+ID2=997, arm ID0=1790
+Synchronized calibration samples: 573
+Inliers/outliers: 561 / 12
+Median translation residual: 0.0060 m
+P95 translation residual: 0.0118 m
+Median rotation residual: 1.429 deg
+P95 rotation residual: 3.888 deg
 ```
 
 The generated frames are expected:
@@ -54,34 +55,16 @@ parent_camera_frame: arm_d435i_arm_color_optical_frame
 parent_imu_frame: arm_imu
 ```
 
-CAD sanity check against the old mount was also consistent. The user measured
-the marker mount translation from the D435i bottom screw/tripod frame:
+This supersedes the accepted 2026-05-19 calibration from
+`dynamic_id2_arm_update_live_20260519_113936`, which had `166` inliers,
+p95 translation residual `0.0104 m`, and p95 rotation residual `2.349 deg`.
+The 2026-05-21 bag has many more synchronized samples and still keeps residuals
+in the documented acceptance range.
 
-```text
-Old screw-frame translation: x=-80.1 mm,  y=67.0 mm,  z=12.5 mm
-New screw-frame translation: x=-26.15 mm, y=122.5 mm, z=172.205 mm
-CAD delta: x=+53.95 mm, y=+55.50 mm, z=+159.705 mm
-```
-
-Using the approximate RealSense convention
-`optical_x=-screw_y`, `optical_y=-screw_z`, `optical_z=screw_x`, this predicts
-an optical-frame delta of roughly:
-
-```text
-expected from CAD: x=-55.50 mm, y=-159.705 mm, z=+53.95 mm
-```
-
-The calibration changed `T_armcam_marker` by:
-
-```text
-calibrated delta: x=-57.65 mm, y=-144.56 mm, z=+60.18 mm
-```
-
-The delta mismatch is about `16.5 mm`, which is plausible given the different
-CAD screw frame, color optical frame, physical marker placement, and observed
-calibration residuals. Do not redo the calibration based on this comparison
-alone. Redo only if active live validation shows unstable or repeatedly rejected
-dynamic ID2 updates.
+No CAD screw-frame sanity check is recorded here for the 2026-05-21 replacement
+mount. If a future CAD comparison is needed, remember that the D435i bottom
+screw/tripod frame is not the same as the ROS optical frame, so translation
+values cannot be compared directly without applying the correct frame rotation.
 
 ID2 remains dynamic only. Do not add ID2 to `marker_fixed_ids`.
 

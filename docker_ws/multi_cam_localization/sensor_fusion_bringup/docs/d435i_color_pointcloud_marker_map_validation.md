@@ -321,6 +321,28 @@ docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd
 docker compose run --rm realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 run tf2_ros tf2_echo arm_d435i_arm_color_optical_frame arm_d435i_arm_depth_optical_frame'
 ```
 
+Do not assume a generic TF consumer can always resolve
+`marker_map -> *_d435i_*_depth_optical_frame` for raw clouds. The OpenVINS tree
+is rooted at `marker_map -> *_imu -> *_cam0`, and the RealSense optical frames
+live in the RealSense driver tree. The Jetson `pointcloud_to_frame_node` bridges
+that intentionally by composing `marker_map -> *_cam0` with the RealSense
+color-to-depth optical transform. For x86 raw-cloud offload, run:
+
+```bash
+ros2 launch sensor_fusion_bringup x86_raw_pointcloud_marker_map.launch.py
+```
+
+and keep the raw input topics as:
+
+```text
+/head/d435i_head/depth/color/points
+/arm/d435i_arm/depth/color/points
+```
+
+If an external fusion node shows `/head/d435i/head/depth/color/points` or
+`/arm/d435i/arm/depth/color/points`, those are misconfigured subscriber-only
+topics; change them to the canonical underscore names above.
+
 Status topics explain published clouds, dropped clouds before lock, stale TF, or
 rate limiting:
 
