@@ -1,0 +1,24 @@
+# Docker Compose GPU runtime override for segmentation-cuda
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.segmentation.cuda.yml \
+#     --profile segmentation-cuda up -d segmentation-cuda
+#
+# Prerequisites:
+#   - NVIDIA Container Toolkit installed on host
+#   - nvidia-docker2 or docker >= 19.03 with nvidia-container-runtime
+#   - Host GPU driver compatible with CUDA 11.8
+
+services:
+    segmentation-cuda:
+        runtime: nvidia
+        environment:
+            - NVIDIA_VISIBLE_DEVICES=all
+            - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]

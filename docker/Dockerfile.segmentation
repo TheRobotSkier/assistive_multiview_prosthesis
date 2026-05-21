@@ -1,11 +1,24 @@
 # Multi-capability Docker image for MinkowskiEngine + InterObject3D inference.
-# Supports CUDA acceleration when a GPU is available, falls back to CPU otherwise.
 # Isolated from the main ROS container — this runs Python 3.8 + PyTorch 1.12.
 # The ROS bridge node talks to this container over HTTP.
+#
+# Build args:
+#   BACKEND=cuda  → NVIDIA CUDA base image, PyTorch CUDA wheels, force CUDA ME build
+#   BACKEND=cpu   → Ubuntu 20.04 base image, PyTorch CPU wheels, CPU-only ME build
+#
+# Platform compatibility:
+#   CUDA backend: x86_64 Linux with NVIDIA driver >= 450.80.02, CUDA 11.8 compatible.
+#   Jetson/L4T is explicitly NOT supported by this CUDA image.
+#   CPU backend: any x86_64 or aarch64 Linux with standard container runtime.
 
-# Ubuntu 20.04 + CUDA 11.8 toolkit (devel includes nvcc for building MinkowskiEngine).
-# CUDA 11.8 is backward-compatible with PyTorch 1.12.1+cu116 wheels.
-FROM docker.io/nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
+ARG BACKEND=cuda
+
+# ── Base image selection ────────────────────────────────────────────────────
+FROM docker.io/nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04 AS base-cuda
+FROM docker.io/ubuntu:20.04 AS base-cpu
+
+# Select the correct base
+FROM base-${BACKEND} AS build-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -34,19 +47,26 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1 \
 # Pin numpy<2 before torch to avoid ABI mismatch with torch 1.12
 RUN pip install --no-cache-dir "numpy<2"
 
-# PyTorch with CUDA 11.6 support (includes CPU fallback automatically).
-# On hosts without a GPU PyTorch falls back to CPU transparently.
+# ── PyTorch installation (backend-specific) ─────────────────────────────────
+FROM build-base AS pytorch-cuda
 RUN pip install --no-cache-dir \
         torch==1.12.1+cu116 \
         torchvision==0.13.1+cu116 \
         -f https://download.pytorch.org/whl/torch_stable.html
 
-# Build MinkowskiEngine.
-# Default (CPU_ONLY=0): force CUDA compilation so the container works on GPU
-# hosts and transparently falls back to CPU on hosts without a GPU (as long as
-# the CUDA runtime libraries are present in the image).
-# Set CPU_ONLY=1 at build time for environments that cannot tolerate CUDA libs.
-ARG CPU_ONLY=0
+FROM build-base AS pytorch-cpu
+RUN pip install --no-cache-dir \
+        torch==1.12.1+cpu \
+        torchvision==0.13.1+cpu \
+        -f https://download.pytorch.org/whl/torch_stable.html
+
+# Select the correct PyTorch stage
+FROM pytorch-${BACKEND} AS final
+
+# ── MinkowskiEngine build ──────────────────────────────────────────────────
+# Default (BACKEND=cuda): force CUDA compilation.
+# BACKEND=cpu: build without CUDA support, no CUDA libs required at runtime.
+ARG BACKEND=cuda
 COPY MinkowskiEngine/ /MinkowskiEngine-src/MinkowskiEngine/
 COPY setup.minkowski.py /MinkowskiEngine-src/setup.py
 COPY src/ /MinkowskiEngine-src/src/
@@ -55,7 +75,7 @@ COPY MANIFEST.in /MinkowskiEngine-src/MANIFEST.in
 COPY README.md /MinkowskiEngine-src/README.md
 ENV MAX_JOBS=4
 RUN cd /MinkowskiEngine-src && \
-    if [ "$CPU_ONLY" = "1" ]; then \
+    if [ "${BACKEND}" = "cpu" ]; then \
         echo "Building MinkowskiEngine CPU_ONLY"; \
         python setup.py install --blas=openblas --cpu_only; \
     else \
@@ -64,7 +84,7 @@ RUN cd /MinkowskiEngine-src && \
     fi && \
     cd / && rm -rf /MinkowskiEngine-src
 
-# Python inference dependencies
+# ── Python inference dependencies ────────────────────────────────────────────
 RUN pip install --no-cache-dir \
         "open3d>=0.12.0" \
         trimesh \
@@ -92,7 +112,7 @@ COPY nodes/inference_server.py /nodes/inference_server.py
 # Pre-create dir with world-writable permissions (userns_mode: keep-id maps non-root).
 RUN mkdir -p /weights && chmod 777 /weights
 ARG DOWNLOAD_WEIGHTS=0
-RUN if [ "$DOWNLOAD_WEIGHTS" = "1" ]; then \
+RUN if [ "${DOWNLOAD_WEIGHTS}" = "1" ]; then \
         wget -q \
           https://omnomnom.vision.rwth-aachen.de/data/3d_inter_obj_seg/scannet_official/weights/weights_exp14_14.pth \
           -O /weights/weights_exp14_14.pth; \

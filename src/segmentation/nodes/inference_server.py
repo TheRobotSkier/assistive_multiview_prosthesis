@@ -4,7 +4,7 @@ Flask inference server for InterObject3D segmentation.
 
 Runs under Python 3.8 (required by MinkowskiEngine + PyTorch 1.12).
 Exposes two endpoints:
-  GET  /health   → {"status": "ok"}
+  GET  /health   → runtime diagnostics (device, CUDA availability, ME mode)
   POST /segment  → accepts base64-encoded xyz/rgb arrays + click lists,
                     returns binary per-point mask {"mask": [0, 1, ...]}
 
@@ -38,6 +38,30 @@ PORT = int(os.environ.get("INFERENCE_SERVER_PORT", "5678"))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[inference_server] Detected device: {device}", flush=True)
 
+# Collect diagnostics for health endpoint and startup logging
+try:
+    import MinkowskiEngine as ME
+    me_version = ME.__version__
+    # MinkowskiEngine does not expose a direct CUDA flag, but we can infer
+    # from whether torch.cuda is available and ME compiled successfully.
+    # If the import works on a non-CUDA build, it's CPU-only.
+    me_cuda_available = torch.cuda.is_available()
+except Exception as e:
+    me_version = f"import_error: {e}"
+    me_cuda_available = False
+
+_cuda_version = torch.version.cuda if torch.version.cuda else None
+
+diagnostics = {
+    "device": str(device),
+    "torch_cuda_available": torch.cuda.is_available(),
+    "torch_cuda_version": _cuda_version,
+    "minkowski_engine_version": me_version,
+    "minkowski_engine_cuda": me_cuda_available,
+}
+
+print(f"[inference_server] Diagnostics: {json.dumps(diagnostics)}", flush=True)
+
 print(f"[inference_server] Loading model from {WEIGHTS_PATH} ...", flush=True)
 _inseg = InteractiveSegmentationModel(pretraining_weights=WEIGHTS_PATH)
 _model = _inseg.create_model(device, _inseg.pretraining_weights_file)
@@ -63,7 +87,11 @@ def _build_click_mask(xyz: np.ndarray, clicks: list, cubeedge: float) -> np.ndar
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"})
+    """Return runtime diagnostics suitable for smoke-test assertions."""
+    return jsonify({
+        "status": "ok",
+        **diagnostics,
+    })
 
 
 @app.route("/segment", methods=["POST"])

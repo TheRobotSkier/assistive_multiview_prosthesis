@@ -1,0 +1,19 @@
+# Podman Compose GPU runtime override for segmentation-cuda
+#
+# Usage:
+#   podman-compose -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml \
+#     --profile segmentation-cuda up -d segmentation-cuda
+#
+# Prerequisites:
+#   - podman >= 4.0 with NVIDIA container device support
+#   - nvidia-container-toolkit or nvidia-cdi-hook configured
+#   - Host GPU driver compatible with CUDA 11.8
+#   - The nvidia.com/gpu=all device must be available via CDI or libnvidia-container
+
+services:
+    segmentation-cuda:
+        devices:
+            - nvidia.com/gpu=all
+        environment:
+            - NVIDIA_VISIBLE_DEVICES=all
+            - NVIDIA_DRIVER_CAPABILITIES=compute,utility

@@ -12,10 +12,15 @@
 #   make digital-twin     # launch digital twin
 #   make mock             # launch mock pipeline
 #
-# Other services:
-#   make segmentation     # start inference server
-#   make up-hw            # start with USB device mapping
-#   make test             # run smoke tests (builds production image)
+# Segmentation services (separate CPU and CUDA variants):
+#   make segmentation-cpu   # CPU-only image (no NVIDIA dependencies)
+#   make segmentation-cuda  # CUDA image with GPU support (requires NVIDIA runtime)
+#   make up-hw              # start with USB device mapping
+#   make test               # run smoke tests (builds production image)
+#
+# Container backend selection:
+#   Set CONTAINER_BACKEND=docker or CONTAINER_BACKEND=podman in environment.
+#   Default auto-detects podman-compose first, then docker compose.
 
 services:
     # ── Main ROS 2 development container ──────────────────────────────────────
@@ -62,15 +67,17 @@ services:
         stdin_open: true
         tty: true
 
-    # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
-    segmentation:
-        container_name: segmentation
-        image: segmentation:latest
+    # ── Segmentation inference server — CUDA variant ──────────────────────────
+    # Requires NVIDIA container runtime. Use docker-compose.segmentation.cuda.yml
+    # (Docker) or docker-compose.segmentation.podman-gpu.yml (Podman) for GPU passthrough.
+    segmentation-cuda:
+        container_name: segmentation-cuda
+        image: segmentation:cuda
         build:
             context: ../src/segmentation
             dockerfile: ../../docker/Dockerfile.segmentation
             args:
-                CPU_ONLY: ${SEGMENTATION_CPU_ONLY:-0}
+                BACKEND: cuda
         environment:
             - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
             - NVIDIA_VISIBLE_DEVICES=all
@@ -81,17 +88,32 @@ services:
             - segmentation-weights:/weights
         network_mode: host
         profiles:
-            - segmentation
+            - segmentation-cuda
         privileged: true # LINUX ONLY
         userns_mode: "keep-id" # LINUX_ONLY
-        # Request GPU access when available; Docker ignores this on CPU-only hosts.
-        deploy:
-            resources:
-                reservations:
-                    devices:
-                        - driver: nvidia
-                          count: all
-                          capabilities: [gpu]
+
+    # ── Segmentation inference server — CPU variant ──────────────────────────
+    # Truly CPU-only: uses ubuntu:20.04 base, CPU PyTorch wheels, and no CUDA libs.
+    # Runs on any machine without NVIDIA container support.
+    segmentation-cpu:
+        container_name: segmentation-cpu
+        image: segmentation:cpu
+        build:
+            context: ../src/segmentation
+            dockerfile: ../../docker/Dockerfile.segmentation
+            args:
+                BACKEND: cpu
+        environment:
+            - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
+        volumes:
+            - /tmp/.X11-unix:/tmp/.X11-unix:rw
+            # Persist model weights across container recreations (~200MB)
+            - segmentation-weights:/weights
+        network_mode: host
+        profiles:
+            - segmentation-cpu
+        privileged: true # LINUX ONLY
+        userns_mode: "keep-id" # LINUX_ONLY
 
     # ── Test runner: uses production image, builds + runs smoke tests, exits ────
     test:
