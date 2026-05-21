@@ -29,12 +29,44 @@ try:
     from std_msgs.msg import Float64MultiArray, Int32, Float32
     from sensor_msgs.msg import JointState
 except ModuleNotFoundError:
-    # Stubs allow static-method unit tests without ROS2 installed
+    # Stubs allow unit tests without ROS2 installed
     class Node:  # type: ignore[misc]
-        pass
+        def __init__(self, name):
+            self._name = name
+
+        def declare_parameter(self, name, default):
+            class _Param:
+                def __init__(self, value):
+                    self.value = value
+            return _Param(default)
+
+        def create_publisher(self, *args, **kwargs):
+            class _Pub:
+                def publish(self, msg):
+                    pass
+            return _Pub()
+
+        def create_subscription(self, *args, **kwargs):
+            pass
+
+        def create_timer(self, *args, **kwargs):
+            pass
+
+        def get_logger(self):
+            class _Logger:
+                def info(self, *args, **kwargs):
+                    pass
+
+                def warn(self, *args, **kwargs):
+                    pass
+            return _Logger()
+
+        def destroy_node(self):
+            pass
 
     class Float64MultiArray:  # type: ignore[no-redef]
-        pass
+        def __init__(self):
+            self.data = []
 
     class Int32:  # type: ignore[no-redef]
         def __init__(self, data=0):
@@ -45,7 +77,10 @@ except ModuleNotFoundError:
             self.data = data
 
     class JointState:  # type: ignore[no-redef]
-        pass
+        def __init__(self):
+            self.name = []
+            self.position = []
+            self.effort = []
 
 FINGER_JOINTS = ["j_thumb_fle", "j_index_fle", "j_mrl_fle"]
 FINGER_COUNT = 3
@@ -183,23 +218,33 @@ class EmgGraspNode(Node):
             return False
         return (time.time() - self._emg_gesture_start_time) >= hold_time_s
 
-    def _dispatch_gesture(self) -> Tuple[Optional[str], Optional[Dict]]:
-        """Look up what function (if any) the current gesture maps to in current mode.
+    def _dispatch_gesture(
+        self,
+        gesture_id: Optional[int] = None,
+        confidence: Optional[float] = None,
+        mode: Optional[str] = None,
+    ) -> Tuple[Optional[str], Optional[Dict]]:
+        """Look up what function (if any) the gesture maps to in the given mode.
 
+        Uses instance state when arguments are not provided.
         Returns (func_name, func_cfg) or (None, None).
         """
-        mode_cfg = self._modes.get(self._mode, {})
+        g = gesture_id if gesture_id is not None else self._emg_gesture
+        c = confidence if confidence is not None else self._emg_confidence
+        m = mode if mode is not None else self._mode
+
+        mode_cfg = self._modes.get(m, {})
         for func_name, func_cfg in mode_cfg.items():
             if func_cfg is None:
                 continue
-            gesture_id = func_cfg.get("gesture_id")
-            if gesture_id is None:
+            cfg_gesture_id = func_cfg.get("gesture_id")
+            if cfg_gesture_id is None:
                 continue
-            if self._emg_gesture == int(gesture_id):
+            if g == int(cfg_gesture_id):
                 conf_thresh = func_cfg.get("confidence_threshold")
                 if conf_thresh is None:
                     continue
-                if self._emg_confidence >= float(conf_thresh):
+                if c >= float(conf_thresh):
                     return func_name, func_cfg
         return None, None
 
