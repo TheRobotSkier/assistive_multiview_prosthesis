@@ -54,7 +54,7 @@ COMPOSE_SEGMENTATION_CPU := -f docker-compose.yml
 COMPOSE_SEGMENTATION_CUDA := -f docker-compose.yml -f docker-compose.segmentation.cuda.yml
 COMPOSE_SEGMENTATION_CUDA_PODMAN := -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp print-force
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp print-force test-volitional up-volitional down-volitional logs-volitional
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -504,3 +504,34 @@ test-static-grasp:
 		-e GRASP_TEST_CONFIG=/prosthesis_ws/config/static_grasp_test.yaml \
 		prosthesis:latest \
 		python3 /prosthesis_ws/scripts/static_grasp_test.sh
+
+# ── Volitional Test ────────────────────────────────────────────────────────
+up-volitional:
+	$(COMPOSE) rm -f volitional_test 2>/dev/null || true
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile volitional_test up volitional_test -d
+
+down-volitional:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile volitional_test down
+
+logs-volitional:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile volitional_test logs -f
+
+test-volitional:
+	@echo "=== MIA Hand Volitional Controller Test ==="
+	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
+	@test -f tests/emg_volitional/emg_volitional_node.py || { echo "Missing tests/emg_volitional/emg_volitional_node.py"; exit 1; }
+	@test -f tests/emg_volitional/emg_volitional_config.yaml || { echo "Missing tests/emg_volitional/emg_volitional_config.yaml"; exit 1; }
+	-podman rm -f mia-volitional 2>/dev/null
+	podman run --rm -it --name mia-volitional \
+		--network host \
+		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/tests:/prosthesis_ws/tests:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-e MIA_PORT=/dev/ttyUSB0 \
+		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
+		prosthesis:latest \
+		bash -c 'source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch emg_volitional_test.launch.py'

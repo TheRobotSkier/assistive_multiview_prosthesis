@@ -184,6 +184,28 @@ services:
         privileged: true
         userns_mode: "keep-id"
 
+    # ── Volitional test: runs EMG volitional hand controller with RViz ─────────
+    volitional_test:
+        container_name: volitional_test
+        extends: prosthesis
+        command:
+            [
+                "/bin/bash",
+                "-c",
+                "source /prosthesis_ws/install/setup.bash && ros2 launch prosthesis_launch emg_volitional_test.launch.py",
+            ]
+        environment:
+            - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+            - DISPLAY=${DISPLAY:-:0}
+            - XAUTHORITY=/tmp/.xauth
+        network_mode: host
+        profiles:
+            - volitional_test
+        stdin_open: true
+        tty: true
+        privileged: true
+        userns_mode: "keep-id"
+
     # ── Test runner: uses production image, builds + runs smoke tests, exits ────
     test:
         container_name: test
