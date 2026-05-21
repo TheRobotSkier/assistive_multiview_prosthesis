@@ -79,6 +79,15 @@ COPY pybind/ /MinkowskiEngine-src/pybind/
 COPY MANIFEST.in /MinkowskiEngine-src/MANIFEST.in
 COPY README.md /MinkowskiEngine-src/README.md
 ENV MAX_JOBS=4
+# Tell PyTorch which CUDA architectures to target. Without this, the build
+# tries to auto-detect via nvidia-smi / device query, which fails inside a
+# container that has no GPU attached at build time (IndexError in
+# _get_cuda_arch_flags — arch_list is empty).
+ENV TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6+PTX"
+# The PyTorch base image ships CUDA headers under /usr/local/cuda but
+# PyTorch defaults CUDA_HOME to /opt/conda (which lacks them).  Point
+# CUDA_HOME at the system toolkit so nvcc can find cusolverDn.h etc.
+ENV CUDA_HOME="/usr/local/cuda"
 RUN cd /MinkowskiEngine-src && \
     if [ "${BACKEND}" = "cpu" ]; then \
         echo "Building MinkowskiEngine CPU_ONLY"; \

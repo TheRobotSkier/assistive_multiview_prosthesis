@@ -196,10 +196,14 @@ twist_propagation:
         process_noise_linear_mps2_per_s: 0.1
         process_noise_angular_radps2_per_s: 0.5
         enable_covariance_propagation: true
+        # Offset from tracked pose origin (camera) to grasp contact point
+        # (fingertips), expressed in the pose's local frame.  Applied by
+        # rotating by pose orientation before propagation.
+        # Default: [0, 0, 0] = no offset (start from camera).
+        propagation_origin_offset: [0.0, 0.0, 0.0]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)
-# ═══════════════════════════════════════════════════════════════════════════════
 
 # ── ROS Topics ────────────────────────────────────────────────────────────────
 topics:
@@ -383,3 +387,6 @@ twist_propagation:
     process_noise_linear_mps2_per_s: 0.1
     process_noise_angular_radps2_per_s: 0.5
     enable_covariance_propagation: true
+    # Offset from tracked pose origin (camera) to grasp contact point
+    # (fingertips), expressed in the pose's local frame.
+    propagation_origin_offset: [0.0, 0.0, 0.0]

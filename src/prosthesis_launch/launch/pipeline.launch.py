@@ -83,6 +83,7 @@ def _launch_setup(context, *args, **kwargs):
     inference_url = LaunchConfiguration("inference_url").perform(context)
     camera_mount = LaunchConfiguration("camera_mount").perform(context)
     mounts_config = LaunchConfiguration("mounts_config").perform(context)
+    mounts_link_frame = LaunchConfiguration("mounts_link_frame").perform(context)
 
     nodes = []
 
@@ -206,11 +207,14 @@ def _launch_setup(context, *args, **kwargs):
                 except Exception:
                     mounts_script = ""
             if mounts_script and os.path.isfile(mounts_script):
+                mounts_cmd = ["python3", mounts_script,
+                              "--mount", camera_mount,
+                              "--config", mounts_config]
+                if mounts_link_frame:
+                    mounts_cmd.extend(["--link-frame", mounts_link_frame])
                 camera_nodes.append(
                     ExecuteProcess(
-                        cmd=["python3", mounts_script,
-                             "--mount", camera_mount,
-                             "--config", mounts_config],
+                        cmd=mounts_cmd,
                         name="camera_mount_tf_publisher",
                         output="screen",
                     )
@@ -398,6 +402,11 @@ def generate_launch_description():
                 "mounts_config",
                 default_value="",
                 description="Path to camera_mounts.yaml (empty = skip mount TF publisher).",
+            ),
+            DeclareLaunchArgument(
+                "mounts_link_frame",
+                default_value="arm_d435i_arm_link",
+                description="TF frame to anchor the camera mounts tree under (empty = use 'world').",
             ),
             DeclareLaunchArgument(
                 "inference_url",

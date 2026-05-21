@@ -406,6 +406,13 @@ class TwistPropagationNode(Node):
         self.declare_parameter("process_noise_angular_radps2_per_s", 0.5)
         self.declare_parameter("enable_covariance_propagation", True)
 
+        # Propagation origin offset (in the pose's local frame)
+        # Shifts the propagation start point from the tracked pose origin
+        # (camera) to the grasp contact point (fingertips).  Applied by
+        # rotating the offset by the pose orientation and adding to the
+        # position before propagation.
+        self.declare_parameter("propagation_origin_offset", [0.0, 0.0, 0.0])
+
         # ── Read parameters ────────────────────────────────────────────────
         self._cycle_delay = self.get_parameter("cycle_delay_s").value
         self._horizon = self.get_parameter("propagation_time_horizon_s").value
@@ -424,6 +431,15 @@ class TwistPropagationNode(Node):
         self._enable_cov = self.get_parameter("enable_covariance_propagation").value
         self._seg_reset_topic = self.get_parameter("segmentation_reset_topic").value
         self._seg_retarget_distance = self.get_parameter("segmentation_retarget_distance_m").value
+
+        # Propagation origin offset (3D vector in pose local frame)
+        offset_raw = self.get_parameter("propagation_origin_offset").value
+        self._propagation_offset = tuple(float(v) for v in offset_raw)
+        if any(abs(v) > 1e-6 for v in self._propagation_offset):
+            self.get_logger().info(
+                f"Propagation origin offset: {self._propagation_offset} "
+                f"(shifts start point in pose local frame)"
+            )
 
         # Effective collision threshold: hit_threshold + collision_radius
         self._effective_hit_thresh = self._hit_thresh + self._collision_radius
@@ -1100,6 +1116,25 @@ class TwistPropagationNode(Node):
         # Get latest pose and its frame
         latest = self._pose_buf[-1]
         _, px, py, pz, qx, qy, qz, qw, pose_frame = latest
+
+        # Apply propagation origin offset (rotate offset by pose orientation,
+        # then add to position).  This shifts the propagation start from the
+        # tracked camera origin to the grasp contact point (fingertips).
+        ox, oy, oz = self._propagation_offset
+        if any(abs(v) > 1e-6 for v in (ox, oy, oz)):
+            # Quaternion rotation of offset vector
+            r00 = 1.0 - 2.0 * (qy * qy + qz * qz)
+            r01 = 2.0 * (qx * qy - qz * qw)
+            r02 = 2.0 * (qx * qz + qy * qw)
+            r10 = 2.0 * (qx * qy + qz * qw)
+            r11 = 1.0 - 2.0 * (qx * qx + qz * qz)
+            r12 = 2.0 * (qy * qz - qx * qw)
+            r20 = 2.0 * (qx * qz - qy * qw)
+            r21 = 2.0 * (qy * qz + qx * qw)
+            r22 = 1.0 - 2.0 * (qx * qx + qy * qy)
+            px += r00 * ox + r01 * oy + r02 * oz
+            py += r10 * ox + r11 * oy + r12 * oz
+            pz += r20 * ox + r21 * oy + r22 * oz
 
         # Transform hand pose position to the cloud frame via TF2
         transformed = self._transform_pose_to_cloud_frame(px, py, pz, pose_frame)

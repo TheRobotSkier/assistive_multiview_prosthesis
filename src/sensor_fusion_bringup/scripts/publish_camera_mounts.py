@@ -4,14 +4,20 @@ Publish camera mount transforms + bounding box marker for RViz visualization.
 
 Reads camera_mounts.yaml and publishes a TF tree plus a visualization marker.
 
-Tree (all-mount mode):
-  world -> palm_frame
-    ├── d435i_arm_bottom_screw_frame_<mount>  (inverse of mount transform)
-    │     └── d435i_arm_link_<mount>           (URDF offset)
-    ├── bb_corner -> bb_opposite               (shared workspace bounding box)
+Pipeline mode (--link-frame arm_d435i_arm_link):
+  <link_frame> -> screw_frame_<mount>    (inverse of screw_to_link)
+    ├── d435i_arm_link_<mount>            (URDF offset)
+    ├── palm_frame                        (screw_to_palm, direct)
+    │     ├── grasp_contact_frame
+    │     └── bb_corner -> bb_opposite
+    └── bbcam1_frame, bbcam2_frame        (camera body pruning box)
 
-Tree (single-mount mode):
-  Same, but only the chosen mount is published.
+Standalone mode (no --link-frame, default):
+  world -> palm_frame                    (identity, for RViz visualization)
+    ├── d435i_arm_bottom_screw_frame_<mount>
+    │     └── d435i_arm_link_<mount>
+    ├── grasp_contact_frame
+    └── bb_corner -> bb_opposite
 
 A CUBE marker is published in palm_frame to visualize the bounding box.
 Published at 1 Hz so RViz can latch it.
@@ -20,6 +26,7 @@ Usage:
   python3 publish_camera_mounts.py --all              # all mounts
   python3 publish_camera_mounts.py --mount NAME       # single mount
   python3 publish_camera_mounts.py --list             # list mounts
+  python3 publish_camera_mounts.py --mount NAME --link-frame arm_d435i_arm_link
 """
 
 import argparse
@@ -147,8 +154,9 @@ _COLORS = [
 
 class CameraMountTFPublisher(Node):
     def __init__(self, config_path: Path, mount_name: str | None = None,
-                 publish_all: bool = False):
+                 publish_all: bool = False, link_frame: str = ""):
         super().__init__("camera_mount_tf_publisher")
+        self._link_frame = link_frame
         self._broadcaster = StaticTransformBroadcaster(self)
         self._marker_pub = self.create_publisher(
             Marker, "/camera_mounts/bounding_box", 10)
@@ -178,6 +186,9 @@ class CameraMountTFPublisher(Node):
 
         self._timer = self.create_timer(1.0, self._republish_marker)
 
+        mode = f"pipeline (root={link_frame})" if link_frame else "standalone (root=world)"
+        self.get_logger().info(f"Camera mount TF publisher started in {mode} mode")
+
     def _republish_marker(self):
         self._bbox_marker.header.stamp = self.get_clock().now().to_msg()
         self._marker_pub.publish(self._bbox_marker)
@@ -186,18 +197,27 @@ class CameraMountTFPublisher(Node):
             self._cam_marker_pub.publish(self._cam_bbox_marker)
 
     def _publish_single(self, data: dict, mount_name: str):
-        tfs = self._build_shared_tfs(data)
+        if self._link_frame:
+            tfs = self._build_pipeline_root(data, mount_name)
+        else:
+            tfs = self._build_standalone_root(data)
+        tfs += self._build_mount_tfs(data, mount_name, f"_{mount_name}")
         tfs += self._build_grasp_contact_tf(data)
         tfs += self._build_bounding_box_tfs(data)
         if "cam_bounding_box_8cm" in data:
             tfs += self._build_cam_bbox_tfs(data)
-        tfs += self._build_mount_tfs(data, mount_name, f"_{mount_name}")
         self._broadcaster.sendTransform(tfs)
         self.get_logger().info(
             f"Published TF tree for mount '{mount_name}' + bounding box")
 
     def _publish_all(self, data: dict):
-        tfs = self._build_shared_tfs(data)
+        if self._link_frame:
+            # In pipeline mode, only publish for the first mount
+            # (the pipeline uses a single mount)
+            first_mount = next(iter(data["mounts"]))
+            tfs = self._build_pipeline_root(data, first_mount)
+        else:
+            tfs = self._build_standalone_root(data)
         tfs += self._build_grasp_contact_tf(data)
         tfs += self._build_bounding_box_tfs(data)
         if "cam_bounding_box_8cm" in data:
@@ -209,12 +229,31 @@ class CameraMountTFPublisher(Node):
         self.get_logger().info(
             f"Published all mounts ({names})")
 
-    def _build_shared_tfs(self, data: dict) -> list[TransformStamped]:
+    def _build_standalone_root(self, data: dict) -> list[TransformStamped]:
+        """Standalone mode: world -> palm_frame (identity, for RViz visualization)."""
         s = self._stamp
         return [
             _make_tf(s, "world", "palm_frame",
                      0.0, 0.0, 0.0,
                      1.0, 0.0, 0.0, 0.0),
+        ]
+
+    def _build_pipeline_root(self, data: dict, mount_name: str) -> list[TransformStamped]:
+        """Pipeline mode: link_frame -> screw_frame (connects to live TF tree).
+
+        Publishes the edge from the bridge's arm link frame to the screw frame,
+        which is the inverse of screw_to_link.  This connects the camera mounts
+        tree into the marker_map TF tree via the OpenVINS bridge.
+        """
+        s = self._stamp
+        screw_frame = f"d435i_arm_bottom_screw_frame_{mount_name}"
+        sl = data["screw_to_link"]
+        # arm_d435i_arm_link -> screw_frame = inverse of screw_to_link
+        # screw_to_link has identity rotation, so inverse is just negated translation
+        return [
+            _make_tf(s, self._link_frame, screw_frame,
+                     -_t(sl, "x"), -_t(sl, "y"), -_t(sl, "z"),
+                     0.0, 0.0, 0.0, 1.0),
         ]
 
     def _build_grasp_contact_tf(self, data: dict) -> list[TransformStamped]:
@@ -288,12 +327,19 @@ class CameraMountTFPublisher(Node):
         screw_frame = f"d435i_arm_bottom_screw_frame{suffix}"
         link_frame = f"d435i_arm_link{suffix}"
 
-        itx, ity, itz, iqx, iqy, iqz, iqw = _invert_transform(
-            sp["translation"], sp["quaternion"])
-
         tfs = []
-        tfs.append(_make_tf(s, "palm_frame", screw_frame,
-                            itx, ity, itz, iqx, iqy, iqz, iqw))
+
+        if self._link_frame:
+            # Pipeline mode: screw_frame -> palm_frame (direct screw_to_palm)
+            tfs.append(_make_tf(s, screw_frame, "palm_frame",
+                                _t(sp, "x"), _t(sp, "y"), _t(sp, "z"),
+                                *_q(sp)))
+        else:
+            # Standalone mode: palm_frame -> screw_frame (inverted screw_to_palm)
+            itx, ity, itz, iqx, iqy, iqz, iqw = _invert_transform(
+                sp["translation"], sp["quaternion"])
+            tfs.append(_make_tf(s, "palm_frame", screw_frame,
+                                itx, ity, itz, iqx, iqy, iqz, iqw))
 
         sl = data["screw_to_link"]
         tfs.append(_make_tf(s, screw_frame, link_frame,
@@ -314,6 +360,10 @@ def main():
                        help="List available mounts and exit")
     parser.add_argument("--config", "-c", default=None,
                         help="Path to camera_mounts.yaml")
+    parser.add_argument("--link-frame", default="",
+                        help="Bridge link frame to anchor the tree under "
+                             "(e.g. arm_d435i_arm_link). Empty = standalone "
+                             "mode with world root.")
     args, _ = parser.parse_known_args()
 
     config_path = Path(args.config) if args.config else _find_config()
@@ -328,11 +378,14 @@ def main():
     rclpy.init(args=sys.argv)
 
     if args.all:
-        node = CameraMountTFPublisher(config_path, publish_all=True)
+        node = CameraMountTFPublisher(config_path, publish_all=True,
+                                      link_frame=args.link_frame)
     elif args.mount:
-        node = CameraMountTFPublisher(config_path, mount_name=args.mount)
+        node = CameraMountTFPublisher(config_path, mount_name=args.mount,
+                                      link_frame=args.link_frame)
     else:
-        node = CameraMountTFPublisher(config_path, publish_all=True)
+        node = CameraMountTFPublisher(config_path, publish_all=True,
+                                      link_frame=args.link_frame)
 
     try:
         rclpy.spin(node)
