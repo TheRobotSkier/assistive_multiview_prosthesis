@@ -1,0 +1,27 @@
+docker/Dockerfile.segmentation
+  s_d66be714410f47::t_29eb442f8d554f 1-2,6-8,12,14-16,30-33,37-38,40-41,44-49,58-64
+src/segmentation/nodes/inference_server.py
+  s_d66be714410f47::t_57e5a797cee976 9,13-15,38-40,90
+  s_d66be714410f47::t_b5583893c5320d 95-97,102
+docker/docker-compose.yml
+  s_d66be714410f47::t_825946b7f2af82 69-70,82-89
+Makefile
+  s_d66be714410f47::t_64d2aafa7532c5 33-35
+  s_d66be714410f47::t_f760ce4443d5a7 21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "2d47e1cdd79d3a66145e8bc0a98a950b8be965d4",
+  "prompts": {},
+  "sessions": {
+    "s_d66be714410f47": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5e49b4fffewSU4IUPA2XRL2n",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
