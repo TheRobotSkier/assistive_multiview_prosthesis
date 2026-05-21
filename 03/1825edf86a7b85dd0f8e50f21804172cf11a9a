@@ -1,0 +1,29 @@
+src/mia_hand_ros2_control/config/mia_hand_controllers.yaml
+  s_29625c6e163b67::t_fb143582b45c90 43
+  s_29625c6e163b67::t_c3937b9f6356f4 91
+src/mia_hand_ros2_control/launch/mia_hand_system_interface_launch.py
+  s_29625c6e163b67::t_4974e25c333e6f 128,130-139,141-190,206-213,217,219
+  s_29625c6e163b67::t_925b05ca425702 259-262
+src/mia_hand_ros2_control/CMakeLists.txt
+  s_29625c6e163b67::t_ff4cc7cecc1cc5 63-68
+src/mia_hand_ros2_control/description/ros2_control/mia_hand.ros2_control.xacro
+  s_29625c6e163b67::t_c81c75fe19500f 42,50,58
+src/mia_hand_ros2_control/mia_hand_ros2_control/mia_safety_node.py
+  s_29625c6e163b67::t_3b6db8b6f7b437 1-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "031825edf86a7b85dd0f8e50f21804172cf11a9a",
+  "prompts": {},
+  "sessions": {
+    "s_29625c6e163b67": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b43b2553ffewxgwzRpeTwYDm2",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
