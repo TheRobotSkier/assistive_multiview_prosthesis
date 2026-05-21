@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-"""EMG-driven velocity-based force grasp test node.
+"""EMG-driven mode-based velocity force grasp test node.
 
 Subscribes to EMG gestures and /joint_states, publishes velocity commands to
-/group_vel_ff_controller/commands and position commands to
-/group_pos_ff_controller/commands.
+/group_vel_ff_controller/commands, position commands to
+/group_pos_ff_controller/commands, and wrist position commands to
+/wrist/set_position.
 
-State machine:
-  IDLE      → Hand open, waiting for EMG grasp trigger (POWER gesture hold)
-  CLOSING   → Velocity ramp closure, monitoring forces/positions
-  HOLDING   → Contact detected, zero velocity, waiting for release
-  RELEASING → EMG release gesture (OPEN) or fault, switch to position control, open hand
-  FAULT     → Safety fault, stop all motion
+Mode state machine:
+  moving    → Hand open/relaxed. Wrist can be positioned. Grasp can be started.
+  grasping  → Velocity ramp closure. Wrist can still be adjusted.
+              Release gesture cancels grasp and returns to moving.
+              Contact detection auto-transitions to holding.
+  holding   → Contact detected. Grasp force can be adjusted.
+              Release gesture opens hand and returns to moving.
 """
 
 import os
 import sys
 import time
 import math
-from enum import Enum, auto
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -49,13 +50,10 @@ except ModuleNotFoundError:
 FINGER_JOINTS = ["j_thumb_fle", "j_index_fle", "j_mrl_fle"]
 FINGER_COUNT = 3
 
-
-class Phase(Enum):
-    IDLE = auto()
-    CLOSING = auto()
-    HOLDING = auto()
-    RELEASING = auto()
-    FAULT = auto()
+# Mode strings
+MODE_MOVING = "moving"
+MODE_GRASPING = "grasping"
+MODE_HOLDING = "holding"
 
 
 class EmgGraspNode(Node):
@@ -83,17 +81,23 @@ class EmgGraspNode(Node):
 
         self._ramp = self._compute_velocity_ramp(self._v_start, self._v_end, self._decay_steps)
 
-        # EMG params
-        self._grasp_gesture = int(self._cfg["emg_grasp_trigger_gesture"])
-        self._release_gesture = int(self._cfg["emg_release_gesture"])
-        self._confidence_thresh = float(self._cfg["emg_grasp_confidence_threshold"])
-        self._hold_timeout = float(self._cfg["gesture_hold_timeout_s"])
+        # Mode configuration
+        self._modes = self._cfg["modes"]
+        self._mode = MODE_MOVING
+
+        # Wrist control
+        self._wrist_control_enabled = bool(self._cfg.get("wrist_control_enabled", False))
+        self._wrist_accel = float(self._cfg.get("wrist_accel_deg_s2", 180.0))
+        self._wrist_position = 0.0
 
         # ── Publishers ────────────────────────────────────────────────────────
         self._vel_pub = self.create_publisher(
             Float64MultiArray, "/group_vel_ff_controller/commands", 10)
         self._pos_pub = self.create_publisher(
             Float64MultiArray, "/group_pos_ff_controller/commands", 10)
+        if self._wrist_control_enabled:
+            self._wrist_pub = self.create_publisher(
+                Float64MultiArray, self._cfg["wrist_cmd_topic"], 10)
 
         # ── Subscribers ───────────────────────────────────────────────────────
         self._positions = [0.0] * FINGER_COUNT
@@ -108,14 +112,13 @@ class EmgGraspNode(Node):
         self.create_subscription(Float32, self._cfg["emg_confidence_topic"], self._on_confidence, 10)
 
         # ── State ─────────────────────────────────────────────────────────────
-        self._phase = Phase.IDLE
         self._step_idx = 0
         self._stop_reason = None
 
         # ── Timer ─────────────────────────────────────────────────────────────
         self._timer = self.create_timer(self._step_interval, self._control_loop)
 
-        self.get_logger().info("EMG Grasp Test node started — waiting in IDLE")
+        self.get_logger().info("EMG Grasp Test node started — waiting in moving mode")
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
 
@@ -175,10 +178,82 @@ class EmgGraspNode(Node):
             self._positions, self._efforts, self._stop_positions, self._force_thresholds
         )
 
-    def _gesture_held_long_enough(self) -> bool:
+    def _gesture_held_long_enough(self, hold_time_s: float) -> bool:
         if self._emg_gesture_start_time is None:
             return False
-        return (time.time() - self._emg_gesture_start_time) >= self._hold_timeout
+        return (time.time() - self._emg_gesture_start_time) >= hold_time_s
+
+    def _dispatch_gesture(self) -> Tuple[Optional[str], Optional[Dict]]:
+        """Look up what function (if any) the current gesture maps to in current mode.
+
+        Returns (func_name, func_cfg) or (None, None).
+        """
+        mode_cfg = self._modes.get(self._mode, {})
+        for func_name, func_cfg in mode_cfg.items():
+            if func_cfg is None:
+                continue
+            gesture_id = func_cfg.get("gesture_id")
+            if gesture_id is None:
+                continue
+            if self._emg_gesture == int(gesture_id):
+                conf_thresh = func_cfg.get("confidence_threshold")
+                if conf_thresh is None:
+                    continue
+                if self._emg_confidence >= float(conf_thresh):
+                    return func_name, func_cfg
+        return None, None
+
+    def _execute_continuous(self, func_name: str, func_cfg: Dict):
+        """Fire-while-held continuous actions."""
+        if func_name in ("wrist_pos", "wrist_neg"):
+            if not self._wrist_control_enabled:
+                return
+            dt = self._step_interval
+            vel = float(func_cfg["velocity"])
+            self._wrist_position += vel * dt
+            msg = Float64MultiArray()
+            msg.data = [self._wrist_position, self._wrist_accel]
+            self._wrist_pub.publish(msg)
+        elif func_name in ("force_inc", "force_dec"):
+            vel = float(func_cfg["velocity"])
+            self._publish_velocity(vel)
+
+    def _stop_continuous_action(self):
+        """Stop any active continuous motion."""
+        self._publish_velocity(0.0)
+
+    def _update_grasping(self):
+        """Velocity ramp closure and auto-transition to holding on contact."""
+        if self._step_idx < len(self._ramp):
+            vel = self._ramp[self._step_idx]
+            self._publish_velocity(vel)
+            self._step_idx += 1
+        else:
+            # Post-ramp: continue at v_end
+            self._publish_velocity(self._v_end)
+
+        self._stop_reason = self._check_stop_conditions()
+        if self._stop_reason:
+            self.get_logger().info(f"Contact detected: {self._stop_reason}")
+            self._publish_velocity(0.0)
+            self._mode = MODE_HOLDING
+
+    def _transition_to_grasping(self):
+        """One-shot: start grasp closure, enter grasping mode."""
+        self.get_logger().info("EMG grasp triggered — entering grasping")
+        self._mode = MODE_GRASPING
+        self._step_idx = 0
+        self._stop_reason = None
+        # Ensure position controller is active before we start (hand is open)
+        self._publish_position(0.0)
+
+    def _transition_to_moving(self):
+        """One-shot: open hand and return to moving mode."""
+        self.get_logger().info("EMG release — entering moving")
+        self._publish_velocity(0.0)
+        time.sleep(0.2)
+        self._publish_position(0.0)
+        self._mode = MODE_MOVING
 
     # ── Control loop ──────────────────────────────────────────────────────────
 
@@ -187,65 +262,49 @@ class EmgGraspNode(Node):
             self.get_logger().warn("No joint states yet — skipping cycle")
             return
 
-        # ---- IDLE: waiting for grasp trigger ----
-        if self._phase == Phase.IDLE:
-            if (self._emg_gesture == self._grasp_gesture
-                    and self._emg_confidence >= self._confidence_thresh
-                    and self._gesture_held_long_enough()):
-                self.get_logger().info("EMG grasp triggered — entering CLOSING")
-                self._phase = Phase.CLOSING
-                self._step_idx = 0
-                self._stop_reason = None
-                # Ensure position controller is active before we start (hand is open)
-                self._publish_position(0.0)
-            return
+        # ---- GRASPING: velocity ramp with optional wrist control ----
+        if self._mode == MODE_GRASPING:
+            self._update_grasping()
 
-        # ---- CLOSING: velocity ramp ----
-        if self._phase == Phase.CLOSING:
-            if self._step_idx < len(self._ramp):
-                vel = self._ramp[self._step_idx]
-                self._publish_velocity(vel)
-                self._step_idx += 1
+            # If we auto-transitioned to holding, don't check gestures this cycle
+            if self._mode == MODE_HOLDING:
+                self._stop_continuous_action()
+                return
+
+            # Check for release gesture or wrist control
+            func_name, func_cfg = self._dispatch_gesture()
+            if func_name == "grasp_release":
+                if self._gesture_held_long_enough(float(func_cfg["hold_time_s"])):
+                    self._transition_to_moving()
+                else:
+                    self._stop_continuous_action()
+            elif func_name in ("wrist_pos", "wrist_neg"):
+                if self._gesture_held_long_enough(float(func_cfg["hold_time_s"])):
+                    self._execute_continuous(func_name, func_cfg)
+                else:
+                    self._stop_continuous_action()
             else:
-                # Post-ramp: continue at v_end
-                self._publish_velocity(self._v_end)
-
-            self._stop_reason = self._check_stop_conditions()
-            if self._stop_reason:
-                self.get_logger().info(f"Contact detected: {self._stop_reason}")
-                self._publish_velocity(0.0)
-                self._phase = Phase.HOLDING
-
-            # EMG release gesture cancels closing
-            if (self._emg_gesture == self._release_gesture
-                    and self._emg_confidence >= self._confidence_thresh):
-                self.get_logger().info("EMG release during CLOSING")
-                self._publish_velocity(0.0)
-                self._phase = Phase.RELEASING
+                self._stop_continuous_action()
             return
 
-        # ---- HOLDING: maintain grasp, wait for release ----
-        if self._phase == Phase.HOLDING:
-            if (self._emg_gesture == self._release_gesture
-                    and self._emg_confidence >= self._confidence_thresh
-                    and self._gesture_held_long_enough()):
-                self.get_logger().info("EMG release triggered — entering RELEASING")
-                self._phase = Phase.RELEASING
+        # ---- MOVING and HOLDING: gesture dispatch ----
+        func_name, func_cfg = self._dispatch_gesture()
+
+        if func_name is None:
+            self._stop_continuous_action()
             return
 
-        # ---- RELEASING: open hand ----
-        if self._phase == Phase.RELEASING:
-            self._publish_velocity(0.0)
-            time.sleep(0.2)
-            self._publish_position(0.0)
-            self.get_logger().info("Hand released — returning to IDLE")
-            self._phase = Phase.IDLE
+        if not self._gesture_held_long_enough(float(func_cfg["hold_time_s"])):
+            self._stop_continuous_action()
             return
 
-        # ---- FAULT: safety stop ----
-        if self._phase == Phase.FAULT:
-            self._publish_velocity(0.0)
-            return
+        # Execute based on function type
+        if func_name in ("wrist_pos", "wrist_neg", "force_inc", "force_dec"):
+            self._execute_continuous(func_name, func_cfg)
+        elif func_name == "grasp_activate":
+            self._transition_to_grasping()
+        elif func_name == "grasp_release":
+            self._transition_to_moving()
 
 
 def main(args=None):
