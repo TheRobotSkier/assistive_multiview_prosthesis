@@ -1,0 +1,19 @@
+src/prosthesis_launch/launch/emg_volitional_test.launch.py
+  s_0af034efac2d2c::t_582d56e8b8c2ff 1-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "eb314b050e90ebc9006e83d53b2114bf8a30a141",
+  "prompts": {},
+  "sessions": {
+    "s_0af034efac2d2c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4171f07ffe25sD7FDzyDU2Vu",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
