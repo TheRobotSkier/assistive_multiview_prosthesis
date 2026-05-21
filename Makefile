@@ -133,13 +133,14 @@ rviz-static:
 	podman run --rm -d --name rviz-robotlab \
 		--network host \
 		--ipc host \
-		--device /dev/dri \
 		--userns=keep-id \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
+		-e NVIDIA_VISIBLE_DEVICES=all \
+		-e NVIDIA_DRIVER_CAPABILITIES=all \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/robotlab_cameras_static_tf.rviz:/rviz_config.rviz:ro \
@@ -251,13 +252,14 @@ rviz-openvins:
 	podman run --rm -d --name rviz-openvins \
 		--network host \
 		--ipc host \
-		--device /dev/dri \
 		--userns=keep-id \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
+		-e NVIDIA_VISIBLE_DEVICES=all \
+		-e NVIDIA_DRIVER_CAPABILITIES=all \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/phase2_dual_openvins.rviz:/rviz_config.rviz:ro \
@@ -300,13 +302,14 @@ rviz-imu-test-single:
 	podman run --rm -d --name rviz-imu-test \
 		--network host \
 		--ipc host \
-		--device /dev/dri \
 		--userns=keep-id \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
+		-e NVIDIA_VISIBLE_DEVICES=all \
+		-e NVIDIA_DRIVER_CAPABILITIES=all \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/imu_test_single.rviz:/rviz_config.rviz:ro \
@@ -323,13 +326,14 @@ rviz-imu-test-dual:
 	podman run --rm -d --name rviz-imu-test \
 		--network host \
 		--ipc host \
-		--device /dev/dri \
 		--userns=keep-id \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
+		-e NVIDIA_VISIBLE_DEVICES=all \
+		-e NVIDIA_DRIVER_CAPABILITIES=all \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/imu_test_dual.rviz:/rviz_config.rviz:ro \

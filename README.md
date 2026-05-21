@@ -367,3 +367,28 @@ python3 -m pytest src/twist_propagation/test/test_twist_propagation.py -v
 ros2 launch prosthesis_launch twist_propagation_test.launch.py  # terminal 1
 python3 scripts/test_twist_propagation_integration.py            # terminal 2
 ```
+
+## Daniel Scratchpad
+
+### How to fix GPU rendering in WSL2
+
+The real fix is at the Windows/WSL2 level, not in your container config:
+
+1. Update your Windows GPU driver -- Download the latest NVIDIA driver for Windows from
+   nvidia.com (https://www.nvidia.com/drivers). Your current driver (580.97) may not be properly exposing D3D12/Vulkan to
+   WSL2.
+
+2. Update WSL2 -- Run this in PowerShell:
+   wsl --update
+   Then restart WSL: wsl --shutdown
+
+1. After the update, verify on the WSL2 host that ls /dev/dri/ shows renderD128 (or similar). If it does, GPU-accelerated
+   OpenGL will work automatically and the container will inherit it.
+
+2. If /dev/dri/ still doesn't appear after driver/WSL updates, you may need to add this to C:\Users\jonat\.wslconfig:
+   [wsl2]
+   networkingMode=mirrored
+   firewall=false
+   Then wsl --shutdown and relaunch. Some WSL2 builds require explicit GPU support to be enabled.
+
+Once /dev/dri/ exists on the host, I can add back --device /dev/dri to the Makefile targets and RViz will use GPU rendering through Mesa's d3d12 driver.

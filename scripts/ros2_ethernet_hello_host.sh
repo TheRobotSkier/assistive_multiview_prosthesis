@@ -79,14 +79,22 @@ container_cmd() {
     env_args+=(-e XAUTHORITY=/tmp/.Xauthority)
   fi
 
+  local nvidia_env_args=()
+  if [[ "${DOCKER_CMD[0]}" == podman ]] && [[ -x /usr/bin/nvidia-container-runtime ]]; then
+    runtime_args=(--runtime=/usr/bin/nvidia-container-runtime)
+    nvidia_env_args=(-e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all)
+  fi
+
   "${DOCKER_CMD[@]}" run --rm "${tty_args[@]}" \
     --name "$name" \
     --network host \
     --ipc host \
+    "${runtime_args[@]}" \
     "${env_args[@]}" \
     -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
     -e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
     -e ROS_DOMAIN_ID="$ROS_DOMAIN_ID_VALUE" \
+    "${nvidia_env_args[@]}" \
     -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
     "${volume_args[@]}" \
     "$IMAGE" \
