@@ -1,0 +1,41 @@
+tests/validate_multiclick_payload.py
+  s_6e20f4a316fa4a::t_396cd2101f8797 1-103
+config/prosthesis_config.yaml
+  s_6e20f4a316fa4a::t_87c0960873b457 393-398
+  s_6e20f4a316fa4a::t_f2f5a13b248755 198-206
+src/segmentation/segmentation_bridge/test/test_segmentation_coalescing.py
+  s_6e20f4a316fa4a::t_e32c644d27b0f4 1-160
+src/segmentation/segmentation_bridge/segmentation_ros2_node.py
+  s_6e20f4a316fa4a::t_5e53bd2621eed9 115,124-127,144-145
+  s_6e20f4a316fa4a::t_3be712be7d8e0d 178-191,201,212,218-220
+  s_6e20f4a316fa4a::t_2ee015bec34c55 242-246
+README.md
+  s_6e20f4a316fa4a::t_fe1841e4b69deb 331-359
+src/twist_propagation/twist_propagation/twist_propagation_node.py
+  s_6e20f4a316fa4a::t_18028e5faf2449 498-516
+  s_6e20f4a316fa4a::t_e123e204acca37 357-402
+  s_6e20f4a316fa4a::t_961f04cfcfd679 472-477
+  s_6e20f4a316fa4a::t_6c09be78180fe3 628-629
+  s_6e20f4a316fa4a::t_131099cc2ed938 1248-1255,1264-1280,1291-1294
+src/twist_propagation/test/test_twist_propagation.py
+  s_6e20f4a316fa4a::t_77b14920547e87 37
+  s_6e20f4a316fa4a::t_194e8543d0c6b9 432-484
+src/twist_propagation/config/twist_propagation.yaml
+  s_6e20f4a316fa4a::t_b1c70b52080cd6 59-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "b696dd90214d933fe8fb5039cc4b5baa15c3aabd",
+  "prompts": {},
+  "sessions": {
+    "s_6e20f4a316fa4a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5b8039dffex7ULmNi0WMv41w",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
