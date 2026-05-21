@@ -1,0 +1,32 @@
+Makefile
+  s_95c3bfa668897f::t_e50a6895caf3f4 57,73-75,361-389
+  s_084c3df962a75e::t_c00360e060983b 390
+docker/Dockerfile.segmentation
+  s_95c3bfa668897f::t_e50a6895caf3f4 3
+docker/docker-compose.yml
+  s_95c3bfa668897f::t_a4cdaa6f6a636e 117-124,142-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "7f9943decef0f6c2482696852d0098b5e1961a4b",
+  "prompts": {},
+  "sessions": {
+    "s_084c3df962a75e": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4f7e604ffeYEKyjW5BLpGjJF",
+        "model": "big-pickle"
+      },
+      "human_author": null
+    },
+    "s_95c3bfa668897f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4773878ffe9xE0CjDOxcM5KX",
+        "model": "kimi-k2.6"
+      },
+      "human_author": null
+    }
+  }
+}
