@@ -1,0 +1,5 @@
+# Live EMG tuning config — edit while pipeline is running; changes apply without restart.
+confidence_threshold: 0.55
+release_confidence_threshold: 0.25
+grasp_gestures: [1, 2, 4]  # POWER, PINCH, POINT
+release_gesture: 3          # OPEN

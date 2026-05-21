@@ -84,6 +84,10 @@ pipeline: ## Launch full hardware pipeline
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch pipeline.launch.py
 
+camera-test: ## Temp to test visual piline untill segmentation
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false
+
 digital-twin: ## Launch digital twin with real cameras
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=true

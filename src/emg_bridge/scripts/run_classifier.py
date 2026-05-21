@@ -146,10 +146,20 @@ def main() -> None:
 
     # ── Load models ───────────────────────────────────────────────────────────
     print(f"{_cyan('Loading classifier from')} {args.model_dir} …")
+    model_path = args.model_dir / "classifier.pkl"
+    if not model_path.exists():
+        print(_red(
+            f"Model file not found: {model_path}\n"
+            f"  Please train a model first:\n"
+            f"    ros2 run emg_bridge train --data-dir /app/data --model-dir {args.model_dir}\n"
+            f"  Or run collect_data to record training data:\n"
+            f"    ros2 run emg_bridge collect_data --output-dir /app/data"
+        ))
+        sys.exit(1)
     try:
         pipe = clf_mod.load(args.model_dir)
-    except FileNotFoundError as e:
-        print(_red(str(e)))
+    except Exception as e:
+        print(_red(f"Failed to load classifier from {args.model_dir}: {e}"))
         sys.exit(1)
 
     calibration = prop_mod.load(args.model_dir)

@@ -135,11 +135,13 @@ def _launch_setup(context, *args, **kwargs):
         )
 
     if _as_bool(context, "emg"):
+        model_dir = LaunchConfiguration("model_dir").perform(context)
         nodes.append(
             Node(
                 package="emg_bridge",
                 executable="run_classifier",
                 name="emg_bridge",
+                arguments=["--model-dir", model_dir],
                 output="screen",
             )
         )
@@ -367,6 +369,11 @@ def generate_launch_description():
                 "inference_url",
                 default_value="http://127.0.0.1:5678",
                 description="Segmentation inference server URL.",
+            ),
+            DeclareLaunchArgument(
+                "model_dir",
+                default_value="/app/models",
+                description="Directory containing trained EMG classifier models.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]

@@ -142,18 +142,21 @@ pointcloud_fusion:
         enable_downsampling: true
         enable_distance_filter: true
         enable_hand_removal: true
+        cloud_max_age_s: 1.5
 
 openvins_realsense_tf_bridge:
     ros__parameters:
         camera_names: ["head", "arm"]
         parent_frames: ["head_cam0", "arm_cam0"]
         link_frames: ["head_d435i_head_link", "arm_d435i_arm_link"]
-        # These marker/OpenVINS frames represent camera body/link poses in marker_map.
-        # The bridge republishes them under the real RealSense link frame names.
+        # The color_optical_frame is derived from the link_frame name.
+        # Since OpenVINS uses the RealSense color camera as its tracking camera,
+        # cam0 == color_optical_frame. The bridge edge cam0->link is just the
+        # RealSense static extrinsic T(color_optical -> link).
         anchor_frames:
             [
-                "head_d435i_head_color_optical_frame_body_display",
-                "arm_d435i_arm_color_optical_frame_body_display",
+                "head_d435i_head_color_optical_frame",
+                "arm_d435i_arm_color_optical_frame",
             ]
         anchor_frame_modes: ["link", "link"]
         fallback_optical_frames:
@@ -161,9 +164,7 @@ openvins_realsense_tf_bridge:
                 "head_d435i_head_depth_optical_frame",
                 "arm_d435i_arm_depth_optical_frame",
             ]
-        publish_rate_hz: 15.0
-        tf_lookup_timeout_s: 0.05
-        fallback_to_optical_assumption: true
+        publish_rate_hz: 2.0
         publish_nominal_static_chain: true
 
 twist_propagation:
@@ -270,8 +271,8 @@ camera_tf_bridge:
     link_frames: ["head_d435i_head_link", "arm_d435i_arm_link"]
     anchor_frames:
         [
-            "head_d435i_head_color_optical_frame_body_display",
-            "arm_d435i_arm_color_optical_frame_body_display",
+            "head_d435i_head_color_optical_frame_from_marker",
+            "arm_d435i_arm_color_optical_frame_from_marker",
         ]
     fallback_optical_frames:
         [

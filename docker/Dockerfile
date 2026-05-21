@@ -29,7 +29,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Python dependencies ──────────────────────────────────────────────────────
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
         dynamixel-sdk \
-        requests
+        requests \
+        scikit-learn \
+        mindrove
 
 # ── User setup ───────────────────────────────────────────────────────────────
 # The osrf/ros:jazzy-desktop image already has a 'ubuntu' user with UID 1000.
@@ -94,10 +96,14 @@ USER prosthesis
 
 CMD ["/bin/bash"]
 
-# ── Production stage: full build (used by test service) ──────────────────────
+# ── Production stage: copies source for test service ────────────────────────
+# colcon build is NOT run here — it happens at runtime inside the container
+# where userns/keep-id gives the prosthesis user correct write permissions.
 FROM base AS production
 
-# Copy everything — colcon will only build packages in src/
+USER root
+
+# Copy everything — test service will build at runtime
 COPY src/ src/
 COPY config/ config/
 COPY rviz/ rviz/
@@ -105,8 +111,5 @@ COPY scripts/ scripts/
 COPY tests/ tests/
 
 RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
-RUN chown -R ${USER_UID}:${USER_GID} tests/
 
-# Build all packages
-RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+USER prosthesis

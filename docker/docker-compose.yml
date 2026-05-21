@@ -55,9 +55,10 @@ services:
             - prosthesis-build:/prosthesis_ws/build
             - prosthesis-install:/prosthesis_ws/install
             - prosthesis-log:/prosthesis_ws/log
+        privileged: true # LINUX ONLY
+        ipc: host       # Share /dev/shm for RViz Qt GPU rendering
         stdin_open: true
         tty: true
-        privileged: true # LINUX ONLY
 
     # ── Segmentation inference server (Python 3.8 + MinkowskiEngine) ────────
     segmentation:
@@ -88,7 +89,7 @@ services:
                           count: all
                           capabilities: [gpu]
 
-    # ── Test runner: uses production image, runs smoke tests, exits ─────────
+    # ── Test runner: uses production image, builds + runs smoke tests, exits ────
     test:
         container_name: test
         build:
@@ -98,12 +99,13 @@ services:
             args:
                 USER_UID: ${USER_UID:-1000}
                 USER_GID: ${USER_GID:-1000}
-        user: "0:0"
+        user: ${USER_UID:-1000}:${USER_GID:-1000}
+        userns_mode: "keep-id"
         environment:
             - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
             - ROS_DOMAIN_ID=0
             - GRASP_CONFIG_PATH=/prosthesis_ws/config/grasp_preshaping.yaml
-        command: ["/bin/bash", "/prosthesis_ws/scripts/run_tests.sh"]
+        command: ["/bin/bash", "-c", ". /opt/ros/jazzy/setup.sh && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && /prosthesis_ws/scripts/run_tests.sh"]
         profiles:
             - test
         network_mode: host
