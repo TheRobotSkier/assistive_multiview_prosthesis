@@ -1,0 +1,21 @@
+src/prosthesis_launch/launch/emg_grasp_test.launch.py
+  s_5054ac321a0cb7::t_fc46a93b8515a0 1-17,19,21-80,94-105
+  s_5054ac321a0cb7::t_e74389e3b5e13f 18,20
+  s_5054ac321a0cb7::t_a7022cb83a689a 81-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "f13776be36f9b64f87c051132998dc5c516b660b",
+  "prompts": {},
+  "sessions": {
+    "s_5054ac321a0cb7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4458b21ffeaDbJCHSwBZIAdH",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
