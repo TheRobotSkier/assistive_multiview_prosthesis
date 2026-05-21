@@ -397,3 +397,12 @@ twist_propagation:
     # (fingertips), expressed in the pose's local frame.
     # Computed from camera_mounts.yaml for 8_cm_cam_mount.
     propagation_origin_offset: [0.1543, -0.1485, 0.1352]
+
+    # ── Multi-click segmentation seeding ────────────────────────────────────
+    # Number of synthetic positive clicks to publish around each collision hit.
+    # Total clicks sent = 1 (original hit) + click_count (synthetic).
+    # click_count=0 preserves the original single-click behavior.
+    click_count: 4
+    click_radius_m: 0.03
+    click_min_radius_m: 0.005
+    click_random_seed: 42

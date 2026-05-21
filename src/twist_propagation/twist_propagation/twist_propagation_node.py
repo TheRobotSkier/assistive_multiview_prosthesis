@@ -339,6 +339,52 @@ def _should_retarget(
     return False, False
 
 
+def _sample_spherical_shell_clicks(
+    centre: tuple[float, float, float],
+    r_min: float,
+    r_max: float,
+    count: int,
+    rng: np.random.Generator,
+) -> list[tuple[float, float, float]]:
+    """Sample N points uniformly from a spherical shell [r_min, r_max].
+
+    Directions are sampled uniformly on the sphere. Radii are sampled
+    uniformly by volume within the shell (i.e. P(r) ~ r^2, so we sample
+    u ~ Uniform(0,1) and r = (u*r_max^3 + (1-u)*r_min^3)^(1/3)).
+
+    Returns a list of (x, y, z) points in the same frame as centre.
+    """
+    if count <= 0 or r_max <= r_min:
+        return []
+
+    cx, cy, cz = centre
+    # Sample directions uniformly on the sphere
+    # Method: sample u,v ~ Uniform, then spherical coordinates
+    # theta = arccos(2*v - 1), phi = 2*pi*u
+    u = rng.random(count)
+    v = rng.random(count)
+    theta = np.arccos(2.0 * v - 1.0)  # polar angle from z-axis
+    phi = 2.0 * np.pi * u              # azimuthal angle
+
+    # Sample radii uniformly by volume in [r_min, r_max]
+    # P(r) ~ r^2  =>  CDF: F(r) = (r^3 - r_min^3) / (r_max^3 - r_min^3)
+    # Inverse: r = (r_min^3 + u*(r_max^3 - r_min^3))^(1/3)
+    w = rng.random(count)
+    r_min3 = r_min ** 3
+    r_max3 = r_max ** 3
+    radii = np.cbrt(r_min3 + w * (r_max3 - r_min3))
+
+    # Convert to Cartesian offsets
+    dx = radii * np.sin(theta) * np.cos(phi)
+    dy = radii * np.sin(theta) * np.sin(phi)
+    dz = radii * np.cos(theta)
+
+    points = []
+    for i in range(count):
+        points.append((float(cx + dx[i]), float(cy + dy[i]), float(cz + dz[i])))
+    return points
+
+
 # ---------------------------------------------------------------------------
 # Internal state enum
 # ---------------------------------------------------------------------------
@@ -413,6 +459,12 @@ class TwistPropagationNode(Node):
         # position before propagation.
         self.declare_parameter("propagation_origin_offset", [0.0, 0.0, 0.0])
 
+        # Multi-click segmentation seeding
+        self.declare_parameter("click_count", 0)
+        self.declare_parameter("click_radius_m", 0.03)
+        self.declare_parameter("click_min_radius_m", 0.005)
+        self.declare_parameter("click_random_seed", 42)
+
         # ── Read parameters ────────────────────────────────────────────────
         self._cycle_delay = self.get_parameter("cycle_delay_s").value
         self._horizon = self.get_parameter("propagation_time_horizon_s").value
@@ -439,6 +491,25 @@ class TwistPropagationNode(Node):
             self.get_logger().info(
                 f"Propagation origin offset: {self._propagation_offset} "
                 f"(shifts start point in pose local frame)"
+            )
+
+        # Multi-click seeding parameters
+        self._click_count = int(self.get_parameter("click_count").value)
+        self._click_radius = float(self.get_parameter("click_radius_m").value)
+        self._click_min_radius = float(self.get_parameter("click_min_radius_m").value)
+        self._click_random_seed = int(self.get_parameter("click_random_seed").value)
+
+        # Validation
+        if self._click_count < 0:
+            raise ValueError(f"click_count must be >= 0, got {self._click_count}")
+        if self._click_radius < 0:
+            raise ValueError(f"click_radius_m must be >= 0, got {self._click_radius}")
+        if self._click_min_radius < 0:
+            raise ValueError(f"click_min_radius_m must be >= 0, got {self._click_min_radius}")
+        if self._click_count > 0 and self._click_min_radius >= self._click_radius:
+            raise ValueError(
+                f"click_min_radius_m ({self._click_min_radius}) must be < click_radius_m "
+                f"({self._click_radius}) when click_count > 0"
             )
 
         # Effective collision threshold: hit_threshold + collision_radius
@@ -558,7 +629,8 @@ class TwistPropagationNode(Node):
             f"horizon={self._horizon}s, dt={self._dt}s, "
             f"hit_thresh={self._hit_thresh}m, "
             f"collision_radius={self._collision_radius}m, "
-            f"effective_thresh={self._effective_hit_thresh}m"
+            f"effective_thresh={self._effective_hit_thresh}m, "
+            f"multi_click={self._click_count} (r={self._click_radius}m, r_min={self._click_min_radius}m)"
         )
 
     # ── Service callbacks ──────────────────────────────────────────────────
@@ -1191,7 +1263,14 @@ class TwistPropagationNode(Node):
                 # Publish hit marker
                 self._publish_hit_marker(hit_x, hit_y, hit_z)
 
-                # Publish click to trigger segmentation
+                # Publish click cluster (original hit + synthetic clicks)
+                rng = np.random.default_rng(self._click_random_seed)
+                synthetic = _sample_spherical_shell_clicks(
+                    hit, self._click_min_radius, self._click_radius, self._click_count, rng
+                )
+                total_clicks = 1 + len(synthetic)
+
+                # Publish original hit first
                 click = PointStamped()
                 click.header.stamp = self.get_clock().now().to_msg()
                 click.header.frame_id = self._cloud_frame
@@ -1199,6 +1278,23 @@ class TwistPropagationNode(Node):
                 click.point.y = hit_y
                 click.point.z = hit_z
                 self._click_pub.publish(click)
+
+                # Publish synthetic clicks
+                for sx, sy, sz in synthetic:
+                    sclick = PointStamped()
+                    sclick.header.stamp = self.get_clock().now().to_msg()
+                    sclick.header.frame_id = self._cloud_frame
+                    sclick.point.x = sx
+                    sclick.point.y = sy
+                    sclick.point.z = sz
+                    self._click_pub.publish(sclick)
+
+                self.get_logger().info(
+                    f"Published click cluster: {total_clicks} clicks "
+                    f"(1 original + {len(synthetic)} synthetic) around hit "
+                    f"({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}), "
+                    f"r=[{self._click_min_radius:.4f}, {self._click_radius:.4f}]m"
+                )
 
                 # Update current target and transition
                 self._current_segmentation_target = hit
@@ -1210,6 +1306,10 @@ class TwistPropagationNode(Node):
                     hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
                     num_predicted_poses=len(positions),
                     reset_before_click=publish_reset,
+                    total_positive_clicks=total_clicks,
+                    click_count=self._click_count,
+                    click_radius_m=self._click_radius,
+                    click_min_radius_m=self._click_min_radius,
                 )
         else:
             # No hit -- publish status with twist info

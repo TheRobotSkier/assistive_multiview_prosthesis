@@ -112,6 +112,7 @@ class SegmentationNode(Node):
 
         self.declare_parameter("cubeedge", 0.05)
         self.declare_parameter("inference_url", "http://127.0.0.1:5678")
+        self.declare_parameter("click_batch_debounce_s", 0.02)
 
         self._lock = threading.Lock()
         self._cloud_xyz: np.ndarray | None = None
@@ -119,6 +120,10 @@ class SegmentationNode(Node):
         self._cloud_header = None
         self._pos_clicks: list[list[float]] = []
         self._neg_clicks: list[list[float]] = []
+
+        # Debounce state for click batching
+        self._debounce_s = float(self.get_parameter("click_batch_debounce_s").value)
+        self._debounce_timer = None
 
         # TF2 listener — used to transform incoming clicks to the cloud frame
         self._tf_buffer = Buffer()
@@ -136,14 +141,15 @@ class SegmentationNode(Node):
         self._pub = self.create_publisher(
             PointCloud2, "/segmentation/object_cloud", 10)
 
-        self.get_logger().info("Segmentation node ready.")
+        self.get_logger().info(
+            f"Segmentation node ready. click_batch_debounce_s={self._debounce_s}s")
 
     # --- helpers ------------------------------------------------------------
 
     def _transform_click_to_cloud_frame(self, msg: PointStamped) -> list[float]:
         """Return [x, y, z] of msg transformed into the current cloud frame.
 
-        Falls back to the raw coordinates if TF lookup fails or no cloud yet.
+        Raises RuntimeError if TF lookup fails — callers must catch and handle.
         """
         with self._lock:
             cloud_frame = self._cloud_header.frame_id if self._cloud_header else None
@@ -155,10 +161,9 @@ class SegmentationNode(Node):
             transformed = self._tf_buffer.transform(msg, cloud_frame, timeout=rclpy.duration.Duration(seconds=0.5))
             return [transformed.point.x, transformed.point.y, transformed.point.z]
         except Exception as exc:
-            self.get_logger().warn(
-                f"TF transform from '{msg.header.frame_id}' to '{cloud_frame}' failed: {exc}. "
-                "Using raw click coordinates.")
-            return [msg.point.x, msg.point.y, msg.point.z]
+            raise RuntimeError(
+                f"TF transform from '{msg.header.frame_id}' to '{cloud_frame}' failed: {exc}"
+            ) from exc
 
     # --- subscribers --------------------------------------------------------
 
@@ -170,24 +175,49 @@ class SegmentationNode(Node):
             self._cloud_rgb = rgb
             self._cloud_header = msg.header
 
+    def _schedule_inference(self):
+        """(Re)start the debounce timer; inference runs once after the delay."""
+        if self._debounce_timer is not None:
+            self._debounce_timer.cancel()
+        self._debounce_timer = self.create_timer(
+            self._debounce_s, self._on_debounce_expired)
+
+    def _on_debounce_expired(self):
+        """Timer callback: run inference with accumulated clicks."""
+        if self._debounce_timer is not None:
+            self._debounce_timer.cancel()
+            self._debounce_timer = None
+        threading.Thread(target=self._run_inference, daemon=True).start()
+
     def _pos_click_cb(self, msg: PointStamped):
-        pt = self._transform_click_to_cloud_frame(msg)
+        try:
+            pt = self._transform_click_to_cloud_frame(msg)
+        except RuntimeError as exc:
+            self.get_logger().error(f"Positive click rejected: {exc}")
+            return
         with self._lock:
             self._pos_clicks.append(pt)
         self.get_logger().info(f"[+] positive click at ({pt[0]:.3f}, {pt[1]:.3f}, {pt[2]:.3f}) (cloud frame)")
-        threading.Thread(target=self._run_inference, daemon=True).start()
+        self._schedule_inference()
 
     def _neg_click_cb(self, msg: PointStamped):
-        pt = self._transform_click_to_cloud_frame(msg)
+        try:
+            pt = self._transform_click_to_cloud_frame(msg)
+        except RuntimeError as exc:
+            self.get_logger().error(f"Negative click rejected: {exc}")
+            return
         with self._lock:
             self._neg_clicks.append(pt)
         self.get_logger().info(f"[-] negative click at ({pt[0]:.3f}, {pt[1]:.3f}, {pt[2]:.3f}) (cloud frame)")
-        threading.Thread(target=self._run_inference, daemon=True).start()
+        self._schedule_inference()
 
     def _reset_cb(self, _msg):
         with self._lock:
             self._pos_clicks.clear()
             self._neg_clicks.clear()
+            if self._debounce_timer is not None:
+                self._debounce_timer.cancel()
+                self._debounce_timer = None
             header = self._cloud_header
         self.get_logger().info("Clicks reset.")
         # Publish an empty cloud to clear the RViz2 display
@@ -208,6 +238,11 @@ class SegmentationNode(Node):
             header = self._cloud_header
             pos_clicks = list(self._pos_clicks)
             neg_clicks = list(self._neg_clicks)
+
+        self.get_logger().info(
+            f"Running inference with {len(pos_clicks)} positive, "
+            f"{len(neg_clicks)} negative clicks"
+        )
 
         cubeedge = self.get_parameter("cubeedge").value
         url = self.get_parameter("inference_url").value

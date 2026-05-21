@@ -63,3 +63,12 @@ twist_propagation:
     # contact point (fingertips).  Rotated by the pose orientation before
     # being applied.  Set to [0, 0, 0] for no offset.
     propagation_origin_offset: [0.0, 0.0, 0.0]
+
+    # ── Multi-click segmentation seeding ───────────────────────────────────
+    # Number of additional synthetic clicks around each collision hit.
+    # Total clicks = 1 (original hit) + click_count (synthetic).
+    # click_count=0 preserves the original single-click behavior.
+    click_count: 0
+    click_radius_m: 0.03
+    click_min_radius_m: 0.005
+    click_random_seed: 42
