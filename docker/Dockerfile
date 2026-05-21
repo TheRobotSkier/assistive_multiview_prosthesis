@@ -29,7 +29,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Python dependencies ──────────────────────────────────────────────────────
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
         dynamixel-sdk \
-        requests
+        requests \
+        scikit-learn \
+        mindrove
 
 # ── User setup ───────────────────────────────────────────────────────────────
 # The osrf/ros:jazzy-desktop image already has a 'ubuntu' user with UID 1000.
