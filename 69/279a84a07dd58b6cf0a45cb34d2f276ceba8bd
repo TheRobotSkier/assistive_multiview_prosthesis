@@ -1,0 +1,22 @@
+docker/docker-compose.yml
+  s_0af034efac2d2c::t_1b734b6b80364c 187-208
+Makefile
+  s_0af034efac2d2c::t_d546fd4e39923a 507-537
+  s_0af034efac2d2c::t_4e4a0fde8a0ba2 57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "69279a84a07dd58b6cf0a45cb34d2f276ceba8bd",
+  "prompts": {},
+  "sessions": {
+    "s_0af034efac2d2c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4171f07ffe25sD7FDzyDU2Vu",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
