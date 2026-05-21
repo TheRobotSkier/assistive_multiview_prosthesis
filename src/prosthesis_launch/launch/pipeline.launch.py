@@ -83,6 +83,16 @@ def _launch_setup(context, *args, **kwargs):
     haptic_bt_addr = LaunchConfiguration("haptic_bt_addr1").perform(context)
     inference_url = LaunchConfiguration("inference_url").perform(context)
 
+    if (
+        mia_serial_port == wrist_serial_port
+        and _as_bool(context, "mia_hand")
+        and _as_bool(context, "wrist")
+    ):
+        raise RuntimeError(
+            f"Mia hand and wrist serial ports must be distinct, got {mia_serial_port} for both. "
+            "Set MIA_SERIAL_PORT and WRIST_SERIAL_PORT to different devices."
+        )
+
     nodes = []
 
     # Pipeline Manager - state machine orchestrator

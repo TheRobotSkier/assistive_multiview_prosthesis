@@ -22,7 +22,8 @@ import time
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray
+from rclpy.qos import QoSProfile, DurabilityPolicy
+from std_msgs.msg import Bool, Float32MultiArray
 
 # ── Protocol constants ────────────────────────────────────────────────────────
 _BT_CHANNEL = 1
@@ -166,6 +167,15 @@ class HapticBridgeNode(Node):
         self.get_logger().info(f'Device address: {addr1}')
         self._dev1 = BtDevice(addr1, 'dev1', self.get_logger())
 
+        self._conn_status_pub = self.create_publisher(
+            Bool,
+            '/haptic_band/connection_status',
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL),
+        )
+        self._prev_connected = self._dev1.is_connected()
+        self._publish_conn_status(self._prev_connected)
+        self.create_timer(0.1, self._check_and_publish_conn_status)
+
         self._sub = self.create_subscription(
             Float32MultiArray,
             '/haptic_band/motors',
@@ -178,6 +188,20 @@ class HapticBridgeNode(Node):
         )
 
     # ------------------------------------------------------------------
+    def _publish_conn_status(self, connected: bool) -> None:
+        msg = Bool()
+        msg.data = connected
+        self._conn_status_pub.publish(msg)
+        self.get_logger().info(
+            f'Haptic connection status: {"connected" if connected else "disconnected"}'
+        )
+
+    def _check_and_publish_conn_status(self) -> None:
+        connected = self._dev1.is_connected()
+        if connected != self._prev_connected:
+            self._prev_connected = connected
+            self._publish_conn_status(connected)
+
     def _on_motors(self, msg: Float32MultiArray):
         data = msg.data
         if len(data) != _NUM_MOTORS:
