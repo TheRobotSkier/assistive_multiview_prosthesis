@@ -328,6 +328,35 @@ The twist propagation node predicts the hand's future trajectory from a stream o
 5. On collision: publishes a click point (`/segmentation/click_positive`), waits for a segmented cloud, then calls the grasp preshaping service
 6. Publishes the estimated twist, predicted path, collision spheres, and hit markers for RViz visualization
 
+### Multi-Click Segmentation Seeding
+
+When `twist_propagation` detects a collision hit, it can publish multiple positive clicks around the hit point to improve segmentation robustness. This is useful when a single click might land on a noisy or ambiguous surface.
+
+**Behavior:**
+- `click_count=0` (default): preserves original single-click behavior — one click at the exact collision hit
+- `click_count=N`: publishes 1 original hit + N synthetic clicks sampled uniformly from a spherical shell around the hit
+- The segmentation bridge coalesces rapid clicks into a single inference request, so the cluster is processed as one unit
+
+**Configuration** (in `config/prosthesis_config.yaml` under `twist_propagation`):
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `click_count` | int | 0 | Number of additional synthetic clicks (total = 1 + click_count) |
+| `click_radius_m` | float | 0.03 | Outer radius of the spherical shell (metres) |
+| `click_min_radius_m` | float | 0.005 | Inner radius of the spherical shell (metres) |
+| `click_random_seed` | int | 42 | Seed for deterministic sampling (useful for tests) |
+
+**Recommended starting values for lab tests:**
+```yaml
+click_count: 4
+click_radius_m: 0.03
+click_min_radius_m: 0.005
+```
+
+This produces 5 total clicks: 1 at the hit + 4 around it within a 5–30 mm shell.
+
+**Validation:** Check `/twist_propagation/status` JSON or logs for `total_positive_clicks` and `click_count` fields after a hit.
+
 ### Launch commands
 
 ```bash

@@ -34,6 +34,7 @@ from twist_propagation_node import (  # noqa: E402
     _build_initial_covariance_from_pose_buf,
     _is_odom_initialized,
     _should_retarget,
+    _sample_spherical_shell_clicks,
 )
 
 
@@ -428,3 +429,56 @@ class TestShouldRetarget:
         publish_click, publish_reset = _should_retarget(hit, current, 0.10)
         assert publish_click is False
         assert publish_reset is False
+
+
+# -- Spherical-shell click sampler tests --
+
+class TestSphericalShellSampler:
+
+    def test_zero_count_returns_empty(self):
+        rng = np.random.default_rng(42)
+        result = _sample_spherical_shell_clicks((1.0, 2.0, 3.0), 0.01, 0.03, 0, rng)
+        assert result == []
+
+    def test_negative_count_returns_empty(self):
+        rng = np.random.default_rng(42)
+        result = _sample_spherical_shell_clicks((1.0, 2.0, 3.0), 0.01, 0.03, -1, rng)
+        assert result == []
+
+    def test_equal_radii_returns_empty(self):
+        rng = np.random.default_rng(42)
+        result = _sample_spherical_shell_clicks((1.0, 2.0, 3.0), 0.02, 0.02, 5, rng)
+        assert result == []
+
+    def test_returns_exactly_count_points(self):
+        rng = np.random.default_rng(42)
+        result = _sample_spherical_shell_clicks((0.0, 0.0, 0.0), 0.01, 0.05, 10, rng)
+        assert len(result) == 10
+
+    def test_all_points_inside_shell(self):
+        centre = (1.0, 2.0, 3.0)
+        r_min, r_max = 0.01, 0.03
+        count = 50
+        rng = np.random.default_rng(42)
+        result = _sample_spherical_shell_clicks(centre, r_min, r_max, count, rng)
+        for pt in result:
+            dist = math.sqrt(sum((c - p) ** 2 for c, p in zip(centre, pt)))
+            assert r_min - 1e-9 <= dist <= r_max + 1e-9
+
+    def test_deterministic_with_same_seed(self):
+        centre = (0.0, 0.0, 0.0)
+        r_min, r_max = 0.01, 0.03
+        count = 5
+        rng1 = np.random.default_rng(123)
+        rng2 = np.random.default_rng(123)
+        result1 = _sample_spherical_shell_clicks(centre, r_min, r_max, count, rng1)
+        result2 = _sample_spherical_shell_clicks(centre, r_min, r_max, count, rng2)
+        assert result1 == result2
+
+    def test_original_hit_preserved_as_centre(self):
+        # The centre itself is not in the returned list; only offsets are.
+        centre = (5.0, 6.0, 7.0)
+        rng = np.random.default_rng(42)
+        result = _sample_spherical_shell_clicks(centre, 0.01, 0.05, 3, rng)
+        for pt in result:
+            assert pt != centre
