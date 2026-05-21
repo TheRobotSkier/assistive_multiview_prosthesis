@@ -62,3 +62,6 @@ backup/
 
 # Force logs
 tests/test2_hw_force_controller/results/
+
+# Worktrees
+.worktrees/
