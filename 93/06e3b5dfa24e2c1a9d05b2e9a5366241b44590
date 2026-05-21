@@ -1,0 +1,21 @@
+tests/emg_volitional/README.md
+  s_5054ac321a0cb7::t_a22426c3db7edc 1-45
+tests/emg_volitional/test_volitional_contract.py
+  s_5054ac321a0cb7::t_9c624a753d3cfd 39-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "9306e3b5dfa24e2c1a9d05b2e9a5366241b44590",
+  "prompts": {},
+  "sessions": {
+    "s_5054ac321a0cb7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4458b21ffeaDbJCHSwBZIAdH",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
