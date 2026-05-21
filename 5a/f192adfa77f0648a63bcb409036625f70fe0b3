@@ -1,0 +1,19 @@
+tests/emg_grasp/emg_grasp_test.yaml
+  s_76b359966caa59::t_4eccfd18ace31a 1-12,14,32,37-38,40-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "5af192adfa77f0648a63bcb409036625f70fe0b3",
+  "prompts": {},
+  "sessions": {
+    "s_76b359966caa59": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4140226ffeaqH5YP95xm23zz",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
