@@ -1,0 +1,19 @@
+tests/emg_grasp/README.md
+  s_13c43a6064590d::t_cc5ceea36f21b9 28-127,133-134
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "1bef2191513f871e56bcd24902da95b91313e301",
+  "prompts": {},
+  "sessions": {
+    "s_13c43a6064590d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4090b6cffe3BYIt4uvzQs3YT",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
