@@ -143,6 +143,8 @@ pointcloud_fusion:
         enable_distance_filter: true
         enable_hand_removal: true
         cloud_max_age_s: 0.5
+        mounts_config_path: ""
+        active_mount: "8_cm_cam_mount"
 
 openvins_realsense_tf_bridge:
     ros__parameters:

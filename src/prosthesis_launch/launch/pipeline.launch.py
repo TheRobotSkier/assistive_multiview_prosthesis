@@ -26,7 +26,7 @@ import os
 
 import yaml
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -81,6 +81,8 @@ def _launch_setup(context, *args, **kwargs):
     wrist_serial_port = LaunchConfiguration("wrist_serial_port").perform(context)
     haptic_bt_addr = LaunchConfiguration("haptic_bt_addr1").perform(context)
     inference_url = LaunchConfiguration("inference_url").perform(context)
+    camera_mount = LaunchConfiguration("camera_mount").perform(context)
+    mounts_config = LaunchConfiguration("mounts_config").perform(context)
 
     nodes = []
 
@@ -171,6 +173,8 @@ def _launch_setup(context, *args, **kwargs):
                 "cam1_topic": cam1_topic,
                 "cam2_topic": cam2_topic,
                 "arm_frame": arm_frame,
+                "mounts_config_path": mounts_config,
+                "active_mount": camera_mount,
             }
         )
         camera_nodes = []
@@ -184,6 +188,33 @@ def _launch_setup(context, *args, **kwargs):
                     output="screen",
                 )
             )
+        # Publish camera mount TFs (palm_frame, bounding boxes, grasp contact)
+        # so the fusion node can look up pruning box frames.
+        if mounts_config:
+            mounts_script = os.path.join(
+                os.path.dirname(__file__), "..", "..", "..",
+                "src", "sensor_fusion_bringup", "scripts",
+                "publish_camera_mounts.py")
+            if not os.path.isfile(mounts_script):
+                # Installed layout
+                import ament_index_python
+                try:
+                    share = ament_index_python.get_package_share_directory(
+                        "sensor_fusion_bringup")
+                    mounts_script = os.path.join(
+                        share, "scripts", "publish_camera_mounts.py")
+                except Exception:
+                    mounts_script = ""
+            if mounts_script and os.path.isfile(mounts_script):
+                camera_nodes.append(
+                    ExecuteProcess(
+                        cmd=["python3", mounts_script,
+                             "--mount", camera_mount,
+                             "--config", mounts_config],
+                        name="camera_mount_tf_publisher",
+                        output="screen",
+                    )
+                )
         camera_nodes.extend(
             [
                 Node(
@@ -357,6 +388,16 @@ def generate_launch_description():
                 "arm_frame",
                 default_value="arm_d435i_arm_depth_frame",
                 description="Arm camera depth frame for hand/arm bbox removal.",
+            ),
+            DeclareLaunchArgument(
+                "camera_mount",
+                default_value="8_cm_cam_mount",
+                description="Camera mount name for publish_camera_mounts.py and pruning boxes.",
+            ),
+            DeclareLaunchArgument(
+                "mounts_config",
+                default_value="",
+                description="Path to camera_mounts.yaml (empty = skip mount TF publisher).",
             ),
             DeclareLaunchArgument(
                 "inference_url",

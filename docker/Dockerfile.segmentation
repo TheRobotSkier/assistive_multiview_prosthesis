@@ -1,20 +1,23 @@
 # Multi-capability Docker image for MinkowskiEngine + InterObject3D inference.
-# Isolated from the main ROS container — this runs Python 3.8 + PyTorch 1.12.
+# Isolated from the main ROS container — this runs Python 3.10 + PyTorch 1.13.
+# Supports CUDA acceleration when a GPU is available, falls back to CPU otherwise.
 # The ROS bridge node talks to this container over HTTP.
 #
 # Build args:
-#   BACKEND=cuda  → NVIDIA CUDA base image, PyTorch CUDA wheels, force CUDA ME build
+#   BACKEND=cuda  → PyTorch CUDA devel image (pre-installed), force CUDA ME build
 #   BACKEND=cpu   → Ubuntu 20.04 base image, PyTorch CPU wheels, CPU-only ME build
 #
 # Platform compatibility:
-#   CUDA backend: x86_64 Linux with NVIDIA driver >= 450.80.02, CUDA 11.8 compatible.
+#   CUDA backend: x86_64 Linux with NVIDIA driver >= 450.80.02, CUDA 11.6 compatible.
 #   Jetson/L4T is explicitly NOT supported by this CUDA image.
 #   CPU backend: any x86_64 or aarch64 Linux with standard container runtime.
 
 ARG BACKEND=cuda
 
 # ── Base image selection ────────────────────────────────────────────────────
-FROM docker.io/nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04 AS base-cuda
+# CUDA: official PyTorch image bundles PyTorch 1.13.1 + CUDA 11.6 + cuDNN 8 +
+#        Python 3.10, ninja, cmake, build-essential, numpy — all self-consistent.
+FROM docker.io/pytorch/pytorch:1.13.1-cuda11.6-cudnn8-devel AS base-cuda
 FROM docker.io/ubuntu:20.04 AS base-cpu
 
 # Select the correct base
@@ -22,15 +25,11 @@ FROM base-${BACKEND} AS build-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Build tools + Open3D headless runtime requirements + Python 3.8
+# Install packages not present in the pytorch base image.
+# The CUDA base already has: python3, pip, ninja, cmake, build-essential, git, numpy.
+# We only add Open3D headless runtime deps + openblas for MinkowskiEngine.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        python3.8 \
-        python3.8-dev \
-        python3-pip \
         git \
-        ninja-build \
-        cmake \
-        build-essential \
         libopenblas-dev \
         wget \
         libgl1 \
@@ -40,20 +39,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Make python3.8 the default python and pip
-RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1 \
-    && update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
+# CPU path: install Python 3.8 and build tools (ubuntu:20.04 base has none of these)
+# The CUDA base already has all of this, so this only runs for BACKEND=cpu.
+RUN if [ ! -x /usr/bin/python ]; then \
+        apt-get update && apt-get install -y --no-install-recommends \
+            python3.8 python3.8-dev python3-pip \
+            ninja-build cmake build-essential \
+        && rm -rf /var/lib/apt/lists/* \
+        && update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1 \
+        && update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1; \
+    fi
 
-# Pin numpy<2 before torch to avoid ABI mismatch with torch 1.12
-RUN pip install --no-cache-dir "numpy<2"
+# CPU path: pin numpy<2 before torch to avoid ABI mismatch with torch 1.12.
+# The CUDA base already has a compatible numpy from PyTorch 1.13.
+RUN if [ ! -x /usr/bin/nvidia-smi ]; then \
+        pip install --no-cache-dir "numpy<2"; \
+    fi
 
-# ── PyTorch installation (backend-specific) ─────────────────────────────────
-FROM build-base AS pytorch-cuda
-RUN pip install --no-cache-dir \
-        torch==1.12.1+cu116 \
-        torchvision==0.13.1+cu116 \
-        -f https://download.pytorch.org/whl/torch_stable.html
-
+# ── PyTorch installation (CPU-only) ────────────────────────────────────────
+# CUDA variant: PyTorch is already installed in the base image — nothing to do.
 FROM build-base AS pytorch-cpu
 RUN pip install --no-cache-dir \
         torch==1.12.1+cpu \
@@ -61,6 +65,8 @@ RUN pip install --no-cache-dir \
         -f https://download.pytorch.org/whl/torch_stable.html
 
 # Select the correct PyTorch stage
+# For CUDA: pytorch-cuda is just build-base (PyTorch pre-installed)
+FROM build-base AS pytorch-cuda
 FROM pytorch-${BACKEND} AS final
 
 # ── MinkowskiEngine build ──────────────────────────────────────────────────

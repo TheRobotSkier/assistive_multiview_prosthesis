@@ -7,7 +7,7 @@ Pipeline:
   2. Transform both to world frame via TF2
   3. Concatenate into a single cloud
   4. Distance filter — remove points >max_distance from arm_frame origin
-  5. Hand/arm bbox removal — AABB crop in arm_frame
+  5. Hand/arm bbox removal — AABB crop per pruning box (from camera_mounts.yaml)
   6. Voxel downsampling — numpy-based grid filter
   7. Publish on /fused_pointcloud
 
@@ -23,9 +23,11 @@ Publish:
 """
 
 import threading
+from pathlib import Path
 
 import numpy as np
 import rclpy
+import yaml
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import PointCloud2, PointField
@@ -218,6 +220,8 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("require_both_cameras", False)
         self.declare_parameter("fallback_merge_rate_hz", 15.0)
         self.declare_parameter("cloud_max_age_s", 0.5)
+        self.declare_parameter("mounts_config_path", "")
+        self.declare_parameter("active_mount", "8_cm_cam_mount")
 
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
@@ -236,6 +240,22 @@ class PointCloudFusionNode(Node):
         self._require_both = self.get_parameter("require_both_cameras").value
         fallback_rate = max(float(self.get_parameter("fallback_merge_rate_hz").value), 1.0)
         self._cloud_max_age = float(self.get_parameter("cloud_max_age_s").value)
+
+        # ── Load pruning boxes from camera_mounts.yaml or fall back to params ─
+        mounts_config = self.get_parameter("mounts_config_path").value
+        if mounts_config:
+            self._pruning_boxes = self._load_pruning_boxes(
+                mounts_config, self.get_parameter("active_mount").value)
+            for i, (frame, bmin, bmax) in enumerate(self._pruning_boxes):
+                self.get_logger().info(
+                    f"Pruning box {i}: frame={frame}, "
+                    f"min={bmin.tolist()}, max={bmax.tolist()}")
+        else:
+            self._pruning_boxes = [
+                (self._arm_frame, self._bbox_min, self._bbox_max)]
+            self.get_logger().info(
+                f"Pruning box 0 (fallback): frame={self._arm_frame}, "
+                f"min={self._bbox_min.tolist()}, max={self._bbox_max.tolist()}")
 
         # ── TF2 ───────────────────────────────────────────────────────────
         self._tf_buffer = tf2_ros.Buffer()
@@ -300,7 +320,8 @@ class PointCloudFusionNode(Node):
         self.get_logger().info(
             f"Pointcloud fusion: {cam1_topic} + {cam2_topic} -> {output_topic} "
             f"(target_frame={self._target_frame}, arm_frame={self._arm_frame}, "
-            f"max_dist={self._max_distance}m, voxel={self._voxel_size}m)"
+            f"max_dist={self._max_distance}m, voxel={self._voxel_size}m, "
+            f"pruning_boxes={len(self._pruning_boxes)})"
         )
 
     # ── Synced callback (message_filters) ────────────────────────────────
@@ -438,24 +459,25 @@ class PointCloudFusionNode(Node):
         if len(xyz_all) == 0:
             return
 
-        # ── Step 4: Hand/arm bbox removal ─────────────────────────────
+        # ── Step 4: Hand/arm bbox removal (multiple pruning boxes) ─────
         if self._enable_hand_removal:
-            xyz_arm = _transform_points_to_frame(
-                xyz_all, self._tf_buffer, self._arm_frame,
-                self._target_frame, rclpy.time.Time(),
-            )
-            if xyz_arm is not None:
-                keep = _bbox_filter(xyz_arm, self._bbox_min, self._bbox_max)
-                removed = len(xyz_all) - np.sum(keep)
-                xyz_all = xyz_all[keep]
-                rgb_all = rgb_all[keep]
-                with self._stats_lock:
-                    self._stats["bbox_removed"] += int(removed)
-            else:
-                self.get_logger().warn(
-                    f"Cannot transform to {self._arm_frame} for bbox removal — skipping",
-                    throttle_duration_sec=5.0,
+            for frame, bbox_min, bbox_max in self._pruning_boxes:
+                xyz_box = _transform_points_to_frame(
+                    xyz_all, self._tf_buffer, frame,
+                    self._target_frame, rclpy.time.Time(),
                 )
+                if xyz_box is not None:
+                    keep = _bbox_filter(xyz_box, bbox_min, bbox_max)
+                    removed = len(xyz_all) - np.sum(keep)
+                    xyz_all = xyz_all[keep]
+                    rgb_all = rgb_all[keep]
+                    with self._stats_lock:
+                        self._stats["bbox_removed"] += int(removed)
+                else:
+                    self.get_logger().warn(
+                        f"Cannot transform to {frame} for bbox removal — skipping",
+                        throttle_duration_sec=5.0,
+                    )
 
         if len(xyz_all) == 0:
             return
@@ -502,38 +524,90 @@ class PointCloudFusionNode(Node):
     # ── BBox visualization ────────────────────────────────────────────────
 
     def _publish_bbox_marker(self):
-        """Publish the hand removal bbox as a semi-transparent cube in arm_frame."""
+        """Publish a semi-transparent cube per pruning box for RViz visualization."""
         if self._bbox_marker_pub.get_subscription_count() == 0:
             return
 
-        marker = Marker()
-        marker.header.frame_id = self._arm_frame
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "hand_removal_bbox"
-        marker.id = 0
-        marker.type = Marker.CUBE
-        marker.action = Marker.ADD
+        colors = [
+            (1.0, 0.3, 0.3, 0.3),  # red for box 0
+            (1.0, 0.6, 0.0, 0.3),  # orange for box 1
+        ]
+        for i, (frame, bbox_min, bbox_max) in enumerate(self._pruning_boxes):
+            marker = Marker()
+            marker.header.frame_id = frame
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = f"pruning_box_{i}"
+            marker.id = i
+            marker.type = Marker.CUBE
+            marker.action = Marker.ADD
 
-        # Center and scale from bbox_min/max
-        center = (self._bbox_min + self._bbox_max) / 2.0
-        scale = self._bbox_max - self._bbox_min
-        marker.pose.position.x = float(center[0])
-        marker.pose.position.y = float(center[1])
-        marker.pose.position.z = float(center[2])
-        marker.pose.orientation.w = 1.0
-        marker.scale.x = float(scale[0])
-        marker.scale.y = float(scale[1])
-        marker.scale.z = float(scale[2])
+            center = (bbox_min + bbox_max) / 2.0
+            scale = bbox_max - bbox_min
+            marker.pose.position.x = float(center[0])
+            marker.pose.position.y = float(center[1])
+            marker.pose.position.z = float(center[2])
+            marker.pose.orientation.w = 1.0
+            marker.scale.x = float(scale[0])
+            marker.scale.y = float(scale[1])
+            marker.scale.z = float(scale[2])
 
-        # Semi-transparent red
-        marker.color.r = 1.0
-        marker.color.g = 0.3
-        marker.color.b = 0.3
-        marker.color.a = 0.3
+            r, g, b, a = colors[i % len(colors)]
+            marker.color.r = r
+            marker.color.g = g
+            marker.color.b = b
+            marker.color.a = a
 
-        marker.lifetime.sec = 5  # Expire if node dies
+            marker.lifetime.sec = 5  # Expire if node dies
 
-        self._bbox_marker_pub.publish(marker)
+            self._bbox_marker_pub.publish(marker)
+
+    # ── Pruning box loading from camera_mounts.yaml ──────────────────
+
+    @staticmethod
+    def _load_pruning_boxes(config_path: str, mount_name: str) -> list:
+        """Load pruning boxes from camera_mounts.yaml.
+
+        Returns a list of (frame_id, bbox_min, bbox_max) tuples.
+        """
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        boxes = []
+
+        # Box 1: bounding_box in palm_frame
+        bb = data["bounding_box"]
+        corner = bb["palm_to_corner"]["translation"]
+        opp_offset = bb["corner_to_opposite"]["translation"]
+        c = np.array([corner["x"], corner["y"], corner["z"]], dtype=np.float32)
+        o = c + np.array([opp_offset["x"], opp_offset["y"], opp_offset["z"]],
+                         dtype=np.float32)
+        boxes.append((
+            "palm_frame",
+            np.minimum(c, o),
+            np.maximum(c, o),
+        ))
+
+        # Box 2: cam_bounding_box in screw frame (if present)
+        cam_key = f"cam_bounding_box_{mount_name.split('_')[0]}cm"
+        # Try exact key first, then fall back to 8cm
+        cam_bb = data.get("cam_bounding_box_8cm")
+        if cam_bb is None:
+            cam_bb = data.get(cam_key)
+        if cam_bb is not None:
+            c1_dict = cam_bb["screw_to_bbcam1"]["translation"]
+            c2_dict = cam_bb["screw_to_bbcam2"]["translation"]
+            c1 = np.array([c1_dict["x"], c1_dict["y"], c1_dict["z"]],
+                          dtype=np.float32)
+            c2 = np.array([c2_dict["x"], c2_dict["y"], c2_dict["z"]],
+                          dtype=np.float32)
+            screw_frame = f"d435i_arm_bottom_screw_frame_{mount_name}"
+            boxes.append((
+                screw_frame,
+                np.minimum(c1, c2),
+                np.maximum(c1, c2),
+            ))
+
+        return boxes
 
     # ── Stats logging ─────────────────────────────────────────────────────
 

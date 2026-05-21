@@ -20,7 +20,7 @@ Makefile.rviz                        — Docker-based launch targets
 ## TF Tree
 
 ```
-world ── palm_frame                           (roty 180°)
+world ── palm_frame                           (identity)
   │
   ├── d435i_arm_bottom_screw_frame_5_cm_cam_mount
   │     └── d435i_arm_link_5_cm_cam_mount
@@ -127,7 +127,7 @@ Box centered at (0, 0.035, -0.05) m in palm frame, dimensions 0.22 × 0.34 × 0.
 
 1. `camera_mounts.yaml` stores all transforms in meters
 2. `publish_camera_mounts.py` reads the YAML and:
-   - Publishes `world → palm_frame` (roty 180°)
+   - Publishes `world → palm_frame` (identity)
    - For each mount, computes the **inverse** of `screw → palm` to get `palm → screw_frame`
    - Appends the URDF offset `screw_frame → camera_link` (+10.6, +17.5, +12.5 mm)
    - Publishes the workspace bounding box as TF frames + a CUBE marker at 1 Hz

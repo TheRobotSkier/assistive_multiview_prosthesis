@@ -51,8 +51,8 @@ The two variants are **distinguishable and non-overwriting**:
   - Container size: ~2.5 GB smaller than CUDA variant
 
 - **CUDA image (`segmentation:cuda`)**
-  - Base: `nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04`
-  - PyTorch: CUDA 11.6 wheels (`torch==1.12.1+cu116`)
+  - Base: `pytorch/pytorch:1.13.1-cuda11.6-cudnn8-devel`
+  - PyTorch: pre-installed (1.13.1 with CUDA 11.6)
   - MinkowskiEngine: built with `--force_cuda`
   - Requires NVIDIA Container Toolkit at runtime for GPU access
   - Falls back to CPU inference on hosts without a GPU **only if** CUDA runtime libs are present (they are, in the image)
@@ -151,8 +151,9 @@ These checks verify:
 
 ### Why Jetson CUDA is not supported
 
-This CUDA image is built for **x86_64** with NVIDIA's desktop CUDA toolkit
-(`nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04`). Jetson devices require
+This CUDA image is built for **x86_64** with the official PyTorch
+Docker image (`pytorch/pytorch:1.13.1-cuda11.6-cudnn8-devel`), which bundles
+CUDA 11.6, cuDNN 8, and PyTorch 1.13.1 with matching versions. Jetson devices require
 L4T-based images (e.g., `nvcr.io/nvidia/l4t-pytorch`) and a different
 MinkowskiEngine build process. Use the CPU backend on Jetson, or build a
 separate Jetson-specific CUDA image if needed.
@@ -161,12 +162,12 @@ separate Jetson-specific CUDA image if needed.
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| CUDA base image | 11.8.0-cudnn8-devel-ubuntu20.04 | Desktop x86_64 only |
-| PyTorch (CUDA) | 1.12.1+cu116 | CUDA 11.6 wheels |
+| CUDA base image | pytorch/pytorch:1.13.1-cuda11.6-cudnn8-devel | Pre-installed PyTorch + CUDA toolkit |
+| PyTorch (CUDA) | 1.13.1 | Pre-installed in base image |
 | PyTorch (CPU) | 1.12.1+cpu | CPU-only wheels |
-| TorchVision (CUDA) | 0.13.1+cu116 | Matches PyTorch CUDA |
+| TorchVision (CUDA) | 0.14.1 | Pre-installed in base image |
 | TorchVision (CPU) | 0.13.1+cpu | Matches PyTorch CPU |
-| Python | 3.8 | Required by MinkowskiEngine |
+| Python | 3.10 (CUDA) / 3.8 (CPU) | Required by MinkowskiEngine |
 | MinkowskiEngine | 0.5.4 (source build) | `--force_cuda` or `--cpu_only` |
 | Open3D | >= 0.12.0 | Headless runtime |
 | InterObject3D | commit `827b350` | Pinned known-good |
@@ -195,5 +196,5 @@ automatically for `build-segmentation-cpu`.
 ### `torch.cuda.is_available()` is false inside the CUDA container
 
 - Verify the host has a working GPU: `nvidia-smi`
-- Verify the container runtime is NVIDIA-enabled: `docker run --rm --runtime=nvidia nvidia/cuda:11.8.0-base-ubuntu20.04 nvidia-smi`
-- For Podman: `podman run --rm --device nvidia.com/gpu=all nvidia/cuda:11.8.0-base-ubuntu20.04 nvidia-smi`
+- Verify the container runtime is NVIDIA-enabled: `docker run --rm --runtime=nvidia nvidia/cuda:11.6.2-base-ubuntu20.04 nvidia-smi`
+- For Podman: `podman run --rm --device nvidia.com/gpu=all nvidia/cuda:11.6.2-base-ubuntu20.04 nvidia-smi`

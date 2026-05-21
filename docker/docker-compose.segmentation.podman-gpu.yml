@@ -7,7 +7,7 @@
 # Prerequisites:
 #   - podman >= 4.0 with NVIDIA container device support
 #   - nvidia-container-toolkit or nvidia-cdi-hook configured
-#   - Host GPU driver compatible with CUDA 11.8
+#   - Host GPU driver compatible with CUDA 11.6
 #   - The nvidia.com/gpu=all device must be available via CDI or libnvidia-container
 
 services:
