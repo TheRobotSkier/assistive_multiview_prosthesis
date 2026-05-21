@@ -1,0 +1,19 @@
+tests/emg_grasp/test_emg_grasp_contract.py
+  s_d9b95a7c3e21cc::t_cad863832e28e2 1-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "546aa12a3cb1482761080a247eda3d555b692ebf",
+  "prompts": {},
+  "sessions": {
+    "s_d9b95a7c3e21cc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b43a2f27ffeZEvKt9d7O3mHTZ",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
