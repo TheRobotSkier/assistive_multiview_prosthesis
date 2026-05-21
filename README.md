@@ -276,6 +276,45 @@ ros2 run emg_bridge run_classifier
 
 Connect to the MindRove WiFi network first. The classifier publishes to `/emg/gesture_label`, `/emg/gesture_name`, `/emg/confidence`, and `/emg/proportional`.
 
+### Live EMG Tuning
+
+The pipeline manager supports live reloading of EMG thresholds and gesture mappings without restarting the pipeline. Edit `config/emg_live.yaml` while the pipeline is running — changes are picked up automatically within 1 second.
+
+**Config path:** `config/emg_live.yaml` (or override with the `emg_live_config_path` ROS parameter)
+
+**Fields:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `confidence_threshold` | float | 0.55 | Minimum confidence to trigger a grasp gesture from IDLE |
+| `release_confidence_threshold` | float | 0.25 | Minimum confidence to trigger release (more permissive than grasp for safety) |
+| `grasp_gestures` | list[int] | [1, 2, 4] | Which gesture labels count as "grasp" (POWER=1, PINCH=2, POINT=4) |
+| `release_gesture` | int | 3 | Which gesture label triggers release (OPEN=3) |
+
+**Safe edit expectations:**
+- Values are validated on reload. Invalid edits (wrong type, out of range [0, 1] for thresholds) are ignored with an ERROR log — previous values are preserved.
+- Partial edits are fine: only the fields present in the file are applied; missing fields keep their current runtime values.
+- Malformed YAML is handled gracefully — the file is skipped and previous values remain.
+
+**Settings that are NOT live-reloadable:**
+- Classifier threshold inside `run_classifier.py` (`--threshold` arg)
+- Prediction smoothing window (`--smooth` arg)
+- Trained model weights (`classifier.pkl`, `meta.pkl`, `prop_calibration.pkl`)
+- These require restarting the `emg_bridge` node or retraining.
+
+**Example workflow:**
+
+```bash
+# Terminal 1 — pipeline is already running
+ros2 launch prosthesis_launch pipeline.launch.py
+
+# Terminal 2 — edit live config
+# Lower release threshold because the user is stressed and can't hold OPEN confidently
+nano config/emg_live.yaml
+# change release_confidence_threshold from 0.25 to 0.15
+# save — pipeline_manager picks it up automatically
+```
+
 ## Twist Propagation
 
 The twist propagation node predicts the hand's future trajectory from a stream of hand poses and detects collisions with the point cloud. When a collision is predicted, it publishes a click point and triggers grasp preshaping.

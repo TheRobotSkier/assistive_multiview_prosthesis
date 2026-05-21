@@ -126,6 +126,8 @@ class ForceControllerNode(Node):
         self.declare_parameter("index_cmd_topic", "/index_pos_ff_controller/commands")
         self.declare_parameter("mrl_cmd_topic", "/mrl_pos_ff_controller/commands")
         self.declare_parameter("force_status_topic", "/force_controller/status")
+        self.declare_parameter("joint_position_limits", [3.14, 3.14, 3.14])
+        self.declare_parameter("joint_position_min", [0.0, 0.0, 0.0])
 
         self._target_min = self.get_parameter("target_force_min").value
         self._target_max = self.get_parameter("target_force_max").value
@@ -153,6 +155,8 @@ class ForceControllerNode(Node):
         self._index_cmd_topic = self.get_parameter("index_cmd_topic").value
         self._mrl_cmd_topic = self.get_parameter("mrl_cmd_topic").value
         self._force_status_topic = self.get_parameter("force_status_topic").value
+        self._joint_pos_limits = list(self.get_parameter("joint_position_limits").value)
+        self._joint_pos_min = list(self.get_parameter("joint_position_min").value)
 
         # ── Internal state ────────────────────────────────────────────────
         self._pipeline_state: int = STATE_IDLE
@@ -297,18 +301,30 @@ class ForceControllerNode(Node):
 
     def _on_joint_states(self, msg: JointState) -> None:
         """Track current joint positions for incremental adjustments."""
+        missing = []
         for i, name in enumerate(JOINT_NAMES):
             try:
                 idx = msg.name.index(name)
                 self._joint_pos[i] = msg.position[idx]
             except (ValueError, IndexError):
-                pass
+                missing.append(name)
+        if missing:
+            self.get_logger().warn(
+                f"Joint states missing: {missing}. Waiting for all {JOINT_NAMES}."
+            )
+            self._joint_pos_received = False
+            return
         self._joint_pos_received = True
 
     # ── Controller lifecycle ───────────────────────────────────────────────
 
     def _activate_controller(self) -> None:
         """Activate force streaming and initialize controller state."""
+        if not self._joint_pos_received:
+            self.get_logger().error(
+                "Cannot activate force controller: valid joint feedback not yet received."
+            )
+            return
         self.get_logger().info("Activating force controller...")
         self._controller_active = True
         self._force_stable = False
@@ -388,6 +404,21 @@ class ForceControllerNode(Node):
             self._publish_status()
             return
 
+        if not self._joint_pos_received:
+            self.get_logger().warn(
+                "Control tick skipped: valid joint feedback not available."
+            )
+            status = ForceControllerStatus()
+            status.active = False
+            status.current_normal_forces = self._normal_forces
+            status.current_tangential_forces = self._tangential_forces
+            status.force_errors = [0.0, 0.0, 0.0]
+            status.force_stable = self._force_stable
+            status.slip_detected = self._slip_detected
+            status.state = STATE_NAMES.get(self._pipeline_state, "UNKNOWN")
+            self._status_pub.publish(status)
+            return
+
         # Check for stale force data (no data for >2 seconds)
         now = time.monotonic()
         if self._force_data_received and (now - self._last_force_time) > self._stale_timeout:
@@ -453,6 +484,13 @@ class ForceControllerNode(Node):
             # Closing = positive position direction
             new_positions[i] = self._joint_pos[i] + adjustment
 
+        # Clamp to joint limits
+        for i in range(3):
+            new_positions[i] = max(
+                self._joint_pos_min[i],
+                min(self._joint_pos_limits[i], new_positions[i]),
+            )
+
         # Publish position commands
         self._publish_position_commands(new_positions)
 
@@ -489,9 +527,13 @@ class ForceControllerNode(Node):
 
     def _publish_position_commands(self, positions: list[float]) -> None:
         """Publish position commands to the three ForwardCommandController topics."""
-        for pub, pos in zip(
+        for i, (pub, pos) in enumerate(zip(
             [self._thumb_pub, self._index_pub, self._mrl_pub], positions
-        ):
+        )):
+            assert self._joint_pos_min[i] <= pos <= self._joint_pos_limits[i], (
+                f"Position for joint {i} out of bounds: {pos} not in "
+                f"[{self._joint_pos_min[i]}, {self._joint_pos_limits[i]}]"
+            )
             msg = Float64MultiArray()
             msg.data = [pos]
             pub.publish(msg)
