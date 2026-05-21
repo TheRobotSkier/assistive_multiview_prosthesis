@@ -95,6 +95,8 @@ public:
       declare_parameter<std::string>("wrist_pose_topic", "/grasp_preshaping/wrist_pose");
     const std::string target_hand_pose_topic =
       declare_parameter<std::string>("target_hand_pose_topic", "/grasp_preshaping/target_hand_pose");
+    target_hand_pose_frame_id_ =
+      declare_parameter<std::string>("target_hand_pose_frame_id", "world");
     const std::string target_closures_topic =
       declare_parameter<std::string>("target_closures_topic", "/grasp_preshaping/target_finger_closures");
     const std::string grasp_type_topic =
@@ -138,7 +140,7 @@ public:
       wrist_pose_topic, 10);
 
     // ── Planner topics (consumed by downstream trajectory node) ──────────
-    target_hand_pose_pub_ = create_publisher<geometry_msgs::msg::Pose>(
+    target_hand_pose_pub_ = create_publisher<geometry_msgs::msg::PoseStamped>(
       target_hand_pose_topic, rclcpp::QoS(10).transient_local());
 
     target_finger_closures_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
@@ -460,14 +462,16 @@ private:
     // -- Publish planner topics for downstream trajectory node --
     // Target hand pose: best grasp position + planned wrist orientation.
     {
-      geometry_msgs::msg::Pose target_pose;
-      target_pose.position.x = ffi_response.target_px;
-      target_pose.position.y = ffi_response.target_py;
-      target_pose.position.z = ffi_response.target_pz;
-      target_pose.orientation.x = ffi_response.wrist_qx;
-      target_pose.orientation.y = ffi_response.wrist_qy;
-      target_pose.orientation.z = ffi_response.wrist_qz;
-      target_pose.orientation.w = ffi_response.wrist_qw;
+      geometry_msgs::msg::PoseStamped target_pose;
+      target_pose.header.stamp = this->now();
+      target_pose.header.frame_id = target_hand_pose_frame_id_;
+      target_pose.pose.position.x = ffi_response.target_px;
+      target_pose.pose.position.y = ffi_response.target_py;
+      target_pose.pose.position.z = ffi_response.target_pz;
+      target_pose.pose.orientation.x = ffi_response.wrist_qx;
+      target_pose.pose.orientation.y = ffi_response.wrist_qy;
+      target_pose.pose.orientation.z = ffi_response.wrist_qz;
+      target_pose.pose.orientation.w = ffi_response.wrist_qw;
       target_hand_pose_pub_->publish(target_pose);
     }
 
@@ -519,6 +523,7 @@ private:
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   std::vector<std::string> camera_frames_;
   std::string camera_lookup_target_frame_;
+  std::string target_hand_pose_frame_id_;
 
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr hand_pose_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr hand_twist_sub_;
@@ -528,7 +533,7 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr index_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr mrl_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr wrist_pose_pub_;
-  rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr target_hand_pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr target_hand_pose_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr target_finger_closures_pub_;
   rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr grasp_type_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_;
