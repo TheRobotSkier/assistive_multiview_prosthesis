@@ -124,6 +124,11 @@ class CommandBridgeNode(Node):
         self._speed_pct = speed_pct
         self._stream_activated = False
 
+        # ── Latched commands ──────────────────────────────────────────────
+        self._latched_commands: dict[str, float] = {}
+        self._latched_timestamps: dict[str, float] = {}
+        self._retry_timer = self.create_timer(2.0, self._retry_latched_commands)
+
         # ── Activate joint position stream ────────────────────────────────
         # Retry periodically until the driver is available.
         self._activate_timer = self.create_timer(2.0, self._try_activate_stream)
@@ -135,23 +140,19 @@ class CommandBridgeNode(Node):
 
     # ── Command forwarding ────────────────────────────────────────────────
 
-    def _on_cmd(
-        self, msg: Float64MultiArray, srv_client: rclpy.client.Client, finger: str
+    def _get_client_for_finger(self, finger: str) -> rclpy.client.Client:
+        """Return the trajectory service client for a given finger."""
+        if finger == "thumb":
+            return self._thumb_srv
+        elif finger == "index":
+            return self._index_srv
+        else:
+            return self._mrl_srv
+
+    def _send_cmd(
+        self, finger: str, target_angle: float, srv_client: rclpy.client.Client
     ) -> None:
-        """Forward a position command to the corresponding trajectory service."""
-        if not msg.data:
-            self.get_logger().warn(f"Empty command on {finger} — ignoring")
-            return
-
-        target_angle = float(msg.data[0])
-
-        if not srv_client.service_is_ready():
-            self.get_logger().warn(
-                f"Service for {finger} not ready — dropping command "
-                f"(angle={target_angle:.4f} rad)"
-            )
-            return
-
+        """Send a latched or direct position command via the trajectory service."""
         req = SetJointTraj.Request()
         req.target_angle = target_angle
         req.spe_for_percent = self._speed_pct
@@ -171,6 +172,50 @@ class CommandBridgeNode(Node):
                 )
 
         future.add_done_callback(on_response)
+
+    def _on_cmd(
+        self, msg: Float64MultiArray, srv_client: rclpy.client.Client, finger: str
+    ) -> None:
+        """Forward a position command to the corresponding trajectory service."""
+        if not msg.data:
+            self.get_logger().warn(f"Empty command on {finger} — ignoring")
+            return
+
+        target_angle = float(msg.data[0])
+
+        if not srv_client.service_is_ready():
+            self._latched_commands[finger] = target_angle
+            self._latched_timestamps[finger] = time.monotonic()
+            self.get_logger().debug(
+                f"Service for {finger} not ready — latching command "
+                f"(angle={target_angle:.4f} rad)"
+            )
+            return
+
+        self._send_cmd(finger, target_angle, srv_client)
+
+    def _retry_latched_commands(self) -> None:
+        """Retry latched commands when their services become ready."""
+        now = time.monotonic()
+        to_remove: list[str] = []
+        for finger, target_angle in list(self._latched_commands.items()):
+            srv_client = self._get_client_for_finger(finger)
+            if srv_client.service_is_ready():
+                self.get_logger().info(
+                    f"Service for {finger} ready — sending latched command "
+                    f"(angle={target_angle:.4f} rad)"
+                )
+                self._send_cmd(finger, target_angle, srv_client)
+                to_remove.append(finger)
+            elif now - self._latched_timestamps[finger] > 10.0:
+                self.get_logger().error(
+                    f"Latched command for {finger} timed out after 10s — dropping "
+                    f"(angle={target_angle:.4f} rad)"
+                )
+                to_remove.append(finger)
+        for finger in to_remove:
+            del self._latched_commands[finger]
+            del self._latched_timestamps[finger]
 
     # ── Joint state translation ───────────────────────────────────────────
 

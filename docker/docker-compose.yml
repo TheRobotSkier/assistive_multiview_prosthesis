@@ -123,6 +123,47 @@ services:
                           count: all
                           capabilities: [gpu]
 
+    # ── Hardware profile: prosthesis with explicit serial device mapping ──────
+    # Map all potential serial ports; udev rules should create stable symlinks in production.
+    # In production, use udev rules to create stable symlinks like /dev/mia_hand and /dev/wrist.
+    hardware:
+        container_name: prosthesis-hw
+        image: prosthesis:latest
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile
+            target: base
+            args:
+                USER_UID: ${USER_UID:-1000}
+                USER_GID: ${USER_GID:-1000}
+        environment:
+            - DISPLAY=${DISPLAY:-:0}
+            - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+            - CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml
+            - ROS_DOMAIN_ID=0
+        network_mode: host
+        userns_mode: "keep-id"
+        volumes:
+            - /tmp/.X11-unix:/tmp/.X11-unix:rw
+            - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
+            - ../src:/prosthesis_ws/src:rw
+            - ../config:/prosthesis_ws/config:rw
+            - ../rviz:/prosthesis_ws/rviz:rw
+            - ../scripts:/prosthesis_ws/scripts:rw
+            - ../tests:/prosthesis_ws/tests:rw
+            - ../Makefile.workspace:/prosthesis_ws/Makefile:ro
+            - prosthesis-build:/prosthesis_ws/build
+            - prosthesis-install:/prosthesis_ws/install
+            - prosthesis-log:/prosthesis_ws/log
+        devices:
+            - /dev/ttyUSB0:/dev/ttyUSB0
+            - /dev/ttyUSB1:/dev/ttyUSB1
+        profiles:
+            - hardware
+        ipc: host
+        stdin_open: true
+        tty: true
+
     # ── Test runner: uses production image, builds + runs smoke tests, exits ────
     test:
         container_name: test
