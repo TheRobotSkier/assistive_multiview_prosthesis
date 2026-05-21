@@ -30,6 +30,9 @@ build-prosthesis:
 build-segmentation:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build segmentation
 
+build-segmentation-cpu:
+	cd $(COMPOSE_DIR) && SEGMENTATION_CPU_ONLY=1 $(COMPOSE) build segmentation
+
 build-jazzy-rviz:
 	$(DOCKER_CMD) build -f docker/Dockerfile.jazzy-rviz -t localhost/ros2-jazzy-rviz:latest .
 

@@ -67,6 +67,8 @@ services:
         build:
             context: ../src/segmentation
             dockerfile: ../../docker/Dockerfile.segmentation
+            args:
+                CPU_ONLY: ${SEGMENTATION_CPU_ONLY:-0}
         environment:
             - INFERENCE_SERVER_PORT=${INFERENCE_SERVER_PORT:-5678}
         volumes:
@@ -78,6 +80,14 @@ services:
             - segmentation
         privileged: true # LINUX ONLY
         userns_mode: "keep-id" # LINUX_ONLY
+        # Request GPU access when available; Docker ignores this on CPU-only hosts.
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
 
     # ── Test runner: uses production image, builds + runs smoke tests, exits ────
     test:
