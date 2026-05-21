@@ -1,0 +1,42 @@
+src/emg_bridge/setup.py
+  s_69ab3b5ccd56bc::t_b6eb51ae584013 23-24
+README.md
+  s_69ab3b5ccd56bc::t_f666b9f92328de 279-317
+src/emg_bridge/emg_bridge/train_entry.py
+  s_69ab3b5ccd56bc::t_4f433940f38b32 1-22
+docker/Dockerfile
+  s_69ab3b5ccd56bc::t_6cbdaa54d7cad3 32-34
+tests/test_emg_live_config.py
+  s_69ab3b5ccd56bc::t_6c88100a34a5b2 5,12,34-35,37,40-43
+  s_69ab3b5ccd56bc::t_1817b84c2bd4f9 8,13-33,36,38-39,48-84,86-87,92,103,105,110-113,123,131-132,134,145,150,152,168,173,175,187,192,194,205,208,210
+  s_69ab3b5ccd56bc::t_0e53d30d587538 1-4,6-7,9-11,44-47,85,88-91,93-102,104,106-109,114-122,124-130,133,135-144,146-149,151,153-167,169-172,174,176-186,188-191,193,195-204,206-207,209,211-212
+src/prosthesis_launch/launch/pipeline.launch.py
+  s_69ab3b5ccd56bc::t_0eea639bcadc84 373-377
+  s_69ab3b5ccd56bc::t_aa943c4cc345c8 138,144
+src/emg_bridge/scripts/run_classifier.py
+  s_69ab3b5ccd56bc::t_75762be99fe9b3 149-158,161-162
+src/emg_bridge/emg_bridge/run_classifier_entry.py
+  s_69ab3b5ccd56bc::t_ae465ad1454414 5-6,17-62,64-81
+src/pipeline_manager/pipeline_manager/pipeline_manager_node.py
+  s_69ab3b5ccd56bc::t_310fd6f68a59c7 18-24,30,33,36,39-41,80,85-102,108,118-128,136-140,149-157,164,175-180,190,193-198,202-292,335-336,345-354,389-428,432-454,458-460,462-476,478,484-497,527-533
+src/emg_bridge/emg_bridge/collect_data_entry.py
+  s_69ab3b5ccd56bc::t_b9377a895d5a65 1-22
+config/emg_live.yaml
+  s_69ab3b5ccd56bc::t_386124781ae2d6 1-5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "f83610ae73d3b74499d9625a6b5adb0a982bcbfb",
+  "prompts": {},
+  "sessions": {
+    "s_69ab3b5ccd56bc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5ac881dffem2uzrcv2fuzrlW",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
