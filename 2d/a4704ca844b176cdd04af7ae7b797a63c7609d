@@ -1,0 +1,26 @@
+scripts/static_grasp_test.sh
+  s_29625c6e163b67::t_d3b475d3da0735 1-325
+config/static_grasp_test.yaml
+  s_29625c6e163b67::t_d3b475d3da0735 1-33
+Makefile
+  s_29625c6e163b67::t_5be93acbcb9e62 464-506
+  s_29625c6e163b67::t_d899354ee30c16 57
+docker/docker-compose.yml
+  s_29625c6e163b67::t_95303167afeced 167-186
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "2da4704ca844b176cdd04af7ae7b797a63c7609d",
+  "prompts": {},
+  "sessions": {
+    "s_29625c6e163b67": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b43b2553ffewxgwzRpeTwYDm2",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
