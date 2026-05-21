@@ -1,0 +1,19 @@
+tests/emg_grasp/mock_emg_publisher.py
+  s_d9b95a7c3e21cc::t_09b0f880d7224a 1-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "0b1d793fc32431cbbd8ba6d71ea4b01fb78bdc4b",
+  "prompts": {},
+  "sessions": {
+    "s_d9b95a7c3e21cc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b43a2f27ffeZEvKt9d7O3mHTZ",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
