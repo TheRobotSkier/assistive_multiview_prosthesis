@@ -171,6 +171,22 @@ def _quat_diff(q1: tuple, q0: tuple) -> tuple:
     return _quat_to_rotation_vec(q_diff)
 
 
+def _rotate_vector_by_quat(q: tuple, v: tuple) -> tuple:
+    """Rotate a 3-D vector by a quaternion (x, y, z, w)."""
+    qx, qy, qz, qw = q
+    vx, vy, vz = v
+    # q * v_quat * q_conj  where v_quat = (vx, vy, vz, 0)
+    tqx, tqy, tqz, tqw = _quat_multiply(
+        (qx, qy, qz, qw),
+        (vx, vy, vz, 0.0),
+    )
+    cqx, cqy, cqz, cqw = _quat_multiply(
+        (tqx, tqy, tqz, tqw),
+        (-qx, -qy, -qz, qw),
+    )
+    return (cqx, cqy, cqz)
+
+
 def _propagate_pose(
     px: float, py: float, pz: float,
     qx: float, qy: float, qz: float, qw: float,
@@ -388,9 +404,11 @@ class TwistPropagationNode(Node):
         self.declare_parameter("segmentation_retarget_distance_m", 0.10)
 
         # Service names
-        self.declare_parameter("compute_grasp_service", "/grasp_preshaping/compute_grasp")
         self.declare_parameter("activate_service", "/twist_propagation/activate")
         self.declare_parameter("deactivate_service", "/twist_propagation/deactivate")
+
+        # Twist frame matching
+        self.declare_parameter("assert_twist_frames_match", False)
 
         # Timeouts / staleness
         self.declare_parameter("segmentation_timeout_s", 5.0)
@@ -424,6 +442,7 @@ class TwistPropagationNode(Node):
         self._enable_cov = self.get_parameter("enable_covariance_propagation").value
         self._seg_reset_topic = self.get_parameter("segmentation_reset_topic").value
         self._seg_retarget_distance = self.get_parameter("segmentation_retarget_distance_m").value
+        self._assert_twist_frames_match = self.get_parameter("assert_twist_frames_match").value
 
         # Effective collision threshold: hit_threshold + collision_radius
         self._effective_hit_thresh = self._hit_thresh + self._collision_radius
@@ -526,12 +545,6 @@ class TwistPropagationNode(Node):
             Trigger,
             self.get_parameter("deactivate_service").value,
             self._on_deactivate,
-        )
-
-        # ── Service client ─────────────────────────────────────────────────
-        self._compute_client = self.create_client(
-            Trigger,
-            self.get_parameter("compute_grasp_service").value,
         )
 
         # ── Cycle timer ────────────────────────────────────────────────────
@@ -1009,10 +1022,6 @@ class TwistPropagationNode(Node):
     # ── Main cycle callback ────────────────────────────────────────────────
 
     def _cycle_callback(self):
-        # Snapshot state under lock, then decide what to do.
-        # The lock is released before any blocking operations (service calls).
-        should_call_preshaping = False
-
         try:
             with self._lock:
                 active = self._active
@@ -1026,12 +1035,11 @@ class TwistPropagationNode(Node):
                 if state == CycleState.WAITING_FOR_SEGMENTATION:
                     elapsed = time.time() - self._seg_trigger_time
                     if self._seg_cloud_stamp > self._seg_cloud_stamp_at_trigger:
-                        # New segmented cloud arrived -- transition and call preshaping
+                        # New segmented cloud arrived -- pipeline_manager owns preshaping
                         self.get_logger().info(
-                            "Segmented cloud received, calling preshaping service"
+                            "Segmented cloud received, returning to IDLE"
                         )
-                        self._cycle_state = CycleState.WAITING_FOR_PRESHAPING
-                        should_call_preshaping = True
+                        self._cycle_state = CycleState.IDLE
                     elif elapsed > self._seg_timeout:
                         self.get_logger().warn(
                             f"Segmentation timeout ({elapsed:.1f}s), "
@@ -1046,18 +1054,9 @@ class TwistPropagationNode(Node):
                         )
                     self._publish_status()
 
-                # -- State: WAITING_FOR_PRESHAPING ------------------------------
-                elif state == CycleState.WAITING_FOR_PRESHAPING:
-                    # Just wait -- the future callback will transition back to IDLE
-                    self._publish_status()
-
                 # -- State: IDLE -- run propagation -----------------------------
                 else:
                     self._run_idle_cycle()
-
-            # -- Outside the lock: call preshaping service if needed -------------
-            if should_call_preshaping:
-                self._call_preshaping_service()
         except Exception as exc:
             import traceback
             self.get_logger().error(
@@ -1105,11 +1104,46 @@ class TwistPropagationNode(Node):
         transformed = self._transform_pose_to_cloud_frame(px, py, pz, pose_frame)
         px_cloud, py_cloud, pz_cloud = transformed
 
+        # Also transform twist vectors into the cloud frame
+        vx, vy, vz, wx, wy, wz = self._twist
+        if pose_frame != self._cloud_frame and _HAS_TF2 and self._tf_buffer is not None:
+            try:
+                tf = self._tf_buffer.lookup_transform(
+                    self._cloud_frame, pose_frame,
+                    rclpy.time.Time(),
+                    timeout=rclpy.duration.Duration(seconds=0.5),
+                )
+                q_tf = (tf.transform.rotation.x, tf.transform.rotation.y,
+                        tf.transform.rotation.z, tf.transform.rotation.w)
+                vx, vy, vz = _rotate_vector_by_quat(q_tf, (vx, vy, vz))
+                wx, wy, wz = _rotate_vector_by_quat(q_tf, (wx, wy, wz))
+                self._twist = (vx, vy, vz, wx, wy, wz)
+            except Exception as exc:
+                self.get_logger().warn(
+                    f"TF twist rotation from '{pose_frame}' to '{self._cloud_frame}' "
+                    f"failed: {exc}. Using twist in original frame."
+                )
+        elif pose_frame != self._cloud_frame:
+            if self._assert_twist_frames_match:
+                self.get_logger().error(
+                    f"Twist frame '{pose_frame}' differs from cloud frame "
+                    f"'{self._cloud_frame}' and TF2 is unavailable. "
+                    "Skipping propagation (assert_twist_frames_match=True)."
+                )
+                self._publish_status(reason="twist_frame_mismatch_no_tf2")
+                return
+            else:
+                self.get_logger().warn(
+                    f"Twist frame '{pose_frame}' differs from cloud frame "
+                    f"'{self._cloud_frame}' and TF2 is unavailable. "
+                    "Using twist in original frame."
+                )
+
         # Publish current pose in cloud frame
         self._publish_current_pose(px_cloud, py_cloud, pz_cloud, qx, qy, qz, qw)
 
-        # Publish twist in the hand pose's frame
-        self._publish_twist(self._twist, pose_frame)
+        # Publish twist in the cloud frame
+        self._publish_twist(self._twist, self._cloud_frame)
 
         # Propagate and find hit (in cloud frame)
         # Initialize the positions list that _propagate_and_find_hit will fill
@@ -1185,38 +1219,6 @@ class TwistPropagationNode(Node):
                 twist_linear_mag=round(lin_mag, 4),
                 num_predicted_poses=len(positions),
             )
-
-    # ── Preshaping service call ────────────────────────────────────────────
-
-    def _call_preshaping_service(self):
-        """Call the preshaping service.  NOT called under self._lock."""
-        if not self._compute_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn("Preshaping service not available")
-            with self._lock:
-                self._cycle_state = CycleState.IDLE
-            return
-
-        future = self._compute_client.call_async(Trigger.Request())
-        future.add_done_callback(self._on_preshaping_response)
-
-    def _on_preshaping_response(self, future):
-        try:
-            response = future.result()
-            if response.success:
-                self.get_logger().info(
-                    f"Preshaping succeeded: {response.message[:100]}"
-                )
-            else:
-                self.get_logger().warn(
-                    f"Preshaping failed: {response.message[:100]}"
-                )
-        except Exception as exc:
-            self.get_logger().error(f"Preshaping service error: {exc}")
-
-        with self._lock:
-            self._cycle_state = CycleState.IDLE
-            self._seg_trigger_time = 0.0
-
 
 # ---------------------------------------------------------------------------
 # Entry point

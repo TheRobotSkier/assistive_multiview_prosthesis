@@ -138,6 +138,7 @@ class PipelineManagerNode(Node):
         self._release_monitor_timer = None
         self._release_monitor_start_time: float = 0.0
         self._force_emergency: bool = False
+        self._segmenting_start_time: rclpy.time.Time | None = None
 
         # ── Publishers ────────────────────────────────────────────────────
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
@@ -503,6 +504,7 @@ class PipelineManagerNode(Node):
                     f'below threshold {self._confidence_threshold}')
                 return
             self._transition(State.SEGMENTING, f'EMG: gesture={gesture}')
+            self._segmenting_start_time = self.get_clock().now()
             self._activate_twist_propagation()
             # Segmentation object cloud will trigger PLANNING
 
@@ -517,6 +519,14 @@ class PipelineManagerNode(Node):
             return
         if msg.width * msg.height == 0:
             return
+        # Staleness check: reject clouds that were produced before we entered SEGMENTING
+        if self._segmenting_start_time is not None:
+            cloud_stamp = rclpy.time.Time.from_msg(msg.header.stamp)
+            if cloud_stamp < self._segmenting_start_time:
+                self.get_logger().warn(
+                    f'Ignoring stale object cloud (stamp={cloud_stamp.nanoseconds} '
+                    f'< segmenting_start={self._segmenting_start_time.nanoseconds})')
+                return
         if self._grasp_type == 0:
             self.get_logger().warn(
                 'Object cloud received but grasp_type is 0 — proceeding anyway')

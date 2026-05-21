@@ -143,7 +143,7 @@ class SegmentationNode(Node):
     def _transform_click_to_cloud_frame(self, msg: PointStamped) -> list[float]:
         """Return [x, y, z] of msg transformed into the current cloud frame.
 
-        Falls back to the raw coordinates if TF lookup fails or no cloud yet.
+        Raises RuntimeError if TF lookup fails — callers must catch and handle.
         """
         with self._lock:
             cloud_frame = self._cloud_header.frame_id if self._cloud_header else None
@@ -155,10 +155,9 @@ class SegmentationNode(Node):
             transformed = self._tf_buffer.transform(msg, cloud_frame, timeout=rclpy.duration.Duration(seconds=0.5))
             return [transformed.point.x, transformed.point.y, transformed.point.z]
         except Exception as exc:
-            self.get_logger().warn(
-                f"TF transform from '{msg.header.frame_id}' to '{cloud_frame}' failed: {exc}. "
-                "Using raw click coordinates.")
-            return [msg.point.x, msg.point.y, msg.point.z]
+            raise RuntimeError(
+                f"TF transform from '{msg.header.frame_id}' to '{cloud_frame}' failed: {exc}"
+            ) from exc
 
     # --- subscribers --------------------------------------------------------
 
@@ -171,14 +170,22 @@ class SegmentationNode(Node):
             self._cloud_header = msg.header
 
     def _pos_click_cb(self, msg: PointStamped):
-        pt = self._transform_click_to_cloud_frame(msg)
+        try:
+            pt = self._transform_click_to_cloud_frame(msg)
+        except RuntimeError as exc:
+            self.get_logger().error(f"Positive click rejected: {exc}")
+            return
         with self._lock:
             self._pos_clicks.append(pt)
         self.get_logger().info(f"[+] positive click at ({pt[0]:.3f}, {pt[1]:.3f}, {pt[2]:.3f}) (cloud frame)")
         threading.Thread(target=self._run_inference, daemon=True).start()
 
     def _neg_click_cb(self, msg: PointStamped):
-        pt = self._transform_click_to_cloud_frame(msg)
+        try:
+            pt = self._transform_click_to_cloud_frame(msg)
+        except RuntimeError as exc:
+            self.get_logger().error(f"Negative click rejected: {exc}")
+            return
         with self._lock:
             self._neg_clicks.append(pt)
         self.get_logger().info(f"[-] negative click at ({pt[0]:.3f}, {pt[1]:.3f}, {pt[2]:.3f}) (cloud frame)")
