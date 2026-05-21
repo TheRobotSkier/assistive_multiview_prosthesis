@@ -39,6 +39,7 @@
         <command_interface name="velocity" />
         <state_interface name="position" />
         <state_interface name="velocity" />
+        <state_interface name="effort" />
       </joint>
 
       <joint name="${prefix}j_index_fle">
@@ -46,6 +47,7 @@
         <command_interface name="velocity" />
         <state_interface name="position" />
         <state_interface name="velocity" />
+        <state_interface name="effort" />
       </joint>
 
       <joint name="${prefix}j_mrl_fle">
@@ -53,6 +55,7 @@
         <command_interface name="velocity" />
         <state_interface name="position" />
         <state_interface name="velocity" />
+        <state_interface name="effort" />
       </joint>
 
       <!-- Extra joints used only for Rviz2 visualization -->

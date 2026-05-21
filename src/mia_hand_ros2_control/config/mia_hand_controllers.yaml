@@ -40,7 +40,7 @@ controller_manager:
       type: velocity_controllers/JointGroupVelocityController
 
     group_vel_ff_controller:
-      type: velocity_controllers/JointGroupPositionController
+      type: velocity_controllers/JointGroupVelocityController
 
     #
     # Position-velocity PID controllers
@@ -85,10 +85,10 @@ joint_state_broadcaster:
       - j_thumb_fle
       - j_index_fle
       - j_mrl_fle
-      - j_thumb_opp
     interfaces:
       - position
       - velocity
+      - effort
 
 #
 # Position controllers

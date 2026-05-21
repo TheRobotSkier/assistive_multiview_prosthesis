@@ -125,23 +125,69 @@ def launch_fun(context, *args, **kwargs):
         ]
     )
 
-    controller_spawner = Node(
-        name = 'controller_spawner',
-        package = 'controller_manager',
-        executable = 'spawner',
-        arguments = [
-            controller,
-            '-c', '/controller_manager',
-            '-p', robot_controllers
-        ]
-    )
+    controller_actions = []
 
-    controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
-        event_handler = OnProcessExit(
-            target_action = joint_state_broadcaster_spawner,
-            on_exit = [controller_spawner]
+    if controller:
+        controller_spawner = Node(
+            name = 'controller_spawner',
+            package = 'controller_manager',
+            executable = 'spawner',
+            arguments = [
+                controller,
+                '-c', '/controller_manager',
+                '-n', TextSubstitution(text = robot_ns)
+            ]
         )
-    )
+        controller_actions.append(
+            RegisterEventHandler(
+                event_handler = OnProcessExit(
+                    target_action = joint_state_broadcaster_spawner,
+                    on_exit = [controller_spawner]
+                )
+            )
+        )
+    else:
+        pos_names = ['thumb_pos_ff_controller', 'index_pos_ff_controller', 'mrl_pos_ff_controller']
+        vel_names = ['thumb_vel_ff_controller', 'index_vel_ff_controller', 'mrl_vel_ff_controller']
+
+        for name in pos_names:
+            spawner = Node(
+                package = 'controller_manager',
+                executable = 'spawner',
+                arguments = [
+                    name,
+                    '-c', '/controller_manager',
+                    '-n', TextSubstitution(text = robot_ns)
+                ]
+            )
+            controller_actions.append(
+                RegisterEventHandler(
+                    event_handler = OnProcessExit(
+                        target_action = joint_state_broadcaster_spawner,
+                        on_exit = [spawner]
+                    )
+                )
+            )
+
+        for name in vel_names:
+            spawner = Node(
+                package = 'controller_manager',
+                executable = 'spawner',
+                arguments = [
+                    name,
+                    '--inactive',
+                    '-c', '/controller_manager',
+                    '-n', TextSubstitution(text = robot_ns)
+                ]
+            )
+            controller_actions.append(
+                RegisterEventHandler(
+                    event_handler = OnProcessExit(
+                        target_action = joint_state_broadcaster_spawner,
+                        on_exit = [spawner]
+                    )
+                )
+            )
     
     rviz2_joint_state_publisher_after_joint_state_broadcaster_spawner = RegisterEventHandler(
         event_handler = OnProcessExit(
@@ -157,11 +203,20 @@ def launch_fun(context, *args, **kwargs):
         )
     )
 
+    mia_safety_node = Node(
+        package = 'mia_hand_ros2_control',
+        executable = 'mia_safety_node',
+        name = 'mia_safety',
+        parameters = [{'serial_port': serial_port}],
+        output = 'screen',
+    )
+
     return [
         ros2_control_node,
         robot_state_publisher,
+        mia_safety_node,
         joint_state_broadcaster_spawner,
-        controller_spawner_after_joint_state_broadcaster_spawner,
+        *controller_actions,
         rviz2_joint_state_publisher_after_joint_state_broadcaster_spawner,
         rviz2_after_joint_state_broadcaster_spawner
     ]
@@ -201,7 +256,10 @@ def generate_launch_description():
 
     controller_arg = DeclareLaunchArgument(
         'controller',
-        default_value = 'group_pos_vel_controller'
+        default_value = '',
+        description = 'Group controller name to spawn (e.g. group_pos_vel_controller). '
+                      'Leave empty to spawn individual per-finger position/velocity '
+                      'controllers (force-aware path for grasp proximity controller).'
     )
 
     use_mock_hardware_arg = DeclareLaunchArgument(
