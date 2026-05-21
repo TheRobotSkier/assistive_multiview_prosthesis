@@ -199,8 +199,9 @@ twist_propagation:
         # Offset from tracked pose origin (camera) to grasp contact point
         # (fingertips), expressed in the pose's local frame.  Applied by
         # rotating by pose orientation before propagation.
-        # Default: [0, 0, 0] = no offset (start from camera).
-        propagation_origin_offset: [0.0, 0.0, 0.0]
+        # Computed from camera_mounts.yaml for 8_cm_cam_mount:
+        #   cam0 -> link (RealSense extrinsic) -> screw -> palm -> grasp_contact
+        propagation_origin_offset: [0.1543, -0.1485, 0.1352]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)
@@ -389,4 +390,5 @@ twist_propagation:
     enable_covariance_propagation: true
     # Offset from tracked pose origin (camera) to grasp contact point
     # (fingertips), expressed in the pose's local frame.
-    propagation_origin_offset: [0.0, 0.0, 0.0]
+    # Computed from camera_mounts.yaml for 8_cm_cam_mount.
+    propagation_origin_offset: [0.1543, -0.1485, 0.1352]

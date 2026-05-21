@@ -25,141 +25,141 @@
 # ============================================================
 
 screw_to_link:
-  translation:
-    x: 0.0106
-    y: 0.0175
-    z: 0.0125
-  rotation: identity
-  quaternion:
-  - 0.0
-  - 0.0
-  - 0.0
-  - 1.0
+    translation:
+        x: 0.0106
+        y: 0.0175
+        z: 0.0125
+    rotation: identity
+    quaternion:
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.0
 
 bounding_box:
-  palm_to_corner:
-    translation:
-      x: 0.11
-      y: 0.205
-      z: 0.11
-    rotation: identity
-    quaternion:
-    - 0.0
-    - 0.0
-    - 0.0
-    - 1.0
-  corner_to_opposite:
-    translation:
-      x: -0.22
-      y: -0.34
-      z: -0.32
-    rotation: identity
-    quaternion:
-    - 0.0
-    - 0.0
-    - 0.0
-    - 1.0
+    palm_to_corner:
+        translation:
+            x: 0.11
+            y: 0.205
+            z: 0.11
+        rotation: identity
+        quaternion:
+            - 0.0
+            - 0.0
+            - 0.0
+            - 1.0
+    corner_to_opposite:
+        translation:
+            x: -0.22
+            y: -0.34
+            z: -0.42
+        rotation: identity
+        quaternion:
+            - 0.0
+            - 0.0
+            - 0.0
+            - 1.0
 
 grasp_contact:
-  palm_to_grasp_contact:
-    translation:
-      x: 0.0
-      y: 0.13
-      z: 0.03
-    rotation: identity
-    quaternion:
-    - 0.0
-    - 0.0
-    - 0.0
-    - 1.0
+    palm_to_grasp_contact:
+        translation:
+            x: 0.0
+            y: 0.13
+            z: 0.03
+        rotation: identity
+        quaternion:
+            - 0.0
+            - 0.0
+            - 0.0
+            - 1.0
 
 cam_bounding_box_8cm:
-  screw_to_bbcam1:
-    translation:
-      x: 0.02
-      y: 0.05
-      z: 0.14
-    rotation: identity
-    quaternion:
-    - 0.0
-    - 0.0
-    - 0.0
-    - 1.0
-  screw_to_bbcam2:
-    translation:
-      x: -0.035
-      y: -0.10
-      z: -0.01
-    rotation: identity
-    quaternion:
-    - 0.0
-    - 0.0
-    - 0.0
-    - 1.0
+    screw_to_bbcam1:
+        translation:
+            x: 0.05
+            y: 0.05
+            z: 0.14
+        rotation: identity
+        quaternion:
+            - 0.0
+            - 0.0
+            - 0.0
+            - 1.0
+    screw_to_bbcam2:
+        translation:
+            x: -0.035
+            y: -0.10
+            z: -0.04
+        rotation: identity
+        quaternion:
+            - 0.0
+            - 0.0
+            - 0.0
+            - 1.0
 
 mounts:
-  5_cm_cam_mount:
-    description: Camera mounted 5 cm above hand, vertical orientation
-    screw_to_palm:
-      translation:
-        x: 0.01585
-        y: -0.091762
-        z: 0.130955
-      orientation_desc: palm x = screw -z,  palm y = screw x,  palm z = screw -y
-      quaternion:
-      - -0.5
-      - -0.5
-      - 0.5
-      - -0.5
-  8_cm_cam_mount:
-    description: Camera mounted 8 cm above hand, vertical orientation
-    screw_to_palm:
-      translation:
-        x: 0.01585
-        y: -0.091762
-        z: 0.160955
-      orientation_desc: palm x = screw -z,  palm y = screw x,  palm z = screw -y
-      quaternion:
-      - -0.5
-      - -0.5
-      - 0.5
-      - -0.5
-  10_cm_cam_mount:
-    description: Camera mounted 10 cm above hand, vertical orientation
-    screw_to_palm:
-      translation:
-        x: 0.01585
-        y: -0.091762
-        z: 0.180955
-      orientation_desc: palm x = screw -z,  palm y = screw x,  palm z = screw -y
-      quaternion:
-      - -0.5
-      - -0.5
-      - 0.5
-      - -0.5
-  12_cm_V_cam_mount:
-    description: Camera mounted 12 cm above hand, vertical orientation
-    screw_to_palm:
-      translation:
-        x: 0.01585
-        y: -0.091762
-        z: 0.200955
-      orientation_desc: palm x = screw -z,  palm y = screw x,  palm z = screw -y
-      quaternion:
-      - -0.5
-      - -0.5
-      - 0.5
-      - -0.5
-  12_cm_H_cam_mount:
-    description: Camera mounted 12 cm away, horizontal orientation
-    screw_to_palm:
-      translation:
-        x: 0.01585
-        y: -0.162955
-        z: -0.053762
-      orientation_desc: palm x = screw y,  palm y = screw x,  palm z = screw -z
-      quaternion:
-      - 0.707107
-      - 0.707107
-      - 0.0
-      - 0.0
+    5_cm_cam_mount:
+        description: Camera mounted 5 cm above hand, vertical orientation
+        screw_to_palm:
+            translation:
+                x: 0.01585
+                y: -0.091762
+                z: 0.130955
+            orientation_desc: palm x = screw -z,  palm y = screw x,  palm z = screw -y
+            quaternion:
+                - -0.5
+                - -0.5
+                - 0.5
+                - -0.5
+    8_cm_cam_mount:
+        description: Camera mounted 8 cm above hand, vertical orientation
+        screw_to_palm:
+            translation:
+                x: 0.01585
+                y: -0.091762
+                z: 0.160955
+            orientation_desc: palm x = screw -z,  palm y = screw x,  palm z = screw -y
+            quaternion:
+                - -0.5
+                - -0.5
+                - 0.5
+                - -0.5
+    10_cm_cam_mount:
+        description: Camera mounted 10 cm above hand, vertical orientation
+        screw_to_palm:
+            translation:
+                x: 0.01585
+                y: -0.091762
+                z: 0.180955
+            orientation_desc: palm x = screw -z,  palm y = screw x,  palm z = screw -y
+            quaternion:
+                - -0.5
+                - -0.5
+                - 0.5
+                - -0.5
+    12_cm_V_cam_mount:
+        description: Camera mounted 12 cm above hand, vertical orientation
+        screw_to_palm:
+            translation:
+                x: 0.01585
+                y: -0.091762
+                z: 0.200955
+            orientation_desc: palm x = screw -z,  palm y = screw x,  palm z = screw -y
+            quaternion:
+                - -0.5
+                - -0.5
+                - 0.5
+                - -0.5
+    12_cm_H_cam_mount:
+        description: Camera mounted 12 cm away, horizontal orientation
+        screw_to_palm:
+            translation:
+                x: 0.01585
+                y: -0.162955
+                z: -0.053762
+            orientation_desc: palm x = screw y,  palm y = screw x,  palm z = screw -z
+            quaternion:
+                - 0.707107
+                - 0.707107
+                - 0.0
+                - 0.0

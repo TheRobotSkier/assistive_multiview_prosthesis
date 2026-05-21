@@ -87,6 +87,12 @@ services:
             # Persist model weights across container recreations (~200MB)
             - segmentation-weights:/weights
         network_mode: host
+        healthcheck:
+            test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
         profiles:
             - segmentation-cuda
         privileged: true # LINUX ONLY
@@ -110,6 +116,12 @@ services:
             # Persist model weights across container recreations (~200MB)
             - segmentation-weights:/weights
         network_mode: host
+        healthcheck:
+            test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
         profiles:
             - segmentation-cpu
         privileged: true # LINUX ONLY

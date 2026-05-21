@@ -133,4 +133,5 @@ def segment():
 
 if __name__ == "__main__":
     # Single-threaded to avoid torch/ME concurrency issues
+    print(f"[inference_server] Starting server on http://127.0.0.1:{PORT}", flush=True)
     app.run(host="127.0.0.1", port=PORT, threaded=False)

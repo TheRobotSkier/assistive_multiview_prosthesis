@@ -400,7 +400,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "mounts_config",
-                default_value="",
+                default_value="/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml",
                 description="Path to camera_mounts.yaml (empty = skip mount TF publisher).",
             ),
             DeclareLaunchArgument(

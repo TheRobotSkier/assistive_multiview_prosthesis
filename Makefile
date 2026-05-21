@@ -105,7 +105,7 @@ down-segmentation:
 
 # ── Run ────────────────────────────────────────────────────────────────────
 up:
-	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis segmentation-cuda
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA) up -d prosthesis segmentation-cuda
 
 up-prosthesis: dev
 

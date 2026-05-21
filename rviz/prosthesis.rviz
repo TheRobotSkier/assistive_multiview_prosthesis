@@ -4,10 +4,10 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /TF1
         - /TF1/Frames1
-        - /PCHead1/Status1
-      Splitter Ratio: 0.5
-    Tree Height: 447
+      Splitter Ratio: 0.5354523062705994
+    Tree Height: 186
   - Class: rviz_common/Views
     Expanded:
       - /Current View1
@@ -42,7 +42,7 @@ Visualization Manager:
       Frames:
         All Enabled: false
         arm_cam0:
-          Value: false
+          Value: true
         arm_d435i_arm_accel_frame:
           Value: false
         arm_d435i_arm_accel_optical_frame:
@@ -50,12 +50,6 @@ Visualization Manager:
         arm_d435i_arm_color_frame:
           Value: false
         arm_d435i_arm_color_optical_frame:
-          Value: false
-        arm_d435i_arm_color_optical_frame_body_display:
-          Value: false
-        arm_d435i_arm_color_optical_frame_from_marker:
-          Value: false
-        arm_d435i_arm_color_optical_frame_raw:
           Value: false
         arm_d435i_arm_depth_frame:
           Value: false
@@ -71,12 +65,22 @@ Visualization Manager:
           Value: false
         arm_d435i_arm_link:
           Value: false
-        arm_imu:
+        bb_corner:
           Value: true
-        arm_imu_from_marker:
+        bb_opposite:
+          Value: true
+        bbcam1_frame:
+          Value: true
+        bbcam2_frame:
+          Value: true
+        d435i_arm_bottom_screw_frame_8_cm_cam_mount:
           Value: false
+        d435i_arm_link_8_cm_cam_mount:
+          Value: false
+        grasp_contact_frame:
+          Value: true
         head_cam0:
-          Value: false
+          Value: true
         head_d435i_head_accel_frame:
           Value: false
         head_d435i_head_accel_optical_frame:
@@ -84,12 +88,6 @@ Visualization Manager:
         head_d435i_head_color_frame:
           Value: false
         head_d435i_head_color_optical_frame:
-          Value: false
-        head_d435i_head_color_optical_frame_body_display:
-          Value: false
-        head_d435i_head_color_optical_frame_from_marker:
-          Value: false
-        head_d435i_head_color_optical_frame_raw:
           Value: false
         head_d435i_head_depth_frame:
           Value: false
@@ -105,13 +103,7 @@ Visualization Manager:
           Value: false
         head_d435i_head_link:
           Value: false
-        head_imu:
-          Value: true
-        head_imu_from_marker:
-          Value: false
-        marker_0:
-          Value: false
-        marker_map:
+        palm_frame:
           Value: true
       Marker Scale: 0.30000001192092896
       Name: TF
@@ -119,60 +111,7 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        marker_map:
-          arm_d435i_arm_color_optical_frame_body_display:
-            {}
-          arm_d435i_arm_color_optical_frame_from_marker:
-            {}
-          arm_imu:
-            arm_cam0:
-              arm_d435i_arm_link:
-                arm_d435i_arm_accel_frame:
-                  arm_d435i_arm_accel_optical_frame:
-                    {}
-                arm_d435i_arm_color_frame:
-                  arm_d435i_arm_color_optical_frame:
-                    {}
-                arm_d435i_arm_depth_frame:
-                  arm_d435i_arm_depth_optical_frame:
-                    {}
-                arm_d435i_arm_gyro_frame:
-                  arm_d435i_arm_gyro_optical_frame:
-                    {}
-                arm_d435i_arm_imu_frame:
-                  arm_d435i_arm_imu_optical_frame:
-                    {}
-          arm_imu_from_marker:
-            {}
-          head_d435i_head_color_optical_frame_body_display:
-            {}
-          head_d435i_head_color_optical_frame_from_marker:
-            {}
-          head_imu:
-            head_cam0:
-              head_d435i_head_link:
-                head_d435i_head_accel_frame:
-                  head_d435i_head_accel_optical_frame:
-                    {}
-                head_d435i_head_color_frame:
-                  head_d435i_head_color_optical_frame:
-                    {}
-                head_d435i_head_depth_frame:
-                  head_d435i_head_depth_optical_frame:
-                    {}
-                head_d435i_head_gyro_frame:
-                  head_d435i_head_gyro_optical_frame:
-                    {}
-                head_d435i_head_imu_frame:
-                  head_d435i_head_imu_optical_frame:
-                    {}
-          head_imu_from_marker:
-            {}
-          marker_0:
-            arm_d435i_arm_color_optical_frame_raw:
-              {}
-            head_d435i_head_color_optical_frame_raw:
-              {}
+        {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -246,7 +185,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: RGB8
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -266,7 +205,7 @@ Visualization Manager:
         Value: /head/d435i_head/depth/color/points
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -279,7 +218,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: RGB8
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -299,7 +238,7 @@ Visualization Manager:
         Value: /arm/d435i_arm/depth/color/points
       Use Fixed Frame: true
       Use rainbow: true
-      Value: true
+      Value: false
     - Alpha: 0.30000001192092896
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -374,10 +313,10 @@ Visualization Manager:
         Value: /ov_msckf_arm/trackhist
       Value: true
     - Class: rviz_default_plugins/Marker
-      Enabled: true
+      Enabled: false
       Name: ArmBBox
       Namespaces:
-        hand_removal_bbox: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -385,7 +324,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /pointcloud_fusion/hand_removal_bbox
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
@@ -460,7 +399,7 @@ Visualization Manager:
       Enabled: true
       History Length: 1
       Name: SegmentationClick
-      Radius: 0.20000000298023224
+      Radius: 0.05000000074505806
       Topic:
         Depth: 5
         Durability Policy: Volatile
