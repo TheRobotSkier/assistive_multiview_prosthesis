@@ -1,0 +1,22 @@
+src/twist_propagation/twist_propagation/twist_propagation_node.py
+  s_6e20f4a316fa4a::t_e123e204acca37 340-341
+  s_6e20f4a316fa4a::t_961f04cfcfd679 408
+  s_6e20f4a316fa4a::t_18028e5faf2449 427
+  s_6e20f4a316fa4a::t_131099cc2ed938 1167
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "3259873c5b91a71b7256451af5d6e24eccc57bf3",
+  "prompts": {},
+  "sessions": {
+    "s_6e20f4a316fa4a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5b8039dffex7ULmNi0WMv41w",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
