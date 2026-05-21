@@ -1,0 +1,19 @@
+tests/emg_volitional/emg_volitional_node.py
+  s_ebf763ac70ad6f::t_33521aa443261b 1-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "f81530ef586380b2b90c79d2771149c90ffae40b",
+  "prompts": {},
+  "sessions": {
+    "s_ebf763ac70ad6f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b4178f3fffek0cewPUuP5nSAq",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
