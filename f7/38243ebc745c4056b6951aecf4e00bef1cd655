@@ -1,0 +1,32 @@
+src/segmentation/nodes/inference_server.py
+  s_56cbda1e2fb14d::t_c97f82d78a718c 7,41-64,90-94
+docker/Dockerfile.segmentation
+  s_56cbda1e2fb14d::t_8d59d9adfa6b83 4-12,14-21,50-51,57-69,78,87,115
+docker/docker-compose.segmentation.podman-gpu.yml
+  s_56cbda1e2fb14d::t_e368776950fa14 1-19
+docker/docker-compose.segmentation.cuda.yml
+  s_56cbda1e2fb14d::t_efebe3707daff4 1-24
+Makefile
+  s_56cbda1e2fb14d::t_f711384d915899 2-17,22-23,25-29,31-32,34-45,52-57,66-68,71,88-101,104,108-110,150-155,158-159,162-164,166-178
+  s_56cbda1e2fb14d::t_89d85d8025547b 156-157,160-161,165
+docker/docker-compose.yml
+  s_56cbda1e2fb14d::t_49d97f1bf69d2a 15-23,70-82,85-100,105,114
+docs/segmentation-backends.md
+  s_56cbda1e2fb14d::t_0fa8db7b3a5d06 1-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "f738243ebc745c4056b6951aecf4e00bef1cd655",
+  "prompts": {},
+  "sessions": {
+    "s_56cbda1e2fb14d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5acfaf0ffeWkVxjA7zdgCNaj",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
