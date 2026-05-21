@@ -1,0 +1,35 @@
+2026-05-20-pointcloud-fusion-debugging-retrospective-v1.md
+  s_d66be714410f47::t_ac0000a88af2b4 1-196
+Makefile.workspace
+  s_d66be714410f47::t_ac0000a88af2b4 87-90
+rviz/prosthesis.rviz
+  s_d66be714410f47::t_ac0000a88af2b4 3,5-10,12-13,15,19-21,23,25,27,36,39-117,121-175,178-182,184-187,189-199,201-202,204-215,217-224,226,228-233,236-257,259,261-279,281,283-301,303-326,328-336,338-346,348-449,451-472,475,482-485,490,492-494,497-499,501,504-505,508-509,513-525
+src/pointcloud_fusion/pointcloud_fusion/pointcloud_fusion_node.py
+  s_d66be714410f47::t_ac0000a88af2b4 218-220,236-238,250,252,257-269,275,277,279,281-284,286-287,293,295-297,317,322,325-330,332-334,336-343,345-347,360,363-364,366-368,370-371,381-382,410-411,429-430,452-453,475-479,483-485,534,541-550,552-557,560-603
+docker/Dockerfile
+  s_d66be714410f47::t_ac0000a88af2b4 97-99,102-104,113
+docker/docker-compose.yml
+  s_d66be714410f47::t_ac0000a88af2b4 58-59,92,102-103,108
+src/camera/camera/openvins_realsense_tf_bridge_node.py
+  s_d66be714410f47::t_ac0000a88af2b4 10,15-19,21-24,185-203,220-221,255-258,339,365-366,376-379,392,394-395,397,399-403,405-421,425-426,431-446
+config/prosthesis_config.yaml
+  s_d66be714410f47::t_ac0000a88af2b4 145,152-155,158-159,167,274-275
+src/twist_propagation/twist_propagation/twist_propagation_node.py
+  s_d66be714410f47::t_ac0000a88af2b4 478-482,486-487
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "f05b83202147cac70de3d7042fdcbb07eb520b03",
+  "prompts": {},
+  "sessions": {
+    "s_d66be714410f47": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5e49b4fffewSU4IUPA2XRL2n",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
