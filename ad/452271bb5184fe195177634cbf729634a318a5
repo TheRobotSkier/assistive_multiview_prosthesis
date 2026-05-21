@@ -1,0 +1,19 @@
+.gitignore
+  s_56cbda1e2fb14d::t_555de31d8ea501 65-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "ad452271bb5184fe195177634cbf729634a318a5",
+  "prompts": {},
+  "sessions": {
+    "s_56cbda1e2fb14d": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1b5acfaf0ffeWkVxjA7zdgCNaj",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
