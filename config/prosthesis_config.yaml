@@ -197,6 +197,15 @@ twist_propagation:
         process_noise_angular_radps2_per_s: 0.5
         enable_covariance_propagation: true
 
+        # ── Multi-click segmentation seeding ────────────────────────────────
+        # Number of synthetic positive clicks to publish around each collision hit.
+        # Total clicks sent = 1 (original hit) + click_count (synthetic).
+        # click_count=0 preserves the original single-click behavior.
+        click_count: 0
+        click_radius_m: 0.03
+        click_min_radius_m: 0.005
+        click_random_seed: 42
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -383,3 +392,9 @@ twist_propagation:
     process_noise_linear_mps2_per_s: 0.1
     process_noise_angular_radps2_per_s: 0.5
     enable_covariance_propagation: true
+
+    # Multi-click segmentation seeding
+    click_count: 0
+    click_radius_m: 0.03
+    click_min_radius_m: 0.005
+    click_random_seed: 42
