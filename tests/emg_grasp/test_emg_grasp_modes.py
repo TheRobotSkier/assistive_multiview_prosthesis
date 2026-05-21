@@ -29,43 +29,21 @@ _HAS_MODE_DISPATCH = hasattr(EmgGraspNode, '_dispatch_gesture')
 
 @pytest.fixture
 def node(monkeypatch):
-    """Instantiate EmgGraspNode with ROS2 stubs for mode-based tests.
-
-    Skips automatically when the mode-based refactor is not yet present.
-    """
+    """Instantiate EmgGraspNode with the local config path."""
     if not _HAS_MODE_DISPATCH:
         pytest.skip("Mode-based refactor not yet applied to emg_grasp_node.py")
 
-    # Provide minimal ROS2 stubs so the node can be instantiated without ROS2.
-    def mock_declare_parameter(self, name, default):
-        class _Param:
-            def __init__(self, value):
-                self.value = value
-        return _Param(default)
+    # Override declare_parameter so the node finds our local YAML
+    orig_declare = EmgGraspNode.declare_parameter
 
-    monkeypatch.setattr(EmgGraspNode, 'declare_parameter', mock_declare_parameter)
+    def _mock_declare(self, name, default):
+        if name == "config_path":
+            class _Param:
+                value = CONFIG_PATH
+            return _Param()
+        return orig_declare(self, name, default)
 
-    def mock_create_publisher(self, *args, **kwargs):
-        class _Pub:
-            def publish(self, msg):
-                pass
-        return _Pub()
-
-    monkeypatch.setattr(EmgGraspNode, 'create_publisher', mock_create_publisher)
-    monkeypatch.setattr(EmgGraspNode, 'create_subscription', lambda *a, **k: None)
-    monkeypatch.setattr(EmgGraspNode, 'create_timer', lambda *a, **k: None)
-
-    def mock_get_logger(self):
-        class _Logger:
-            def info(self, *args, **kwargs):
-                pass
-
-            def warn(self, *args, **kwargs):
-                pass
-        return _Logger()
-
-    monkeypatch.setattr(EmgGraspNode, 'get_logger', mock_get_logger)
-
+    monkeypatch.setattr(EmgGraspNode, "declare_parameter", _mock_declare)
     return EmgGraspNode()
 
 
