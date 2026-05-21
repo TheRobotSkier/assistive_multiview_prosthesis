@@ -142,7 +142,7 @@ pointcloud_fusion:
         enable_downsampling: true
         enable_distance_filter: true
         enable_hand_removal: true
-        cloud_max_age_s: 1.5
+        cloud_max_age_s: 0.5
 
 openvins_realsense_tf_bridge:
     ros__parameters:
@@ -164,7 +164,7 @@ openvins_realsense_tf_bridge:
                 "head_d435i_head_depth_optical_frame",
                 "arm_d435i_arm_depth_optical_frame",
             ]
-        publish_rate_hz: 2.0
+        publish_rate_hz: 10.0
         publish_nominal_static_chain: true
 
 twist_propagation:

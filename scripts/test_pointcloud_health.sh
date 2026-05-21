@@ -36,7 +36,6 @@ done
 echo "--- Checking node existence ---"
 NODES=(
     "pointcloud_fuser"
-    "pointcloud_relay"
     "segmentation_bridge"
     "cloud_snapshot_node"
     "preshaping_service"

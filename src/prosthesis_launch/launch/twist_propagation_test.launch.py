@@ -14,12 +14,11 @@ The arm camera's OpenVINS odometry (/ov_msckf_arm/odomimu) is relayed to
 
 Nodes started:
   1. Pointcloud fusion       — TF-transforms both clouds to marker_map, merges, filters
-  2. Pointcloud relay        — /fused_pointcloud -> /segmentation/input_cloud
-  3. Odom-to-pose relay      — converts OpenVINS odom to /hand_pose + /hand_twist
-  4. Segmentation bridge     — HTTP inference client (receives fused cloud via relay)
-  5. Grasp preshaping         — C++/Rust FFI bridge (called after segmentation)
-  6. Twist propagation        — active, listening to /fused_pointcloud + odom
-  7. RViz                     — twist_propagation.rviz (fixed frame: marker_map)
+  2. Odom-to-pose relay      — converts OpenVINS odom to /hand_pose + /hand_twist
+  3. Segmentation bridge     — HTTP inference client (subscribes directly to /fused_pointcloud)
+  4. Grasp preshaping         — C++/Rust FFI bridge (called after segmentation)
+  5. Twist propagation        — active, listening to /fused_pointcloud + odom
+  6. RViz                     — twist_propagation.rviz (fixed frame: marker_map)
 
 NOT started (must be provided externally):
   - Camera + OpenVINS nodes   — running on Jetson
@@ -99,17 +98,7 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 2. Pointcloud relay (fused -> segmentation input) ────────────────
-    nodes.append(
-        Node(
-            package="camera",
-            executable="pointcloud_relay_node",
-            name="pointcloud_relay",
-            output="screen",
-        )
-    )
-
-    # ── 3. Odom-to-pose relay ────────────────────────────────────────────
+    # ── 2. Odom-to-pose relay ────────────────────────────────────────────
     # Converts the OpenVINS odometry stream into /hand_pose (PoseStamped),
     # /hand_twist (TwistStamped), and /hand_odom (full Odometry for covariance).
     nodes.append(
@@ -128,20 +117,20 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 4. Segmentation bridge ───────────────────────────────────────────
-    # Receives the fused cloud via /segmentation/input_cloud (provided by
-    # the pointcloud_relay_node). No remapping needed.
+    # ── 3. Segmentation bridge ───────────────────────────────────────────
+    # Subscribes directly to /fused_pointcloud via remapping.
     nodes.append(
         Node(
             package="segmentation_bridge",
             executable="segmentation_ros2_node",
             name="segmentation_bridge",
+            remappings={("/segmentation/input_cloud", "/fused_pointcloud")},
             parameters=[{"inference_url": inference_url}],
             output="screen",
         )
     )
 
-    # ── 5. Grasp preshaping service ──────────────────────────────────────
+    # ── 4. Grasp preshaping service ──────────────────────────────────────
     nodes.append(
         Node(
             package="grasp_preshaping",
@@ -151,7 +140,7 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 6. Twist propagation ─────────────────────────────────────────────
+    # ── 5. Twist propagation ─────────────────────────────────────────────
     # Load full parameter set from the package config, overlay overrides.
     twist_params = _load_twist_propagation_params()
     twist_params["active"] = active == "true"
@@ -168,7 +157,7 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    # ── 7. RViz ──────────────────────────────────────────────────────────
+    # ── 6. RViz ──────────────────────────────────────────────────────────
     if rviz_enabled:
         # The rviz/ directory lives at /prosthesis_ws/rviz/ inside the container.
         # Use absolute path since rviz configs aren't part of any ROS package.

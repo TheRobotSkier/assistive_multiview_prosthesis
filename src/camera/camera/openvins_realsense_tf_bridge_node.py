@@ -20,8 +20,11 @@ static property of the D435i hardware.
 
 The node publishes this extrinsic directly from the RealSense static chain
 (no aruco marker detection needed).  It also broadcasts the full nominal
-D435/D435i static fan-out via both StaticTransformBroadcaster and the
-dynamic /tf topic.
+D435/D435i static fan-out via StaticTransformBroadcaster once at startup.
+
+A slow liveness timer (~0.2 Hz) re-sends only the bridge-edge transforms on
+/tf as a workaround for CycloneDDS /tf_static latch unreliability with
+late-joining nodes.
 """
 
 from __future__ import annotations
@@ -243,14 +246,19 @@ class OpenVinsRealSenseTfBridge(Node):
         self._specs = self._load_specs()
         self._warned: set[str] = set()
         self._published_from: dict[str, str] = {}
+        self._bridge_tfs: list[TransformStamped] = []  # resolved bridge-edge TFs
 
         # Pre-build the nominal static chain so we can send it efficiently.
         self._nominal_static_tfs: list[TransformStamped] = []
         if self._publish_nominal_static:
             self._build_and_send_nominal_static_chain()
 
+        # Phase 1: fast startup timer to resolve bridge extrinsics.
         rate = max(float(self.get_parameter("publish_rate_hz").value), 1.0)
-        self.create_timer(1.0 / rate, self._publish_all)
+        self._startup_timer = self.create_timer(1.0 / rate, self._startup_tick)
+
+        # Phase 2: slow liveness timer (created after startup completes).
+        self._liveness_timer = None
 
         # Periodic diagnostic for unresolved bridge transforms.
         self._resolve_fail_counts: dict[str, int] = {}
@@ -347,19 +355,15 @@ class OpenVinsRealSenseTfBridge(Node):
         except Exception:
             return None
 
-    def _publish_all(self):
+    def _startup_tick(self):
+        """Phase 1: resolve bridge extrinsics at high rate, then switch to liveness."""
         stamp = self.get_clock().now().to_msg()
-
-        # Re-broadcast nominal static chain on the dynamic /tf topic as a
-        # safety net for containers that missed the /tf_static latch.
-        if self._nominal_static_tfs:
-            for tf_msg in self._nominal_static_tfs:
-                tf_msg.header.stamp = stamp
-            self._tf_broadcaster.sendTransform(self._nominal_static_tfs)
+        all_resolved = True
 
         for spec in self._specs:
             matrix, source = self._resolve_bridge_transform(spec)
             if matrix is None:
+                all_resolved = False
                 self._warn_once(
                     spec.name,
                     f"waiting for color_optical->link extrinsic "
@@ -374,10 +378,19 @@ class OpenVinsRealSenseTfBridge(Node):
                 stamp=stamp,
             )
 
-            # Always publish on /tf_static since this is a static extrinsic.
+            # Publish on /tf_static once per spec (idempotent for static transforms).
             self._static_tf_broadcaster.sendTransform(tf_msg)
-            # Also publish on /tf for nodes with stale /tf_static caches.
+            # Also on /tf during startup for late joiners.
             self._tf_broadcaster.sendTransform(tf_msg)
+
+            # Track resolved transforms for the liveness phase.
+            already = any(
+                t.header.frame_id == tf_msg.header.frame_id
+                and t.child_frame_id == tf_msg.child_frame_id
+                for t in self._bridge_tfs
+            )
+            if not already:
+                self._bridge_tfs.append(tf_msg)
 
             if self._published_from.get(spec.name) != source:
                 self._published_from[spec.name] = source
@@ -385,6 +398,29 @@ class OpenVinsRealSenseTfBridge(Node):
                     f"{spec.name}: publishing {spec.parent_frame}->{spec.link_frame} "
                     f"from {source}"
                 )
+
+        if all_resolved and self._startup_timer is not None:
+            self.get_logger().info(
+                f"All {len(self._specs)} bridge transform(s) resolved — "
+                "switching to liveness mode (0.2 Hz)"
+            )
+            self._startup_timer.cancel()
+            self._startup_timer = None
+            self._liveness_timer = self.create_timer(5.0, self._liveness_tick)
+
+    def _liveness_tick(self):
+        """Phase 2: re-send only the bridge-edge transforms on /tf at ~0.2 Hz.
+
+        This is a workaround for CycloneDDS /tf_static latch unreliability.
+        Late-joining nodes that missed the /tf_static latch can pick up the
+        bridge edges from the dynamic /tf topic.
+        """
+        if not self._bridge_tfs:
+            return
+        stamp = self.get_clock().now().to_msg()
+        for tf_msg in self._bridge_tfs:
+            tf_msg.header.stamp = stamp
+        self._tf_broadcaster.sendTransform(self._bridge_tfs)
 
     def _resolve_bridge_transform(
         self, spec: BridgeSpec

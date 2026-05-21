@@ -7,10 +7,9 @@ Launches the complete prosthesis pipeline:
    4. EMG bridge (MindRove)
    5. Haptic bridge and controller
    6. Pointcloud fusion (TF-transforms + merges Jetson camera clouds)
-   7. Pointcloud relay (fused -> segmentation input)
-   8. Odom-to-pose relay (OpenVINS odom -> /hand_pose)
-   9. Segmentation ROS bridge
-  10. Twist propagation target selector
+   7. Odom-to-pose relay (OpenVINS odom -> /hand_pose)
+   8. Segmentation ROS bridge (subscribes directly to /fused_pointcloud)
+   9. Twist propagation target selector
   11. Grasp preshaping service
   12. Grasp proximity controller
   13. Force controller
@@ -196,12 +195,6 @@ def _launch_setup(context, *args, **kwargs):
                 ),
                 Node(
                     package="camera",
-                    executable="pointcloud_relay_node",
-                    name="pointcloud_relay",
-                    output="screen",
-                ),
-                Node(
-                    package="camera",
                     executable="odom_to_pose_relay",
                     name="odom_to_pose_relay",
                     parameters=[
@@ -220,11 +213,13 @@ def _launch_setup(context, *args, **kwargs):
         nodes.extend(camera_nodes)
 
     # Segmentation ROS bridge (talks to inference server over HTTP)
+    # Subscribes directly to /fused_pointcloud via remapping.
     nodes.append(
         Node(
             package="segmentation_bridge",
             executable="segmentation_ros2_node",
             name="segmentation_bridge",
+            remappings={("/segmentation/input_cloud", "/fused_pointcloud")},
             parameters=[{"inference_url": inference_url}],
             output="screen",
         )

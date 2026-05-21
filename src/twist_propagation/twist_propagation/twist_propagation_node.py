@@ -62,6 +62,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy, HistoryPolicy
+from rclpy.time import Time
 
 from geometry_msgs.msg import (
     PoseStamped,
@@ -792,19 +793,35 @@ class TwistPropagationNode(Node):
         if frame_id == self._cloud_frame:
             return (px, py, pz)
 
-        ps = PointStamped()
-        ps.header.frame_id = frame_id
-        ps.header.stamp = self.get_clock().now().to_msg()
-        ps.point.x = px
-        ps.point.y = py
-        ps.point.z = pz
-
         try:
-            transformed = self._tf_buffer.transform(
-                ps, self._cloud_frame,
-                timeout=rclpy.duration.Duration(seconds=0.5),
+            t = self._tf_buffer.lookup_transform(
+                self._cloud_frame, frame_id, Time()
             )
-            return (transformed.point.x, transformed.point.y, transformed.point.z)
+            # Apply the transform manually to avoid blocking.
+            tx = t.transform.translation.x
+            ty = t.transform.translation.y
+            tz = t.transform.translation.z
+            qx = t.transform.rotation.x
+            qy = t.transform.rotation.y
+            qz = t.transform.rotation.z
+            qw = t.transform.rotation.w
+
+            # Rotate the point: p_out = R * p_in + t
+            # Quaternion rotation matrix (row-major).
+            r00 = 1.0 - 2.0 * (qy * qy + qz * qz)
+            r01 = 2.0 * (qx * qy - qz * qw)
+            r02 = 2.0 * (qx * qz + qy * qw)
+            r10 = 2.0 * (qx * qy + qz * qw)
+            r11 = 1.0 - 2.0 * (qx * qx + qz * qz)
+            r12 = 2.0 * (qy * qz - qx * qw)
+            r20 = 2.0 * (qx * qz - qy * qw)
+            r21 = 2.0 * (qy * qz + qx * qw)
+            r22 = 1.0 - 2.0 * (qx * qx + qy * qy)
+
+            rx = r00 * px + r01 * py + r02 * pz + tx
+            ry = r10 * px + r11 * py + r12 * pz + ty
+            rz = r20 * px + r21 * py + r22 * pz + tz
+            return (rx, ry, rz)
         except Exception as exc:
             self.get_logger().warn(
                 f"TF transform from '{frame_id}' to '{self._cloud_frame}' "
