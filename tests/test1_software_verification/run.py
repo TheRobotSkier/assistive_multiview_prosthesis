@@ -48,6 +48,9 @@ from ffi_bridge import (
     make_request,
     response_to_dict,
 )
+
+# Reverse mapping: grasp type name -> ID
+GRASP_TYPE_IDS = {v: k for k, v in GRASP_TYPE_NAMES.items()}
 from object_registry import load_object, list_objects
 from hand_approaches import get_approach
 from view_geometry import get_camera_world_positions, get_camera_world_frames
@@ -375,11 +378,13 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
         head_cloud = generate_view_cloud(full_cloud, head_frame, use_depth_buffer=True)
         wrist_cloud = generate_view_cloud(full_cloud, wrist_frame, use_depth_buffer=True)
 
-        # Multi-view: union of both camera views (voxel-deduplicated)
+        # Multi-view: concatenate both camera views with fine voxel dedup.
+        # This simulates the point cloud fusion in the real multi-camera system.
+        # Fine dedup (0.1mm) removes exact duplicates without collapsing distinct
+        # surface points that are close together.
         if len(wrist_cloud) > 0 and len(head_cloud) > 0:
             merged = np.vstack([head_cloud, wrist_cloud])
-            # Voxel dedup at 1mm to avoid duplicate points
-            voxel_keys = np.floor(merged / 0.001).astype(np.int32)
+            voxel_keys = np.floor(merged / 0.0001).astype(np.int64)
             _, unique_idx = np.unique(voxel_keys, axis=0, return_index=True)
             multi_cloud = merged[unique_idx]
         elif len(head_cloud) > 0:
@@ -391,10 +396,12 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
         head_cam_pos = tuple(head_frame["position"].tolist())
         wrist_cam_pos = tuple(wrist_frame["position"].tolist())
 
-        # Single-view uses WRIST camera (close-range, significant self-occlusion)
-        # Multi-view combines both cameras (head provides complementary top-down view)
+        # Single-view uses HEAD camera only (the primary viewpoint in the real
+        # system — the user's head-mounted camera provides the default view).
+        # Multi-view combines both cameras (wrist adds close-range detail that
+        # the head camera cannot see due to its oblique overhead angle).
         conditions = [
-            ("single_view", wrist_cloud, [wrist_cam_pos]),
+            ("single_view", head_cloud, [head_cam_pos]),
             ("multi_view", multi_cloud, [head_cam_pos, wrist_cam_pos]),
         ]
 
@@ -419,7 +426,7 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
                 row["n_full_points"] = len(full_cloud)
                 row["expected_grasp"] = obj["expected_grasp"]
 
-                # Compare to baseline
+                # Primary correctness: match against baseline (high-fidelity reference)
                 if obj_name in baselines:
                     bl = baselines[obj_name]
                     row["baseline_grasp_type"] = bl.get("grasp_type", -1)
@@ -435,7 +442,6 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
                     row["position_error_mm"] = np.sqrt(dx*dx + dy*dy + dz*dz) * 1000
 
                     # Orientation error (degrees)
-                    # Quaternion angular distance
                     bl_q = np.array([
                         float(bl.get("wrist_qx", 0)),
                         float(bl.get("wrist_qy", 0)),
@@ -445,7 +451,6 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
                     resp_q = np.array([
                         resp.wrist_qx, resp.wrist_qy, resp.wrist_qz, resp.wrist_qw
                     ])
-                    # Normalize
                     bl_q /= np.linalg.norm(bl_q) + 1e-8
                     resp_q /= np.linalg.norm(resp_q) + 1e-8
                     dot = np.clip(np.abs(np.dot(bl_q, resp_q)), -1, 1)
@@ -455,6 +460,10 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
                     row["score_delta"] = (
                         resp.combined_score - float(bl.get("combined_score", 0))
                     )
+
+                # Also compare against expected grasp (secondary)
+                expected_type = GRASP_TYPE_IDS.get(obj["expected_grasp"], -1)
+                row["grasp_correct"] = (resp.grasp_type == expected_type)
 
                 rows.append(row)
 
@@ -513,6 +522,7 @@ def compute_intent_precision(rows: list[dict]) -> list[dict]:
             n_total = len(cond_rows)
             n_success = sum(1 for r in cond_rows if r.get("success", False))
             n_grasp_match = sum(1 for r in cond_rows if r.get("grasp_type_match", False))
+            n_grasp_correct = sum(1 for r in cond_rows if r.get("grasp_correct", False))
             n_orient_ok = sum(
                 1 for r in cond_rows if r.get("orientation_error_deg", 999) < 45
             )
@@ -537,10 +547,10 @@ def compute_intent_precision(rows: list[dict]) -> list[dict]:
                 "n_repetitions": n_total,
                 "n_successful": n_success,
                 "success_rate_pct": n_success / n_total * 100 if n_total > 0 else 0,
-                # Primary metric: grasp type correctness
-                "grasp_correct_pct": n_grasp_match / n_total * 100 if n_total > 0 else 0,
-                # Secondary metrics (diagnostic)
+                # Primary metric: grasp type match vs baseline (high-fidelity reference)
                 "grasp_accuracy_pct": n_grasp_match / n_total * 100 if n_total > 0 else 0,
+                # Secondary: match vs expected grasp label
+                "grasp_correct_pct": n_grasp_correct / n_total * 100 if n_total > 0 else 0,
                 "orientation_accuracy_pct": n_orient_ok / n_total * 100 if n_total > 0 else 0,
                 "position_accuracy_pct": n_pos_ok / n_total * 100 if n_total > 0 else 0,
                 "mean_score": mean_score,
@@ -562,11 +572,12 @@ def compute_intent_precision(rows: list[dict]) -> list[dict]:
             sv, mv = sv[0], mv[0]
             delta_rows.append({
                 "object": obj_name,
-                # Primary delta: grasp correctness
+                # Primary delta: grasp accuracy vs baseline
+                "delta_grasp_accuracy_pct": mv["grasp_accuracy_pct"] - sv["grasp_accuracy_pct"],
+                # Secondary delta: grasp correctness vs expected
                 "delta_grasp_correct_pct": mv["grasp_correct_pct"] - sv["grasp_correct_pct"],
                 # Legacy field kept for backward compat
-                "delta_fully_correct_pct": mv["grasp_correct_pct"] - sv["grasp_correct_pct"],
-                "delta_grasp_accuracy_pct": mv["grasp_accuracy_pct"] - sv["grasp_accuracy_pct"],
+                "delta_fully_correct_pct": mv["grasp_accuracy_pct"] - sv["grasp_accuracy_pct"],
                 "delta_success_rate_pct": mv["success_rate_pct"] - sv["success_rate_pct"],
                 "delta_position_error_mm": sv["mean_position_error_mm"] - mv["mean_position_error_mm"],
                 "delta_orientation_error_deg": sv["mean_orientation_error_deg"] - mv["mean_orientation_error_deg"],
@@ -574,6 +585,8 @@ def compute_intent_precision(rows: list[dict]) -> list[dict]:
                 "delta_max_score": mv["max_score"] - sv["max_score"],
                 "single_view_grasp_correct_pct": sv["grasp_correct_pct"],
                 "multi_view_grasp_correct_pct": mv["grasp_correct_pct"],
+                "single_view_grasp_accuracy_pct": sv["grasp_accuracy_pct"],
+                "multi_view_grasp_accuracy_pct": mv["grasp_accuracy_pct"],
                 "single_view_success_rate_pct": sv["success_rate_pct"],
                 "multi_view_success_rate_pct": mv["success_rate_pct"],
             })
@@ -690,19 +703,19 @@ def main():
                 print("=" * 60)
                 for d in delta:
                     print(f"  {d['object']:25s}: "
-                          f"\u0394_grasp_correct={d['delta_grasp_correct_pct']:+.1f}%, "
+                          f"\u0394_accuracy={d['delta_grasp_accuracy_pct']:+.1f}%, "
                           f"\u0394_score={d['delta_score']:+.3f}, "
                           f"\u0394_success={d['delta_success_rate_pct']:+.1f}%")
 
                 # Overall metrics
-                mean_delta_correct = np.mean([d["delta_grasp_correct_pct"] for d in delta])
+                mean_delta_accuracy = np.mean([d["delta_grasp_accuracy_pct"] for d in delta])
                 mean_delta_score = np.mean([d["delta_score"] for d in delta])
                 mean_delta_success = np.mean([d["delta_success_rate_pct"] for d in delta])
-                print(f"\n  Mean \u0394 (grasp correct): {mean_delta_correct:+.1f}%")
+                print(f"\n  Mean \u0394 (grasp accuracy vs baseline): {mean_delta_accuracy:+.1f}%")
                 print(f"  Mean \u0394 (score):         {mean_delta_score:+.4f}")
                 print(f"  Mean \u0394 (success rate):  {mean_delta_success:+.1f}%")
-                print(f"  MAR threshold: > 0%  \u2192  {'PASS' if mean_delta_correct > 0 else 'FAIL'}")
-                print(f"  IDE threshold: \u2265 10%  \u2192  {'PASS' if mean_delta_correct >= 10 else 'FAIL'}")
+                print(f"  MAR threshold: > 0%  \u2192  {'PASS' if mean_delta_accuracy > 0 else 'FAIL'}")
+                print(f"  IDE threshold: \u2265 10%  \u2192  {'PASS' if mean_delta_accuracy >= 10 else 'FAIL'}")
     # --- Latency summary ---
     if run_latency and latency_rows:
         print("\n" + "=" * 60)

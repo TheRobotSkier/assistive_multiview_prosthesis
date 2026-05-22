@@ -92,7 +92,7 @@ dev:
 	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis
 
 dev-shell: dev
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash
 
 # Segmentation services (explicit backend variants)
 # Use the appropriate compose override based on detected backend for CUDA GPU support.
@@ -142,7 +142,7 @@ TONIGHT_TARGETS := tonight tonight-build tonight-clean tonight-raw-check tonight
 tonight-segmentation-check tonight-grasp-check: segmentation
 
 $(TONIGHT_TARGETS): dev
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -lc 'make $@'
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make $@'
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:
@@ -150,7 +150,7 @@ test:
 
 # ── Shell into running container ──────────────────────────────────────────
 shell:
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash
 
 # ── Cleanup ───────────────────────────────────────────────────────────────
 down:

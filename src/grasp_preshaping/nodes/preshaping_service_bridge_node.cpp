@@ -509,6 +509,8 @@ private:
       ", full=[" + std::to_string(full_thumb) + ","
                   + std::to_string(full_index) + ","
                   + std::to_string(full_mrl) + "]"
+      ", pipeline_time_ms=" + std::to_string(ffi_response.pipeline_time_ms) +
+      ", smc_iterations=" + std::to_string(ffi_response.smc_iterations_used) +
       ")";
     return true;
   }

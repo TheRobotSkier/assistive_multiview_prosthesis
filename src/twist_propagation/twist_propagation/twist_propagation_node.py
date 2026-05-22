@@ -417,6 +417,10 @@ class TwistPropagationNode(Node):
 
         # Twist estimation
         self.declare_parameter("twist_estimation_window", 5)
+        self.declare_parameter("min_twist_linear_mps", 0.0)
+
+        # Hit validation
+        self.declare_parameter("min_time_to_hit_s", 0.0)
 
         # Activation
         self.declare_parameter("active", False)
@@ -481,6 +485,8 @@ class TwistPropagationNode(Node):
         self._min_points = self.get_parameter("min_points_near_hit").value
         self._collision_radius = self.get_parameter("collision_geometry_radius_m").value
         self._twist_window = self.get_parameter("twist_estimation_window").value
+        self._min_twist_linear = self.get_parameter("min_twist_linear_mps").value
+        self._min_time_to_hit = self.get_parameter("min_time_to_hit_s").value
         self._seg_timeout = self.get_parameter("segmentation_timeout_s").value
         self._cloud_max_age = self.get_parameter("cloud_max_age_s").value
         self._pose_max_age = self.get_parameter("pose_max_age_s").value
@@ -819,7 +825,7 @@ class TwistPropagationNode(Node):
     ) -> tuple | None:
         """Propagate the pose forward and check for cloud intersection.
 
-        Returns (hit_x, hit_y, hit_z) in the cloud frame, or None.
+        Returns (hit_x, hit_y, hit_z, time_to_hit_s) in the cloud frame, or None.
         Also populates self._last_predicted_positions for visualization.
         """
         tree = self._get_kdtree()
@@ -873,10 +879,12 @@ class TwistPropagationNode(Node):
             dists, _ = tree.query([px, py, pz], k=max(self._min_points, 1))
             if np.max(dists[:self._min_points]) <= self._effective_hit_thresh:
                 self._last_predicted_positions = positions
-                # Return the nearest surface point, not the sphere center
+                # Return the nearest surface point, not the sphere center,
+                # along with the predicted time-to-hit.
                 _, nearest_idx = tree.query([px, py, pz], k=1)
                 idx = int(nearest_idx) if np.ndim(nearest_idx) == 0 else int(nearest_idx[0])
-                return tuple(self._cloud_xyz[idx].tolist())
+                hit_point = self._cloud_xyz[idx]
+                return (float(hit_point[0]), float(hit_point[1]), float(hit_point[2]), t)
 
         self._last_predicted_positions = positions
         return None
@@ -1201,6 +1209,19 @@ class TwistPropagationNode(Node):
         # Estimate twist
         self._twist = self._estimate_twist()
 
+        # Speed gate: skip propagation when the hand is essentially
+        # stationary.  Prevents false hits from tracking drift and
+        # near-geometry false positives when the hand is at rest.
+        vx, vy, vz, wx, wy, wz = self._twist
+        lin_mag = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
+        if self._min_twist_linear > 0.0 and lin_mag < self._min_twist_linear:
+            self._publish_status(
+                reason="below_min_speed",
+                twist_linear_mag=round(lin_mag, 4),
+                min_twist_linear_mps=self._min_twist_linear,
+            )
+            return
+
         # Get latest pose and its frame
         latest = self._pose_buf[-1]
         _, px, py, pz, qx, qy, qz, qw, pose_frame = latest
@@ -1237,7 +1258,7 @@ class TwistPropagationNode(Node):
         # Propagate and find hit (in cloud frame)
         # Initialize the positions list that _propagate_and_find_hit will fill
         self._last_predicted_positions: list[tuple[float, float, float]] = []
-        hit = self._propagate_and_find_hit(
+        hit_result = self._propagate_and_find_hit(
             (px_cloud, py_cloud, pz_cloud, qx, qy, qz, qw),
             self._twist,
         )
@@ -1247,12 +1268,41 @@ class TwistPropagationNode(Node):
         # Always publish visualization (even when no hit)
         self._publish_predicted_path(positions)
         self._publish_collision_spheres(positions)
-        self._publish_trajectory_line(positions, hit_found=hit is not None)
+        self._publish_trajectory_line(positions, hit_found=hit_result is not None)
 
-        if hit is not None:
-            hit_x, hit_y, hit_z = hit
+        if hit_result is not None:
+            hit_x, hit_y, hit_z, time_to_hit = hit_result
+
+            # Time-to-hit gate: reject hits that occur too soon in the
+            # propagation horizon.  If the predicted collision is less than
+            # min_time_to_hit_s away, the downstream pipeline (segmentation
+            # + grasp planning) cannot complete in time, so triggering
+            # would waste computation and lock the state machine.
+            if (self._min_time_to_hit > 0.0
+                    and time_to_hit < self._min_time_to_hit):
+                self.get_logger().debug(
+                    f"Hit at ({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}) "
+                    f"rejected: time-to-hit {time_to_hit:.3f}s < "
+                    f"min {self._min_time_to_hit:.3f}s"
+                )
+                self._publish_status(
+                    reason="hit_too_close",
+                    hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
+                    time_to_hit_s=round(time_to_hit, 3),
+                    min_time_to_hit_s=self._min_time_to_hit,
+                    num_predicted_poses=len(positions),
+                )
+                # Fall through to the "no hit" visualization path below
+                hit_result = None
+            else:
+                # Valid hit — proceed with retarget check and segmentation
+                pass
+
+        if hit_result is not None:
+            hit_x, hit_y, hit_z, time_to_hit = hit_result
+            hit_point = (hit_x, hit_y, hit_z)
             publish_click, publish_reset = _should_retarget(
-                hit, self._current_segmentation_target, self._seg_retarget_distance
+                hit_point, self._current_segmentation_target, self._seg_retarget_distance
             )
 
             if not publish_click:
@@ -1282,7 +1332,7 @@ class TwistPropagationNode(Node):
                 # Publish click cluster (original hit + synthetic clicks)
                 rng = np.random.default_rng(self._click_random_seed)
                 synthetic = _sample_spherical_shell_clicks(
-                    hit, self._click_min_radius, self._click_radius, self._click_count, rng
+                    hit_point, self._click_min_radius, self._click_radius, self._click_count, rng
                 )
                 total_clicks = 1 + len(synthetic)
 
@@ -1313,13 +1363,14 @@ class TwistPropagationNode(Node):
                 )
 
                 # Update current target and transition
-                self._current_segmentation_target = hit
+                self._current_segmentation_target = hit_point
                 self._seg_cloud_stamp_at_trigger = self._seg_cloud_stamp
                 self._seg_trigger_time = time.time()
                 self._cycle_state = CycleState.WAITING_FOR_SEGMENTATION
 
                 self._publish_status(
                     hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
+                    time_to_hit_s=round(time_to_hit, 3),
                     num_predicted_poses=len(positions),
                     reset_before_click=publish_reset,
                     total_positive_clicks=total_clicks,
@@ -1329,8 +1380,6 @@ class TwistPropagationNode(Node):
                 )
         else:
             # No hit -- publish status with twist info
-            vx, vy, vz, wx, wy, wz = self._twist
-            lin_mag = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
             self._publish_status(
                 reason="no_hit",
                 twist_linear_mag=round(lin_mag, 4),

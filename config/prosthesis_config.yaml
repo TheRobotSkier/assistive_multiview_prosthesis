@@ -183,6 +183,13 @@ twist_propagation:
         min_points_near_hit: 3
         collision_geometry_radius_m: 0.05
         twist_estimation_window: 5
+        # Minimum linear speed (m/s) below which hit detection is suppressed.
+        # Prevents false hits when the hand is stationary or drifting near geometry.
+        min_twist_linear_mps: 0.02
+        # Minimum predicted time-to-hit (s) below which hits are rejected.
+        # If the collision is closer than this, the pipeline (~1.4s) cannot
+        # complete in time.  Rejecting avoids wasted computation.
+        min_time_to_hit_s: 0.4
         active: false
         input_cloud_topic: "/fused_pointcloud"
         segmented_cloud_topic: "/segmentation/object_cloud"
@@ -376,6 +383,8 @@ twist_propagation:
     min_points_near_hit: 3
     collision_geometry_radius_m: 0.05
     twist_estimation_window: 5
+    min_twist_linear_mps: 0.02
+    min_time_to_hit_s: 0.4
     active: false
     input_cloud_topic: "/fused_pointcloud"
     segmented_cloud_topic: "/segmentation/object_cloud"

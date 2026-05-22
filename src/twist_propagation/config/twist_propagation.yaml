@@ -20,6 +20,19 @@ twist_propagation:
     # ── Twist estimation ───────────────────────────────────────────────────
     twist_estimation_window: 5
 
+    # ── Hit validation ────────────────────────────────────────────────────
+    # Minimum linear speed (m/s) below which hit detection is suppressed.
+    # Prevents false hits when the hand is stationary or drifting near
+    # geometry.  Set to 0.0 to disable (backward-compatible default).
+    min_twist_linear_mps: 0.0
+
+    # Minimum predicted time-to-hit (seconds) below which hits are rejected.
+    # If the predicted collision is closer than this, the downstream pipeline
+    # (segmentation + grasp planning, ~1.4s total) cannot complete in time.
+    # Rejecting these avoids wasted computation and state-machine lockout.
+    # Set to 0.0 to disable (backward-compatible default).
+    min_time_to_hit_s: 0.0
+
     # ── Activation ─────────────────────────────────────────────────────────
     active: false
 

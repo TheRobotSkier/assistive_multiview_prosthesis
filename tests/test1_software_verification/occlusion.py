@@ -163,8 +163,11 @@ def depth_buffer_occlude(points, position, forward, up,
     valid = (col >= 0) & (col < w) & (row >= 0) & (row < h) & (z > near) & (z < far)
 
     # Step 4: Z-buffer — keep nearest point per pixel
-    # Use a depth tolerance to keep points at similar depths (surface thickness)
-    depth_tol = 0.005  # 5mm tolerance
+    # Depth tolerance scales with distance: at 1m, tolerance is 2mm;
+    # at 0.2m, tolerance is 0.4mm. This prevents over-aggressive culling
+    # of nearby surfaces while correctly occluding distant ones.
+    median_depth = float(np.median(z[valid])) if np.any(valid) else 1.0
+    depth_tol = 0.002 * median_depth  # 0.2% of distance
 
     depth_buffer = np.full((h, w), np.inf, dtype=np.float32)
     pixel_mask = np.zeros(len(visible_pts), dtype=bool)
@@ -216,3 +219,47 @@ def generate_view_cloud(points, camera_frame, use_depth_buffer=True):
     else:
         visible, _ = frustum_cull(points, **kwargs)
     return visible
+
+
+def voxel_fuse_multi_view(points_list, voxel_size=0.002):
+    """Fuse multiple view point clouds using voxel-grid averaging.
+
+    This simulates the TSDF fusion that occurs in the real multi-camera
+    system. Points from different views are merged by voxelising the
+    combined cloud and averaging points within each voxel. This produces
+    a cleaner, more uniform point cloud than simple concatenation.
+
+    Args:
+        points_list: list of (N_i, 3) float32 arrays from different views
+        voxel_size: voxel grid resolution in metres (default: 2mm)
+
+    Returns:
+        (M, 3) float32 array of fused, deduplicated points
+    """
+    if not points_list:
+        return np.zeros((0, 3), dtype=np.float32)
+
+    # Concatenate all views
+    combined = np.vstack(points_list)
+
+    if len(combined) == 0:
+        return combined
+
+    # Voxelise: compute voxel key for each point
+    voxel_keys = np.floor(combined / voxel_size).astype(np.int64)
+
+    # Group by voxel and average
+    unique_keys, inverse = np.unique(voxel_keys, axis=0, return_inverse=True)
+
+    # Compute mean position per voxel
+    n_voxels = len(unique_keys)
+    sums = np.zeros((n_voxels, 3), dtype=np.float64)
+    counts = np.zeros(n_voxels, dtype=np.int32)
+
+    np.add.at(sums, inverse, combined)
+    np.add.at(counts, inverse, 1)
+
+    # Average positions (this is the TSDF-like fusion step)
+    fused = (sums / counts[:, np.newaxis]).astype(np.float32)
+
+    return fused
