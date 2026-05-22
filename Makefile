@@ -319,10 +319,10 @@ robotlab-connect:
 
 timesync: robotlab-connect
 	@echo "=== One-shot clock sync (host -> Jetson) ==="
-	@HOST_TIME="$$(date -u '+%Y-%m-%d %H:%M:%S')" && \
-		echo "Host time:  $${HOST_TIME} UTC" && \
+	@HOST_EPOCH="$$(date +%s.%N)" && \
+		echo "Host time:   $$(date)" && \
 		echo "Jetson before: $$(ssh $(JETSON_HOST) date)" && \
-		ssh $(JETSON_HOST) "echo robotlab | sudo -S date -s '$${HOST_TIME}'" 2>/dev/null && \
+		ssh $(JETSON_HOST) "echo robotlab | sudo -S date -s @$${HOST_EPOCH}" 2>/dev/null && \
 		echo "Jetson after:  $$(ssh $(JETSON_HOST) date)"
 	@echo ""
 	@echo "=== Configuring chrony on Jetson for ongoing drift correction ==="
