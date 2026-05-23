@@ -573,11 +573,17 @@ def plot_convexity_analysis(delta_rows: list[dict], summary_rows: list[dict],
 def plot_per_view_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
     """3D scatter of an example object showing which surfaces each camera sees.
 
+    4-panel layout:
+      1. Combined view (all colours) with camera positions
+      2. Head camera visible surfaces only
+      3. Wrist camera visible surfaces only
+      4. Multi-view union (green = visible from either camera)
+
     Points are colour-coded:
       - #5099e9 (blue)     = head camera only
       - #ff9e4a (orange)   = wrist camera only
       - #55a868 (green)    = both cameras
-      - #b0b0b0 (gray)     = neither (not visible from any camera at approach distance)
+      - #b0b0b0 (gray)     = neither
     """
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -622,71 +628,255 @@ def plot_per_view_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
             colors[i] = 1  # head only
         elif in_wrist:
             colors[i] = 2  # wrist only
-        # else: 4 = neither (default)
 
+    # Colour map: [unused, head-only, wrist-only, both, neither]
     cmap = np.array([
-        [0, 0, 0, 0],                 # 0: unused
-        [80 / 255, 153 / 255, 233 / 255, 1],   # 1: head only (blue #5099e9)
-        [1, 159 / 255, 74 / 255, 1],           # 2: wrist only (orange #ff9e4a)
-        [85 / 255, 168 / 255, 104 / 255, 1],   # 3: both (green #55a868)
-        [176 / 255, 176 / 255, 176 / 255, 0.4],  # 4: neither (gray, semi-transparent)
+        [0, 0, 0, 0],                       # 0: unused
+        [80/255, 153/255, 233/255, 0.9],    # 1: head only (blue #5099e9)
+        [1, 159/255, 74/255, 0.9],          # 2: wrist only (orange #ff9e4a)
+        [85/255, 168/255, 104/255, 0.9],    # 3: both (green #55a868)
+        [176/255, 176/255, 176/255, 0.15],  # 4: neither (gray, faint)
     ])
 
-    fig = plt.figure(figsize=(14, 5))
+    # Compute equal axis bounds from the full cloud (in metres)
+    pad = 0.005
+    x_min, x_max = full[:, 0].min() - pad, full[:, 0].max() + pad
+    y_min, y_max = full[:, 1].min() - pad, full[:, 1].max() + pad
+    z_min, z_max = full[:, 2].min() - pad, full[:, 2].max() + pad
+    max_range = max(x_max - x_min, y_max - y_min, z_max - z_min)
+    x_mid = (x_min + x_max) / 2
+    y_mid = (y_min + y_max) / 2
+    z_mid = (z_min + z_max) / 2
 
-    # --- Subplot 1: Full view from a 3/4 angle ---
-    ax1 = fig.add_subplot(1, 3, 1, projection="3d")
+    def _set_equal_axes(ax):
+        ax.set_xlim(x_mid - max_range/2, x_mid + max_range/2)
+        ax.set_ylim(y_mid - max_range/2, y_mid + max_range/2)
+        ax.set_zlim(z_mid - max_range/2, z_mid + max_range/2)
+        ax.set_box_aspect([1, 1, 1])
+        ax.set_xlabel("X (m)", fontsize=7, labelpad=1)
+        ax.set_ylabel("Y (m)", fontsize=7, labelpad=1)
+        ax.set_zlabel("Z (m)", fontsize=7, labelpad=1)
+        ax.tick_params(labelsize=6)
+
+    # Count statistics for subplot titles
+    n_head_only = (colors == 1).sum()
+    n_wrist_only = (colors == 2).sum()
+    n_both = (colors == 3).sum()
+    n_neither = (colors == 4).sum()
+
+    fig = plt.figure(figsize=(16, 10), facecolor=COLORS["bg"])
+
+    # --- Subplot 1: Combined view (all colours) with cameras ---
+    ax1 = fig.add_subplot(2, 2, 1, projection="3d", facecolor=COLORS["panel_bg"])
     ax1.scatter(full[:, 0], full[:, 1], full[:, 2],
-                c=cmap[colors], s=0.5, alpha=0.8)
-    # Camera positions
+                c=cmap[colors], s=0.3, depthshade=True)
     for label, cf in [("Head", cam_frames[0]), ("Wrist", cam_frames[1])]:
         p = cf["position"]
-        ax1.scatter(*p, c="#e74c3c" if label == "Head" else "#2c3e50",
-                    s=80, marker="^", label=label)
-        # Simple frustum arrow
+        clr = "#e74c3c" if label == "Head" else "#2c3e50"
+        ax1.scatter(*p, c=clr, s=80, marker="^", label=label, zorder=10)
         fwd = cf["forward"] * 0.15
-        ax1.quiver(*p, *fwd, color="#e74c3c" if label == "Head" else "#2c3e50",
-                   arrow_length_ratio=0.15, linewidth=2)
-    ax1.set_title(f"Full Cloud — {obj_name}", fontsize=10, fontweight="bold")
-    ax1.legend(fontsize=8, loc="upper right")
-    ax1.set_xlabel("X (m)"); ax1.set_ylabel("Y (m)"); ax1.set_zlabel("Z (m)")
+        ax1.quiver(*p, *fwd, color=clr, arrow_length_ratio=0.15, linewidth=2)
+    ax1.set_title(f"Combined — {obj_name}\n"
+                  f"Head-only: {n_head_only}  Wrist-only: {n_wrist_only}  "
+                  f"Both: {n_both}  Unseen: {n_neither}",
+                  fontsize=9, fontweight="bold")
+    ax1.legend(fontsize=7, loc="upper right")
+    ax1.view_init(elev=25, azim=-55)
+    _set_equal_axes(ax1)
 
     # --- Subplot 2: Head camera view ---
-    ax2 = fig.add_subplot(1, 3, 2, projection="3d")
-    head_labels = np.full(n, 4, dtype=np.uint8)
-    for i in range(n):
-        key = tuple(np.round(full[i] / tol).astype(int))
-        if key in head_set:
-            head_labels[i] = 1  # visible from head
+    ax2 = fig.add_subplot(2, 2, 2, projection="3d", facecolor=COLORS["panel_bg"])
+    head_labels = np.where(
+        np.isin(np.arange(n), np.where(colors == 1)[0]), 1,
+        np.where(np.isin(np.arange(n), np.where(colors == 3)[0]), 3, 4)
+    )
     ax2.scatter(full[:, 0], full[:, 1], full[:, 2],
-                c=cmap[head_labels], s=0.5, alpha=0.8)
-    # Set viewpoint to approximate head camera
-    ax2.view_init(elev=20, azim=-60)
-    ax2.set_title("Head Camera View", fontsize=10, fontweight="bold")
-    ax2.set_xlabel("X (m)"); ax2.set_ylabel("Y (m)"); ax2.set_zlabel("Z (m)")
+                c=cmap[head_labels], s=0.3, depthshade=True)
+    ax2.set_title(f"Head Camera Visible\n"
+                  f"{n_head_only + n_both} / {n} points "
+                  f"({(n_head_only + n_both)/n*100:.0f}%)",
+                  fontsize=9, fontweight="bold")
+    ax2.view_init(elev=35, azim=-90)
+    _set_equal_axes(ax2)
 
     # --- Subplot 3: Wrist camera view ---
-    ax3 = fig.add_subplot(1, 3, 3, projection="3d")
-    wrist_labels = np.full(n, 4, dtype=np.uint8)
-    for i in range(n):
-        key = tuple(np.round(full[i] / tol).astype(int))
-        if key in wrist_set:
-            wrist_labels[i] = 2  # visible from wrist
+    ax3 = fig.add_subplot(2, 2, 3, projection="3d", facecolor=COLORS["panel_bg"])
+    wrist_labels = np.where(
+        np.isin(np.arange(n), np.where(colors == 2)[0]), 2,
+        np.where(np.isin(np.arange(n), np.where(colors == 3)[0]), 3, 4)
+    )
     ax3.scatter(full[:, 0], full[:, 1], full[:, 2],
-                c=cmap[wrist_labels], s=0.5, alpha=0.8)
-    # Set viewpoint to approximate wrist camera
+                c=cmap[wrist_labels], s=0.3, depthshade=True)
+    ax3.set_title(f"Wrist Camera Visible\n"
+                  f"{n_wrist_only + n_both} / {n} points "
+                  f"({(n_wrist_only + n_both)/n*100:.0f}%)",
+                  fontsize=9, fontweight="bold")
     ax3.view_init(elev=10, azim=-20)
-    ax3.set_title("Wrist Camera View", fontsize=10, fontweight="bold")
-    ax3.set_xlabel("X (m)"); ax3.set_ylabel("Y (m)"); ax3.set_zlabel("Z (m)")
+    _set_equal_axes(ax3)
 
-    fig.suptitle(f"Per-View Point Cloud Coverage: {obj_name}\n"
-                 "(Blue = head only, Orange = wrist only, Gray = unseen from approach pose)",
-                 fontsize=11, fontweight="bold", color=COLORS["text"])
+    # --- Subplot 4: Multi-view union ---
+    ax4 = fig.add_subplot(2, 2, 4, projection="3d", facecolor=COLORS["panel_bg"])
+    mv_labels = np.where(
+        (colors == 1) | (colors == 2) | (colors == 3), 3, 4
+    )
+    ax4.scatter(full[:, 0], full[:, 1], full[:, 2],
+                c=cmap[mv_labels], s=0.3, depthshade=True)
+    n_visible = n - n_neither
+    ax4.set_title(f"Multi-View Union (head + wrist)\n"
+                  f"{n_visible} / {n} points ({n_visible/n*100:.0f}%)",
+                  fontsize=9, fontweight="bold")
+    ax4.view_init(elev=25, azim=-55)
+    _set_equal_axes(ax4)
+
+    fig.suptitle(f"Per-View Point Cloud Coverage: {obj_name.replace('_', ' ').title()}",
+                 fontsize=12, fontweight="bold", color=COLORS["text"])
     fig.tight_layout()
     _save_fig(fig, "fig7c_per_view_coverage", fmt, dpi)
 
 
 # ---------------------------------------------------------------------------
+# Figure 7d-bench: Benchmark comparison (baseline vs SV vs MV per object)
+# ---------------------------------------------------------------------------
+
+def plot_benchmark_comparison(occlusion_rows: list[dict], summary_rows: list[dict], fmt: str, dpi: int):
+    """Violin plot: baseline vs single-view vs multi-view score distributions per object.
+
+    Shows the full score distribution for each condition as violin plots, with
+    median markers and quartile ranges. Baseline uses all individual repetitions
+    from baseline_all_scores.csv for a fair distribution comparison.
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from object_registry import get_convexity
+
+    # Collect per-object scores by condition
+    objects = sorted(set(r['object'] for r in occlusion_rows))
+
+    # SV and MV from occlusion_rows (per-trial data)
+    sv_data = {}
+    mv_data = {}
+    for obj in objects:
+        obj_rows = [r for r in occlusion_rows if r['object'] == obj]
+        sv = [float(r['combined_score']) for r in obj_rows if r['condition'] == 'single_view']
+        mv = [float(r['combined_score']) for r in obj_rows if r['condition'] == 'multi_view']
+        if sv:
+            sv_data[obj] = sv
+        if mv:
+            mv_data[obj] = mv
+
+    # Baseline from baseline_all_scores.csv (individual reps for distribution)
+    bl_data = {}
+    baseline_csv = os.path.join(RESULTS_DIR, "baseline_all_scores.csv")
+    if os.path.isfile(baseline_csv):
+        import pandas as pd
+        bl_df = pd.read_csv(baseline_csv)
+        for obj in bl_df['object'].unique():
+            scores = bl_df[bl_df['object'] == obj]['combined_score'].values.tolist()
+            if scores:
+                bl_data[obj] = scores
+    else:
+        # Fallback: single score per object from baseline_results.csv
+        baseline_csv2 = os.path.join(RESULTS_DIR, "baseline_results.csv")
+        if os.path.isfile(baseline_csv2):
+            import pandas as pd
+            bl_df2 = pd.read_csv(baseline_csv2)
+            for _, row in bl_df2.iterrows():
+                bl_data[row['object']] = [float(row['combined_score'])]
+
+    # Only plot objects that have all three conditions
+    plot_objects = [o for o in objects if o in bl_data and o in sv_data and o in mv_data]
+    if not plot_objects:
+        print("  [SKIP] fig7d_benchmark: no objects with all 3 conditions")
+        return
+
+    n = len(plot_objects)
+    fig, ax = plt.subplots(figsize=(max(12, n * 1.2), 6))
+    fig.patch.set_facecolor(COLORS["bg"])
+    ax.set_facecolor(COLORS["panel_bg"])
+
+    # Build violin data: for each object, 3 violins (BL, SV, MV)
+    positions = []
+    violin_data = []
+    colors = []
+    labels_added = {'Baseline': False, 'Single-view': False, 'Multi-view': False}
+
+    for i, obj in enumerate(plot_objects):
+        for j, (data, color, label) in enumerate([
+            (bl_data[obj], '#8ecae6', 'Baseline (full cloud)'),
+            (sv_data[obj], COLORS["primary"], 'Single-view (head)'),
+            (mv_data[obj], '#55a868', 'Multi-view (head+wrist)'),
+        ]):
+            pos = i * 4 + j
+            positions.append(pos)
+            violin_data.append(data)
+            colors.append(color)
+
+    parts = ax.violinplot(violin_data, positions=positions, widths=2.8,
+                          showmeans=False, showmedians=False, showextrema=False)
+
+    # Style each violin
+    for i, pc in enumerate(parts['bodies']):
+        obj_idx = i // 3
+        cond_idx = i % 3
+        pc.set_facecolor(colors[i])
+        pc.set_edgecolor('white')
+        pc.set_linewidth(0.5)
+        pc.set_alpha(0.7)
+
+    # Add median markers and quartile whiskers
+    for i, data in enumerate(violin_data):
+        if not data:
+            continue
+        med = np.median(data)
+        q25 = np.percentile(data, 25)
+        q75 = np.percentile(data, 75)
+        # Median dot
+        ax.scatter(positions[i], med, s=30, color=colors[i], edgecolors='black',
+                   linewidth=0.5, zorder=5)
+        # Quartile whisker
+        ax.vlines(positions[i], q25, q75, color='black', linewidth=1, zorder=4)
+
+    # Annotate convexity with colored dots below x-axis
+    for i, obj in enumerate(plot_objects):
+        c = get_convexity(obj)
+        color = '#aaaaaa' if c == 'convex' else '#e6550d'
+        ax.plot(i * 4 + 1, -0.02, 'o', color=color, markersize=5, clip_on=False,
+                transform=ax.get_xaxis_transform())
+
+    # X-axis labels (centered on each object group)
+    ax.set_xticks([i * 4 + 1 for i in range(n)])
+    ax.set_xticklabels([o.replace('_', '\n') for o in plot_objects],
+                       fontsize=7, rotation=0, ha='center')
+    ax.set_ylabel('Combined Score', fontsize=10)
+
+    # Legend
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Patch(facecolor='#8ecae6', edgecolor='white', label='Baseline (full cloud)'),
+        Patch(facecolor=COLORS["primary"], edgecolor='white', label='Single-view (head)'),
+        Patch(facecolor='#55a868', edgecolor='white', label='Multi-view (head+wrist)'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#aaaaaa',
+               markersize=6, label='Convex'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='#e6550d',
+               markersize=6, label='Non-convex'),
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', fontsize=8,
+              framealpha=0.9, ncol=2)
+
+    ax.set_ylim(-0.02, 1.05)
+    ax.grid(axis='y', alpha=0.3, zorder=0)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    fig.tight_layout()
+    path = os.path.join(FIGURES_DIR, f"fig7d_benchmark_comparison.{fmt}")
+    fig.savefig(path, dpi=dpi, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    print(f"  [OK] {os.path.basename(path)}")
+
+
 # Figure 7d: Score distribution comparison (SV vs MV per object)
 # ---------------------------------------------------------------------------
 
@@ -1301,6 +1491,10 @@ def plot_synthetic_setup(fmt: str, dpi: int):
         ax.set_xlim(-max_range, max_range)
         ax.set_ylim(-max_range, max_range)
         ax.set_zlim(-5, max_range * 1.5)
+        try:
+            ax.set_box_aspect([1, 1, 1])
+        except AttributeError:
+            pass
         ax.set_xlabel("X (cm)", fontsize=7, labelpad=2)
         ax.set_ylabel("Y (cm)", fontsize=7, labelpad=2)
         ax.set_zlabel("Z (cm)", fontsize=7, labelpad=2)
@@ -1311,9 +1505,9 @@ def plot_synthetic_setup(fmt: str, dpi: int):
 
     viewpoints = [
         (25, -55, "Perspective Overview"),
-        (85, -90, "Top-Down View"),
-        (10, 0, "Side View (from +Y)"),
-        (15, -160, "Rear View (from -X)"),
+        (90, -90, "Top-Down View"),
+        (0, -90, "Side View (from \u2013Y)"),
+        (10, 180, "Rear View (from \u2013X)"),
     ]
 
     for idx, (elev, azim, title) in enumerate(viewpoints):
@@ -1498,6 +1692,191 @@ def plot_per_stage_waterfall(fmt: str = "pdf", dpi: int = 150):
 
 
 # ---------------------------------------------------------------------------
+# Figure 12: Object Gallery
+# ---------------------------------------------------------------------------
+
+def plot_object_gallery(fmt: str, dpi: int):
+    """Show all 13 test objects as 3D point clouds in a grid, colored by convexity."""
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    sys.path.insert(0, SCRIPT_DIR)
+    from object_registry import load_object, list_objects, get_convexity
+
+    objects = sorted(list_objects())
+    n_obj = len(objects)
+    ncols = 5
+    nrows = int(np.ceil(n_obj / ncols))
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(20, 4 * nrows),
+                              subplot_kw={"projection": "3d"},
+                              facecolor=COLORS["bg"])
+
+    convex_color = COLORS["primary"]
+    nonconvex_color = COLORS["warning"]
+
+    for idx, ax in enumerate(axes.flat):
+        if idx < n_obj:
+            obj_name = objects[idx]
+            try:
+                obj = load_object(obj_name)
+            except Exception:
+                ax.axis("off")
+                continue
+
+            pts = obj["points"]
+            c = get_convexity(obj_name)
+            color = convex_color if c == "convex" else nonconvex_color
+
+            ax.scatter(pts[:, 0] * 100, pts[:, 1] * 100, pts[:, 2] * 100,
+                       c=color, s=0.3, alpha=0.5, depthshade=True)
+
+            # Equal axis scaling
+            ranges = np.array([
+                pts[:, 0].max() - pts[:, 0].min(),
+                pts[:, 1].max() - pts[:, 1].min(),
+                pts[:, 2].max() - pts[:, 2].min(),
+            ]) * 100
+            max_range = ranges.max()
+            mid = np.array([
+                (pts[:, 0].max() + pts[:, 0].min()) / 2 * 100,
+                (pts[:, 1].max() + pts[:, 1].min()) / 2 * 100,
+                (pts[:, 2].max() + pts[:, 2].min()) / 2 * 100,
+            ])
+            ax.set_xlim(mid[0] - max_range / 2, mid[0] + max_range / 2)
+            ax.set_ylim(mid[1] - max_range / 2, mid[1] + max_range / 2)
+            ax.set_zlim(mid[2] - max_range / 2, mid[2] + max_range / 2)
+            try:
+                ax.set_box_aspect([1, 1, 1])
+            except Exception:
+                pass
+
+            tag = "convex" if c == "convex" else "non-convex"
+            ax.set_title(f"{obj_name}\n({tag})", fontsize=9, color=COLORS["text"])
+            ax.set_xlabel("X (cm)", fontsize=7, labelpad=-2)
+            ax.set_ylabel("Y (cm)", fontsize=7, labelpad=-2)
+            ax.set_zlabel("Z (cm)", fontsize=7, labelpad=-2)
+            ax.tick_params(labelsize=6)
+            ax.view_init(elev=25, azim=-55)
+        else:
+            ax.axis("off")
+
+    # Legend
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=convex_color,
+               markersize=10, label='Convex'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor=nonconvex_color,
+               markersize=10, label='Non-convex'),
+    ]
+    fig.legend(handles=legend_elements, loc='lower center', ncol=2,
+               fontsize=11, frameon=False)
+
+    fig.suptitle("Test 1 Object Gallery", fontsize=14, color=COLORS["text"],
+                 fontweight="bold", y=0.98)
+    fig.tight_layout(rect=[0, 0.03, 1, 0.96])
+    _save_fig(fig, "fig12_object_gallery", fmt, dpi)
+
+
+# ---------------------------------------------------------------------------
+# Figure 13: Score vs Samples Sweep
+# ---------------------------------------------------------------------------
+
+def plot_score_vs_samples(fmt: str, dpi: int):
+    """Plot how combined_score converges as prediction_samples increases.
+
+    Requires results/score_sweep_results.csv generated by run.py --sweep-samples.
+    If the file doesn't exist, prints a message and returns.
+    """
+    import matplotlib.pyplot as plt
+
+    sweep_path = os.path.join(RESULTS_DIR, "score_sweep_results.csv")
+    if not os.path.isfile(sweep_path):
+        print("  Skipping fig13_score_vs_samples: no sweep data. "
+              "Run: python run.py --sweep-samples")
+        return
+
+    import pandas as pd
+    sweep = pd.read_csv(sweep_path)
+
+    if len(sweep) == 0:
+        print("  Skipping fig13_score_vs_samples: sweep data is empty.")
+        return
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6), facecolor=COLORS["bg"])
+    fig.set_facecolor(COLORS["bg"])
+
+    # Left panel: Score vs samples (accumulated across objects)
+    sample_counts = sorted(sweep["prediction_samples"].unique())
+
+    sv_means = []
+    mv_means = []
+    sv_stds = []
+    mv_stds = []
+
+    for n_samples in sample_counts:
+        subset = sweep[sweep["prediction_samples"] == n_samples]
+        sv = subset[subset["condition"] == "single_view"]["combined_score"]
+        mv = subset[subset["condition"] == "multi_view"]["combined_score"]
+        sv_means.append(sv.mean() if len(sv) > 0 else np.nan)
+        mv_means.append(mv.mean() if len(mv) > 0 else np.nan)
+        sv_stds.append(sv.std() if len(sv) > 0 else np.nan)
+        mv_stds.append(mv.std() if len(mv) > 0 else np.nan)
+
+    ax1.errorbar(sample_counts, sv_means, yerr=sv_stds,
+                  fmt='o-', color=COLORS["single_view"], label="Single-view",
+                  capsize=3, markersize=5, linewidth=2)
+    ax1.errorbar(sample_counts, mv_means, yerr=mv_stds,
+                  fmt='s-', color=COLORS["multi_view"], label="Multi-view",
+                  capsize=3, markersize=5, linewidth=2)
+
+    # Baseline reference
+    baseline_path = os.path.join(RESULTS_DIR, "baseline_results.csv")
+    if os.path.isfile(baseline_path):
+        bl = pd.read_csv(baseline_path)
+        bl_mean = bl["combined_score"].mean()
+        ax1.axhline(bl_mean, color=COLORS["positive"], linestyle='--', linewidth=1.5,
+                     label=f"Baseline (mean={bl_mean:.3f})")
+
+    ax1.set_xlabel("Prediction Samples", color=COLORS["text"])
+    ax1.set_ylabel("Mean Combined Score", color=COLORS["text"])
+    ax1.set_title("Score vs Sample Count", color=COLORS["text"])
+    ax1.legend(fontsize=9, frameon=True)
+    ax1.set_xscale("log")
+    ax1.grid(True, alpha=0.3, color=COLORS["grid"])
+    ax1.set_facecolor(COLORS["panel_bg"])
+
+    # Right panel: Latency vs samples
+    lat_means = []
+    lat_stds = []
+    for n_samples in sample_counts:
+        subset = sweep[sweep["prediction_samples"] == n_samples]
+        lats = subset["latency_ms"]
+        lat_means.append(lats.mean() if len(lats) > 0 else np.nan)
+        lat_stds.append(lats.std() if len(lats) > 0 else np.nan)
+
+    ax2.errorbar(sample_counts, lat_means, yerr=lat_stds,
+                  fmt='o-', color=COLORS["warning"], capsize=3, markersize=5, linewidth=2)
+    ax2.axhline(100, color=COLORS["negative"], linestyle='--', linewidth=1.5,
+                 label="IDE limit (100ms)")
+    ax2.axhline(400, color=COLORS["negative"], linestyle=':', linewidth=1.5,
+                 label="MAR limit (400ms)")
+
+    ax2.set_xlabel("Prediction Samples", color=COLORS["text"])
+    ax2.set_ylabel("Pipeline Latency (ms)", color=COLORS["text"])
+    ax2.set_title("Latency vs Sample Count", color=COLORS["text"])
+    ax2.legend(fontsize=9, frameon=True)
+    ax2.set_xscale("log")
+    ax2.grid(True, alpha=0.3, color=COLORS["grid"])
+    ax2.set_facecolor(COLORS["panel_bg"])
+
+    fig.suptitle("Score & Latency vs SMC Sample Count",
+                 fontsize=14, color=COLORS["text"], fontweight="bold")
+    fig.tight_layout()
+    _save_fig(fig, "fig13_score_vs_samples", fmt, dpi)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1538,6 +1917,7 @@ def main():
     plot_per_view_coverage(occlusion_rows, args.format, args.dpi)
 
     # Score-based analysis figures (Figures 7d-7f)
+    plot_benchmark_comparison(occlusion_rows, summary_rows, args.format, args.dpi)
     plot_score_distribution(occlusion_rows, args.format, args.dpi)
     plot_best_score_by_type(occlusion_rows, args.format, args.dpi)
     plot_score_vs_wrist_angle(occlusion_rows, args.format, args.dpi)
@@ -1549,6 +1929,12 @@ def main():
 
     # Figure 9: 3D synthetic setup (always generated, no data dependencies)
     plot_synthetic_setup(args.format, args.dpi)
+
+    # Figure 12: Object gallery (no data dependencies)
+    plot_object_gallery(args.format, args.dpi)
+
+    # Figure 13: Score vs samples sweep (requires sweep data)
+    plot_score_vs_samples(args.format, args.dpi)
 
     print(f"\nDone. Figures in: {FIGURES_DIR}")
 

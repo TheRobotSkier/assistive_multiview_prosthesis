@@ -24,6 +24,10 @@ pub fn HAND_RADIUS_M() -> f64 { crate::runtime_config::get().hand_radius_m }
 pub fn MIN_TSDF_DIM_M() -> f32 { crate::runtime_config::get().min_tsdf_dim_m }
 pub fn MAX_TSDF_DIM_M() -> f32 { crate::runtime_config::get().max_tsdf_dim_m }
 
+// Hit-time-informed sampling
+pub fn HIT_TIME_SPREAD_S() -> f64 { crate::runtime_config::get().hit_time_spread_s }
+pub fn HIT_TIME_EXPLORATION_FRACTION() -> f64 { crate::runtime_config::get().hit_time_exploration_fraction }
+
 // Wrist rotation allowed range (radians). The wrist rotates around the local
 // Y axis (supination/pronation). Value is the half-range; actual rotation is
 // sampled uniformly from [-WRIST_ROTATION_RANGE_RAD, WRIST_ROTATION_RANGE_RAD].
@@ -37,8 +41,6 @@ pub fn FIXED_COV_V() -> [f64; 3] { crate::runtime_config::get().fixed_cov_v }
 pub fn ITERATIONS() -> usize { crate::runtime_config::get().iterations }
 pub fn DECAY_RATE() -> f64 { crate::runtime_config::get().decay_rate }
 pub fn ELITE_RATIO() -> f64 { crate::runtime_config::get().elite_ratio }
-pub fn SMC_CONVERGENCE_TOL() -> f64 { crate::runtime_config::get().smc_convergence_tol }
-pub fn SMC_MIN_ITERATIONS() -> usize { crate::runtime_config::get().smc_min_iterations }
 pub fn GRASP_TYPE_MIN_PROBABILITY() -> f64 { crate::runtime_config::get().grasp_type_min_probability }
 
 // Starting Proposal Variance

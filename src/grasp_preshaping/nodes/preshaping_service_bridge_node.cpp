@@ -86,6 +86,8 @@ public:
       declare_parameter<std::string>("hand_twist_topic", "/hand_twist");
     const std::string cloud_topic =
       declare_parameter<std::string>("cloud_topic", "/segmentation/object_cloud");
+    const std::string hit_time_topic =
+      declare_parameter<std::string>("hit_time_topic", "/grasp_preshaping/hit_time");
     const std::string thumb_cmd_topic =
       declare_parameter<std::string>("thumb_cmd_topic", "/thumb_pos_ff_controller/commands");
     const std::string index_cmd_topic =
@@ -125,6 +127,14 @@ public:
         std::lock_guard<std::mutex> lock(input_mutex_);
         latest_cloud_ = *msg;
         has_cloud_ = true;
+      });
+
+    hit_time_sub_ = create_subscription<std_msgs::msg::Float64>(
+      hit_time_topic, 10,
+      [this](const std_msgs::msg::Float64::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(input_mutex_);
+        latest_hit_time_ = msg->data;
+        has_hit_time_ = true;
       });
 
     thumb_cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
@@ -371,6 +381,11 @@ private:
       n_cameras = 1;
     }
     request.n_cameras = n_cameras;
+    // Hit time from twist propagation (negative = no hit time available).
+    {
+      std::lock_guard<std::mutex> lock(input_mutex_);
+      request.hit_time_s = has_hit_time_ ? latest_hit_time_ : -1.0;
+    }
 
     RCLCPP_INFO(
       get_logger(),
@@ -535,6 +550,8 @@ private:
   bool has_pose_;
   bool has_twist_;
   bool has_cloud_;
+  bool has_hit_time_ = false;
+  double latest_hit_time_ = -1.0;
 
   void * rust_lib_handle_;
   GraspComputeFn rust_compute_fn_;
@@ -551,6 +568,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr hand_pose_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr hand_twist_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr hit_time_sub_;
 
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr thumb_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr index_cmd_pub_;

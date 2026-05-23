@@ -119,6 +119,15 @@ GRASP_TYPE_NAMES = {
     GRASP_TYPE_LATERAL: "lateral",
 }
 
+# Map grasp_type_id -> string names
+GRASP_TYPE_NAMES_INV = {v: k for k, v in GRASP_TYPE_NAMES.items()}
+
+__all__ = [
+    "GraspLibrary", "reload_config",
+    "GRASP_TYPE_NAMES", "GRASP_TYPE_NAMES_INV",
+]
+
+
 # ---------------------------------------------------------------------------
 # Library loader
 # ---------------------------------------------------------------------------
@@ -153,6 +162,28 @@ def _find_so() -> str:
         + "\n".join(f"  {p}" for p in _SO_SEARCH_PATHS)
         + "\nSet GRASP_PRESHAPING_LIB_PATH to override."
     )
+
+
+def _load_so() -> tuple[ctypes.CDLL, str]:
+    """Load the library at module level for use by reload_config."""
+    so_path = _find_so()
+    lib = ctypes.CDLL(so_path)
+    lib.grasp_preshaping_reload_config.restype = ctypes.c_int32
+    return lib, so_path
+
+
+_LIB, _SO_PATH = _load_so()
+
+
+def reload_config() -> int:
+    """Clear the cached C API config, forcing reload from GRASP_CONFIG_PATH.
+
+    Returns 0 on success, -1 if the C API function is not available (older lib).
+    """
+    try:
+        return _LIB.grasp_preshaping_reload_config()
+    except AttributeError:
+        return -1
 
 
 class GraspLibrary:

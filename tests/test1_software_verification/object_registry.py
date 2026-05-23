@@ -30,13 +30,11 @@ CONVEXITY = {
     "ellipsoid": "convex",
     "tapered_bottle": "convex",
     "small_cube": "convex",
-    "sphere": "convex",
     # Non-convex parametric objects
     "l_block": "non-convex",
-    "mug_with_handle": "non-convex",
     "notched_box": "non-convex",
     "cross_shape": "non-convex",
-    "thin_plate": "non-convex",  # flat shape has grazing-angle occlusion
+    "thin_plate": "non-convex",
     # YCB objects (non-convex geometry)
     "banana": "non-convex",
     "mug": "non-convex",

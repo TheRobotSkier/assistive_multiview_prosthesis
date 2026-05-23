@@ -17,14 +17,18 @@ import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, Command
 
 
-# Default config path: workspace-root config/prosthesis_config.yaml
-_WORKSPACE_ROOT = os.path.join(
+# Default config path: try workspace-root config/ first, then relative to launch file
+_workspace_root = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", ".."
 )
-DEFAULT_CONFIG = os.path.join(_WORKSPACE_ROOT, "config", "prosthesis_config.yaml")
+DEFAULT_CONFIG = os.path.join(_workspace_root, "config", "prosthesis_config.yaml")
+if not os.path.isfile(DEFAULT_CONFIG):
+    # When running from install space, the relative path may not resolve.
+    # Fall back to the well-known Docker workspace path.
+    DEFAULT_CONFIG = "/prosthesis_ws/config/prosthesis_config.yaml"
 
 
 def generate_launch_description():
@@ -40,7 +44,10 @@ def generate_launch_description():
         package="pipeline_manager",
         executable="pipeline_manager_node",
         name="pipeline_manager",
-        parameters=[LaunchConfiguration("config_file")],
+        parameters=[
+            LaunchConfiguration("config_file"),
+            {"use_mock_emg": False},  # test scripts publish synthetic EMG
+        ],
         output="screen",
     )
 
@@ -111,11 +118,30 @@ def generate_launch_description():
         output="screen",
     )
 
+    # Static TF: camera_color_optical_frame → world (identity)
+    # Required by segmentation bridge to transform clicks from the twist
+    # propagation frame to the cloud frame.  In the real system this comes
+    # from the camera extrinsics calibration.
+    camera_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        name="camera_optical_tf",
+        arguments=[
+            "--x", "0", "--y", "0", "--z", "0",
+            "--roll", "0", "--pitch", "0", "--yaw", "0",
+            "--frame-id", "world",
+            "--child-frame-id", "camera_color_optical_frame",
+        ],
+        output="screen",
+    )
+
     return LaunchDescription(
         [
             config_arg,
+            camera_tf,
             mock_cloud,
             mock_emg,
+            segmentation_bridge,
             twist_propagation,
             preshaping_service,
             proximity_controller,

@@ -1,0 +1,146 @@
+\subsubsection{Initial TSDF Construction via BFS}
+The algorithm constructs an unsigned truncated distance field by running a breadth-first search outward from the occupied surface voxels, which are identified via the sorted Morton array by finding the unique IDs of the array. Setting the maximum BFS depth to match the truncation distance naturally confines all volumetric computations and memory allocations to a narrow band surrounding the object boundary.
+
+A per-camera ray-voting scheme determines the signs of individual voxels. The system remembers the nearest surface point from the previous BFS step, then projects both the target voxel and that point onto the ray originating from each camera centre. If the voxel lies farther along the camera ray than the surface point, and the surface-to-voxel vector aligns with the camera ray direction (maintaining a dot product greater than 0.9), that camera casts an internal vote. The system assigns a negative sign if at least one camera confirms the voxel is occluded behind the surface and no other sensor views it as unoccluded. While thin geometric surfaces can introduce voting ambiguity within narrow truncation bands, this edge-case mismatch does not compromise stability, as the underlying superquadric approximation resolves outstanding tie-breakers.
+
+It is worth noting that the sign assignment of the initial TSDF is inherently an approximation of the real TSDF. The architecture was designed to accept a fused, segmented point cloud as the interface between perception and planning, meaning the grasp planner operates on a camera-agnostic representation without requiring knowledge of intrinsics, extrinsics, or depth map formats. Computing distances directly on this fused point cloud via a BFS provides analytically exact nearest-surface Euclidean distances at the voxel centres, avoiding the `staircase' artefacts that projective TSDF can introduce at oblique surfaces. While projective TSDF could alternatively be applied to individual depth maps and fused in a separate volume, this would reintroduce camera-specific dependencies that the current architecture intentionally avoids.
+
+[We should have an image that shows the tsdf at this stage]
+
+A TSDF offers three distinct advantages over raw point representations:
+\begin{enumerate}
+    \item \textbf{Voxel Distance Field:} Provides direct lookup for proximity evaluations, accelerating collision checks.
+    \item \textbf{Volumetric Truncation:} Limits the computational overhead by only calculating the narrow surface band relevant to finger contact.
+    \item \textbf{Signed Voxel Space:} The spatial gradient of the field yields explicit surface normals for force direction scoring, while the sign clearly distinguishes internal space from free space.
+\end{enumerate}
+
+\subsection{Superquadric Backside Estimation}
+
+Without backside estimation, the TSDF only contains information from the visible surface. This makes the optimiser fail to determine how far to close the grasp and makes grasp scoring unreliable. This could result in the wrong grasp type purely based on the thin shell of observed voxels. Therefore, a backside estimation is implemented.
+
+While fitting standard shapes like cubes, cylinders, or spheres independently could close the mesh, each primitive demands distinct algebraic formulations, specialised optimisation procedures, and dedicated boundary checks. To prevent this complexity, this framework uses superquadric representations of these primitives to provide a single inside-outside function that unifies all shapes:
+\begin{equation}
+F(x,y,z) = \left(\left(\left|\frac{x}{a}\right|^{\frac{2}{\epsilon_1}} + \left|\frac{y}{b}\right|^{\frac{2}{\epsilon_1}}\right)^{\frac{\epsilon_1}{\epsilon_2}} + \left|\frac{z}{c}\right|^{\frac{2}{\epsilon_2}}\right)^{\epsilon_2} - 1
+\end{equation}
+where $a,b,c$ are the half-extents along each axis and $(\epsilon_1, \epsilon_2)$ control the shape: $(1,1)$ produces a sphere, $(0.1, 0.1)$ approximates a box with rounded edges, and $(0.1, 1.0)$ produces a cylinder. The surface is defined by $F=0$, with $F<0$ inside and $F>0$ outside. This single function supports all three primitive types with one optimisation routine, one distance evaluation, and one inside/outside test.
+
+\subsubsection{Pipeline}
+\begin{enumerate}
+    \item \textbf{Principal Component Analysis:} Using PCA, the orientation of the point cloud can be established, limiting the optimisation variables. One thing to note is that PCA locks the rotation for all template fits; for the cylinder template the Z PCA axis is implicitly treated as the symmetry axis. This is acceptable in practice because the hand approach direction from the motion model constrains the feasible cylinder orientations, and the parallel template matching selects the best-fitting shape class overall.
+    \item \textbf{Oriented Bounding Boxes:} Evaluates the bounding extents along the computed PCA axes to establish the initial scale and translation parameters for the optimiser.
+    \item \textbf{Parallel Template Matching:} Fits three distinct shape configurations (sphere: $\epsilon_1=1, \epsilon_2=1$; box: $\epsilon_1=0.1, \epsilon_2=0.1$; cylinder: $\epsilon_1=0.1, \epsilon_2=1.0$) concurrently using the \texttt{rayon} parallel framework. The primitives use $\epsilon_1, \epsilon_2 = 0.1$ (rather than true zero) for the box and cylinder templates to maintain numerical stability in the Taubin distance approximation (\S\ref{sec:taubin}), which divides by the gradient norm — near-singular gradients that arise from extremely sharp corners would degrade this computation.
+    \item \textbf{Optimiser:} Each primitive template is refined using a Gauss-Newton optimiser. The optimisation searches for the optimal location and scale for each axis that minimises distance to the template.
+    \item \textbf{Template Selection:} The pipeline selects the shape template with the lowest mean squared fitting residual — the average of $F(\mathbf{p})^2$ over all observed points $\mathbf{p}$ in the point cloud, which measures how closely each point conforms to the superquadric surface — provided the error falls below a predefined threshold ($0.15$ in the default configuration, chosen as a sensible empirical value); otherwise, the backside estimation is skipped entirely and the pipeline proceeds with camera-only TSDF data.
+\end{enumerate}
+
+\newcommand{\sqfunc}{F(\mathbf{x})}%
+Evaluating geometric distances from the fitted superquadric uses the Taubin approximation
+\begin{equation}
+D = \frac{\sqfunc}{\|\nabla \sqfunc\|},
+\end{equation}
+which normalises the inside-outside function by its analytical spatial gradient. One Newton-Raphson refinement step along the estimated surface normal reduces the distance error from approximately 15\% to 5\% within the truncation band, satisfying the precision constraints of the collision scoring system.
+
+\subsubsection{Backside Integration in TSDF}
+Integrating the superquadric geometry into the existing TSDF uses a blending scheme defined by:
+\begin{itemize}
+    \item \textbf{Congruent Signs:} If both the camera and superquadric model agree on the sign, the pipeline preserves the camera-derived distances near the visible shell. The framework will interpolate into the superquadric distance values near the existing outer truncation boundary. Beyond the initial truncation band, the superquadric model defines the distance exclusively.
+    \item \textbf{Incongruent Signs:} If they disagree, the pipeline trusts the superquadric sign for the inside/outside decision in all cases. Near the visible boundary, the camera distance magnitude is preserved while the sign is flipped to match the superquadric. Farther from the observed shell, the system switches to the superquadric distance entirely, with smoothstep interpolation in the transition zone to ensure a continuous gradient.
+\end{itemize}
+This dual-domain approach ensures that camera data governs the visible regions, while the regularised superquadric geometry builds the unobserved backside.
+
+[We should have a nice figure to show the finished TSDF]
+
+\subsection{Finger Contact Lookup Table}
+To avoid running inverse kinematics at runtime, the full finger closure trajectories are pre-computed offline. This allows the execution loop to step along a pre-calculated path and evaluate coordinate positions directly against the TSDF volume, reducing collision detection to a series of array lookups and distance queries.
+
+Generating this LUT utilises the Pinocchio rigid-body dynamics library operating on the official prosthesis URDF. The kinematic description is simplified to match the single-degree-of-freedom actuation constraints of the prosthesis, enabling direct integration with Pinocchio. The system stores the spatial transforms of individual points along the finger segments at every step along the closure path as dual quaternions. Dual quaternions represent rigid body transforms compactly using eight real coefficients, avoiding gimbal lock and allowing computationally efficient linear interpolation directly in the rigid body transform manifold. The resulting \texttt{.npz} file is saved and otherwise loaded into memory during application startup.
+
+[Figure showing the contact points. There is a Python file that can already visualise this]
+
+\subsection{Grasp Scoring}
+The scoring framework evaluates grasp quality by combining multiple complementary metrics. Each metric targets a specific failure mode, constructing a dense optimisation landscape that guides the evolutionary search toward stable grasps.
+
+\subsubsection{Collision Detection and Binary Refinement}
+The optimisation loop steps through the pre-computed trajectory LUT, testing active collision points against local TSDF values. When a coordinate enters the collision tolerance zone, the system logs the sample state and executes a binary search refinement between the colliding state and the preceding safe step to pinpoint the exact contact interface.
+
+Hardware coupling constraints are embedded directly into the LUT layout; each distinct grasp type features a maximum closure threshold that prevents the virtual joints from exceeding the physical limits of the mechanical prosthesis. Furthermore, fingers omitted from a specified grasp configuration (such as the middle, ring, and little fingers during a precision pinch grasp) remain locked in an open position.
+
+\subsubsection{Grasp Type Specifications}
+The three grasp types used differ in their contact point sets, minimum contact requirements, and thumb mode. Table~\ref{tab:grasp_specs} summarises these specifications.
+
+\begin{table}[h]
+\centering
+\caption{Grasp Type Specifications}
+\label{tab:grasp_specs}
+\begin{tabular}{lcccc}
+\hline
+\textbf{Grasp Type} & \textbf{Score Contacts} & \textbf{Min Contacts} & \textbf{Min Fingers} & \textbf{Thumb Mode} \\ \hline
+Cylindrical & 21 & 3 & Thumb + Index & Abduction \\
+Pinch & 2 & 2 & Thumb + Index & Abduction \\
+Lateral & 5 & 2 & Thumb + Index & Adduction \\ \hline
+\end{tabular}
+\end{table}
+
+For cylindrical grasps, all finger segments (including fingertips) and four palm contacts participate in scoring. Pinch grasps evaluate only the thumb tip and index tip. Lateral grasps use the adducted thumb tip and the lateral (side) contacts of the index finger. All three types require both thumb and index finger engagement for a valid Tier 1 score.
+
+\subsubsection{Tier-Based Scoring System}
+Because a binary collision signal provides no optimisation gradient, a four-tier contact scoring architecture was designed. This formulation creates a smooth optimisation landscape that spans from the initial object approach to the final stable contact:
+
+\begin{table}[h]
+\centering
+\caption{Tiered Grasp Optimisation Scoring Hierarchy}
+\label{tab:scoring_tiers}
+\begin{tabular}{lll}
+\hline
+\textbf{Tier} & \textbf{Condition} & \textbf{Score Range} \\ \hline
+\textbf{Tier 4} & No Contact (Finger sweep completes without collision) & $[0.00, 0.05]$ \\
+\textbf{Tier 3} & Invalid Initial Contact (Palm or hand starts inside object) & $[0.01, 0.09]$ \\
+\textbf{Tier 2} & Partial Contact (Insufficient finger groups engaged) & $[0.00, 0.50]$ \\
+\textbf{Tier 1} & Valid Contact (Thumb and index finger engaged, plus required additional fingers) & $[0.80, 1.00]$ \\ \hline
+\end{tabular}
+\end{table}
+
+Tier 4 evaluates proximity at mid-closure using three key points (palm centre, index tip, thumb tip). When these points fall within the TSDF truncation band, the TSDF distance produces a score in $[0.00, 0.05]$; outside the band the superquadric Taubin distance provides a fallback score in $[0.00, 0.04]$. This coarse directional signal pulls the population toward the target surface. Tier 3 penalises impossible configurations where the hand initialises inside the object structure. The score is depth-graded using the superquadric penetration depth, yielding $0.09$ when the hand is barely inside the surface and decaying to $0.01$ for deep penetration, producing a gradient that encourages the optimiser to move the hand outward. Tier 2 awards partial credit when the prosthesis touches the object but fails to establish a mechanically stable configuration because the thumb, index finger, or minimum finger count requirement is not met. The score is $0.25 \times \text{contact\_fraction} + 0.25 \times \text{proximity\_penalty}$, where the penalty measures the distance from the missing fingers to the nearest surface. Tier 1 applies full alignment and force closure evaluations to valid grasp candidates, scoring as $0.8 + 0.2 \times \text{contact\_fraction}$ to reward higher contact coverage. The explicit thumb and index finger requirement in Tier 1 reflects the prosthesis kinematics: the thumb provides opposition while the index finger provides the primary contact surface, making both essential for a mechanically stable grasp across all available grasp types.
+
+\subsubsection{Wrench Proxy}
+Computing a full wrench-based force closure metric requires an accurate estimate of the object's centre of mass, which can only be roughly estimated with the current sensors in this project. Instead, a wrench proxy is used. It measures the spatial balance of contact normals:
+\begin{equation}
+\text{force\_closure} = 1 - \|\bar{\mathbf{n}}\|
+\end{equation}
+where $\bar{\mathbf{n}}$ represents the mean surface normal vector averaged across all active contact points. This formulation tracks grasp stability by encouraging balanced opposition without requiring mass or density information. The proxy penalises unstable, single-sided grasps where contact vectors align in the same direction, and rewards configurations with opposing contact forces.
+
+\subsubsection{Combined Score}
+A normalised weighted sum determines the final combined score ($S$):
+\begin{equation}
+S = \frac{w_p \cdot P + w_a \cdot A + w_f \cdot F + w_c \cdot C}{w_p + w_a + w_f + w_c}
+\end{equation}
+where $P$ represents the sample probability, $A$ defines the geometric alignment, $F$ matches the force closure proxy, and $C$ tracks the tiered contact score. The contact component receives a dominant weight assignment ($w_c = 3.0$ versus $w_p = w_a = w_f = 1.0$) because $C$ establishes the primary directional gradient across the tier hierarchy.
+
+\subsection{Evolution Strategy Optimization}
+The underlying search space comprises eight dimensions: a 6-DOF propagation pose, a 1D continuous wrist rotation, and 1D discrete grasp selection. In early design iterations, a uniform random sampling strategy was evaluated; however, that approach required up to $1{,}000{,}000$ independent samples to cover the high-dimensional space adequately, exceeding latency limits.
+
+By replacing random sampling with an iterative, population-based Evolution Strategy with elitist preservation and decaying mutation variance, the pipeline achieves equivalent stability in grasp selection using only $20{,}000$ particles evaluated over 5 iterations. The predictive motion model provides a strong spatial prior that clusters the initial population around likely future trajectories, while the tiered scoring function ensures a smooth optimisation gradient across sparse regions.
+
+\subsubsection{The Optimization Algorithm}
+The optimization initializes by drawing a broad population from the motion model prior (Iteration 0). The framework then iteratively refines this population through truncation selection, elite preservation, and focused resampling guided by a decaying proposal variance. In each subsequent iteration, a hard threshold isolates the top-performing 5\% of the population to act as parents. The algorithm then regenerates the population around these parents by applying localised Gaussian perturbations with a standard deviation that decays geometrically as $\sigma = \sigma_0 \cdot 0.7^{\text{iteration}}$.
+
+\subsubsection{Algorithmic Enhancements}
+Five tailored architectural enhancements were made to stabilise the evolution loop and prevent localised convergence:
+\begin{itemize}
+    \item \textbf{Elite Injection:} The framework preserves the top 1\% of candidate solutions completely unchanged across generational updates, ensuring optimal grasp paths are not lost to stochastic mutation noise.
+    \item \textbf{Score-Weighted Parent Selection:} Rather than sampling uniformly, the generation of new candidate particles selects parent seeds with a probability directly proportional to their scores, focusing search density on highly productive regions.
+    \item \textbf{Grasp Type Mutation:} A stochastic mutation operator introduces a 10\% chance to swap categorical grasp types. The swap distribution is weighted by the real-time performance of each grasp family across the population, allowing the search to lock onto the ideal grasp type without freezing out alternative strategies too early.
+    \item \textbf{Decaying Proposal Variance:} The mutation standard deviation decays geometrically according to $\sigma = \sigma_0 \cdot 0.7^{\text{iteration}}$. This decay ensures broad exploration during initial iterations and fine-grained refinement in later generations.
+\end{itemize}
+
+\subsubsection{Computational Considerations}
+The primary configuration manages an active population of $20{,}000$ particles across a maximum of 5 generations. Because the pipeline constructs the TSDF volume once per sensor frame, parallel particle scoring across concurrent threads dominates the per-generation computational cost. Total execution timing for the entire pipeline ranges around $\sim$100 ms on an Intel i7-12700 (20 000 particles $\times$ 5 iterations), fitting comfortably within the target operating window.
+
+\subsection{Challenges}
+Several engineering challenges encountered during development yielded insights applicable beyond this specific system:
+
+\begin{enumerate}
+    \item \textbf{Deep-interior contact filtering:} Negative-distance voxels deep inside the object were incorrectly scored as valid contacts. A surface proximity filter in the contact detection stage now rejects contacts whose distance falls outside a narrow band around the zero-crossing, ensuring only genuine surface contacts contribute to the score.
+    \item \textbf{Best-grasp tracking across iterations:} Initially, the output was selected from the final iteration only. In debugs, this produced inconsistent results with higher scores being seen than where selected. The resolution was to use elite injection to prevent loss of high-quality solutions.
+    \item \textbf{SQ boundary artefacts :} Slight misalignment between the superquadric surface and the camera-derived surface caused sign flips near the boundary. Writing better thought-out sign flipping logic, combined with a minimum distance threshold (2 voxels from the surface), helps preserve camera authority near the observed surface.
+\end{enumerate}

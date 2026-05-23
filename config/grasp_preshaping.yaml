@@ -31,8 +31,6 @@ fixed_cov_v: [0.0005, 0.0005, 0.0005]
 iterations: 5
 decay_rate: 0.7
 elite_ratio: 0.05
-smc_convergence_tol: 0.01
-smc_min_iterations: 3
 grasp_type_min_probability: 0.15
 
 # Starting proposal variance

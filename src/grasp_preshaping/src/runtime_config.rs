@@ -8,6 +8,7 @@
 // If the file is missing or malformed, compile-time defaults are used unchanged.
 // The YAML file only needs to contain values you want to override.
 
+use std::sync::atomic::{AtomicPtr, Ordering};
 use std::sync::OnceLock;
 
 use serde::Deserialize;
@@ -37,6 +38,10 @@ mod defaults {
     // Wrist rotation
     pub const WRIST_ROTATION_RANGE_RAD: f64 = std::f64::consts::FRAC_PI_2;
 
+    // Hit-time-informed sampling
+    pub const HIT_TIME_SPREAD_S: f64 = 0.5;
+    pub const HIT_TIME_EXPLORATION_FRACTION: f64 = 0.1;
+
     // Fixed twist covariance
     pub const FIXED_COV_OMEGA: [f64; 3] = [0.001, 0.001, 0.001];
     pub const FIXED_COV_V: [f64; 3] = [0.0005, 0.0005, 0.0005];
@@ -45,8 +50,6 @@ mod defaults {
     pub const ITERATIONS: usize = 5;
     pub const DECAY_RATE: f64 = 0.7;
     pub const ELITE_RATIO: f64 = 0.05;
-    pub const SMC_CONVERGENCE_TOL: f64 = 0.01;
-    pub const SMC_MIN_ITERATIONS: usize = 3;
     pub const GRASP_TYPE_MIN_PROBABILITY: f64 = 0.15;
 
     // Starting proposal variance
@@ -105,6 +108,10 @@ pub struct RuntimeConfig {
     // Wrist rotation
     pub wrist_rotation_range_rad: f64,
 
+    // Hit-time-informed sampling
+    pub hit_time_spread_s: f64,
+    pub hit_time_exploration_fraction: f64,
+
     // Fixed twist covariance
     pub fixed_cov_omega: [f64; 3],
     pub fixed_cov_v: [f64; 3],
@@ -113,8 +120,6 @@ pub struct RuntimeConfig {
     pub iterations: usize,
     pub decay_rate: f64,
     pub elite_ratio: f64,
-    pub smc_convergence_tol: f64,
-    pub smc_min_iterations: usize,
     pub grasp_type_min_probability: f64,
 
     // Starting proposal variance
@@ -162,13 +167,13 @@ impl Default for RuntimeConfig {
             min_tsdf_dim_m: defaults::MIN_TSDF_DIM_M,
             max_tsdf_dim_m: defaults::MAX_TSDF_DIM_M,
             wrist_rotation_range_rad: defaults::WRIST_ROTATION_RANGE_RAD,
+            hit_time_spread_s: defaults::HIT_TIME_SPREAD_S,
+            hit_time_exploration_fraction: defaults::HIT_TIME_EXPLORATION_FRACTION,
             fixed_cov_omega: defaults::FIXED_COV_OMEGA,
             fixed_cov_v: defaults::FIXED_COV_V,
             iterations: defaults::ITERATIONS,
             decay_rate: defaults::DECAY_RATE,
             elite_ratio: defaults::ELITE_RATIO,
-            smc_convergence_tol: defaults::SMC_CONVERGENCE_TOL,
-            smc_min_iterations: defaults::SMC_MIN_ITERATIONS,
             grasp_type_min_probability: defaults::GRASP_TYPE_MIN_PROBABILITY,
             initial_proposal_std_v: defaults::INITIAL_PROPOSAL_STD_V,
             initial_proposal_std_omega: defaults::INITIAL_PROPOSAL_STD_OMEGA,
@@ -237,7 +242,19 @@ pub fn crate_root() -> &'static std::path::Path {
 // Global singleton
 // ─────────────────────────────────────────────────────────────────────────────
 
-static RUNTIME_CONFIG: OnceLock<RuntimeConfig> = OnceLock::new();
+// Lock-free, reloadable runtime config.
+// Uses AtomicPtr so reads are a single Acquire load (~5 ns) with no contention.
+// On reload, the old config is leaked (bounded by 7 reloads × ~200 bytes = ~1.4 KB).
+static RUNTIME_CONFIG: AtomicPtr<RuntimeConfig> = AtomicPtr::new(std::ptr::null_mut());
+static INIT: OnceLock<()> = OnceLock::new();
+
+fn ensure_init() {
+    INIT.get_or_init(|| {
+        let cfg = Box::new(load_config());
+        let ptr = Box::into_raw(cfg);
+        RUNTIME_CONFIG.store(ptr, Ordering::Release);
+    });
+}
 
 /// Load runtime config from YAML file. Called once on first access.
 /// If the file doesn't exist or can't be parsed, defaults are used.
@@ -279,6 +296,22 @@ fn load_config() -> RuntimeConfig {
 }
 
 /// Get the global runtime config. Initialized once on first access.
+/// Get the global runtime config. Lock-free, ~5 ns after first call.
 pub fn get() -> &'static RuntimeConfig {
-    RUNTIME_CONFIG.get_or_init(load_config)
+    ensure_init();
+    let ptr = RUNTIME_CONFIG.load(Ordering::Acquire);
+    // SAFETY: AtomicPtr is only ever set to a valid Box::into_raw pointer
+    // that outlives the caller (leaked on reload).
+    unsafe { &*ptr }
+}
+
+/// Force-reload the config from `GRASP_CONFIG_PATH`. Used by the sweep test
+/// to change `prediction_samples` between iterations.
+/// Old config is leaked (bounded, ~1.4 KB total for a 7-point sweep).
+pub fn reload() {
+    let new_cfg = Box::new(load_config());
+    let new_ptr = Box::into_raw(new_cfg);
+    let old_ptr = RUNTIME_CONFIG.swap(new_ptr, Ordering::AcqRel);
+    // Leak old config — other threads may still hold references through `get()`.
+    std::mem::forget(unsafe { Box::from_raw(old_ptr) });
 }

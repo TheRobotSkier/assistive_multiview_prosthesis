@@ -117,6 +117,7 @@ _BASELINE_SCRIPT = textwrap.dedent("""\
         result = response_to_dict(resp)
         result["status"] = status
         result["message"] = msg
+        result["rep"] = i
         runs.append(result)
 
     successful = [r for r in runs if r["success"]]
@@ -126,6 +127,7 @@ _BASELINE_SCRIPT = textwrap.dedent("""\
         agg["condition"] = "baseline"
         agg["n_baseline_reps"] = n_reps
         agg["n_successful"] = 0
+        all_scores = [0.0] * n_reps
     else:
         from collections import Counter
         grasp_counts = Counter(r["grasp_type_name"] for r in successful)
@@ -142,6 +144,7 @@ _BASELINE_SCRIPT = textwrap.dedent("""\
         median_target = np.median(targets, axis=0)
         median_quat = quats[np.argmax(np.abs(quats @ np.median(quats, axis=0)))]
         best_score = max(r["combined_score"] for r in successful)
+        all_scores = [r.get("combined_score", 0.0) for r in runs]
         agg = {
             "object": obj_name,
             "condition": "baseline",
@@ -159,6 +162,7 @@ _BASELINE_SCRIPT = textwrap.dedent("""\
             "wrist_qw": float(median_quat[3]),
             "success": True,
             "pipeline_time_ms": max(r["pipeline_time_ms"] for r in successful),
+            "all_scores": all_scores,
         }
 
     with open(output_path, "w") as f:
@@ -171,7 +175,7 @@ def compute_baseline(
     approach: dict,
     results_dir: str,
     timeout: int = 120,
-    n_reps: int = 5,
+    n_reps: int = 20,
 ) -> dict | None:
     """Run baseline computation in a fresh subprocess with the high-fidelity config.
 
@@ -475,6 +479,36 @@ def run_occlusion_test(lib: GraspLibrary, objects: list[str],
                           f"grasp={GRASP_TYPE_NAMES.get(resp.grasp_type, '?')}, "
                           f"score={resp.combined_score:.3f}")
 
+    # Save baselines to CSV for benchmark comparison
+    if baselines:
+        baseline_rows = []
+        baseline_all_scores = []
+        for obj_name, bl in sorted(baselines.items()):
+            row = {"object": obj_name, "condition": "baseline"}
+            for k, v in bl.items():
+                if k.startswith("_"):
+                    continue
+                row[k] = v
+            baseline_rows.append(row)
+            # Expand all_scores into individual rows for violin plot
+            all_scores = bl.get("all_scores", [])
+            for i, score in enumerate(all_scores):
+                baseline_all_scores.append({
+                    "object": obj_name,
+                    "condition": "baseline",
+                    "rep": i,
+                    "combined_score": score,
+                })
+        _write_csv(
+            os.path.join(RESULTS_DIR, "baseline_results.csv"),
+            baseline_rows,
+        )
+        if baseline_all_scores:
+            _write_csv(
+                os.path.join(RESULTS_DIR, "baseline_all_scores.csv"),
+                baseline_all_scores,
+            )
+
     return rows
 
 
@@ -595,6 +629,110 @@ def compute_intent_precision(rows: list[dict]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Score-vs-Samples Sweep
+# ---------------------------------------------------------------------------
+
+def run_score_sweep(lib, objects, args):
+    """Sweep prediction_samples across multiple values and record scores + latency."""
+    import yaml
+
+    sample_counts = [int(x.strip()) for x in args.sweep_counts.split(",")]
+    n_reps = args.sweep_reps
+    prod_config = os.path.join(CONFIG_DIR, "grasp_preshaping.yaml")
+
+    with open(prod_config) as f:
+        base_cfg = yaml.safe_load(f)
+
+    sweep_rows = []
+
+    for n_samples in sample_counts:
+        print(f"\n--- Sample count: {n_samples} ---")
+
+        # Create a temporary config with modified prediction_samples
+        cfg = dict(base_cfg)
+        cfg["prediction_samples"] = n_samples
+        sweep_config = os.path.join(RESULTS_DIR, f"_sweep_config_{n_samples}.yaml")
+        with open(sweep_config, "w") as f:
+            yaml.dump(cfg, f)
+        os.environ["GRASP_CONFIG_PATH"] = sweep_config
+
+        # Force Rust library to reload config from the new path
+        from ffi_bridge import reload_config
+        reload_config()
+
+        for obj_name in objects:
+            try:
+                obj = load_object(obj_name)
+                approach = get_approach(obj_name)
+            except Exception as e:
+                print(f"  {obj_name}: SKIP ({e})")
+                continue
+
+            full_cloud = obj["points"]
+            cam_frames = get_camera_world_frames(approach["pose"])
+
+            # Generate view clouds
+            head_cloud = generate_view_cloud(full_cloud, cam_frames[0], use_depth_buffer=True)
+            wrist_cloud = generate_view_cloud(full_cloud, cam_frames[1], use_depth_buffer=True)
+
+            # Multi-view merge (concatenation + dedup)
+            if len(wrist_cloud) > 0 and len(head_cloud) > 0:
+                merged = np.vstack([head_cloud, wrist_cloud])
+                vk = np.floor(merged / 0.0001).astype(np.int64)
+                _, ui = np.unique(vk, axis=0, return_index=True)
+                multi_cloud = merged[ui]
+            elif len(head_cloud) > 0:
+                multi_cloud = head_cloud
+            else:
+                multi_cloud = wrist_cloud
+
+            pose = approach["pose"]
+            hand_pose = make_pose(pose["px"], pose["py"], pose["pz"],
+                                   pose["qx"], pose["qy"], pose["qz"], pose["qw"])
+            twist = make_twist(0.10, 0, 0, 0, 0, 0)
+
+            conditions = [
+                ("single_view", head_cloud, [cam_frames[0]["position"]]),
+                ("multi_view", multi_cloud, [cam_frames[0]["position"], cam_frames[1]["position"]]),
+            ]
+
+            for cond_name, cloud, cam_positions in conditions:
+                if len(cloud) == 0:
+                    continue
+
+                for rep in range(n_reps):
+                    req = make_request(hand_pose, twist, cloud, cam_positions)
+                    t0 = time.perf_counter()
+                    status, resp, msg = lib.compute(req)
+                    elapsed_ms = (time.perf_counter() - t0) * 1000
+
+                    r = response_to_dict(resp)
+                    sweep_rows.append({
+                        "object": obj_name,
+                        "condition": cond_name,
+                        "prediction_samples": n_samples,
+                        "repetition": rep,
+                        "combined_score": r.get("combined_score", 0.0),
+                        "contact_score": r.get("contact_score", 0.0),
+                        "grasp_type_name": r.get("grasp_type_name", "unknown"),
+                        "latency_ms": elapsed_ms,
+                    })
+
+            print(f"  {obj_name}: done ({n_reps * 2} trials)")
+
+        # Clean up temp config
+        if os.path.isfile(sweep_config):
+            os.remove(sweep_config)
+
+    # Restore original config
+    os.environ["GRASP_CONFIG_PATH"] = prod_config
+
+    # Save sweep results
+    _write_csv(os.path.join(RESULTS_DIR, "score_sweep_results.csv"), sweep_rows)
+    print(f"\nSweep complete. {len(sweep_rows)} rows saved to results/score_sweep_results.csv")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -616,6 +754,12 @@ def main():
                         help="Enable debug visualization dumps")
     parser.add_argument("--baseline-timeout", type=int, default=120,
                         help="Per-object baseline timeout in seconds (default: 120)")
+    parser.add_argument("--sweep-samples", action="store_true",
+                        help="Run score-vs-samples sweep instead of normal test")
+    parser.add_argument("--sweep-counts", type=str, default="1000,2000,5000,10000,20000,50000,100000",
+                        help="Comma-separated sample counts for sweep (default: 1K-100K)")
+    parser.add_argument("--sweep-reps", type=int, default=30,
+                        help="Repetitions per sample count for sweep (default: 30)")
     args = parser.parse_args()
 
     _ensure_dirs()
@@ -660,6 +804,10 @@ def main():
     lib = GraspLibrary()
     print(f"  API version: {lib.api_version}")
     print(f"  Library: {lib.so_path}")
+
+    if args.sweep_samples:
+        run_score_sweep(lib, objects, args)
+        return
 
     run_latency = not args.occlusion_only
     run_occlusion = not args.latency_only

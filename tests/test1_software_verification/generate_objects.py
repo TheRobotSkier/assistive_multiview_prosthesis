@@ -375,7 +375,7 @@ def gen_notched_box():
     # Surface mask: on any face of the outer box
     abs_d = np.abs(dense)
     dist_to_face = np.array([hx, hy, hz]) - abs_d
-    on_outer_face = np.any(dist_to_face < 0.002, axis=1)
+    on_outer_face = np.any(dist_to_face < 0.0015, axis=1)
 
     # Notch mask: points inside the notch region
     in_notch = (
@@ -402,7 +402,7 @@ def gen_notched_box():
         notch_pts[:, 2] - (-hz),  # bottom
         (-hz + notch_hz) - notch_pts[:, 2],  # top
     ]).T
-    on_notch_face = np.any(notch_face_dist < 0.002, axis=1)
+    on_notch_face = np.any(notch_face_dist < 0.0015, axis=1)
     notch_pts = notch_pts[on_notch_face]
 
     points = np.vstack([dense[mask], notch_pts]).astype(np.float32)
@@ -692,7 +692,8 @@ PARAMETRIC_GENERATORS = [
     gen_small_cube,
     gen_thin_plate,
     # Non-convex objects for multi-view advantage evaluation
-    gen_mug_with_handle,
+    # mug_with_handle removed — redundant with YCB mug
+
     gen_notched_box,
     gen_cross_shape,
 ]

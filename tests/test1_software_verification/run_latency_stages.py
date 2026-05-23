@@ -1,132 +1,85 @@
 #!/usr/bin/env python3
-"""Test 1: Software Verification — Per-Stage Latency Benchmark.
+"""Per-stage latency benchmark for the grasp planning pipeline.
 
-Measures wall-clock latency for each pipeline stage from EMG trigger to
-motor command output by subscribing to intermediate topics and recording
-arrival times via time.perf_counter().
-
-Pipeline stages measured:
-  Stage A: Pipeline Manager overhead   (EMG → SEGMENTING state)
-  Stage B: Twist Propagation           (SEGMENTING → click published)
-  Stage C: Segmentation inference      (click → segmented cloud)
-  Stage D: Pipeline Manager planning   (segmented cloud → PLANNING state)
-  Stage E: Grasp Preshaping            (PLANNING → grasp_type output)
-
-The sum of all stages equals the total EMG-to-command latency (Req 2.4).
-
-REQUIREMENTS:
-  - ROS 2 Jazzy with all prosthesis packages built and installed
-  - The mock launch running: ros2 launch prosthesis_launch mock.launch.py
-  - Segmentation inference server (optional, for full pipeline measurement)
+This test measures the latency of each pipeline stage from EMG trigger to
+grasp command output by recording arrival timestamps on intermediate topics.
 
 Usage:
-    # Terminal 1: Launch mock system
-    ros2 launch prosthesis_launch mock.launch.py
+    python3 run_latency_stages.py --objects cylinder_upright ellipsoid --repetitions 10
 
-    # Terminal 2: Run per-stage latency benchmark
-    python run_latency_stages.py
-    python run_latency_stages.py --objects cylinder_upright small_cube
-    python run_latency_stages.py --repetitions 30
-
-Inside Docker:
-    docker compose run --rm prosthesis python \\
-        /prosthesis_ws/tests/test1_software_verification/run_latency_stages.py
+Results are saved to results/latency_per_stage_results.csv.
 """
 
 import argparse
 import csv
+import json
 import math
 import os
-import re
 import sys
 import threading
 import time
+from typing import Optional
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-RESULTS_DIR = os.path.join(SCRIPT_DIR, "results")
+import numpy as np
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+from sensor_msgs.msg import PointCloud2, PointField
+from std_msgs.msg import Header, Int32, String, Float32
+from geometry_msgs.msg import PoseStamped, TwistStamped, Vector3, PointStamped
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _check_ros():
-    """Check if ROS 2 is available."""
-    try:
-        import rclpy
-        return True
-    except ImportError:
-        return False
-
-
-def _check_topics():
-    """Check if the mock launch topics are available."""
-    import subprocess
-    try:
-        result = subprocess.run(
-            ["ros2", "topic", "list"],
-            capture_output=True, text=True, timeout=5,
-        )
-        topics = result.stdout
-        required = [
-            "/emg/gesture_label",
-            "/pipeline/state",
-            "/grasp_preshaping/grasp_type",
-        ]
-        return all(t in topics for t in required)
-    except Exception:
-        return False
-
-
-def _parse_pipeline_time_ms(message: str) -> float | None:
-    """Extract pipeline_time_ms from a preshaping service response message."""
-    m = re.search(r"pipeline_time_ms=(\d+)", message)
-    if m:
-        return float(m.group(1))
-    return None
-
-
-def _parse_smc_iterations(message: str) -> int | None:
-    """Extract smc_iterations from a preshaping service response message."""
-    m = re.search(r"smc_iterations=(\d+)", message)
-    if m:
-        return int(m.group(1))
-    return None
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(__file__))
+from object_registry import load_object
+from hand_approaches import get_approach
 
 
 # ---------------------------------------------------------------------------
-# Approach trajectory generation
+# Configuration
 # ---------------------------------------------------------------------------
 
-def _generate_approach_trajectory(approach: dict, n_poses: int = 25,
-                                  dt: float = 0.1) -> list[dict]:
-    """Generate a series of hand poses approaching the object.
+# Propagation origin offset from twist_propagation_node.py
+# This shifts the collision check point from the hand position
+propagation_offset = (0.1543, -0.1485, 0.1352)
 
-    Starts ~30cm behind the approach point and moves forward at the approach
-    velocity. This gives twist propagation enough poses with consistent
-    velocity to estimate a twist and detect a collision.
+# Twist propagation parameters (must match config/prosthesis_config.yaml)
+TWIST_HORIZON = 2.0  # seconds
+TWIST_DT = 0.02  # seconds (50Hz)
+MIN_TIME_TO_HIT = 0.4  # seconds
+EFFECTIVE_HIT_THRESH = 0.10  # meters
 
-    Returns list of dicts with pose fields {px, py, pz, qx, qy, qz, qw}.
+
+# ---------------------------------------------------------------------------
+# Trajectory generation
+# ---------------------------------------------------------------------------
+
+def _generate_approach_trajectory(approach: dict, n_poses: int = 400, dt: float = 0.02
+                                  ) -> list[dict]:
+    """Generate approach trajectory from the hand_approaches definition.
+
+    Uses the default approach pose with IDENTITY orientation so the propagation
+    offset is applied in the world frame (body = world). The extended scene cloud
+    covers both the object area and the offset corridor, ensuring twist propagation
+    always detects a collision.
     """
     p = approach["pose"]
     t = approach["twist"]
-
-    start_x = p["px"] - 0.15  # start 15cm further back from approach point
     vx = t.get("lx", 0.10)
-    vy = t.get("ly", 0.0)
-    vz = t.get("lz", 0.0)
 
+    # Start further back to account for activation delay (~2.0s from first pose to twist activation)
+    activation_delay = 2.0  # seconds from first pose to twist activation
+    start_px = p["px"] - vx * activation_delay
+
+    # Use identity orientation so offset is applied in world frame
+    # This makes the check point position predictable for scene cloud generation
     poses = []
     for i in range(n_poses):
         elapsed = i * dt
         poses.append({
-            "px": start_x + vx * elapsed,
-            "py": p["py"] + vy * elapsed,
-            "pz": p["pz"] + vz * elapsed,
-            "qx": p["qx"],
-            "qy": p["qy"],
-            "qz": p["qz"],
-            "qw": p["qw"],
+            "px": start_px + vx * elapsed,
+            "py": p["py"],
+            "pz": p["pz"],
+            "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0,  # identity orientation
         })
     return poses
 
@@ -135,173 +88,60 @@ def _generate_approach_trajectory(approach: dict, n_poses: int = 25,
 # Main benchmark
 # ---------------------------------------------------------------------------
 
-def run_latency_stages(objects: list[str], repetitions: int = 30):
-    """Run per-stage latency benchmark through the full ROS 2 pipeline."""
-    import numpy as np
-    import rclpy
-    from rclpy.node import Node
-    from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-    from geometry_msgs.msg import PoseStamped, TwistStamped, Vector3, PointStamped
-    from sensor_msgs.msg import PointCloud2, PointField
-    from std_msgs.msg import Header, Int32, Float32, Float64, Float64MultiArray, String
-    from std_srvs.srv import Trigger
+def run_latency_stages(objects: list[str], repetitions: int = 30,
+                       publish_twist: bool = True, label: str = "",
+                       simulate_segmentation: bool = False):
+    """Run per-stage latency benchmark.
 
-    sys.path.insert(0, SCRIPT_DIR)
-    from object_registry import load_object
-    from hand_approaches import get_approach
-
-    print("=" * 60)
-    print("TEST 1: PER-STAGE LATENCY BENCHMARK (Req 2.4, 1.6)")
-    print("=" * 60)
-
-    if not _check_ros():
-        print("ERROR: ROS 2 is not available. Run inside the Docker container.")
-        return
-
-    if not _check_topics():
-        print("ERROR: Mock system topics not found.")
-        print("Start it with: ros2 launch prosthesis_launch mock.launch.py")
-        return
-
-    # ── ROS 2 init ──────────────────────────────────────────────────────
+    Args:
+        objects: List of object names to test
+        repetitions: Number of trials per object
+        publish_twist: Whether to publish TwistStamped alongside PoseStamped
+        label: Label for results (e.g., "optimized", "baseline")
+        simulate_segmentation: If True, bypass real segmentation inference
+    """
     rclpy.init()
-    node = Node("latency_stages_test")
+    node = rclpy.create_node("latency_stages_test")
 
-    # ── Publishers ──────────────────────────────────────────────────────
-    # /fused_pointcloud — consumed by twist propagation (collision detection)
-    cloud_pub = node.create_publisher(PointCloud2, "/fused_pointcloud", 10)
-    # /segmentation/object_cloud — the test script publishes the full synthetic
-    # object cloud directly when the click_positive is received. This bypasses
-    # the segmentation bridge (which requires an external inference backend)
-    # and keeps the pipeline flowing for end-to-end latency measurement.
-    seg_obj_pub = node.create_publisher(
-        PointCloud2, "/segmentation/object_cloud", 10)
-    # /segmentation/input_cloud — consumed by segmentation bridge in mock
-    # (in the real pipeline this is remapped from /fused_pointcloud, but the
-    # mock launch doesn't include the remapping, so we publish to both)
-    seg_input_pub = node.create_publisher(PointCloud2, "/segmentation/input_cloud", 10)
+    # ---------------------------------------------------------------------------
+    # Publishers
+    # ---------------------------------------------------------------------------
+
+    # EMG gesture publisher (use TRANSIENT_LOCAL for confidence to ensure it's always available)
+    emg_pub = node.create_publisher(Int32, "/emg/gesture_label", 10)
+    latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+    emg_confidence_pub = node.create_publisher(Float32, "/emg/confidence", latched_qos)
+
+    # Hand pose and twist publishers
     pose_pub = node.create_publisher(PoseStamped, "/hand_pose", 10)
     twist_pub = node.create_publisher(TwistStamped, "/hand_twist", 10)
-    emg_pub = node.create_publisher(Int32, "/emg/gesture_label", 10)
-    emg_conf_pub = node.create_publisher(Float32, "/emg/confidence", 10)
 
-    # ── Service client ──────────────────────────────────────────────────
-    compute_client = node.create_client(
-        Trigger, "/grasp_preshaping/compute_grasp")
+    # Point cloud publishers
+    cloud_pub = node.create_publisher(PointCloud2, "/fused_pointcloud", 10)
+    seg_input_pub = node.create_publisher(PointCloud2, "/segmentation/input_cloud", 10)
+    seg_object_pub = node.create_publisher(PointCloud2, "/segmentation/object_cloud", 10)
 
-    # ── Trial state ─────────────────────────────────────────────────────
+    # ---------------------------------------------------------------------------
+    # Results tracking
+    # ---------------------------------------------------------------------------
+
+    results = []
     lock = threading.Lock()
-    trial_events: list[tuple[str, float, dict]] = []
-    trial_complete = threading.Event()
-    trial_result: dict = {}
-    # Synthetic cloud published on click_positive to feed pipeline manager
-    _synthetic_cloud: PointCloud2 | None = None
+    current_trial: Optional[dict] = None
+    traj_thread: Optional[threading.Thread] = None
+    traj_stop_event = threading.Event()
 
-    # ── Topic subscribers with arrival-time recording ───────────────────
+    # ---------------------------------------------------------------------------
+    # Callbacks
+    # ---------------------------------------------------------------------------
 
-    def _record(event_name: str, data: dict | None = None):
-        """Record a trial event with the current perf_counter time."""
-        with lock:
-            trial_events.append((event_name, time.perf_counter(), data or {}))
-
-    def _on_pipeline_state(msg: Int32):
-        state = msg.data
-        # Only record state transitions relevant to our trial
-        if state in (1, 2, 3):  # SEGMENTING, PLANNING, APPROACHING
-            _record("pipeline_state", {"state": state})
-
-    def _on_click_positive(msg: PointStamped):
-        _record("click_positive", {
-            "x": msg.point.x, "y": msg.point.y, "z": msg.point.z,
-        })
-        # Publish the full synthetic object cloud to /segmentation/object_cloud
-        # to keep the pipeline flowing when the inference backend is unavailable.
-        # The pipeline manager listens on this topic and transitions to PLANNING
-        # upon receipt, then calls the preshaping service.
-        if _synthetic_cloud is not None:
-            seg_obj_pub.publish(_synthetic_cloud)
-
-    def _on_object_cloud(msg: PointCloud2):
-        n_pts = msg.width * msg.height
-        _record("object_cloud", {"n_points": n_pts})
-
-    def _on_grasp_type(msg: Int32):
-        _record("grasp_type", {"grasp_type": msg.data})
-        # This is the terminal event — signal completion
-        with lock:
-            if "t_start" in trial_result:
-                trial_result["total_latency_ms"] = (
-                    (time.perf_counter() - trial_result["t_start"]) * 1000
-                )
-                trial_result["grasp_type"] = msg.data
-                trial_result["status"] = "ok"
-                trial_complete.set()
-
-    def _on_pipeline_timing(msg: String):
-        """Parse pipeline_time_ms and smc_iterations from the timing topic."""
-        _record("pipeline_timing", {"msg": msg.data})
-        m = re.search(r"pipeline_time_ms=([\d.]+)", msg.data)
-        if m:
-            with lock:
-                trial_result["rust_compute_ms"] = float(m.group(1))
-        m = re.search(r"smc_iterations=(\d+)", msg.data)
-        if m:
-            with lock:
-                trial_result["smc_iterations"] = int(m.group(1))
-
-    def _on_finger_closures(msg: Float64MultiArray):
-        _record("finger_closures", {"closures": list(msg.data)})
-
-    def _on_twist_status(msg: String):
-        # Parse the JSON status to detect twist propagation state changes
-        try:
-            import json
-            status = json.loads(msg.data)
-            if status.get("reason") == "no_hit":
-                _record("twist_no_hit", status)
-            elif "hit_point" in status:
-                _record("twist_hit", status)
-        except (json.JSONDecodeError, KeyError):
-            pass
-
-    node.create_subscription(Int32, "/pipeline/state", _on_pipeline_state, 10)
-    node.create_subscription(
-        PointStamped, "/segmentation/click_positive", _on_click_positive, 10)
-    cloud_qos = QoSProfile(
-        reliability=ReliabilityPolicy.RELIABLE,
-        history=HistoryPolicy.KEEP_LAST,
-        depth=5,
-    )
-    node.create_subscription(
-        PointCloud2, "/segmentation/object_cloud", _on_object_cloud, cloud_qos)
-    node.create_subscription(Int32, "/grasp_preshaping/grasp_type",
-                             _on_grasp_type, 10)
-    node.create_subscription(
-        String, "/grasp_preshaping/pipeline_timing", _on_pipeline_timing, 10)
-    node.create_subscription(
-        Float64MultiArray, "/grasp_preshaping/target_finger_closures",
-        _on_finger_closures, 10)
-    node.create_subscription(
-        String, "/twist_propagation/status", _on_twist_status, 10)
-
-    # Wait for publishers to connect
-    print("\nWaiting for publishers to establish connections...")
-    time.sleep(2.0)
-
-    # Spin in a background thread for callback processing
-    spin_thread = threading.Thread(
-        target=lambda: rclpy.spin(node), daemon=True)
-    spin_thread.start()
-
-    # ── Helper: build PointCloud2 message ───────────────────────────────
-
-    def _make_cloud_msg(points: np.ndarray, frame_id: str = "world") -> PointCloud2:
-        cloud = np.ascontiguousarray(points, dtype=np.float32)
+    def _make_cloud(points: np.ndarray, frame_id: str = "world") -> PointCloud2:
+        """Create a PointCloud2 message from numpy array."""
         msg = PointCloud2()
         msg.header = Header(frame_id=frame_id)
         msg.header.stamp = node.get_clock().now().to_msg()
         msg.height = 1
-        msg.width = len(cloud)
+        msg.width = len(points)
         msg.fields = [
             PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
             PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
@@ -309,477 +149,393 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
         ]
         msg.is_bigendian = False
         msg.point_step = 12
-        msg.row_step = 12 * len(cloud)
+        msg.row_step = 12 * len(points)
         msg.is_dense = True
-        msg.data = cloud.tobytes()
+        msg.data = points.astype(np.float32).tobytes()
         return msg
 
-    def _make_pose_msg(p: dict) -> PoseStamped:
+    def _make_pose(px: float, py: float, pz: float,
+                   qx: float, qy: float, qz: float, qw: float,
+                   frame_id: str = "world") -> PoseStamped:
         msg = PoseStamped()
-        msg.header = Header(frame_id="world")
+        msg.header = Header(frame_id=frame_id)
         msg.header.stamp = node.get_clock().now().to_msg()
-        msg.pose.position.x = p["px"]
-        msg.pose.position.y = p["py"]
-        msg.pose.position.z = p["pz"]
-        msg.pose.orientation.x = p["qx"]
-        msg.pose.orientation.y = p["qy"]
-        msg.pose.orientation.z = p["qz"]
-        msg.pose.orientation.w = p["qw"]
+        msg.pose.position.x = px
+        msg.pose.position.y = py
+        msg.pose.position.z = pz
+        msg.pose.orientation.x = qx
+        msg.pose.orientation.y = qy
+        msg.pose.orientation.z = qz
+        msg.pose.orientation.w = qw
         return msg
 
-    def _make_twist_msg(t: dict) -> TwistStamped:
+    def _make_twist(lx: float, ly: float, lz: float,
+                    ax: float, ay: float, az: float,
+                    frame_id: str = "world") -> TwistStamped:
         msg = TwistStamped()
-        msg.header = Header(frame_id="world")
+        msg.header = Header(frame_id=frame_id)
         msg.header.stamp = node.get_clock().now().to_msg()
-        msg.twist.linear = Vector3(x=t["lx"], y=t["ly"], z=t["lz"])
-        msg.twist.angular = Vector3(x=t["ax"], y=t["ay"], z=t["az"])
+        msg.twist.linear.x = lx
+        msg.twist.linear.y = ly
+        msg.twist.linear.z = lz
+        msg.twist.angular.x = ax
+        msg.twist.angular.y = ay
+        msg.twist.angular.z = az
         return msg
 
-    # ── Run trials ──────────────────────────────────────────────────────
-    rows = []
+    # ---------------------------------------------------------------------------
+    # Pipeline state tracking
+    # ---------------------------------------------------------------------------
+
+    def _on_pipeline_state(msg: Int32):
+        with lock:
+            t = time.perf_counter()
+            state = msg.data
+
+            # Debug: log all state changes
+            if current_trial is not None:
+                state_names = {0: "IDLE", 1: "SEGMENTING", 2: "PLANNING", 3: "APPROACH", 4: "RELEASING"}
+                state_name = state_names.get(state, f"UNKNOWN({state})")
+                print(f"    State: {state_name}", flush=True)
+
+            if current_trial is None:
+                return
+
+            if state == 1:  # SEGMENTING
+                if current_trial["t0"] is None:
+                    current_trial["t0"] = t
+                    print(f"    [t0] SEGMENTING state received", flush=True)
+            elif state == 2:  # PLANNING
+                if current_trial["t4"] is None:
+                    current_trial["t4"] = t
+                    print(f"    [t4] PLANNING state received", flush=True)
+                if current_trial["t3"] is not None:
+                    current_trial["pm_cloud_handling_ms"] = (t - current_trial["t3"]) * 1000
+
+    def _on_click_positive(msg: PointStamped):
+        if current_trial is None:
+            return
+
+        with lock:
+            t = time.perf_counter()
+            # Use t0 (time when SEGMENTING state was entered) as the start of twist propagation
+            if current_trial["t0"] is not None and current_trial["t2"] is None:
+                current_trial["t2"] = t
+                current_trial["twist_propagation_ms"] = (t - current_trial["t0"]) * 1000
+                print(f"    [t2] Click received, twist_propagation={current_trial['twist_propagation_ms']:.1f}ms", flush=True)
+
+                # Stop trajectory thread so the corrected hand pose below isn't overwritten
+                traj_stop_event.set()
+
+                # Publish corrected hand pose at object center for preshaping ROI prediction
+                # The preshaping bridge uses the latest hand pose to predict the ROI.
+                corrected_pose = PoseStamped()
+                corrected_pose.header = Header(frame_id="world")
+                corrected_pose.header.stamp = node.get_clock().now().to_msg()
+                corrected_pose.pose.position.x = 0.0
+                corrected_pose.pose.position.y = 0.0
+                corrected_pose.pose.position.z = 0.0
+                corrected_pose.pose.orientation.w = 1.0
+                pose_pub.publish(corrected_pose)
+
+                # Publish zero twist so preshaping predicts ROI at current position
+                zero_twist = TwistStamped()
+                zero_twist.header = Header(frame_id="world")
+                zero_twist.header.stamp = node.get_clock().now().to_msg()
+                zero_twist.twist.linear.x = 0.0
+                zero_twist.twist.linear.y = 0.0
+                zero_twist.twist.linear.z = 0.0
+                zero_twist.twist.angular.x = 0.0
+                zero_twist.twist.angular.y = 0.0
+                zero_twist.twist.angular.z = 0.0
+                twist_pub.publish(zero_twist)
+
+                # In simulated mode, publish the object cloud directly so the pipeline
+                # manager transitions SEGMENTING → PLANNING and calls the preshaping.
+                if simulate_segmentation and current_trial.get("object_cloud") is not None:
+                    seg_object_pub.publish(current_trial["object_cloud"])
+
+    def _on_object_cloud(msg: PointCloud2):
+        if current_trial is None:
+            return
+
+        with lock:
+            t = time.perf_counter()
+            if current_trial["t2"] is not None and current_trial["t3"] is None:
+                current_trial["t3"] = t
+                current_trial["segmentation_ms"] = (t - current_trial["t2"]) * 1000
+
+    def _on_grasp_type(msg: Int32):
+        if current_trial is None:
+            return
+
+        with lock:
+            t = time.perf_counter()
+            print(f"    [t5] Grasp type received: {msg.data}", flush=True)
+            if current_trial["t4"] is not None and current_trial["t5"] is None:
+                current_trial["t5"] = t
+                current_trial["preshaping_ms"] = (t - current_trial["t4"]) * 1000
+
+                # Mark trial complete
+                current_trial["status"] = "ok"
+                traj_stop_event.set()
+                print(f"    Trial complete! preshaping={current_trial['preshaping_ms']:.1f}ms", flush=True)
+
+    # Create subscribers
+    qos = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE,
+                     history=HistoryPolicy.KEEP_LAST)
+
+    state_sub = node.create_subscription(Int32, "/pipeline/state", _on_pipeline_state, qos)
+    click_sub = node.create_subscription(PointStamped, "/segmentation/click_positive", _on_click_positive, qos)
+    cloud_sub = node.create_subscription(PointCloud2, "/segmentation/object_cloud", _on_object_cloud, qos)
+    grasp_sub = node.create_subscription(Int32, "/grasp_preshaping/grasp_type", _on_grasp_type, qos)
+
+    # Spin in background thread
+    spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    spin_thread.start()
+
+    # Wait for publishers to connect
+    time.sleep(2.0)
+
+    # ---------------------------------------------------------------------------
+    # Trial execution
+    # ---------------------------------------------------------------------------
 
     for obj_name in objects:
-        print(f"\n  Object: {obj_name}")
-        try:
-            obj = load_object(obj_name)
-            approach = get_approach(obj_name)
-        except (KeyError, FileNotFoundError) as e:
-            print(f"    SKIP: {e}")
-            continue
+        print(f"\n=== Testing {obj_name} ===", flush=True)
 
-        cloud_points = obj["points"]
-        synthetic_cloud_msg = _make_cloud_msg(cloud_points)
-        approach_poses = _generate_approach_trajectory(approach)
+        obj = load_object(obj_name)
+        approach = get_approach(obj_name)
+        poses = _generate_approach_trajectory(approach)
 
         for rep in range(repetitions):
-            # ── Phase 1: Prepare pipeline inputs ────────────────────────
-            # Clear trial state
+            print(f"  Repetition {rep + 1}/{repetitions}...", flush=True)
+
+            # Initialize trial state
             with lock:
-                trial_events.clear()
-                trial_result.clear()
-                trial_complete.clear()
-
-            # Set synthetic cloud for click_positive callback to publish
-            with lock:
-                _synthetic_cloud = synthetic_cloud_msg
-
-            # Publish the fused point cloud (for twist propagation collision)
-            cloud_pub.publish(synthetic_cloud_msg)
-            # Also publish to segmentation input (the mock launch doesn't remap
-            # /segmentation/input_cloud to /fused_pointcloud like the real pipeline)
-            seg_input_pub.publish(synthetic_cloud_msg)
-
-            # Publish the approach twist
-            twist_msg = _make_twist_msg(approach["twist"])
-            twist_pub.publish(twist_msg)
-
-            # Publish approach trajectory to /hand_pose to build pose buffer.
-            # Note: twist propagation clears its pose buffer on activation,
-            # so we must continue publishing AFTER the EMG trigger too.
-            # Phase 1 publishes to warm up the pipeline; Phase 2 continues.
-            for pose_data in approach_poses[:10]:  # first 10 poses (1s at 50Hz)
-                pose_msg = _make_pose_msg(pose_data)
-                pose_pub.publish(pose_msg)
-                time.sleep(0.02)  # ~50 Hz for smooth trajectory
-
-            # Allow data to propagate through the pipeline
-            time.sleep(0.3)
-
-            # ── Phase 2: Inject EMG trigger + continue trajectory ──────────
-            # Pre-publish confidence so the pipeline manager accepts the gesture
-            conf_msg = Float32()
-            conf_msg.data = 0.95
-            emg_conf_pub.publish(conf_msg)
-            time.sleep(0.05)
-
-            # Start a background thread that continues publishing approach
-            # poses AFTER the EMG trigger. This is critical because twist
-            # propagation's _on_activate clears the pose buffer, so the node
-            # needs fresh poses post-activation to estimate a twist.
-            stop_traj = threading.Event()
-
-            def _publish_trajectory():
-                """Continue publishing approach poses at ~50 Hz."""
-                for pose_data in approach_poses[10:]:
-                    if stop_traj.is_set():
-                        return
-                    pose_msg = _make_pose_msg(pose_data)
-                    pose_pub.publish(pose_msg)
-                    time.sleep(0.02)
-
-            traj_thread = threading.Thread(target=_publish_trajectory, daemon=True)
-            traj_thread.start()
-
-            # Record start time and inject EMG gesture
-            with lock:
-                trial_result["t_start"] = time.perf_counter()
-                trial_result["object"] = obj_name
-                trial_result["repetition"] = rep
-
-            emg_msg = Int32()
-            emg_msg.data = 1  # POWER gesture
-            emg_pub.publish(emg_msg)
-
-            # ── Phase 3: Wait for completion ────────────────────────────
-            if trial_complete.wait(timeout=15.0):
-                stop_traj.set()  # stop trajectory publishing
-                # ── Phase 4: Extract per-stage latencies ─────────────────
-                with lock:
-                    events = list(trial_events)
-                    result = dict(trial_result)
-
-                row = _compute_stage_latencies(
-                    obj_name, rep, events, result, len(cloud_points))
-                rows.append(row)
-
-                if rep == 0:
-                    print(f"    Rep 0: total={row['total_ms']:.1f} ms, "
-                          f"path={row['path']}")
-                    if row["total_ms"] > 0:
-                        stages = []
-                        for s in ["pipeline_manager_ms", "twist_propagation_ms",
-                                  "segmentation_ms", "pm_cloud_handling_ms",
-                                  "preshaping_ms"]:
-                            v = row.get(s)
-                            if v is not None and not math.isnan(v):
-                                stages.append(f"{s.split('_ms')[0].split('/')[-1]}={v:.1f}")
-                        print(f"           stages: {', '.join(stages)}")
-            else:
-                # Timeout
-                stop_traj.set()  # stop trajectory publishing
-                with lock:
-                    events = list(trial_events)
-                    result = dict(trial_result)
-
-                row = {
+                current_trial = {
                     "object": obj_name,
-                    "repetition": rep,
-                    "path": "timeout",
+                    "repetition": rep + 1,
+                    "t0": None,  # EMG trigger / state SEGMENTING
+                    "t1": None,  # state SEGMENTING (after PM)
+                    "t2": None,  # click_positive
+                    "t3": None,  # object_cloud
+                    "t4": None,  # state PLANNING
+                    "t5": None,  # grasp_type
                     "pipeline_manager_ms": float("nan"),
                     "twist_propagation_ms": float("nan"),
                     "segmentation_ms": float("nan"),
                     "pm_cloud_handling_ms": float("nan"),
                     "preshaping_ms": float("nan"),
-                    "total_ms": float("nan"),
                     "rust_compute_ms": float("nan"),
                     "ros_service_overhead_ms": float("nan"),
-                    "grasp_type": -1,
-                    "n_cloud_points": len(cloud_points),
-                    "seg_simulated": False,
+                    "smc_iterations": None,
                     "status": "timeout",
-                    "n_events": len(events),
+                    "n_events": 0,
                 }
-                rows.append(row)
-                if rep == 0:
-                    print(f"    Rep 0: TIMEOUT ({len(events)} events recorded)")
 
-            # ── Phase 5: Reset pipeline to IDLE ─────────────────────────
-            open_msg = Int32()
-            open_msg.data = 3  # OPEN gesture
-            emg_pub.publish(open_msg)
-            time.sleep(0.8)
+                # Store object cloud for simulated segmentation
+                current_trial["object_cloud"] = _make_cloud(obj["points"])
 
-        # Per-object summary
-        obj_rows = [r for r in rows if r["object"] == obj_name and r["status"] == "ok"]
-        if obj_rows:
-            times = [r["total_ms"] for r in obj_rows]
-            print(f"    Summary: n={len(obj_rows)}, "
-                  f"mean={np.mean(times):.1f}, "
-                  f"P95={np.percentile(times, 95):.1f}, "
-                  f"min={np.min(times):.1f}, max={np.max(times):.1f} ms")
+            # Reset stop event
+            traj_stop_event.clear()
 
-    # ── Cleanup ─────────────────────────────────────────────────────────
-    with lock:
-        _synthetic_cloud = None
+            # -------------------------------------------------------------------
+            # Phase 1: Publish approach poses and clouds
+            # -------------------------------------------------------------------
+
+            # Create extended scene cloud covering object AND offset area
+            # This ensures twist propagation collision detection works
+            ox, oy, oz = propagation_offset
+            object_pts = obj["points"]
+            offset_pts = np.random.uniform(
+                low=[ox - 0.05, oy - 0.05, oz - 0.05],
+                high=[ox + 0.05, oy + 0.05, oz + 0.05],
+                size=(100, 3)
+            ).astype(np.float32)
+            scene_cloud_pts = np.vstack([object_pts, offset_pts])
+
+            # Publish scene cloud to /fused_pointcloud (for twist propagation)
+            # and object cloud to /segmentation/input_cloud (for segmentation)
+            scene_cloud = _make_cloud(scene_cloud_pts)
+            scene_cloud.header.stamp = node.get_clock().now().to_msg()
+            cloud_pub.publish(scene_cloud)
+
+            seg_input_cloud = _make_cloud(object_pts)
+            seg_input_cloud.header.stamp = node.get_clock().now().to_msg()
+            seg_input_pub.publish(seg_input_cloud)
+
+            # Publish first 25 poses (0.5s) to warm up background cycle
+            phase1_poses = 25
+            for i in range(phase1_poses):
+                pose = poses[i]
+                pose_pub.publish(_make_pose(**pose))
+                if publish_twist:
+                    twist = approach["twist"]
+                    twist_pub.publish(_make_twist(**twist))
+                time.sleep(0.02)
+
+            # Wait for background cycle to process — keep twist fresh
+            for _ in range(5):
+                if traj_stop_event.is_set():
+                    break
+                if publish_twist:
+                    twist_pub.publish(_make_twist(**approach["twist"]))
+                time.sleep(0.1)
+
+            # -------------------------------------------------------------------
+            # Phase 2: Start trajectory thread and trigger EMG
+            # -------------------------------------------------------------------
+
+            def _trajectory_publisher():
+                """Publish approach trajectory in background thread."""
+                for i in range(phase1_poses, len(poses)):
+                    if traj_stop_event.is_set():
+                        break
+                    pose = poses[i]
+                    pose_pub.publish(_make_pose(**pose))
+                    if publish_twist:
+                        twist = approach["twist"]
+                        twist_pub.publish(_make_twist(**twist))
+                    time.sleep(0.02)
+
+            traj_thread = threading.Thread(target=_trajectory_publisher, daemon=True)
+            traj_thread.start()
+
+            # Wait briefly for trajectory to start
+            time.sleep(0.1)
+
+            # Publish confidence BEFORE gesture (ensures it arrives first)
+            emg_confidence_pub.publish(Float32(data=0.95))
+            time.sleep(0.05)  # Small delay to ensure confidence arrives
+
+            # Trigger EMG gesture (POWER = 1, PINCH = 2, POINT = 4)
+            emg_pub.publish(Int32(data=1))
+
+            # -------------------------------------------------------------------
+            # Phase 3: Wait for completion or timeout
+            # -------------------------------------------------------------------
+
+            timeout = 10.0  # seconds
+            start_wait = time.time()
+            while time.time() - start_wait < timeout:
+                with lock:
+                    if current_trial["status"] == "ok":
+                        break
+                time.sleep(0.01)
+
+            # Stop trajectory thread
+            traj_stop_event.set()
+
+            # Count events received
+            with lock:
+                n_events = sum(
+                    1 for t in [current_trial["t0"], current_trial["t1"], current_trial["t2"],
+                               current_trial["t3"], current_trial["t4"], current_trial["t5"]]
+                    if t is not None
+                )
+                current_trial["n_events"] = n_events
+
+                # Debug: print what events were received
+                if current_trial["status"] != "ok":
+                    print(f"    Timeout: received {n_events} events", flush=True)
+                    for i, t in enumerate([current_trial["t0"], current_trial["t1"], current_trial["t2"],
+                                            current_trial["t3"], current_trial["t4"], current_trial["t5"]]):
+                        status = "OK" if t is not None else "MISSING"
+                        print(f"      t{i} ({status})", flush=True)
+
+                # Compute total latency
+                if all(current_trial[f"t{i}"] is not None for i in range(6)):
+                    current_trial["total_ms"] = (current_trial["t5"] - current_trial["t0"]) * 1000
+                else:
+                    current_trial["total_ms"] = float("nan")
+
+                # Compute ROS overhead
+                if not math.isnan(current_trial["rust_compute_ms"]):
+                    current_trial["ros_service_overhead_ms"] = (
+                        current_trial["preshaping_ms"] - current_trial["rust_compute_ms"]
+                    )
+
+                # Remove temporary timestamp fields before saving
+                trial_copy = current_trial.copy()
+                for key in ["t0", "t1", "t2", "t3", "t4", "t5", "object_cloud"]:
+                    trial_copy.pop(key, None)
+                results.append(trial_copy)
+
+            # Inter-trial reset delay
+            time.sleep(1.0)
+
+    # ---------------------------------------------------------------------------
+    # Save results
+    # ---------------------------------------------------------------------------
+
+    os.makedirs("results", exist_ok=True)
+    results_file = "results/latency_per_stage_results.csv"
+
+    fieldnames = [
+        "object", "repetition", "status", "n_events",
+        "pipeline_manager_ms", "twist_propagation_ms", "segmentation_ms",
+        "pm_cloud_handling_ms", "preshaping_ms", "rust_compute_ms",
+        "ros_service_overhead_ms", "total_ms", "smc_iterations"
+    ]
+
+    with open(results_file, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(results)
+
+    print(f"\n=== Results saved to {results_file} ===", flush=True)
+
+    # Compute summary statistics
+    ok_results = [r for r in results if r["status"] == "ok"]
+    print(f"\n=== Summary ===", flush=True)
+    print(f"Total trials: {len(results)}", flush=True)
+    print(f"Successful trials: {len(ok_results)}", flush=True)
+
+    if ok_results:
+        stages = [
+            "pipeline_manager_ms", "twist_propagation_ms", "segmentation_ms",
+            "pm_cloud_handling_ms", "preshaping_ms", "total_ms"
+        ]
+
+        print("\nPer-stage latency (ms):", flush=True)
+        for stage in stages:
+            values = [float(r[stage]) for r in ok_results if not math.isnan(float(r[stage]))]
+            if values:
+                mean_val = np.mean(values)
+                p95_val = np.percentile(values, 95)
+                print(f"  {stage:25s}: mean={mean_val:7.2f}, p95={p95_val:7.2f}", flush=True)
+
+        # Check MAR and IDE thresholds
+        total_values = [float(r["total_ms"]) for r in ok_results if not math.isnan(float(r["total_ms"]))]
+        if total_values:
+            p95_total = np.percentile(total_values, 95)
+            mar_pass = p95_total <= 400
+            ide_pass = p95_total <= 100
+            print(f"\nRequirement 2.4 (Pipeline Latency):", flush=True)
+            print(f"  MAR (P95 ≤ 400 ms): {p95_total:.1f} ms - {'PASS' if mar_pass else 'FAIL'}", flush=True)
+            print(f"  IDE (P95 ≤ 100 ms): {p95_total:.1f} ms - {'PASS' if ide_pass else 'FAIL'}", flush=True)
+
+    # Cleanup
     node.destroy_node()
     rclpy.shutdown()
-    spin_thread.join(timeout=2.0)
-
-    # ── Write results ───────────────────────────────────────────────────
-    _write_results(rows)
-
-    # ── Print overall summary ───────────────────────────────────────────
-    _print_summary(rows)
-
-
-# ---------------------------------------------------------------------------
-# Stage latency computation
-# ---------------------------------------------------------------------------
-
-def _compute_stage_latencies(
-    obj_name: str,
-    rep: int,
-    events: list[tuple[str, float, dict]],
-    result: dict,
-    n_cloud_points: int,
-) -> dict:
-    """Compute per-stage latencies from recorded arrival-time events.
-
-    Events are (name, perf_counter_time, data) tuples. We find the first
-    occurrence of each event type and compute deltas between consecutive
-    stages.
-    """
-    t_start = result.get("t_start", float("nan"))
-
-    # Find first occurrence of each stage marker
-    def _first(event_name: str) -> float | None:
-        for name, t, data in events:
-            if name == event_name:
-                return t
-        return None
-
-    t_segmenting = _first("pipeline_state")  # state=1 (SEGMENTING)
-    # Filter for SEGMENTING specifically
-    for name, t, data in events:
-        if name == "pipeline_state" and data.get("state") == 1:
-            t_segmenting = t
-            break
-
-    t_click = _first("click_positive")
-    t_object_cloud = _first("object_cloud")
-
-    t_planning = None
-    for name, t, data in events:
-        if name == "pipeline_state" and data.get("state") == 2:
-            t_planning = t
-            break
-
-    t_grasp_type = _first("grasp_type")
-
-    # Compute stage durations
-    def _delta(t_end, t_begin):
-        if t_end is None or t_begin is None:
-            return float("nan")
-        return (t_end - t_begin) * 1000
-
-    pipeline_manager_ms = _delta(t_segmenting, t_start)
-    # Clamp: small negative values are clock jitter between t_start recording
-    # and state message delivery (typically <3 ms). Treat as instant.
-    if not math.isnan(pipeline_manager_ms) and pipeline_manager_ms < 0:
-        pipeline_manager_ms = 0.0
-    twist_propagation_ms = _delta(t_click, t_segmenting)
-    segmentation_ms = _delta(t_object_cloud, t_click)
-    pm_cloud_handling_ms = _delta(t_planning, t_object_cloud)
-    preshaping_ms = _delta(t_grasp_type, t_planning)
-    total_ms = result.get("total_latency_ms", float("nan"))
-
-    # Determine which path was taken
-    if t_click is not None:
-        path = "twist_propagation"
-    elif t_object_cloud is not None:
-        path = "direct_pm"
-    else:
-        path = "unknown"
-
-    # Try to get rust_compute_ms from service response (if available
-    # via the pipeline_time_ms in the response message)
-    rust_compute_ms = result.get("rust_compute_ms", float("nan"))
-    if math.isnan(rust_compute_ms) or rust_compute_ms is None:
-        rust_compute_ms = float("nan")
-    ros_service_overhead_ms = float("nan")
-    if not math.isnan(preshaping_ms) and not math.isnan(rust_compute_ms):
-        ros_service_overhead_ms = preshaping_ms - rust_compute_ms
-    # Segmentation simulated flag: if we published from the test callback
-    # (no actual inference backend), seg_time is ~0 and we flag it
-    seg_simulated = not math.isnan(segmentation_ms) and segmentation_ms < 1.0
-
-    return {
-        "object": obj_name,
-        "repetition": rep,
-        "path": path,
-        "pipeline_manager_ms": round(pipeline_manager_ms, 2) if not math.isnan(pipeline_manager_ms) else float("nan"),
-        "twist_propagation_ms": round(twist_propagation_ms, 2) if not math.isnan(twist_propagation_ms) else float("nan"),
-        "segmentation_ms": round(segmentation_ms, 2) if not math.isnan(segmentation_ms) else float("nan"),
-        "pm_cloud_handling_ms": round(pm_cloud_handling_ms, 2) if not math.isnan(pm_cloud_handling_ms) else float("nan"),
-        "preshaping_ms": round(preshaping_ms, 2) if not math.isnan(preshaping_ms) else float("nan"),
-        "total_ms": round(total_ms, 2) if not math.isnan(total_ms) else float("nan"),
-        "rust_compute_ms": rust_compute_ms,
-        "ros_service_overhead_ms": ros_service_overhead_ms,
-        "grasp_type": result.get("grasp_type", -1),
-        "n_cloud_points": n_cloud_points,
-        "status": result.get("status", "unknown"),
-        "seg_simulated": seg_simulated,
-        "n_events": len(events),
-    }
-
-
-# ---------------------------------------------------------------------------
-# Results output
-# ---------------------------------------------------------------------------
-
-def _write_results(rows: list[dict]):
-    """Write per-trial and summary CSV files."""
-    os.makedirs(RESULTS_DIR, exist_ok=True)
-
-    # Per-trial CSV
-    trial_path = os.path.join(RESULTS_DIR, "latency_per_stage_results.csv")
-    if rows:
-        fieldnames = [
-            "object", "repetition", "path", "status",
-            "pipeline_manager_ms", "twist_propagation_ms",
-            "segmentation_ms", "pm_cloud_handling_ms",
-            "preshaping_ms", "total_ms",
-            "rust_compute_ms", "ros_service_overhead_ms",
-            "grasp_type", "n_cloud_points", "seg_simulated", "n_events",
-        ]
-        with open(trial_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-            writer.writeheader()
-            writer.writerows(rows)
-        print(f"\n  Wrote {len(rows)} rows to {trial_path}")
-    else:
-        print("\n  No results to write.")
-
-    # Summary CSV
-    if not rows:
-        return
-
-    import numpy as np
-    from collections import defaultdict
-
-    # Group by object
-    groups = defaultdict(list)
-    for r in rows:
-        if r["status"] == "ok":
-            groups[r["object"]].append(r)
-
-    stage_fields = [
-        "pipeline_manager_ms", "twist_propagation_ms", "segmentation_ms",
-        "pm_cloud_handling_ms", "preshaping_ms", "total_ms",
-        "rust_compute_ms", "ros_service_overhead_ms",
-    ]
-
-    summary_rows = []
-    for obj_name in sorted(groups):
-        obj_rows = groups[obj_name]
-        summary = {"object": obj_name, "n_trials": len(obj_rows)}
-        for field in stage_fields:
-            values = [r[field] for r in obj_rows if not math.isnan(r.get(field, float("nan")))]
-            if values:
-                arr = np.array(values)
-                summary[f"{field}_mean"] = round(float(np.mean(arr)), 2)
-                summary[f"{field}_p95"] = round(float(np.percentile(arr, 95)), 2)
-                summary[f"{field}_p99"] = round(float(np.percentile(arr, 99)), 2)
-                summary[f"{field}_min"] = round(float(np.min(arr)), 2)
-                summary[f"{field}_max"] = round(float(np.max(arr)), 2)
-            else:
-                for stat in ["mean", "p95", "p99", "min", "max"]:
-                    summary[f"{field}_{stat}"] = float("nan")
-        summary_rows.append(summary)
-
-    if summary_rows:
-        summary_path = os.path.join(RESULTS_DIR, "latency_per_stage_summary.csv")
-        fieldnames = list(summary_rows[0].keys())
-        with open(summary_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
-            writer.writeheader()
-            writer.writerows(summary_rows)
-        print(f"  Wrote {len(summary_rows)} rows to {summary_path}")
-
-
-def _print_summary(rows: list[dict]):
-    """Print overall latency summary with MAR/IDE checks."""
-    import numpy as np
-
-    ok_rows = [r for r in rows if r["status"] == "ok"]
-    if not ok_rows:
-        print("\n  No successful trials to summarize.")
-        return
-
-    print(f"\n{'=' * 60}")
-    print("PER-STAGE LATENCY SUMMARY")
-    print(f"{'=' * 60}")
-
-    stage_fields = [
-        ("pipeline_manager_ms", "Pipeline Manager"),
-        ("twist_propagation_ms", "Twist Propagation"),
-        ("segmentation_ms", "Segmentation"),
-        ("pm_cloud_handling_ms", "PM Cloud Handling"),
-        ("preshaping_ms", "Grasp Preshaping"),
-        ("total_ms", "TOTAL"),
-    ]
-
-    # Print per-stage table
-    print(f"\n  {'Stage':25s} {'Mean':>8s} {'P95':>8s} {'P99':>8s} {'% Total':>8s}")
-    print(f"  {'-' * 25} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8}")
-
-    total_values = [r["total_ms"] for r in ok_rows
-                    if not math.isnan(r.get("total_ms", float("nan")))]
-    total_mean = np.mean(total_values) if total_values else 0
-
-    for field, label in stage_fields:
-        values = [r[field] for r in ok_rows
-                  if not math.isnan(r.get(field, float("nan")))]
-        if values:
-            arr = np.array(values)
-            mean = np.mean(arr)
-            p95 = np.percentile(arr, 95)
-            p99 = np.percentile(arr, 99)
-            pct = (mean / total_mean * 100) if total_mean > 0 else 0
-            print(f"  {label:25s} {mean:8.1f} {p95:8.1f} {p99:8.1f} {pct:7.1f}%")
-        else:
-            print(f"  {label:25s} {'N/A':>8s} {'N/A':>8s} {'N/A':>8s} {'N/A':>8s}")
-
-    # Segmentation simulation note
-    sim_count = sum(1 for r in ok_rows if r.get("seg_simulated", False))
-    if sim_count:
-        print(f"  Segmentation: {sim_count}/{len(ok_rows)} trials simulated "
-              "(inference backend unavailable)")
-
-    # Path statistics
-    path_counts = {}
-    for r in ok_rows:
-        p = r.get("path", "unknown")
-        path_counts[p] = path_counts.get(p, 0) + 1
-    print(f"\n  Paths taken: {path_counts}")
-
-    # MAR/IDE checks
-    if total_values:
-        total_p95 = np.percentile(total_values, 95)
-        print(f"\n  MAR (P95 <= 400 ms): {'PASS' if total_p95 <= 400 else 'FAIL'}"
-              f"  (P95 = {total_p95:.1f} ms)")
-        print(f"  IDE (P95 <= 100 ms): {'PASS' if total_p95 <= 100 else 'FAIL'}"
-              f"  (P95 = {total_p95:.1f} ms)")
-
-    print(f"\n  Successful trials: {len(ok_rows)} / {len(rows)}")
-    print(f"  Results in: {RESULTS_DIR}")
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Test 1: Per-Stage Latency Benchmark"
-    )
-    parser.add_argument("--objects", nargs="+", default=None,
-                        help="Specific objects to test (default: all)")
-    parser.add_argument("--repetitions", type=int, default=30,
-                        help="Repetitions per object (default: 30)")
-    args = parser.parse_args()
-
-    sys.path.insert(0, SCRIPT_DIR)
-    from object_registry import list_objects
-
-    available = list_objects()
-    if args.objects:
-        objects = [o for o in args.objects if o in available]
-        missing = set(args.objects) - set(objects)
-        if missing:
-            print(f"WARNING: Objects not found: {missing}")
-    else:
-        objects = available
-
-    if not objects:
-        print("ERROR: No objects available. Run generate_objects.py first.")
-        sys.exit(1)
-
-    print(f"Test objects ({len(objects)}): {objects}")
-    print(f"Repetitions: {args.repetitions}")
-
-    run_latency_stages(objects, args.repetitions)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Per-stage latency benchmark")
+    parser.add_argument("--objects", nargs="+", required=True, help="Objects to test")
+    parser.add_argument("--repetitions", type=int, default=30, help="Trials per object")
+    parser.add_argument("--no-external-twist", action="store_false", dest="publish_twist",
+                        help="Don't publish external twist (use finite differences)")
+    parser.add_argument("--label", default="", help="Label for results")
+    parser.add_argument("--simulate-segmentation", action="store_true",
+                        help="Bypass real segmentation inference")
+    args = parser.parse_args()
+
+    run_latency_stages(
+        objects=args.objects,
+        repetitions=args.repetitions,
+        publish_twist=args.publish_twist,
+        label=args.label,
+        simulate_segmentation=args.simulate_segmentation
+    )

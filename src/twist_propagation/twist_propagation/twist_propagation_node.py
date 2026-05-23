@@ -72,7 +72,7 @@ from geometry_msgs.msg import (
 )
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import PointCloud2, PointField
-from std_msgs.msg import String, ColorRGBA, Empty
+from std_msgs.msg import String, ColorRGBA, Empty, Float64
 from std_srvs.srv import Trigger
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -406,7 +406,7 @@ class TwistPropagationNode(Node):
 
         # ── Parameters ─────────────────────────────────────────────────────
         # Core propagation
-        self.declare_parameter("cycle_delay_s", 0.1)
+        self.declare_parameter("cycle_delay_s", 0.02)
         self.declare_parameter("propagation_time_horizon_s", 2.0)
         self.declare_parameter("propagation_dt_s", 0.02)
 
@@ -432,6 +432,8 @@ class TwistPropagationNode(Node):
         self.declare_parameter("odom_topic", "")  # optional: nav_msgs/Odometry
         self.declare_parameter("click_positive_topic", "/segmentation/click_positive")
         self.declare_parameter("hand_twist_topic", "/hand_twist")
+        self.declare_parameter("hand_twist_input_topic", "/hand_twist")  # external twist source
+        self.declare_parameter("external_twist_max_age_s", 0.5)
         self.declare_parameter("segmentation_reset_topic", "/segmentation/reset")
 
         # Segmentation retarget policy
@@ -477,6 +479,9 @@ class TwistPropagationNode(Node):
         # error.
         self.declare_parameter("preshaping_call_delay_s", 0.15)
 
+        # Background warm cache
+        self.declare_parameter("background_cycle_enabled", True)
+
         # ── Read parameters ────────────────────────────────────────────────
         self._cycle_delay = self.get_parameter("cycle_delay_s").value
         self._horizon = self.get_parameter("propagation_time_horizon_s").value
@@ -513,6 +518,8 @@ class TwistPropagationNode(Node):
         self._click_min_radius = float(self.get_parameter("click_min_radius_m").value)
         self._click_random_seed = int(self.get_parameter("click_random_seed").value)
         self._preshaping_call_delay = float(self.get_parameter("preshaping_call_delay_s").value)
+        self._background_cycle_enabled = bool(self.get_parameter("background_cycle_enabled").value)
+        self._external_twist_max_age = float(self.get_parameter("external_twist_max_age_s").value)
 
         # Validation
         if self._click_count < 0:
@@ -559,6 +566,17 @@ class TwistPropagationNode(Node):
         # Current accepted segmentation target (cloud frame)
         self._current_segmentation_target: tuple[float, float, float] | None = None
 
+        # External twist from odometry (None when unavailable)
+        self._external_twist: tuple | None = None
+        self._external_twist_time: float = 0.0
+        self._twist_source: str = "estimated"  # "external" or "estimated"
+
+        # Activation fast-path flag
+        self._just_activated: bool = False
+
+        # Status publication throttle counter
+        self._status_counter: int = 0
+
         # Marker ID counters for RViz visualization
         self._sphere_marker_ns = "collision_spheres"
         self._hit_marker_ns = "hit_marker"
@@ -578,6 +596,12 @@ class TwistPropagationNode(Node):
         odom_topic = self.get_parameter("odom_topic").value
 
         self.create_subscription(PoseStamped, hand_pose_topic, self._on_hand_pose, 10)
+
+        # Optional external twist subscription (e.g. from odom_to_pose_relay)
+        hand_twist_input = self.get_parameter("hand_twist_input_topic").value
+        self._has_external_twist_sub = bool(hand_twist_input)
+        if hand_twist_input:
+            self.create_subscription(TwistStamped, hand_twist_input, self._on_hand_twist, 10)
 
         # RELIABLE — the fusion node publishes with RELIABLE QoS; the
         # RealSense publishers on the Jetson also use RELIABLE, so this
@@ -618,6 +642,8 @@ class TwistPropagationNode(Node):
             MarkerArray, "/twist_propagation/hit_marker", 10)
         self._trajectory_line_pub = self.create_publisher(
             MarkerArray, "/twist_propagation/trajectory_line", 10)
+        self._hit_time_pub = self.create_publisher(
+            Float64, "/grasp_preshaping/hit_time", 10)
 
         # ── Service servers ────────────────────────────────────────────────
         self.create_service(
@@ -646,8 +672,21 @@ class TwistPropagationNode(Node):
             f"hit_thresh={self._hit_thresh}m, "
             f"collision_radius={self._collision_radius}m, "
             f"effective_thresh={self._effective_hit_thresh}m, "
-            f"multi_click={self._click_count} (r={self._click_radius}m, r_min={self._click_min_radius}m)"
+            f"multi_click={self._click_count} (r={self._click_radius}m, r_min={self._click_min_radius}m), "
+            f"background_cycle={self._background_cycle_enabled}, "
+            f"cycle_rate={1.0/self._cycle_delay:.0f}Hz"
         )
+        if self._has_external_twist_sub:
+            twist_input_topic = self.get_parameter("hand_twist_input_topic").value
+            self.get_logger().info(
+                f"External twist source: {twist_input_topic} "
+                f"(max_age={self._external_twist_max_age}s)"
+            )
+        else:
+            self.get_logger().info(
+                "No external twist topic configured -- "
+                "using pose finite-difference estimation"
+            )
 
     # ── Service callbacks ──────────────────────────────────────────────────
 
@@ -657,6 +696,7 @@ class TwistPropagationNode(Node):
             self._cycle_state = CycleState.IDLE
             self._pose_buf.clear()
             self._seg_trigger_time = 0.0
+            self._just_activated = True
         self.get_logger().info("Activated")
         resp.success = True
         resp.message = "twist_propagation activated"
@@ -690,6 +730,22 @@ class TwistPropagationNode(Node):
                 q.x, q.y, q.z, q.w,
                 frame_id,
             ))
+
+    def _on_hand_twist(self, msg: TwistStamped):
+        """Store the latest external twist from odometry."""
+        now_s = self.get_clock().now().nanoseconds / 1e-9
+        with self._lock:
+            self._external_twist = (
+                msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z,
+                msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z,
+            )
+            # Use wall-clock time (not message stamp) so the age check
+            # in _estimate_twist is reliable regardless of clock domain.
+            self._external_twist_time = now_s
+        self.get_logger().info(
+            f"External twist received: ({msg.twist.linear.x:.3f}, "
+            f"{msg.twist.linear.y:.3f}, {msg.twist.linear.z:.3f})"
+        )
 
     def _on_odom(self, msg: Odometry):
         """Store the latest odometry for covariance initialization."""
@@ -727,16 +783,30 @@ class TwistPropagationNode(Node):
     # ── Twist estimation ───────────────────────────────────────────────────
 
     def _estimate_twist(self) -> tuple:
-        """Estimate twist from the pose buffer using finite differences.
+        """Estimate twist from external source or pose buffer.
 
-        Uses the last two poses for a simple estimate, or a least-squares
-        linear fit over the full window if enough poses are available.
+        Prefers the external twist (from odometry) when fresh.
+        Falls back to finite-difference estimation from the pose buffer.
 
         Returns (vx, vy, vz, wx, wy, wz).
         """
+        # Check for fresh external twist first
+        if self._external_twist is not None:
+            now_s = self.get_clock().now().nanoseconds / 1e9
+            age = now_s - self._external_twist_time
+            if age <= self._external_twist_max_age:
+                self._twist_source = "external"
+                return self._external_twist
+            else:
+                self.get_logger().info(
+                    f"External twist stale: age={age:.3f}s > max={self._external_twist_max_age:.3f}s"
+                )
+
+        self._twist_source = "estimated"
+
         buf = list(self._pose_buf)
         if len(buf) < 2:
-            return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            return self._twist  # return previous estimate
 
         # Simple finite difference using last two poses
         t0, px0, py0, pz0, qx0, qy0, qz0, qw0, _ = buf[-2]
@@ -851,6 +921,12 @@ class TwistPropagationNode(Node):
         # Collect predicted positions for visualization
         positions: list[tuple[float, float, float]] = []
 
+        self.get_logger().info(
+            f"Propagation start: pose=({px:.3f},{py:.3f},{pz:.3f}) "
+            f"twist=({vx:.3f},{vy:.3f},{vz:.3f}) horizon={self._horizon} dt={self._dt} "
+            f"cloud_pts={len(self._cloud_xyz) if self._cloud_xyz is not None else 0}"
+        )
+
         t = 0.0
         while t < self._horizon:
             t += self._dt
@@ -867,7 +943,7 @@ class TwistPropagationNode(Node):
                 P = _propagate_covariance(P, self._dt, self._sigma_v_sq, self._sigma_w_sq)
                 cov_trace = float(np.trace(P))
                 if cov_trace > self._max_cov_trace:
-                    self.get_logger().debug(
+                    self.get_logger().info(
                         f"Covariance trace {cov_trace:.2f} exceeds max "
                         f"{self._max_cov_trace} at t={t:.3f}s, truncating horizon"
                     )
@@ -886,6 +962,11 @@ class TwistPropagationNode(Node):
                 hit_point = self._cloud_xyz[idx]
                 return (float(hit_point[0]), float(hit_point[1]), float(hit_point[2]), t)
 
+        self.get_logger().info(
+            f"Propagation end: {len(positions)} positions, "
+            f"hit={'yes' if positions and 'return' in str(self._last_predicted_positions) else 'no'}, "
+            f"final=({px:.3f},{py:.3f},{pz:.3f})"
+        )
         self._last_predicted_positions = positions
         return None
 
@@ -1112,6 +1193,7 @@ class TwistPropagationNode(Node):
         status = {
             "active": self._active,
             "state": self._cycle_state.value,
+            "twist_source": self._twist_source,
             **kwargs,
         }
         msg = String()
@@ -1131,7 +1213,11 @@ class TwistPropagationNode(Node):
                 state = self._cycle_state
 
                 if not active:
-                    self._publish_status()
+                    if self._background_cycle_enabled:
+                        self._run_background_cycle()
+                    self._status_counter += 1
+                    if self._status_counter % 5 == 1:
+                        self._publish_status()
                     return
 
                 # -- State: WAITING_FOR_SEGMENTATION ----------------------------
@@ -1167,6 +1253,10 @@ class TwistPropagationNode(Node):
                 else:
                     self._run_idle_cycle()
 
+                # Throttled status for active non-IDLE states handled above;
+                # IDLE cycle publishes its own status internally.
+                self._status_counter += 1
+
             # -- Outside the lock: call preshaping service if needed -------------
             if should_call_preshaping:
                 self._schedule_preshaping_call()
@@ -1176,12 +1266,41 @@ class TwistPropagationNode(Node):
                 f"EXCEPTION in _cycle_callback: {exc}\n{traceback.format_exc()}"
             )
 
+    def _run_background_cycle(self):
+        """Warm the twist and KDTree caches while inactive.
+
+        Runs a read-only subset of _run_idle_cycle: estimates twist
+        (from external source or pose buffer) and ensures the KDTree
+        is built.  Does NOT publish clicks, resets, state transitions,
+        or visualization markers.
+        """
+        # Update twist estimate (side-effect: updates self._twist)
+        self._estimate_twist()
+
+        # Ensure KDTree is built from current cloud
+        if self._cloud_xyz is not None:
+            self._get_kdtree()
+
     def _run_idle_cycle(self):
         """Run one propagation cycle.  Called under self._lock."""
-        # Need at least 2 poses and a cloud
-        if len(self._pose_buf) < 2:
-            self._publish_status(reason="waiting_for_poses")
-            return
+        # -- Handle _just_activated fast path --------------------------------
+        if self._just_activated:
+            # Background cycle already warmed the twist — allow single pose
+            if len(self._pose_buf) < 1:
+                self._publish_status(reason="waiting_for_poses")
+                return
+            self._just_activated = False
+            # Use self._twist as-is (pre-computed by background cycle or
+            # external source).  Do NOT re-estimate — the pose buffer was
+            # just cleared on activation.
+        else:
+            # Normal path: check pose buffer requirement
+            min_poses = 1 if self._twist_source == "external" else 2
+            if len(self._pose_buf) < min_poses:
+                self._publish_status(reason="waiting_for_poses")
+                return
+            # Estimate twist (updates self._twist and self._twist_source)
+            self._twist = self._estimate_twist()
         if self._cloud_xyz is None:
             self._publish_status(reason="waiting_for_cloud")
             return
@@ -1206,8 +1325,7 @@ class TwistPropagationNode(Node):
             )
             return
 
-        # Estimate twist
-        self._twist = self._estimate_twist()
+        # (twist already estimated above or inherited from background cycle)
 
         # Speed gate: skip propagation when the hand is essentially
         # stationary.  Prevents false hits from tracking drift and
@@ -1272,6 +1390,8 @@ class TwistPropagationNode(Node):
 
         if hit_result is not None:
             hit_x, hit_y, hit_z, time_to_hit = hit_result
+            # Publish hit time for the preshaping bridge, regardless of gate.
+            self._hit_time_pub.publish(Float64(data=time_to_hit))
 
             # Time-to-hit gate: reject hits that occur too soon in the
             # propagation horizon.  If the predicted collision is less than
@@ -1379,6 +1499,9 @@ class TwistPropagationNode(Node):
                     click_min_radius_m=self._click_min_radius,
                 )
         else:
+            # No hit -- publish -1.0 sentinel to invalidate any stale hit time
+            self._hit_time_pub.publish(Float64(data=-1.0))
+
             # No hit -- publish status with twist info
             self._publish_status(
                 reason="no_hit",
