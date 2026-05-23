@@ -5,22 +5,19 @@
 \toprule
 \textbf{Object} & \textbf{Mean (ms)} & \textbf{P95 (ms)} & \textbf{P99 (ms)} & \textbf{Result} \\
 \midrule
-banana & 66.4 & 73.7 & 76.0 & \textcolor{green!60!black}{\checkmark} \\
-banana\_fallback & 49.5 & 60.6 & 67.0 & \textcolor{green!60!black}{\checkmark} \\
-cross\_shape & 69.1 & 76.5 & 77.0 & \textcolor{green!60!black}{\checkmark} \\
-cylinder\_tilted & 63.9 & 75.2 & 78.4 & \textcolor{green!60!black}{\checkmark} \\
-cylinder\_upright & 61.2 & 68.2 & 72.1 & \textcolor{green!60!black}{\checkmark} \\
-drill\_fallback & 75.3 & 84.0 & 88.3 & \textcolor{green!60!black}{\checkmark} \\
-ellipsoid & 64.5 & 73.0 & 75.1 & \textcolor{green!60!black}{\checkmark} \\
-l\_block & 69.8 & 85.3 & 90.1 & \textcolor{green!60!black}{\checkmark} \\
-mug & 66.0 & 80.0 & 83.6 & \textcolor{green!60!black}{\checkmark} \\
-mug\_fallback & 61.7 & 67.0 & 69.1 & \textcolor{green!60!black}{\checkmark} \\
-mug\_with\_handle & 62.9 & 69.1 & 70.0 & \textcolor{green!60!black}{\checkmark} \\
-notched\_box & 69.7 & 80.1 & 82.4 & \textcolor{green!60!black}{\checkmark} \\
-power\_drill & 58.8 & 64.5 & 66.4 & \textcolor{green!60!black}{\checkmark} \\
-small\_cube & 69.4 & 84.3 & 87.7 & \textcolor{green!60!black}{\checkmark} \\
-tapered\_bottle & 60.1 & 64.0 & 65.4 & \textcolor{green!60!black}{\checkmark} \\
-thin\_plate & 65.5 & 83.0 & 85.1 & \textcolor{green!60!black}{\checkmark} \\
+banana & 73.5 & 85.0 & 88.0 & \textcolor{green!60!black}{\checkmark} \\
+cross\_shape & 73.3 & 87.0 & 92.0 & \textcolor{green!60!black}{\checkmark} \\
+cylinder\_tilted & 70.1 & 81.0 & 89.1 & \textcolor{green!60!black}{\checkmark} \\
+cylinder\_upright & 67.1 & 75.0 & 83.0 & \textcolor{green!60!black}{\checkmark} \\
+ellipsoid & 71.3 & 83.0 & 92.1 & \textcolor{green!60!black}{\checkmark} \\
+l\_block & 79.0 & 93.0 & 98.0 & \textcolor{green!60!black}{\checkmark} \\
+mug & 70.2 & 85.0 & 90.0 & \textcolor{green!60!black}{\checkmark} \\
+mug\_with\_handle & 69.4 & 78.0 & 80.0 & \textcolor{green!60!black}{\checkmark} \\
+notched\_box & 75.8 & 90.0 & 97.0 & \textcolor{green!60!black}{\checkmark} \\
+power\_drill & 65.1 & 72.0 & 73.0 & \textcolor{green!60!black}{\checkmark} \\
+small\_cube & 76.3 & 86.1 & 94.0 & \textcolor{green!60!black}{\checkmark} \\
+tapered\_bottle & 67.8 & 74.0 & 76.0 & \textcolor{green!60!black}{\checkmark} \\
+thin\_plate & 72.5 & 93.0 & 98.0 & \textcolor{green!60!black}{\checkmark} \\
 \bottomrule
 \end{tabular}
 \caption{Test 1a: Pipeline latency results per object. MAR $\leq 400$\,ms.}
@@ -34,24 +31,21 @@ thin\_plate & 65.5 & 83.0 & 85.1 & \textcolor{green!60!black}{\checkmark} \\
 \toprule
 \textbf{Object} & \textbf{SV (\%)} & \textbf{MV (\%)} & \textbf{$\Delta$ (\%)} & \textbf{Wrist Err (deg)} \\
 \midrule
-banana & 86.7 & 63.3 & -23.3 & 66 / 75 \\
-banana\_fallback & 76.7 & 60.0 & -16.7 & 115 / 85 \\
-cross\_shape & 80.0 & 86.7 & +6.7 & 69 / 68 \\
-cylinder\_tilted & 60.0 & 50.0 & -10.0 & 80 / 81 \\
-cylinder\_upright & 60.0 & 56.7 & -3.3 & 84 / 96 \\
-drill\_fallback & 90.0 & 80.0 & -10.0 & 100 / 86 \\
-ellipsoid & 63.3 & 53.3 & -10.0 & 78 / 78 \\
-l\_block & 76.7 & 53.3 & -23.3 & 98 / 81 \\
-mug & 66.7 & 86.7 & +20.0 & 66 / 72 \\
-mug\_fallback & 20.0 & 30.0 & +10.0 & 92 / 79 \\
-mug\_with\_handle & 53.3 & 60.0 & +6.7 & 78 / 83 \\
-notched\_box & 66.7 & 73.3 & +6.7 & 78 / 81 \\
-power\_drill & 43.3 & 80.0 & +36.7 & 96 / 56 \\
-small\_cube & 40.0 & 46.7 & +6.7 & 89 / 68 \\
-tapered\_bottle & 56.7 & 46.7 & -10.0 & 115 / 82 \\
-thin\_plate & 33.3 & 33.3 & +0.0 & 88 / 94 \\
+banana & 47.0 & 56.0 & +9.0 & 92 / 97 \\
+cross\_shape & 93.0 & 87.0 & -6.0 & 61 / 77 \\
+cylinder\_tilted & 33.0 & 44.0 & +11.0 & 101 / 100 \\
+cylinder\_upright & 35.0 & 33.0 & -2.0 & 96 / 79 \\
+ellipsoid & 50.0 & 48.0 & -2.0 & 77 / 94 \\
+l\_block & 70.0 & 69.0 & -1.0 & 85 / 87 \\
+mug & 48.0 & 51.0 & +3.0 & 86 / 93 \\
+mug\_with\_handle & 45.0 & 38.0 & -7.0 & 82 / 81 \\
+notched\_box & 67.0 & 59.0 & -8.0 & 83 / 89 \\
+power\_drill & 43.0 & 47.0 & +4.0 & 95 / 102 \\
+small\_cube & 36.0 & 53.0 & +17.0 & 92 / 77 \\
+tapered\_bottle & 27.0 & 39.0 & +12.0 & 86 / 92 \\
+thin\_plate & 28.0 & 22.0 & -6.0 & 87 / 104 \\
 \midrule
-\textbf{Mean} & & & -0.8 \\
+\textbf{Mean} & & & +1.8 \\
 \bottomrule
 \end{tabular}
 \caption{Test 1b: Intent precision $\Delta$ (multi-view $-$ single-view). Grasp type correctness. MAR $> 0$\,\%, IDE $\geq 10$\,\%. Wrist Err shows SV / MV mean orientation error.}

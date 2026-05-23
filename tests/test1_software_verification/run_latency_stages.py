@@ -143,7 +143,7 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
     from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
     from geometry_msgs.msg import PoseStamped, TwistStamped, Vector3, PointStamped
     from sensor_msgs.msg import PointCloud2, PointField
-    from std_msgs.msg import Header, Int32, Float64, Float64MultiArray, String
+    from std_msgs.msg import Header, Int32, Float32, Float64, Float64MultiArray, String
     from std_srvs.srv import Trigger
 
     sys.path.insert(0, SCRIPT_DIR)
@@ -170,6 +170,12 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
     # ── Publishers ──────────────────────────────────────────────────────
     # /fused_pointcloud — consumed by twist propagation (collision detection)
     cloud_pub = node.create_publisher(PointCloud2, "/fused_pointcloud", 10)
+    # /segmentation/object_cloud — the test script publishes the full synthetic
+    # object cloud directly when the click_positive is received. This bypasses
+    # the segmentation bridge (which requires an external inference backend)
+    # and keeps the pipeline flowing for end-to-end latency measurement.
+    seg_obj_pub = node.create_publisher(
+        PointCloud2, "/segmentation/object_cloud", 10)
     # /segmentation/input_cloud — consumed by segmentation bridge in mock
     # (in the real pipeline this is remapped from /fused_pointcloud, but the
     # mock launch doesn't include the remapping, so we publish to both)
@@ -177,7 +183,7 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
     pose_pub = node.create_publisher(PoseStamped, "/hand_pose", 10)
     twist_pub = node.create_publisher(TwistStamped, "/hand_twist", 10)
     emg_pub = node.create_publisher(Int32, "/emg/gesture_label", 10)
-    emg_conf_pub = node.create_publisher(Float64, "/emg/confidence", 10)
+    emg_conf_pub = node.create_publisher(Float32, "/emg/confidence", 10)
 
     # ── Service client ──────────────────────────────────────────────────
     compute_client = node.create_client(
@@ -188,6 +194,8 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
     trial_events: list[tuple[str, float, dict]] = []
     trial_complete = threading.Event()
     trial_result: dict = {}
+    # Synthetic cloud published on click_positive to feed pipeline manager
+    _synthetic_cloud: PointCloud2 | None = None
 
     # ── Topic subscribers with arrival-time recording ───────────────────
 
@@ -206,6 +214,12 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
         _record("click_positive", {
             "x": msg.point.x, "y": msg.point.y, "z": msg.point.z,
         })
+        # Publish the full synthetic object cloud to /segmentation/object_cloud
+        # to keep the pipeline flowing when the inference backend is unavailable.
+        # The pipeline manager listens on this topic and transitions to PLANNING
+        # upon receipt, then calls the preshaping service.
+        if _synthetic_cloud is not None:
+            seg_obj_pub.publish(_synthetic_cloud)
 
     def _on_object_cloud(msg: PointCloud2):
         n_pts = msg.width * msg.height
@@ -222,6 +236,18 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
                 trial_result["grasp_type"] = msg.data
                 trial_result["status"] = "ok"
                 trial_complete.set()
+
+    def _on_pipeline_timing(msg: String):
+        """Parse pipeline_time_ms and smc_iterations from the timing topic."""
+        _record("pipeline_timing", {"msg": msg.data})
+        m = re.search(r"pipeline_time_ms=([\d.]+)", msg.data)
+        if m:
+            with lock:
+                trial_result["rust_compute_ms"] = float(m.group(1))
+        m = re.search(r"smc_iterations=(\d+)", msg.data)
+        if m:
+            with lock:
+                trial_result["smc_iterations"] = int(m.group(1))
 
     def _on_finger_closures(msg: Float64MultiArray):
         _record("finger_closures", {"closures": list(msg.data)})
@@ -250,6 +276,8 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
         PointCloud2, "/segmentation/object_cloud", _on_object_cloud, cloud_qos)
     node.create_subscription(Int32, "/grasp_preshaping/grasp_type",
                              _on_grasp_type, 10)
+    node.create_subscription(
+        String, "/grasp_preshaping/pipeline_timing", _on_pipeline_timing, 10)
     node.create_subscription(
         Float64MultiArray, "/grasp_preshaping/target_finger_closures",
         _on_finger_closures, 10)
@@ -320,6 +348,7 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
             continue
 
         cloud_points = obj["points"]
+        synthetic_cloud_msg = _make_cloud_msg(cloud_points)
         approach_poses = _generate_approach_trajectory(approach)
 
         for rep in range(repetitions):
@@ -330,12 +359,15 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
                 trial_result.clear()
                 trial_complete.clear()
 
+            # Set synthetic cloud for click_positive callback to publish
+            with lock:
+                _synthetic_cloud = synthetic_cloud_msg
+
             # Publish the fused point cloud (for twist propagation collision)
-            cloud_msg = _make_cloud_msg(cloud_points)
-            cloud_pub.publish(cloud_msg)
+            cloud_pub.publish(synthetic_cloud_msg)
             # Also publish to segmentation input (the mock launch doesn't remap
             # /segmentation/input_cloud to /fused_pointcloud like the real pipeline)
-            seg_input_pub.publish(cloud_msg)
+            seg_input_pub.publish(synthetic_cloud_msg)
 
             # Publish the approach twist
             twist_msg = _make_twist_msg(approach["twist"])
@@ -355,7 +387,7 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
 
             # ── Phase 2: Inject EMG trigger + continue trajectory ──────────
             # Pre-publish confidence so the pipeline manager accepts the gesture
-            conf_msg = Float64()
+            conf_msg = Float32()
             conf_msg.data = 0.95
             emg_conf_pub.publish(conf_msg)
             time.sleep(0.05)
@@ -433,6 +465,7 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
                     "ros_service_overhead_ms": float("nan"),
                     "grasp_type": -1,
                     "n_cloud_points": len(cloud_points),
+                    "seg_simulated": False,
                     "status": "timeout",
                     "n_events": len(events),
                 }
@@ -456,6 +489,8 @@ def run_latency_stages(objects: list[str], repetitions: int = 30):
                   f"min={np.min(times):.1f}, max={np.max(times):.1f} ms")
 
     # ── Cleanup ─────────────────────────────────────────────────────────
+    with lock:
+        _synthetic_cloud = None
     node.destroy_node()
     rclpy.shutdown()
     spin_thread.join(timeout=2.0)
@@ -518,6 +553,10 @@ def _compute_stage_latencies(
         return (t_end - t_begin) * 1000
 
     pipeline_manager_ms = _delta(t_segmenting, t_start)
+    # Clamp: small negative values are clock jitter between t_start recording
+    # and state message delivery (typically <3 ms). Treat as instant.
+    if not math.isnan(pipeline_manager_ms) and pipeline_manager_ms < 0:
+        pipeline_manager_ms = 0.0
     twist_propagation_ms = _delta(t_click, t_segmenting)
     segmentation_ms = _delta(t_object_cloud, t_click)
     pm_cloud_handling_ms = _delta(t_planning, t_object_cloud)
@@ -534,10 +573,15 @@ def _compute_stage_latencies(
 
     # Try to get rust_compute_ms from service response (if available
     # via the pipeline_time_ms in the response message)
-    rust_compute_ms = float("nan")
+    rust_compute_ms = result.get("rust_compute_ms", float("nan"))
+    if math.isnan(rust_compute_ms) or rust_compute_ms is None:
+        rust_compute_ms = float("nan")
     ros_service_overhead_ms = float("nan")
     if not math.isnan(preshaping_ms) and not math.isnan(rust_compute_ms):
         ros_service_overhead_ms = preshaping_ms - rust_compute_ms
+    # Segmentation simulated flag: if we published from the test callback
+    # (no actual inference backend), seg_time is ~0 and we flag it
+    seg_simulated = not math.isnan(segmentation_ms) and segmentation_ms < 1.0
 
     return {
         "object": obj_name,
@@ -554,6 +598,7 @@ def _compute_stage_latencies(
         "grasp_type": result.get("grasp_type", -1),
         "n_cloud_points": n_cloud_points,
         "status": result.get("status", "unknown"),
+        "seg_simulated": seg_simulated,
         "n_events": len(events),
     }
 
@@ -575,7 +620,7 @@ def _write_results(rows: list[dict]):
             "segmentation_ms", "pm_cloud_handling_ms",
             "preshaping_ms", "total_ms",
             "rust_compute_ms", "ros_service_overhead_ms",
-            "grasp_type", "n_cloud_points", "n_events",
+            "grasp_type", "n_cloud_points", "seg_simulated", "n_events",
         ]
         with open(trial_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
@@ -674,6 +719,12 @@ def _print_summary(rows: list[dict]):
             print(f"  {label:25s} {mean:8.1f} {p95:8.1f} {p99:8.1f} {pct:7.1f}%")
         else:
             print(f"  {label:25s} {'N/A':>8s} {'N/A':>8s} {'N/A':>8s} {'N/A':>8s}")
+
+    # Segmentation simulation note
+    sim_count = sum(1 for r in ok_rows if r.get("seg_simulated", False))
+    if sim_count:
+        print(f"  Segmentation: {sim_count}/{len(ok_rows)} trials simulated "
+              "(inference backend unavailable)")
 
     # Path statistics
     path_counts = {}

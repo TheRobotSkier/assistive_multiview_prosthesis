@@ -531,6 +531,13 @@ class PointCloudFusionNode(Node):
                     rgb_all = rgb_all[keep]
                     with self._stats_lock:
                         self._stats["bbox_removed"] += int(removed)
+                    # Throttled success logging — only visible when bbox removal
+                    # is actually filtering hand/arm points.
+                    if removed > 0 and self._bbox_successes % 50 == 1:
+                        self.get_logger().info(
+                            f"Bbox removal via fresh TF removed {removed} points "
+                            f"from {frame}",
+                            throttle_duration_sec=10.0)
                 else:
                     # Fresh lookup failed — apply fallback strategy
                     handled = self._bbox_fallback(
@@ -594,9 +601,6 @@ class PointCloudFusionNode(Node):
         Returns (xyz_all, rgb_all) if fallback was applied, or None if
         the pruning box was skipped entirely.
         """
-        with self._stats_lock:
-            self._stats["bbox_skipped"] += 1
-
         if self._bbox_fallback_mode == "cache":
             cached = self._bbox_transform_cache.get(frame)
             if cached is not None:
@@ -613,12 +617,22 @@ class PointCloudFusionNode(Node):
                     with self._stats_lock:
                         self._stats["bbox_removed"] += int(removed)
                         self._stats["bbox_cache_hits"] += 1
+                    # Also count cache hits as functional successes
+                    self._bbox_successes += 1
+                    if removed > 0:
+                        if self._bbox_successes % 50 == 1:
+                            self.get_logger().info(
+                                f"Bbox removal via cache removed {removed} points "
+                                f"from {frame} (cache age={age_s:.2f}s)",
+                                throttle_duration_sec=10.0)
                     self.get_logger().warn(
                         f"Using cached transform for {frame} "
                         f"(age={age_s:.2f}s) — fresh lookup failed",
                         throttle_duration_sec=5.0)
                     return xyz_all, rgb_all
                 else:
+                    with self._stats_lock:
+                        self._stats["bbox_skipped"] += 1
                     self.get_logger().warn(
                         f"Cannot transform to {frame} for bbox removal — "
                         f"cached transform too old ({age_s:.1f}s > "
@@ -626,6 +640,8 @@ class PointCloudFusionNode(Node):
                         throttle_duration_sec=5.0)
                     return None
             # No cache available
+            with self._stats_lock:
+                self._stats["bbox_skipped"] += 1
             self.get_logger().warn(
                 f"Cannot transform to {frame} for bbox removal — "
                 f"no cached transform available, skipping",
@@ -642,6 +658,8 @@ class PointCloudFusionNode(Node):
             return np.zeros((0, 3), dtype=np.float32), rgb_all[:0]
 
         else:  # "skip" mode (original behavior)
+            with self._stats_lock:
+                self._stats["bbox_skipped"] += 1
             self.get_logger().warn(
                 f"Cannot transform to {frame} for bbox removal — skipping",
                 throttle_duration_sec=5.0)

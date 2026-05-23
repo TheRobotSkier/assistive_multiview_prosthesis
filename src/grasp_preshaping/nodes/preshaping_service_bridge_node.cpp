@@ -18,6 +18,7 @@
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
@@ -146,6 +147,9 @@ public:
 
     grasp_type_pub_ = create_publisher<std_msgs::msg::Int32>(
       grasp_type_topic, rclcpp::QoS(10).transient_local());
+
+    pipeline_timing_pub_ = create_publisher<std_msgs::msg::String>(
+      "/grasp_preshaping/pipeline_timing", 10);
 
     initialize_rust_backend();
 
@@ -498,6 +502,15 @@ private:
       grasp_type_pub_->publish(grasp_type_msg);
     }
 
+    // Pipeline timing info (for latency benchmarking).
+    {
+      std_msgs::msg::String timing_msg;
+      timing_msg.data =
+        "pipeline_time_ms=" + std::to_string(ffi_response.pipeline_time_ms) +
+        ",smc_iterations=" + std::to_string(ffi_response.smc_iterations_used);
+      pipeline_timing_pub_->publish(timing_msg);
+    }
+
     response->success = true;
     response->message = message.empty() ? "Preshaping completed" : message;
     response->message +=
@@ -546,6 +559,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr target_hand_pose_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr target_finger_closures_pub_;
   rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr grasp_type_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pipeline_timing_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_;
 };
 

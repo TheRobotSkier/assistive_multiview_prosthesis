@@ -278,6 +278,16 @@ def _launch_setup(context, *args, **kwargs):
                     output="screen",
                     arguments=["--ros-args", "--log-level", "warn"],
                 ),
+                # OpenVINS odometry-to-TF relay: publishes marker_map -> *_imu
+                # from odom messages so the host doesn't depend on Jetson /tf.
+                Node(
+                    package="camera",
+                    executable="openvins_odom_tf_relay",
+                    name="openvins_odom_tf_relay",
+                    parameters=[_node_params(config, "openvins_odom_tf_relay")],
+                    output="screen",
+                    arguments=["--ros-args", "--log-level", "warn"],
+                ),
             ]
         )
         nodes.extend(camera_nodes)

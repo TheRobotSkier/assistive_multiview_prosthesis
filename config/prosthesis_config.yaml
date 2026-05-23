@@ -146,6 +146,24 @@ pointcloud_fusion:
         mounts_config_path: ""
         active_mount: "8_cm_cam_mount"
 
+openvins_odom_tf_relay:
+    ros__parameters:
+        head_odom_topic: "/ov_msckf/odomimu"
+        arm_odom_topic: "/ov_msckf_arm/odomimu"
+        target_frame: "marker_map"
+        head_imu_frame: "head_imu"
+        arm_imu_frame: "arm_imu"
+        head_cam_frame: "head_cam0"
+        arm_cam_frame: "arm_cam0"
+        publish_imu_to_cam_tf: true
+        # Nominal D435i imu->cam0 (color_optical) extrinsic.
+        # OpenVINS cam0 == color_optical_frame.  The imu frame is at the link
+        # origin; color_optical is (0, 0.015, 0) with optical rotation.
+        imu_to_cam_extrinsics_head:
+            {x: 0.0, y: 0.015, z: 0.0, roll: -1.570796, pitch: 0.0, yaw: -1.570796}
+        imu_to_cam_extrinsics_arm:
+            {x: 0.0, y: 0.015, z: 0.0, roll: -1.570796, pitch: 0.0, yaw: -1.570796}
+
 openvins_realsense_tf_bridge:
     ros__parameters:
         camera_names: ["head", "arm"]
@@ -168,10 +186,9 @@ openvins_realsense_tf_bridge:
             ]
         publish_rate_hz: 10.0
         # Liveness re-sends bridge edges on /tf to work around CycloneDDS
-        # /tf_static latch unreliability.  2 Hz keeps the bridge edges
-        # available for the fusion node (15 Hz, 0.5s cloud max age) while
-        # being much cheaper than the startup rate.
-        liveness_rate_hz: 2.0
+        # /tf_static latch unreliability.  10 Hz ensures the TF buffer always
+        # has a fresh entry for the fusion node (15 Hz, 0.5s cloud max age).
+        liveness_rate_hz: 10.0
         publish_nominal_static_chain: true
 
 twist_propagation:

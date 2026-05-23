@@ -610,8 +610,8 @@ def main():
                         help="Skip baseline computation (use previous results)")
     parser.add_argument("--objects", nargs="+", default=None,
                         help="Specific objects to test (default: all)")
-    parser.add_argument("--repetitions", type=int, default=30,
-                        help="Number of repetitions per condition (default: 30)")
+    parser.add_argument("--repetitions", type=int, default=100,
+                        help="Number of repetitions per condition (default: 100)")
     parser.add_argument("--debug", action="store_true",
                         help="Enable debug visualization dumps")
     parser.add_argument("--baseline-timeout", type=int, default=120,

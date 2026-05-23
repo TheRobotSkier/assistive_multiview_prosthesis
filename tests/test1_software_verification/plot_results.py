@@ -567,6 +567,393 @@ def plot_convexity_analysis(delta_rows: list[dict], summary_rows: list[dict],
 
 
 # ---------------------------------------------------------------------------
+# Figure 7c: Per-view point cloud coverage comparison
+# ---------------------------------------------------------------------------
+
+def plot_per_view_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
+    """3D scatter of an example object showing which surfaces each camera sees.
+
+    Points are colour-coded:
+      - #5099e9 (blue)     = head camera only
+      - #ff9e4a (orange)   = wrist camera only
+      - #55a868 (green)    = both cameras
+      - #b0b0b0 (gray)     = neither (not visible from any camera at approach distance)
+    """
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    sys.path.insert(0, SCRIPT_DIR)
+    from object_registry import load_object
+    from hand_approaches import get_approach
+    from view_geometry import get_camera_world_frames
+    from occlusion import generate_view_cloud
+
+    # Pick an interesting non-convex object
+    obj_name = "power_drill"
+    try:
+        obj = load_object(obj_name)
+        approach = get_approach(obj_name)
+    except (KeyError, FileNotFoundError) as e:
+        print(f"  SKIP per_view_coverage: {e}")
+        return
+
+    full = obj["points"]
+    cam_frames = get_camera_world_frames(approach["pose"])
+
+    # Generate camera-specific views
+    head_vis = generate_view_cloud(full, cam_frames[0], use_depth_buffer=True)
+    wrist_vis = generate_view_cloud(full, cam_frames[1], use_depth_buffer=True)
+
+    # Dedup for membership check
+    tol = 0.001  # 1 mm tolerance for membership test
+    head_set = set(map(tuple, np.round(head_vis / tol).astype(int)))
+    wrist_set = set(map(tuple, np.round(wrist_vis / tol).astype(int)))
+
+    # Classify each point in the full cloud
+    n = len(full)
+    colors = np.full(n, 4, dtype=np.uint8)  # 4 = neither
+    for i in range(n):
+        key = tuple(np.round(full[i] / tol).astype(int))
+        in_head = key in head_set
+        in_wrist = key in wrist_set
+        if in_head and in_wrist:
+            colors[i] = 3  # both
+        elif in_head:
+            colors[i] = 1  # head only
+        elif in_wrist:
+            colors[i] = 2  # wrist only
+        # else: 4 = neither (default)
+
+    cmap = np.array([
+        [0, 0, 0, 0],                 # 0: unused
+        [80 / 255, 153 / 255, 233 / 255, 1],   # 1: head only (blue #5099e9)
+        [1, 159 / 255, 74 / 255, 1],           # 2: wrist only (orange #ff9e4a)
+        [85 / 255, 168 / 255, 104 / 255, 1],   # 3: both (green #55a868)
+        [176 / 255, 176 / 255, 176 / 255, 0.4],  # 4: neither (gray, semi-transparent)
+    ])
+
+    fig = plt.figure(figsize=(14, 5))
+
+    # --- Subplot 1: Full view from a 3/4 angle ---
+    ax1 = fig.add_subplot(1, 3, 1, projection="3d")
+    ax1.scatter(full[:, 0], full[:, 1], full[:, 2],
+                c=cmap[colors], s=0.5, alpha=0.8)
+    # Camera positions
+    for label, cf in [("Head", cam_frames[0]), ("Wrist", cam_frames[1])]:
+        p = cf["position"]
+        ax1.scatter(*p, c="#e74c3c" if label == "Head" else "#2c3e50",
+                    s=80, marker="^", label=label)
+        # Simple frustum arrow
+        fwd = cf["forward"] * 0.15
+        ax1.quiver(*p, *fwd, color="#e74c3c" if label == "Head" else "#2c3e50",
+                   arrow_length_ratio=0.15, linewidth=2)
+    ax1.set_title(f"Full Cloud — {obj_name}", fontsize=10, fontweight="bold")
+    ax1.legend(fontsize=8, loc="upper right")
+    ax1.set_xlabel("X (m)"); ax1.set_ylabel("Y (m)"); ax1.set_zlabel("Z (m)")
+
+    # --- Subplot 2: Head camera view ---
+    ax2 = fig.add_subplot(1, 3, 2, projection="3d")
+    head_labels = np.full(n, 4, dtype=np.uint8)
+    for i in range(n):
+        key = tuple(np.round(full[i] / tol).astype(int))
+        if key in head_set:
+            head_labels[i] = 1  # visible from head
+    ax2.scatter(full[:, 0], full[:, 1], full[:, 2],
+                c=cmap[head_labels], s=0.5, alpha=0.8)
+    # Set viewpoint to approximate head camera
+    ax2.view_init(elev=20, azim=-60)
+    ax2.set_title("Head Camera View", fontsize=10, fontweight="bold")
+    ax2.set_xlabel("X (m)"); ax2.set_ylabel("Y (m)"); ax2.set_zlabel("Z (m)")
+
+    # --- Subplot 3: Wrist camera view ---
+    ax3 = fig.add_subplot(1, 3, 3, projection="3d")
+    wrist_labels = np.full(n, 4, dtype=np.uint8)
+    for i in range(n):
+        key = tuple(np.round(full[i] / tol).astype(int))
+        if key in wrist_set:
+            wrist_labels[i] = 2  # visible from wrist
+    ax3.scatter(full[:, 0], full[:, 1], full[:, 2],
+                c=cmap[wrist_labels], s=0.5, alpha=0.8)
+    # Set viewpoint to approximate wrist camera
+    ax3.view_init(elev=10, azim=-20)
+    ax3.set_title("Wrist Camera View", fontsize=10, fontweight="bold")
+    ax3.set_xlabel("X (m)"); ax3.set_ylabel("Y (m)"); ax3.set_zlabel("Z (m)")
+
+    fig.suptitle(f"Per-View Point Cloud Coverage: {obj_name}\n"
+                 "(Blue = head only, Orange = wrist only, Gray = unseen from approach pose)",
+                 fontsize=11, fontweight="bold", color=COLORS["text"])
+    fig.tight_layout()
+    _save_fig(fig, "fig7c_per_view_coverage", fmt, dpi)
+
+
+# ---------------------------------------------------------------------------
+# Figure 7d: Score distribution comparison (SV vs MV per object)
+# ---------------------------------------------------------------------------
+
+def plot_score_distribution(occlusion_rows: list[dict], fmt: str, dpi: int):
+    """Score distribution histograms: single-view vs multi-view per object.
+
+    Uses kernel density estimates over 100 trials to show whether the
+    multi-view condition shifts the combined_score distribution upward.
+    """
+    import matplotlib.pyplot as plt
+
+    if not occlusion_rows:
+        print("  SKIP: No occlusion data")
+        return
+
+    # Group scores by object and condition
+    from collections import defaultdict
+    scores = defaultdict(lambda: {"single_view": [], "multi_view": []})
+    for row in occlusion_rows:
+        obj = row["object"]
+        cond = row["condition"]
+        sc = float(row.get("combined_score", 0))
+        scores[obj][cond].append(sc)
+
+    objects = sorted(k for k in scores
+                     if scores[k]["single_view"] and scores[k]["multi_view"])
+
+    n = len(objects)
+    ncols = min(4, n)
+    nrows = (n + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(ncols * 3.5, nrows * 3),
+                             squeeze=False)
+
+    for ax_idx, obj in enumerate(objects):
+        ax = axes[ax_idx // ncols][ax_idx % ncols]
+        sv_scores = scores[obj]["single_view"]
+        mv_scores = scores[obj]["multi_view"]
+
+        # Compute histogram bins covering union range
+        all_scores = np.array(sv_scores + mv_scores)
+        bins = np.linspace(min(all_scores), max(all_scores) + 1e-6, 20)
+
+        ax.hist(sv_scores, bins=bins, alpha=0.5, density=True,
+                color=COLORS["single_view"], label=f"SV (n={len(sv_scores)})")
+        ax.hist(mv_scores, bins=bins, alpha=0.5, density=True,
+                color=COLORS["multi_view"], label=f"MV (n={len(mv_scores)})")
+
+        # Vertical lines for means
+        sv_mean = np.mean(sv_scores)
+        mv_mean = np.mean(mv_scores)
+        ax.axvline(sv_mean, color=COLORS["single_view"], linestyle="--", linewidth=1.5)
+        ax.axvline(mv_mean, color=COLORS["multi_view"], linestyle="--", linewidth=1.5)
+
+        # Delta annotation
+        delta_mean = mv_mean - sv_mean
+        color = COLORS["positive"] if delta_mean > 0 else COLORS["negative"]
+        ax.set_title(f"{obj}\n$\\Delta$={delta_mean:+.3f}",
+                     fontsize=9, fontweight="bold", color=color)
+        ax.set_xlabel("Combined Score", fontsize=7)
+        ax.set_ylabel("Density", fontsize=7)
+        ax.tick_params(labelsize=7)
+        ax.grid(alpha=0.2, color=COLORS["grid"])
+
+        if ax_idx == 0:
+            ax.legend(fontsize=6, loc="upper left")
+
+    # Hide unused subplots
+    for ax_idx in range(len(objects), nrows * ncols):
+        axes[ax_idx // ncols][ax_idx % ncols].set_visible(False)
+
+    fig.suptitle("Test 1b: Combined Score Distribution — Single-view vs. Multi-view",
+                 fontsize=11, fontweight="bold", color=COLORS["text"])
+    fig.tight_layout()
+    _save_fig(fig, "fig7d_score_distribution", fmt, dpi)
+
+
+# ---------------------------------------------------------------------------
+# Figure 7e: Best score by grasp type (SV vs MV)
+# ---------------------------------------------------------------------------
+
+def plot_best_score_by_type(occlusion_rows: list[dict], fmt: str, dpi: int):
+    """For each object, show the max combined_score attainable per grasp type,
+    comparing single-view vs multi-view conditions.
+
+    This answers: "Does multi-view let the SMC find higher-scoring grasps
+    of each type?"
+    """
+    import matplotlib.pyplot as plt
+
+    if not occlusion_rows:
+        print("  SKIP: No occlusion data")
+        return
+
+    # Build: object -> condition -> grasp_type -> [scores]
+    from collections import defaultdict
+    data = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for row in occlusion_rows:
+        obj = row["object"]
+        cond = row["condition"]
+        gtype = row["grasp_type_name"]
+        sc = float(row.get("combined_score", 0))
+        data[obj][cond][gtype].append(sc)
+
+    objects = sorted(data.keys())
+    # Pick a representative subset (or all, arranged in a grid)
+    # For clarity, show a focused 2x2 grid if > 4 objects
+    n = len(objects)
+    ncols = min(4, n)
+    nrows = (n + ncols - 1) // ncols
+
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(ncols * 3.5, nrows * 3),
+                             squeeze=False)
+
+    # Collect all grasp types across objects for consistent ordering
+    all_types = sorted(set(
+        gt for obj_data in data.values()
+        for cond_data in obj_data.values()
+        for gt in cond_data
+    ))
+
+    for ax_idx, obj in enumerate(objects):
+        ax = axes[ax_idx // ncols][ax_idx % ncols]
+
+        types_present = sorted(set(
+            gt for cond_data in data[obj].values()
+            for gt in cond_data
+        ))
+
+        x = np.arange(len(types_present))
+        width = 0.35
+
+        sv_max = []
+        mv_max = []
+        for gt in types_present:
+            sv_list = data[obj]["single_view"].get(gt, [])
+            mv_list = data[obj]["multi_view"].get(gt, [])
+            sv_max.append(max(sv_list) if sv_list else 0)
+            mv_max.append(max(mv_list) if mv_list else 0)
+
+        bars_sv = ax.bar(x - width / 2, sv_max, width,
+                         color=COLORS["single_view"], alpha=0.8,
+                         edgecolor=COLORS["text"], linewidth=0.3,
+                         label="Single-view")
+        bars_mv = ax.bar(x + width / 2, mv_max, width,
+                         color=COLORS["multi_view"], alpha=0.8,
+                         edgecolor=COLORS["text"], linewidth=0.3,
+                         label="Multi-view")
+
+        # Highlight where MV beats SV
+        for i, gt in enumerate(types_present):
+            sv_best = sv_max[i]
+            mv_best = mv_max[i]
+            if mv_best > sv_best:
+                ax.annotate("+", xy=(i + width / 2, mv_best),
+                            fontsize=10, ha="center", va="bottom",
+                            color=COLORS["positive"], fontweight="bold")
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(types_present, fontsize=7, rotation=30, ha="right")
+        ax.set_title(obj, fontsize=9, fontweight="bold")
+        ax.set_ylabel("Max Combined Score", fontsize=7)
+        ax.tick_params(labelsize=7)
+        ax.grid(axis="y", alpha=0.2, color=COLORS["grid"])
+
+        if ax_idx == 0:
+            ax.legend(fontsize=6, loc="upper left")
+
+    # Hide unused subplots
+    for ax_idx in range(len(objects), nrows * ncols):
+        axes[ax_idx // ncols][ax_idx % ncols].set_visible(False)
+
+    fig.suptitle("Test 1b: Best Score per Grasp Type — Multi-view vs. Single-view\n"
+                 "(\"+\" marks where multi-view finds a higher-scoring grasp)",
+                 fontsize=10, fontweight="bold", color=COLORS["text"])
+    fig.tight_layout()
+    _save_fig(fig, "fig7e_best_score_by_type", fmt, dpi)
+
+
+# ---------------------------------------------------------------------------
+# Figure 7f: Score vs wrist angle scatter (by condition, per object)
+# ---------------------------------------------------------------------------
+
+def plot_score_vs_wrist_angle(occlusion_rows: list[dict], fmt: str, dpi: int):
+    """Scatter plot: combined_score vs wrist_rotation_deg for each object,
+    colored by condition (single-view vs multi-view).
+
+    This reveals whether multi-view helps the SMC converge to
+    higher-scoring wrist angles more consistently.
+    """
+    import matplotlib.pyplot as plt
+
+    if not occlusion_rows:
+        print("  SKIP: No occlusion data")
+        return
+
+    # Group by object
+    from collections import defaultdict
+    rows_by_obj = defaultdict(list)
+    for row in occlusion_rows:
+        rows_by_obj[row["object"]].append(row)
+
+    objects = sorted(rows_by_obj.keys())
+    n = len(objects)
+    ncols = min(4, n)
+    nrows = (n + ncols - 1) // ncols
+
+    fig, axes = plt.subplots(nrows, ncols,
+                             figsize=(ncols * 3.5, nrows * 3),
+                             squeeze=False)
+
+    for ax_idx, obj in enumerate(objects):
+        ax = axes[ax_idx // ncols][ax_idx % ncols]
+
+        sv_rows = [r for r in rows_by_obj[obj] if r["condition"] == "single_view"]
+        mv_rows = [r for r in rows_by_obj[obj] if r["condition"] == "multi_view"]
+
+        # Single-view scatter
+        if sv_rows:
+            sv_angles = [float(r["wrist_rotation_deg"]) for r in sv_rows]
+            sv_scores = [float(r["combined_score"]) for r in sv_rows]
+            ax.scatter(sv_angles, sv_scores,
+                       c=COLORS["single_view"], alpha=0.4, s=20,
+                       marker="o", label=f"SV (n={len(sv_rows)})")
+
+        # Multi-view scatter
+        if mv_rows:
+            mv_angles = [float(r["wrist_rotation_deg"]) for r in mv_rows]
+            mv_scores = [float(r["combined_score"]) for r in mv_rows]
+            ax.scatter(mv_angles, mv_scores,
+                       c=COLORS["multi_view"], alpha=0.4, s=20,
+                       marker="s", label=f"MV (n={len(mv_rows)})")
+
+        # Show max score per condition with large marker
+        if sv_rows:
+            sv_best_idx = np.argmax(sv_scores)
+            ax.scatter(sv_angles[sv_best_idx], sv_scores[sv_best_idx],
+                       c=COLORS["single_view"], s=120, marker="*",
+                       edgecolor="white", linewidth=0.8, zorder=5)
+        if mv_rows:
+            mv_best_idx = np.argmax(mv_scores)
+            ax.scatter(mv_angles[mv_best_idx], mv_scores[mv_best_idx],
+                       c=COLORS["multi_view"], s=120, marker="*",
+                       edgecolor="white", linewidth=0.8, zorder=5)
+
+        ax.set_title(obj, fontsize=9, fontweight="bold")
+        ax.set_xlabel("Wrist Rotation (deg)", fontsize=7)
+        ax.set_ylabel("Combined Score", fontsize=7)
+        ax.tick_params(labelsize=7)
+        ax.grid(alpha=0.2, color=COLORS["grid"])
+
+        if ax_idx == 0:
+            ax.legend(fontsize=6, loc="upper left", markerscale=0.5)
+
+    # Hide unused subplots
+    for ax_idx in range(len(objects), nrows * ncols):
+        axes[ax_idx // ncols][ax_idx % ncols].set_visible(False)
+
+    fig.suptitle("Test 1b: Combined Score vs Wrist Rotation Angle\n"
+                 "(Stars = best trial per condition)",
+                 fontsize=10, fontweight="bold", color=COLORS["text"])
+    fig.tight_layout()
+    _save_fig(fig, "fig7f_score_vs_wrist_angle", fmt, dpi)
+
+
+# ---------------------------------------------------------------------------
 # Figure 8: Tier A vs Tier B latency comparison
 # ---------------------------------------------------------------------------
 
@@ -1148,6 +1535,13 @@ def main():
     plot_pose_error_scatter(occlusion_rows, args.format, args.dpi)
     plot_cloud_coverage(occlusion_rows, args.format, args.dpi)
     plot_convexity_analysis(delta_rows, summary_rows, args.format, args.dpi)
+    plot_per_view_coverage(occlusion_rows, args.format, args.dpi)
+
+    # Score-based analysis figures (Figures 7d-7f)
+    plot_score_distribution(occlusion_rows, args.format, args.dpi)
+    plot_best_score_by_type(occlusion_rows, args.format, args.dpi)
+    plot_score_vs_wrist_angle(occlusion_rows, args.format, args.dpi)
+
     plot_tier_ab_latency(latency_rows, tier_b_rows, args.format, args.dpi)
     plot_per_stage_latency(args.format, args.dpi)
     plot_per_stage_waterfall(args.format, args.dpi)

@@ -697,19 +697,14 @@ PARAMETRIC_GENERATORS = [
     gen_cross_shape,
 ]
 
-FALLBACK_GENERATORS = [
-    gen_banana_fallback,
-    gen_mug_fallback,
-    gen_drill_fallback,
-]
+# Fallback generators are removed. YCB meshes are used when available.
+FALLBACK_GENERATORS = []
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate test object point clouds")
     parser.add_argument("--ycb", action="store_true", help="Process YCB meshes")
-    parser.add_argument("--fallbacks", action="store_true",
-                        help="Generate parametric fallbacks for YCB objects")
-    parser.add_argument("--all", action="store_true", help="Generate everything")
+    parser.add_argument("--all", action="store_true", help="Generate parametric + YCB objects")
     args = parser.parse_args()
 
     os.makedirs(PARAMETRIC_DIR, exist_ok=True)
@@ -723,14 +718,7 @@ def main():
         print("\nProcessing YCB meshes...")
         gen_ycb_objects()
 
-    if args.fallbacks or args.all:
-        print("\nGenerating YCB fallbacks...")
-        for gen in FALLBACK_GENERATORS:
-            gen()
-
-    print("\nDone. Object files in:", PARAMETRIC_DIR)
-    if args.ycb or args.all:
-        print("YCB files in:", YCB_DIR)
+    print("\nDone.")
 
 
 if __name__ == "__main__":

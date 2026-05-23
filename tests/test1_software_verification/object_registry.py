@@ -39,11 +39,8 @@ CONVEXITY = {
     "thin_plate": "non-convex",  # flat shape has grazing-angle occlusion
     # YCB objects (non-convex geometry)
     "banana": "non-convex",
-    "banana_fallback": "non-convex",
     "mug": "non-convex",
-    "mug_fallback": "non-convex",
     "power_drill": "non-convex",
-    "drill_fallback": "non-convex",
 }
 
 

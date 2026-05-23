@@ -1,14 +1,87 @@
-"""Frustum culling and depth-buffer occlusion simulation.
+"""Frustum culling, back-face culling, and depth-buffer occlusion simulation.
 
-Provides two levels of occlusion:
-  1. frustum_cull() — keep only points inside the camera frustum
-  2. depth_buffer_occlude() — additionally remove self-occluded points via z-buffer
+Provides three levels of occlusion:
+  1. frustum_cull() — keep only points inside the camera viewing frustum
+  2. backface_cull() — remove points whose surface normal faces away from camera
+  3. depth_buffer_occlude() — additionally remove self-occluded points via z-buffer
 
 The depth-buffer approach rasterizes points into a 2D grid and keeps only
-the nearest point per pixel, simulating what a real depth camera would see.
+the nearest point per pixel. Back-face culling estimates surface normals
+via local PCA and removes points facing away from the camera, which is
+essential for thin structures where the depth buffer alone may not
+correctly exclude back surfaces visible at grazing angles.
 """
 
 import numpy as np
+
+
+def _estimate_normals(points: np.ndarray,
+                      k: int = 12) -> np.ndarray:
+    """Estimate surface normals via local plane fitting (PCA on kNN).
+
+    Args:
+        points: (N, 3) float32 point cloud
+        k: number of nearest neighbours for local neighbourhood
+
+    Returns:
+        (N, 3) float32 normals oriented outward from the centre of mass
+    """
+    from scipy.spatial import KDTree
+
+    n = len(points)
+    if n < k:
+        return np.zeros((n, 3), dtype=np.float32)
+
+    tree = KDTree(points)
+    _, indices = tree.query(points, k=k)
+
+    neighbours = points[indices]                      # (N, k, 3)
+    centroids = neighbours.mean(axis=1, keepdims=True)  # (N, 1, 3)
+    centred = neighbours - centroids                   # (N, k, 3)
+
+    # Covariance matrices  (N, 3, 3)
+    cov = np.einsum('nki,nkj->nij', centred, centred) / (k - 1)
+
+    # Eigen-decomposition — smallest eigenvector = surface normal
+    eigvals, eigvecs = np.linalg.eigh(cov)  # (N, 3), (N, 3, 3)
+    normals = eigvecs[:, :, 0].copy()       # (N, 3)  smallest eigenvalue
+
+    # Orient outward from the centre of mass
+    centre = points.mean(axis=0)
+    outward = points - centre
+    flip = np.einsum('ni,ni->n', normals, outward) < 0
+    normals[flip] *= -1
+
+    return normals.astype(np.float32)
+
+
+def backface_cull(points: np.ndarray,
+                  camera_position: np.ndarray,
+                  normals: np.ndarray | None = None) -> np.ndarray:
+    """Return mask of points whose surface normal faces toward the camera.
+
+    A point is *front-facing* (visible) when its outward surface normal
+    has a positive dot-product with the vector from the point to the
+    camera.
+
+    Args:
+        points: (N, 3) point cloud
+        camera_position: (3,) camera origin in world frame
+        normals: optional pre-computed (N, 3) normals; computed on the fly
+                 if not supplied.
+
+    Returns:
+        (N,) bool mask  (True = front-facing = keep)
+    """
+    if normals is None:
+        normals = _estimate_normals(points)
+
+    view_dir = camera_position - points                # (N, 3)
+    vn = np.linalg.norm(view_dir, axis=1, keepdims=True)
+    view_dir = view_dir / (vn + 1e-10)
+
+    dot = np.einsum('ni,ni->n', normals, view_dir)    # (N,)
+    return dot > 0
 
 
 def _build_frustum_planes(position, forward, up, fov_h_deg, fov_v_deg, near, far):
@@ -96,12 +169,15 @@ def frustum_cull(points, position, forward, up, fov_h_deg, fov_v_deg, near, far)
 
 def depth_buffer_occlude(points, position, forward, up,
                          fov_h_deg, fov_v_deg, near, far,
-                         resolution=(640, 480)):
-    """Remove self-occluded points using a z-buffer.
+                         resolution=(640, 480),
+                         use_backface_cull=True):
+    """Remove self-occluded and back-facing points.
 
-    First applies frustum culling, then rasterizes surviving points into
-    a 2D grid and keeps only the nearest point per pixel (with a small
-    depth tolerance to preserve points at similar depths).
+    Three-stage pipeline:
+      1. Frustum cull — discard points outside the viewing frustum.
+      2. Back-face cull — discard points whose surface normal faces away.
+      3. Z-buffer — keep only the nearest point per pixel (with small
+         depth tolerance to preserve points at similar depths).
 
     Args:
         points: (N, 3) float32 array
@@ -109,6 +185,7 @@ def depth_buffer_occlude(points, position, forward, up,
         fov_h_deg, fov_v_deg: field of view
         near, far: clip distances
         resolution: (width, height) of the virtual depth buffer
+        use_backface_cull: if True, apply surface-normal back-face culling
 
     Returns:
         (N', 3) float32 array of visible points
@@ -132,7 +209,16 @@ def depth_buffer_occlude(points, position, forward, up,
 
     visible_pts = points[frustum_mask]
 
-    # Step 2: Build camera coordinate system
+    # Step 2: Back-face cull — remove points facing away from camera
+    if use_backface_cull and len(visible_pts) >= 12:
+        bf_mask = backface_cull(visible_pts, position)
+        frustum_mask[frustum_mask] = bf_mask  # update combined mask
+        visible_pts = visible_pts[bf_mask]
+
+    if not np.any(visible_pts):
+        return np.zeros((0, 3), dtype=np.float32), frustum_mask
+
+    # Step 3: Build camera coordinate system
     fwd = forward / np.linalg.norm(forward)
     right = np.cross(fwd, up)
     r_norm = np.linalg.norm(right)
@@ -143,7 +229,7 @@ def depth_buffer_occlude(points, position, forward, up,
     cam_up = np.cross(right, fwd)
     cam_up = cam_up / np.linalg.norm(cam_up)
 
-    # Step 3: Project points into camera space
+    # Step 4: Project points into camera space
     rel = visible_pts - position
     z = rel @ fwd  # depth along forward axis
     x = rel @ right
@@ -162,7 +248,7 @@ def depth_buffer_occlude(points, position, forward, up,
     # Clip to image bounds
     valid = (col >= 0) & (col < w) & (row >= 0) & (row < h) & (z > near) & (z < far)
 
-    # Step 4: Z-buffer — keep nearest point per pixel
+    # Step 5: Z-buffer — keep nearest point per pixel
     # Depth tolerance scales with distance: at 1m, tolerance is 2mm;
     # at 0.2m, tolerance is 0.4mm. This prevents over-aggressive culling
     # of nearby surfaces while correctly occluding distant ones.
