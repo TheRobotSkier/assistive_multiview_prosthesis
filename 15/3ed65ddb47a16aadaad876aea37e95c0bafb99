@@ -1,0 +1,27 @@
+src/emg_bridge/emg_bridge/gesture_stabilizer.py
+  s_eae49b1fbc4572::t_3234b9e0548db4 33
+  s_eae49b1fbc4572::t_b6c821e4e29c8c 1-32,34-147
+tests/test_gesture_stabilizer.py
+  s_eae49b1fbc4572::t_7398e9e3f4f9ed 189-193,195,197-200
+  s_eae49b1fbc4572::t_0c3cecc252653d 138-143
+  s_eae49b1fbc4572::t_b7de7fed7763c3 1-137,144-188,194,196,201-208,214-225,237-405,407,410,413,415-467
+  s_eae49b1fbc4572::t_0d9bf22ce8c738 209-213
+  s_eae49b1fbc4572::t_a385e14075436c 226-236
+  s_eae49b1fbc4572::t_81c5c261e40e84 406,408-409,411-412,414
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "153ed65ddb47a16aadaad876aea37e95c0bafb99",
+  "prompts": {},
+  "sessions": {
+    "s_eae49b1fbc4572": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a536ac6dffeIKVg9z22AeKq4k",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
