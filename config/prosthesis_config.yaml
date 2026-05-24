@@ -146,6 +146,11 @@ pointcloud_fusion:
         cloud_max_age_s: 0.5
         mounts_config_path: ""
         active_mount: "8_cm_cam_mount"
+        # TF wait gate: when true, suppresses cloud processing until
+        # marker_map -> *_depth_optical_frame is connected.  Prevents
+        # 40-80s of failed TF lookups during OpenVINS startup.
+        wait_for_tf: true
+        tf_ready_check_interval: 2.0
 
 openvins_odom_tf_relay:
     ros__parameters:
@@ -183,6 +188,16 @@ openvins_odom_tf_relay:
         imu_to_cam_roll_arm: 0.0
         imu_to_cam_pitch_arm: 0.0
         imu_to_cam_yaw_arm: 0.0
+        # When true, the relay attempts to compute live imu->cam0 extrinsics
+        # by looking up T(actual_imu, depth_optical) through the RealSense
+        # TF chain (not through the hardcoded static TF).  On success, the
+        # hardcoded values are overridden.  On failure, the hardcoded values
+        # are kept and a warning is logged.
+        self_calibrate_extrinsics: false
+        self_calibration_max_retries: 100
+        # Optional custom topic for receiving live extrinsics from the Jetson
+        # (future support).  Leave empty to disable.
+        extrinsics_topic: ""
 
 openvins_realsense_tf_bridge:
     ros__parameters:

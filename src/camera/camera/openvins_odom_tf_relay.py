@@ -42,7 +42,18 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
-from tf2_ros import TransformBroadcaster, StaticTransformBroadcaster
+from tf2_ros import Buffer, TransformBroadcaster, StaticTransformBroadcaster, TransformListener
+
+
+# Minimum covariance trace required to consider OpenVINS initialized.
+# Uninitialized OpenVINS publishes odometry with all-zero covariance.
+# A trace > 0 means the EKF has produced at least one update.
+_MIN_COV_TRACE = 1e-12
+
+# Maximum translation magnitude (m) for the imu->cam0 extrinsic.
+# If self-calibration produces a translation larger than this, it is
+# rejected and the hardcoded fallback is kept.
+_MAX_VALID_EXTRINSIC_TRANSLATION_M = 0.20
 
 
 def _quaternion_from_rpy(roll: float, pitch: float, yaw: float) -> tuple[float, float, float, float]:
@@ -108,6 +119,10 @@ class OpenVINSOdomTFRelay(Node):
         # is near-identity rotation with a small translation.
         #   head (marker-6): T_cam_imu t=[0.015,0.011, -0.066]
         # T_imu_cam = inv(T_cam_imu) ≈ (-0.015, -0.011,0.066)
+        #
+        # These are FALLBACK values used when self_calibrate_extrinsics is
+        # False or when self-calibration fails.  When self-calibration
+        # succeeds, the computed live values override these.
         self.declare_parameter("imu_to_cam_x_head", -0.015)
         self.declare_parameter("imu_to_cam_y_head", -0.011)
         self.declare_parameter("imu_to_cam_z_head",0.066)
@@ -123,6 +138,11 @@ class OpenVINSOdomTFRelay(Node):
         self.declare_parameter("imu_to_cam_roll_arm",0.0)
         self.declare_parameter("imu_to_cam_pitch_arm",0.0)
         self.declare_parameter("imu_to_cam_yaw_arm",0.0)
+        # ── Self-calibration parameters ───────────────────────────────────
+        self.declare_parameter("self_calibrate_extrinsics", False)
+        self.declare_parameter("self_calibration_max_retries", 100)
+        # ── Future Jetson-side extrinsics topic ───────────────────────────
+        self.declare_parameter("extrinsics_topic", "")
 
         # ── Read parameters ───────────────────────────────────────────────
         head_odom_topic = self.get_parameter("head_odom_topic").value
@@ -150,6 +170,17 @@ class OpenVINSOdomTFRelay(Node):
             "yaw": self.get_parameter("imu_to_cam_yaw_arm").value,
         }
 
+        # ── Self-calibration config ──────────────────────────────────────
+        self._self_calibrate = self.get_parameter(
+            "self_calibrate_extrinsics").value
+        self._self_calibration_max_retries = self.get_parameter(
+            "self_calibration_max_retries").value
+        self._extrinsics_topic = self.get_parameter("extrinsics_topic").value
+
+        # ── TF2 buffer for self-calibration lookups ───────────────────────
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
+
         # ── QoS — OpenVINS publishes odom with BEST_EFFORT ────────────────
         best_effort = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -168,9 +199,36 @@ class OpenVINSOdomTFRelay(Node):
         self.create_subscription(
             Odometry, arm_odom_topic, self._on_arm_odom, best_effort)
 
+        # Optional extrinsics topic for future Jetson-side support.
+        if self._extrinsics_topic:
+            from std_msgs.msg import Float64MultiArray
+            self.create_subscription(
+                Float64MultiArray,
+                self._extrinsics_topic,
+                self._on_extrinsics,
+                10,
+            )
+            self.get_logger().info(
+                f"Subscribing to extrinsics topic: {self._extrinsics_topic}"
+            )
+
         # -- Counters for throttled logging ---------------------------------
         self._head_count = 0
         self._arm_count = 0
+
+        # -- Per-camera initialization tracking --------------------------------
+        self._head_initialized = False
+        self._arm_initialized = False
+
+        # -- Per-camera self-calibration state ---------------------------------
+        self._head_self_calibrated = False
+        self._arm_self_calibrated = False
+        self._head_self_calibration_attempts = 0
+        self._arm_self_calibration_attempts = 0
+        # Track the actual IMU frame name from the odom message for
+        # self-calibration lookups through the RealSense TF tree.
+        self._head_actual_imu_frame: str | None = None
+        self._arm_actual_imu_frame: str | None = None
 
         # -- Publish static *_imu -> *_cam0 edges --------------------------
         # Stored for liveness re-send on /tf, matching the same pattern
@@ -220,15 +278,55 @@ class OpenVINSOdomTFRelay(Node):
         )
 
     def _on_head_odom(self, msg: Odometry):
-        self._on_odom(msg, self._target_frame, self._head_imu, "head")
+        self._on_odom(msg, self._target_frame, self._head_imu,
+                      self._head_cam, "head",
+                      "_head_self_calibrated",
+                      "_head_actual_imu_frame")
 
     def _on_arm_odom(self, msg: Odometry):
-        self._on_odom(msg, self._target_frame, self._arm_imu, "arm")
+        self._on_odom(msg, self._target_frame, self._arm_imu,
+                      self._arm_cam, "arm",
+                      "_arm_self_calibrated",
+                      "_arm_actual_imu_frame")
 
-    def _on_odom(self, msg: Odometry, parent: str, child: str, name: str):
-        """Extract pose from odom and publish as TF with odom's timestamp."""
+    def _on_odom(self, msg: Odometry, parent: str, child: str,
+                 cam_frame: str, name: str,
+                 calibrated_attr: str, actual_imu_attr: str):
+        """Extract pose from odom and publish as TF with odom's timestamp.
+
+        Skips messages from uninitialized OpenVINS (zero covariance or
+        non-finite pose).  This prevents garbage TFs from flooding the
+        system during the first 40-80 seconds while VIO converges.
+        """
         x, y, z = _extract_translation_from_odom(msg)
         qx, qy, qz, qw = _extract_quaternion_from_odom(msg)
+
+        # ── Initialization guard ─────────────────────────────────────────
+        # Uninitialized OpenVINS publishes identity pose with zero
+        # covariance.  Wait until the EKF has actually converged before
+        # publishing TFs to avoid polluting the TF buffer.
+        init_attr = f"_{name}_initialized"
+        if not getattr(self, init_attr):
+            # Check 1: all pose values must be finite.
+            if not all(math.isfinite(v) for v in [x, y, z, qx, qy, qz, qw]):
+                return
+            # Check 2: covariance trace must be > 0 (EKF has updated).
+            cov = msg.pose.covariance
+            cov_trace = sum(c * c for c in cov)
+            if cov_trace < _MIN_COV_TRACE:
+                return
+            # First valid message — mark initialized and log.
+            setattr(self, init_attr, True)
+            # Capture the actual IMU frame name from the odom message.
+            actual_imu = msg.child_frame_id
+            setattr(self, actual_imu_attr, actual_imu)
+            self.get_logger().info(
+                f"{name}: OpenVINS initialized, publishing TF "
+                f"{parent} -> {child} "
+                f"(p=({x:.3f}, {y:.3f}, {z:.3f}), "
+                f"cov_trace={cov_trace:.2e}, "
+                f"actual_imu_frame={actual_imu!r})"
+            )
 
         # Use the odom message's timestamp so TF stamps share the same
         # time domain as the point clouds from the Jetson.  The fusion
@@ -240,16 +338,286 @@ class OpenVINSOdomTFRelay(Node):
         )
         self._tf_broadcaster.sendTransform(tf_msg)
 
+        # ── Self-calibration attempt (once per camera) ────────────────────
+        if (self._self_calibrate and not getattr(self, calibrated_attr)
+                and getattr(self, init_attr)):
+            self._try_self_calibrate(name, child, cam_frame,
+                                     calibrated_attr, actual_imu_attr)
+
         # Throttled log every 100th message
-        count = getattr(self, f"_{name}_count")
+        count_attr = f"_{name}_count"
+        count = getattr(self, count_attr)
         count += 1
-        setattr(self, f"_{name}_count", count)
+        setattr(self, count_attr, count)
         if count % 100 == 1:
             self.get_logger().info(
                 f"Relay #{count} ({name}): "
                 f"{parent} -> {child} "
                 f"t=({x:.3f}, {y:.3f}, {z:.3f})"
             )
+
+    # ── Self-calibration ──────────────────────────────────────────────────
+
+    def _try_self_calibrate(self, name: str, imu_frame: str, cam_frame: str,
+                            calibrated_attr: str, actual_imu_attr: str):
+        """Attempt to compute live imu->cam0 extrinsic from the TF tree.
+
+        Uses the actual IMU frame name (captured from the first valid odom
+        message's child_frame_id) to look up T(imu, depth_optical) through
+        the RealSense static chain.  This path does NOT go through the
+        hardcoded static TF, so the result reflects the true live extrinsic.
+        """
+        actual_imu = getattr(self, actual_imu_attr, None)
+        if not actual_imu:
+            return
+
+        count_attr = f"_{name}_self_calibration_attempts"
+        attempts = getattr(self, count_attr)
+        attempts += 1
+        setattr(self, count_attr, attempts)
+
+        # Only attempt on the first message, then every 10th, up to max.
+        if attempts > self._self_calibration_max_retries:
+            if attempts == self._self_calibration_max_retries + 1:
+                self.get_logger().warn(
+                    f"{name}: self-calibration exceeded max retries "
+                    f"({self._self_calibration_max_retries}) — "
+                    f"using hardcoded extrinsics"
+                )
+            setattr(self, calibrated_attr, True)
+            return
+        if attempts > 1 and attempts % 10 != 0:
+            return
+
+        # Derive the depth optical frame name from the actual IMU frame.
+        # Typical RealSense naming: *_imu_optical_frame -> *_depth_optical_frame
+        depth_optical = self._derive_depth_optical_frame(actual_imu)
+        if depth_optical is None:
+            self.get_logger().debug(
+                f"{name}: cannot derive depth optical frame from "
+                f"actual IMU frame {actual_imu!r} — skipping self-calibration"
+            )
+            setattr(self, calibrated_attr, True)
+            return
+
+        color_optical = self._derive_color_optical_frame(actual_imu)
+
+        # Look up T(actual_imu_frame, depth_optical_frame) through the
+        # RealSense static chain (not through our hardcoded imu->cam0).
+        try:
+            t_imu_depth = self._tf_buffer.lookup_transform(
+                actual_imu, depth_optical, rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.5),
+            )
+        except Exception as e:
+            self.get_logger().debug(
+                f"{name}: self-calibration lookup "
+                f"{actual_imu!r} -> {depth_optical!r} failed: {e}"
+            )
+            return
+
+        # Look up T(depth_optical, color_optical) — known RealSense extrinsic.
+        T_imu_cam0 = self._extract_transform_matrix(t_imu_depth)
+        if color_optical and color_optical != depth_optical:
+            try:
+                t_depth_color = self._tf_buffer.lookup_transform(
+                    depth_optical, color_optical, rclpy.time.Time(),
+                    timeout=rclpy.duration.Duration(seconds=0.5),
+                )
+                T_depth_color = self._extract_transform_matrix(t_depth_color)
+                T_imu_cam0 = T_imu_cam0 @ T_depth_color
+            except Exception:
+                # color_optical may not be available; use imu->depth directly
+                # (depth and color have the same origin, only a small baseline).
+                pass
+
+        # ── Sanity check: reject translations > 20cm ────────────────────
+        tx, ty, tz = T_imu_cam0[0, 3], T_imu_cam0[1, 3], T_imu_cam0[2, 3]
+        trans_norm = math.sqrt(tx * tx + ty * ty + tz * tz)
+        if trans_norm > _MAX_VALID_EXTRINSIC_TRANSLATION_M:
+            self.get_logger().warn(
+                f"{name}: self-calibration produced implausible translation "
+                f"({trans_norm:.3f}m > {_MAX_VALID_EXTRINSIC_TRANSLATION_M}m) "
+                f"— rejecting, using hardcoded extrinsics"
+            )
+            setattr(self, calibrated_attr, True)
+            return
+
+        # ── Extract rotation as quaternion ──────────────────────────────
+        q = self._matrix_to_quaternion(T_imu_cam0[:3, :3])
+
+        # ── Update the static TF for this camera ─────────────────────────
+        self._update_imu_to_cam_tf(name, imu_frame, cam_frame,
+                                    tx, ty, tz, q[0], q[1], q[2], q[3])
+        setattr(self, calibrated_attr, True)
+
+        # ── Log the result ──────────────────────────────────────────────
+        self.get_logger().info(
+            f"{name}: self-calibrated extrinsics "
+            f"{imu_frame} -> {cam_frame} "
+            f"t=({tx:.4f}, {ty:.4f}, {tz:.4f}) "
+            f"q=({q[0]:.4f}, {q[1]:.4f}, {q[2]:.4f}, {q[3]:.4f}) "
+            f"(trans_norm={trans_norm:.4f}m, attempts={attempts})"
+        )
+
+    @staticmethod
+    def _derive_depth_optical_frame(imu_frame: str) -> str | None:
+        """Derive the depth optical frame name from an IMU frame name.
+
+        Typical RealSense conventions:
+          head_d435i_head_imu_optical_frame -> head_d435i_head_depth_optical_frame
+        """
+        for suffix in ("_imu_optical_frame", "_accel_optical_frame",
+                        "_gyro_optical_frame", "_imu_frame",
+                        "_accel_frame", "_gyro_frame"):
+            if imu_frame.endswith(suffix):
+                prefix = imu_frame[: -len(suffix)]
+                return prefix + "_depth_optical_frame"
+        return None
+
+    @staticmethod
+    def _derive_color_optical_frame(imu_frame: str) -> str | None:
+        """Derive the color optical frame name from an IMU frame name."""
+        for suffix in ("_imu_optical_frame", "_accel_optical_frame",
+                        "_gyro_optical_frame", "_imu_frame",
+                        "_accel_frame", "_gyro_frame"):
+            if imu_frame.endswith(suffix):
+                prefix = imu_frame[: -len(suffix)]
+                return prefix + "_color_optical_frame"
+        return None
+
+    @staticmethod
+    def _extract_transform_matrix(t: TransformStamped):
+        """Extract a 4x4 homogeneous transform matrix from a TransformStamped."""
+        import numpy as np
+        q = t.transform.rotation
+        tx = t.transform.translation.x
+        ty = t.transform.translation.y
+        tz = t.transform.translation.z
+
+        qx, qy, qz, qw = q.x, q.y, q.z, q.w
+        r00 = 1 - 2 * (qy * qy + qz * qz)
+        r01 = 2 * (qx * qy - qz * qw)
+        r02 = 2 * (qx * qz + qy * qw)
+        r10 = 2 * (qx * qy + qz * qw)
+        r11 = 1 - 2 * (qx * qx + qz * qz)
+        r12 = 2 * (qy * qz - qx * qw)
+        r20 = 2 * (qx * qz - qy * qw)
+        r21 = 2 * (qy * qz + qx * qw)
+        r22 = 1 - 2 * (qx * qx + qy * qy)
+
+        return np.array([
+            [r00, r01, r02, tx],
+            [r10, r11, r12, ty],
+            [r20, r21, r22, tz],
+            [0.0, 0.0, 0.0, 1.0],
+        ], dtype=np.float64)
+
+    @staticmethod
+    def _matrix_to_quaternion(R):
+        """Convert a 3x3 rotation matrix to quaternion (x, y, z, w)."""
+        import numpy as np
+        trace = float(np.trace(R))
+        if trace > 0.0:
+            s = math.sqrt(trace + 1.0) * 2.0
+            qw = 0.25 * s
+            qx = (R[2, 1] - R[1, 2]) / s
+            qy = (R[0, 2] - R[2, 0]) / s
+            qz = (R[1, 0] - R[0, 1]) / s
+        elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+            s = math.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2.0
+            qw = (R[2, 1] - R[1, 2]) / s
+            qx = 0.25 * s
+            qy = (R[0, 1] + R[1, 0]) / s
+            qz = (R[0, 2] + R[2, 0]) / s
+        elif R[1, 1] > R[2, 2]:
+            s = math.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2.0
+            qw = (R[0, 2] - R[2, 0]) / s
+            qx = (R[0, 1] + R[1, 0]) / s
+            qy = 0.25 * s
+            qz = (R[1, 2] + R[2, 1]) / s
+        else:
+            s = math.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2.0
+            qw = (R[1, 0] - R[0, 1]) / s
+            qx = (R[0, 2] + R[2, 0]) / s
+            qy = (R[1, 2] + R[2, 1]) / s
+            qz = 0.25 * s
+
+        norm = math.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
+        if norm <= 0.0:
+            return (0.0, 0.0, 0.0, 1.0)
+        return (qx / norm, qy / norm, qz / norm, qw / norm)
+
+    def _update_imu_to_cam_tf(self, name: str, imu_frame: str, cam_frame: str,
+                               x: float, y: float, z: float,
+                               qx: float, qy: float, qz: float, qw: float):
+        """Update the stored imu->cam0 static TF with live values.
+
+        Re-publishes on /tf_static (persistent) and /tf (for late joiners).
+        Also updates the liveness timer's stored list.
+        """
+        stamp = self.get_clock().now().to_msg()
+        new_tf = _make_transform(
+            imu_frame, cam_frame, x, y, z, qx, qy, qz, qw, stamp,
+        )
+
+        # Replace the old entry for this camera in _imu_to_cam_tfs.
+        updated = False
+        for i, tf_msg in enumerate(self._imu_to_cam_tfs):
+            if tf_msg.header.frame_id == imu_frame and tf_msg.child_frame_id == cam_frame:
+                self._imu_to_cam_tfs[i] = new_tf
+                updated = True
+                break
+        if not updated:
+            self._imu_to_cam_tfs.append(new_tf)
+
+        # Re-publish static (persistent) and dynamic (for late joiners).
+        self._static_tf_broadcaster.sendTransform(new_tf)
+        self._tf_broadcaster.sendTransform(new_tf)
+
+    # ── Extrinsics topic callback (future Jetson-side support) ────────────
+
+    def _on_extrinsics(self, msg):
+        """Handle incoming extrinsics from a custom topic.
+
+        Expected format: Float64MultiArray with layout.dim[0].label = "head" or
+        "arm", and data = [x, y, z, qx, qy, qz, qw] (imu->cam0).
+        """
+        if len(msg.data) != 7:
+            self.get_logger().warn(
+                f"extrinsics message has {len(msg.data)} values, expected 7"
+            )
+            return
+
+        # Determine which camera this is for.
+        label = ""
+        if msg.layout.dim and len(msg.layout.dim) > 0:
+            label = msg.layout.dim[0].label.lower()
+        if not label:
+            self.get_logger().warn(
+                "extrinsics message has no label — cannot determine camera"
+            )
+            return
+
+        if "head" in label:
+            name, imu_frame, cam_frame = "head", self._head_imu, self._head_cam
+        elif "arm" in label:
+            name, imu_frame, cam_frame = "arm", self._arm_imu, self._arm_cam
+        else:
+            self.get_logger().warn(
+                f"extrinsics message label {label!r} not recognised"
+            )
+            return
+
+        x, y, z, qx, qy, qz, qw = msg.data
+        self._update_imu_to_cam_tf(name, imu_frame, cam_frame,
+                                    x, y, z, qx, qy, qz, qw)
+        self.get_logger().info(
+            f"{name}: received live extrinsics via topic "
+            f"{imu_frame} -> {cam_frame} "
+            f"t=({x:.4f}, {y:.4f}, {z:.4f}) "
+            f"q=({qx:.4f}, {qy:.4f}, {qz:.4f}, {qw:.4f})"
+        )
 
     def _liveness_tick(self):
         """Re-send imu->cam0 static transforms on /tf periodically.

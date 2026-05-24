@@ -247,6 +247,8 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("active_mount", "8_cm_cam_mount")
         self.declare_parameter("bbox_fallback_mode", "cache")  # skip | cache | conservative
         self.declare_parameter("bbox_cache_max_age_s", 2.0)
+        self.declare_parameter("wait_for_tf", True)
+        self.declare_parameter("tf_ready_check_interval", 2.0)
 
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
@@ -268,6 +270,9 @@ class PointCloudFusionNode(Node):
         self._bbox_fallback_mode = self.get_parameter("bbox_fallback_mode").value
         self._bbox_cache_max_age = float(
             self.get_parameter("bbox_cache_max_age_s").value)
+        self._wait_for_tf = self.get_parameter("wait_for_tf").value
+        self._tf_ready_check_interval = float(
+            self.get_parameter("tf_ready_check_interval").value)
 
         # ── Load pruning boxes from camera_mounts.yaml or fall back to params ─
         mounts_config = self.get_parameter("mounts_config_path").value
@@ -358,6 +363,31 @@ class PointCloudFusionNode(Node):
         self._bbox_health_window_start = self.get_clock().now()
         self.create_timer(30.0, self._check_bbox_health)
 
+        # ── TF wait gate ───────────────────────────────────────────────────
+        # When wait_for_tf is True, the fusion node waits for the TF tree to
+        # be fully connected (marker_map -> depth_optical_frame) before
+        # processing any clouds.  This eliminates the 40-80s startup race
+        # where every cloud TF lookup fails.
+        self._tf_ready = not self._wait_for_tf  # if gate disabled, ready immediately
+        self._tf_ready_time = None  # set when _tf_ready transitions to True
+        if self._wait_for_tf:
+            # Check immediately, then periodically.
+            self._check_tf_ready()
+            self._tf_ready_timer = self.create_timer(
+                self._tf_ready_check_interval, self._check_tf_ready)
+            self._node_start_time = self.get_clock().now()
+            self.get_logger().info(
+                f"TF wait gate active: waiting for TF tree to connect "
+                f"(checking every {self._tf_ready_check_interval:.1f}s)"
+            )
+        else:
+            self._tf_ready_timer = None
+            self._node_start_time = None
+            self.get_logger().info(
+                "TF wait gate DISABLED (wait_for_tf=False) — "
+                "processing clouds immediately"
+            )
+
         self.get_logger().info(
             f"Pointcloud fusion: {cam1_topic} + {cam2_topic} -> {output_topic} "
             f"(target_frame={self._target_frame}, arm_frame={self._arm_frame}, "
@@ -370,6 +400,8 @@ class PointCloudFusionNode(Node):
 
     def _synced_callback(self, msg1: PointCloud2, msg2: PointCloud2):
         """Called when both clouds arrive within sync tolerance."""
+        if not self._tf_ready:
+            return
         self._process_clouds([msg1, msg2])
 
     # ── Fallback individual callbacks ────────────────────────────────────
@@ -390,6 +422,8 @@ class PointCloudFusionNode(Node):
         Runs processing in a background thread so the executor can continue
         receiving cloud callbacks and TF updates without starvation.
         """
+        if not self._tf_ready:
+            return
         now = self.get_clock().now()
         with self._lock:
             c1, s1 = self._cam1_cloud, self._cam1_stamp
@@ -435,6 +469,14 @@ class PointCloudFusionNode(Node):
                 )
 
         if not transformed:
+            # ── First batch after TF ready: log diagnostic ─────────
+            if self._tf_ready and self._tf_ready_time is not None:
+                age_s = (self.get_clock().now() - self._tf_ready_time).nanoseconds / 1e9
+                if age_s < 5.0:
+                    self.get_logger().info(
+                        f"TF tree is connected but first cloud batch had "
+                        f"no successful transforms — retrying on next batch"
+                    )
             return
 
         # ── Step 2: Concatenate clouds ────────────────────────────────
@@ -695,6 +737,82 @@ class PointCloudFusionNode(Node):
             ], dtype=np.float32)
         except Exception:
             return None
+
+    # ── TF wait gate ───────────────────────────────────────────────────────
+
+    # Depth optical frames checked by the gate.  Either one connecting is
+    # sufficient to start fusion (head is preferred but may never initialize
+    # — arm is more reliable in practice).
+    _GATE_DEPTH_FRAMES = [
+        "head_d435i_head_depth_optical_frame",
+        "arm_d435i_arm_depth_optical_frame",
+    ]
+
+    def _check_tf_ready(self):
+        """Check whether the TF tree is fully connected.
+
+        Attempts a non-blocking TF lookup from marker_map to each camera's
+        depth optical frame.  Opens the gate as soon as **either** camera
+        chain is connected — the fusion node can operate single-camera
+        (require_both=False).
+        """
+        if self._tf_ready:
+            # Already ready — cancel the timer if it still exists.
+            if self._tf_ready_timer is not None:
+                self._tf_ready_timer.cancel()
+                self._tf_ready_timer = None
+            return
+
+        # Try each camera's depth optical frame.
+        for depth_frame in self._GATE_DEPTH_FRAMES:
+            try:
+                self._tf_buffer.lookup_transform(
+                    self._target_frame,
+                    depth_frame,
+                    rclpy.time.Time(),
+                    timeout=rclpy.duration.Duration(seconds=1.0),
+                )
+            except Exception:
+                continue  # this camera's chain not ready yet
+
+            # ── This camera's TF tree is connected! ──────────────────────
+            self._tf_ready = True
+            self._tf_ready_time = self.get_clock().now()
+
+            # Cancel the polling timer.
+            if self._tf_ready_timer is not None:
+                self._tf_ready_timer.cancel()
+                self._tf_ready_timer = None
+
+            # Compute elapsed time since node startup.
+            if self._node_start_time is not None:
+                waited_s = (
+                    self._tf_ready_time - self._node_start_time
+                ).nanoseconds / 1e9
+            else:
+                waited_s = 0.0
+
+            self.get_logger().info(
+                f"TF tree connected via {depth_frame!r} — "
+                f"starting point cloud fusion "
+                f"(waited {waited_s:.1f}s since node startup)"
+            )
+
+            # Reset bbox health tracking to avoid 0% success rate
+            # from the startup period polluting the health metrics.
+            self._bbox_attempts = 0
+            self._bbox_successes = 0
+            self._bbox_health_window_start = self.get_clock().now()
+            self.get_logger().debug(
+                "Bbox health tracking window reset after TF tree connected"
+            )
+            return
+
+        # Neither camera's chain is ready yet — expected during startup.
+        self.get_logger().debug(
+            "TF tree not yet connected for either camera — "
+            "waiting for OpenVINS bridge"
+        )
 
     # ── BBox visualization ────────────────────────────────────────────────
 
