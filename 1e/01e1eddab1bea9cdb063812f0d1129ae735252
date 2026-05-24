@@ -1,0 +1,40 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py
+  s_a9bc1dd19e776a::t_b3ee0b93413f8f 157
+docker_ws/src/open_vins/ov_msckf/src/core/VioManager.h
+  s_a9bc1dd19e776a::t_127da27b4378a7 98,100
+docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.h
+  s_a9bc1dd19e776a::t_33b87e78095aee 184-187
+  s_a9bc1dd19e776a::t_91344d6dbf35d6 208
+docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.h
+  s_a9bc1dd19e776a::t_ebe39d8ef8aca2 69,74-82
+  s_a9bc1dd19e776a::t_f54dd9bcb26175 21
+docker_ws/src/open_vins/ov_msckf/src/core/VioManager.cpp
+  s_a9bc1dd19e776a::t_a51f7a3f3c4c59 260-263
+  s_a9bc1dd19e776a::t_2426c863a30b03 206-209,212-213,216,218,221,223,226,228,233,236,243-246,248-249,253-254,257-259,267-271,273,275-276,280,282,286-290,292,295
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py
+  s_a9bc1dd19e776a::t_dd5f77c084a762 157
+docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.cpp
+  s_a9bc1dd19e776a::t_569ff96aea5bd8 262
+  s_a9bc1dd19e776a::t_46f085efa2c0e7 976-1043
+  s_a9bc1dd19e776a::t_8bb1070ffa2083 154-158
+  s_a9bc1dd19e776a::t_e119c3454d45b7 839-841,853-855,863-864
+docker_ws/src/open_vins/ov_msckf/src/core/VioManagerOptions.h
+  s_a9bc1dd19e776a::t_b13d925586ceea 145
+  s_a9bc1dd19e776a::t_2f7f3bcb36336d 210
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "1e01e1eddab1bea9cdb063812f0d1129ae735252",
+  "prompts": {},
+  "sessions": {
+    "s_a9bc1dd19e776a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5b8efa9ffeptmt67N93R9tOk",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
