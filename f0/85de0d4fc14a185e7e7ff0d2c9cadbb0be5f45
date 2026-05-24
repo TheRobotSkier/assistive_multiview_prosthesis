@@ -1,0 +1,25 @@
+src/mia_hand_ros2_control/test_safety_preflight.py
+  s_0653f3e90488d2::t_e9f1117bf622c9 1-523
+src/mia_hand_ros2_control/mia_hand_ros2_control/emg_safety_preflight.py
+  s_0653f3e90488d2::t_5856080978c4f1 1-929
+config/emg_safety.yaml
+  s_0653f3e90488d2::t_b79f2ef2513343 1-91
+src/mia_hand_ros2_control/CMakeLists.txt
+  s_0653f3e90488d2::t_7b9fcdc2cac129 66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "f085de0d4fc14a185e7e7ff0d2c9cadbb0be5f45",
+  "prompts": {},
+  "sessions": {
+    "s_0653f3e90488d2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3c44b66ffeoL99UN3qppcgGV",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
