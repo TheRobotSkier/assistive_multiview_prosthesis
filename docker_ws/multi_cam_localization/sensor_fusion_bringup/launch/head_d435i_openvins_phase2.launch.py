@@ -154,6 +154,7 @@ def generate_launch_description():
             {"publish_calibration_tf": True},
             {"use_marker_pose_updates": True},
             {"marker_pose_topic": "/head/marker_pose/observation"},
+            {"marker_status_topic": "/ov_msckf/marker_update/status"},
             {"marker_global_frame_id": "marker_map"},
             {"marker_target_frame": "head_imu"},
             {"marker_fixed_ids": "0"},

@@ -95,8 +95,9 @@ public:
   /**
    * @brief Feed function for an externally detected fixed marker pose in the global/marker_map frame.
    * @param message Contains timestamped marker_map-to-IMU pose and covariance from Phase 1 detector
+   * @return Detailed diagnostics result for every decision point
    */
-  void feed_measurement_marker(const MarkerPoseMeasurement &message);
+  MarkerPoseUpdateResult feed_measurement_marker(const MarkerPoseMeasurement &message);
 
   /**
    * @brief Feed function for a head-derived dynamic arm pose measurement.

@@ -142,6 +142,7 @@ struct VioManagerOptions {
       parser->parse_config("record_timing_filepath", record_timing_filepath);
       parser->parse_config("use_marker_pose_updates", marker_pose_options.enabled, false);
       parser->parse_config("marker_pose_topic", marker_pose_options.topic, false);
+      parser->parse_config("marker_status_topic", marker_pose_options.status_topic, false);
       parser->parse_config("marker_global_frame_id", marker_pose_options.global_frame_id, false);
       parser->parse_config("marker_target_frame", marker_pose_options.target_frame, false);
       std::string marker_fixed_ids = "0";
@@ -206,6 +207,7 @@ struct VioManagerOptions {
     PRINT_DEBUG("  - record timing filepath: %s\n", record_timing_filepath.c_str());
     PRINT_DEBUG("  - marker pose updates?: %d\n", (int)marker_pose_options.enabled);
     PRINT_DEBUG("  - marker pose topic: %s\n", marker_pose_options.topic.c_str());
+    PRINT_DEBUG("  - marker status topic: %s\n", marker_pose_options.status_topic.c_str());
     PRINT_DEBUG("  - marker global frame: %s\n", marker_pose_options.global_frame_id.c_str());
     PRINT_DEBUG("  - marker target frame: %s\n", marker_pose_options.target_frame.c_str());
     std::stringstream marker_ids_ss;
