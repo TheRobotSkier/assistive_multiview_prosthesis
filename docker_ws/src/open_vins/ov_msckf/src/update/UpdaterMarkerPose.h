@@ -36,6 +36,8 @@ struct MarkerPoseUpdaterOptions {
   double reset_min_velocity_std_mps = 0.05;
   double reset_bias_gyro_std = 0.02;
   double reset_bias_accel_std = 0.20;
+  bool marker_initial_lock_allow_zero_velocity = false;
+  double marker_initial_lock_velocity_cov_std = 0.5;
 };
 
 struct MarkerPoseMeasurement {
@@ -80,6 +82,8 @@ struct MarkerPoseUpdateResult {
   double velocity_fit_sample_span_s = 0.0;
   double velocity_fit_speed_mps = 0.0;
   bool marker_map_initialized = false;
+  bool is_first_lock_attempt = false;
+  bool initial_lock_zero_velocity_fallback = false;
 };
 
 class UpdaterMarkerPose {

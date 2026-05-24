@@ -1018,6 +1018,8 @@ void ROS2Visualizer::publish_marker_status(const MarkerPoseMeasurement &measurem
   ss << ",\"velocity_fit_sample_span_s\":" << result.velocity_fit_sample_span_s;
   ss << ",\"velocity_fit_speed_mps\":" << result.velocity_fit_speed_mps;
   ss << ",\"marker_map_initialized\":" << (result.marker_map_initialized ? "true" : "false");
+  ss << ",\"is_first_lock_attempt\":" << (result.is_first_lock_attempt ? "true" : "false");
+  ss << ",\"initial_lock_zero_velocity_fallback\":" << (result.initial_lock_zero_velocity_fallback ? "true" : "false");
   ss << ",\"last_fixed_marker_update_dt_s\":" << fixed_dt;
   ss << ",\"reprojection_error_px\":" << measurement.reprojection_error_px;
   ss << ",\"distance_m\":" << measurement.distance_m;

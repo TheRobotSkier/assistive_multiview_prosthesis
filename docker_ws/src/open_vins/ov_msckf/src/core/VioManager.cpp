@@ -247,27 +247,49 @@ MarkerPoseUpdateResult VioManager::feed_measurement_marker(const MarkerPoseMeasu
   if (should_marker_reset(message, innovation)) {
     result.reset_requested = true;
     result.reset_reason = innovation.reason;
-    Eigen::Vector3d velocity = Eigen::Vector3d::Zero();
-    Eigen::Matrix3d velocity_covariance = Eigen::Matrix3d::Identity();
-    if (!marker_velocity_fit(velocity, velocity_covariance)) {
-      result.reset_skipped_velocity_fit = true;
-      result.reason = "reset_skipped_velocity_fit_unreliable";
-      PRINT_WARNING(YELLOW "[MARKER]: reset requested for marker %d but velocity fit is not reliable yet (%s)\n" RESET, message.marker_id,
-                    innovation.reason.c_str());
-      return result;
-    }
-    result.velocity_fit_passed = true;
-    result.velocity_fit_speed_mps = velocity.norm();
+
     if (!recent_marker_measurements.empty()) {
       result.velocity_fit_sample_count = (int)recent_marker_measurements.size();
       result.velocity_fit_sample_span_s = recent_marker_measurements.back().timestamp - recent_marker_measurements.front().timestamp;
     }
-    if (reset_to_marker_map(message, velocity, velocity_covariance,
-                            is_marker_global_initialized ? innovation.reason : "first_marker_map_lock")) {
+
+    const bool is_first_lock = !is_marker_global_initialized;
+    result.is_first_lock_attempt = is_first_lock;
+
+    Eigen::Vector3d velocity = Eigen::Vector3d::Zero();
+    Eigen::Matrix3d velocity_covariance = Eigen::Matrix3d::Identity();
+    if (!marker_velocity_fit(velocity, velocity_covariance)) {
+      if (is_first_lock && params.marker_pose_options.marker_initial_lock_allow_zero_velocity) {
+        velocity.setZero();
+        const double vel_std = params.marker_pose_options.marker_initial_lock_velocity_cov_std;
+        velocity_covariance = vel_std * vel_std * Eigen::Matrix3d::Identity();
+        result.initial_lock_zero_velocity_fallback = true;
+        result.reset_skipped_velocity_fit = true;
+        result.velocity_fit_speed_mps = 0.0;
+        PRINT_WARNING(CYAN "[MARKER]: first lock using zero-velocity fallback (cov std %.3f m/s) for marker %d\n" RESET,
+                      vel_std, message.marker_id);
+      } else {
+        result.reset_skipped_velocity_fit = true;
+        result.reason = "reset_skipped_velocity_fit_unreliable";
+        PRINT_WARNING(YELLOW "[MARKER]: reset requested for marker %d but velocity fit is not reliable yet (%s)\n" RESET, message.marker_id,
+                      innovation.reason.c_str());
+        return result;
+      }
+    } else {
+      result.velocity_fit_passed = true;
+      result.velocity_fit_speed_mps = velocity.norm();
+    }
+    std::string reset_reason;
+    if (!is_marker_global_initialized) {
+      reset_reason = result.initial_lock_zero_velocity_fallback ? "first_marker_map_lock_zero_velocity" : "first_marker_map_lock";
+    } else {
+      reset_reason = innovation.reason;
+    }
+    if (reset_to_marker_map(message, velocity, velocity_covariance, reset_reason)) {
       result.reset_performed = true;
       result.state_updated = true;
       result.accepted = true;
-      result.reason = is_marker_global_initialized ? "reset_applied" : "first_marker_map_lock";
+      result.reason = reset_reason;
       result.marker_map_initialized = true;
       last_fixed_marker_update_timestamp = message.timestamp;
       return result;
