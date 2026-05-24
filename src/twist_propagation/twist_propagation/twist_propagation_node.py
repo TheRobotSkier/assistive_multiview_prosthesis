@@ -1634,6 +1634,11 @@ class TwistPropagationNode(Node):
                 if publish_reset:
                     self._reset_pub.publish(Empty())
                     self.get_logger().info("Published segmentation reset (new object)")
+                    # Brief pause to ensure DDS delivers the reset to subscribers
+                    # before the click messages arrive on a different topic.
+                    # Without this, the click can be processed before the reset,
+                    # causing the original hit-point click to be cleared.
+                    time.sleep(0.05)
 
                 # Publish hit marker
                 self._publish_hit_marker(hit_x, hit_y, hit_z)

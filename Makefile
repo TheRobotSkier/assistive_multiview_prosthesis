@@ -160,7 +160,7 @@ clean:
 	cd $(COMPOSE_DIR) && $(COMPOSE) down --rmi local --volumes
 
 clean-volumes:
-	-$(DOCKER_CMD) volume rm prosthesis-build prosthesis-install prosthesis-log segmentation-weights 2>/dev/null || true
+	-$(DOCKER_CMD) volume rm prosthesis-build prosthesis-install prosthesis-log 2>/dev/null || true
 	@echo "Named volumes removed. Next 'make dev' will trigger a fresh build."
 
 logs:
@@ -174,8 +174,12 @@ segmentation-status:
 	@echo "=== Health check ==="
 	@curl -sf http://127.0.0.1:5678/health && echo "" || echo "Inference server NOT reachable on port 5678"
 	@echo ""
-	@echo "=== Weights volume ==="
-	@$(DOCKER_CMD) volume inspect segmentation-weights --format '{{.Mountpoint}} ({{.CreatedAt}})' 2>/dev/null || echo "Volume 'segmentation-weights' not found."
+	@echo "=== Weights ==="
+	@if [ -f "${HOME}/prosthesis_data/weights/weights_exp14_14.pth" ]; then \
+		ls -lh ${HOME}/prosthesis_data/weights/weights_exp14_14.pth | awk '{print "  " $$5, $$9}'; \
+	else \
+		echo "  Weights not found at ${HOME}/prosthesis_data/weights/"; \
+	fi
 
 segmentation-logs:
 	@$(DOCKER_CMD) logs --tail 100 -f $$( $(DOCKER_CMD) ps -a --filter name=segmentation --format "{{.Names}}" | head -1 ) 2>/dev/null || echo "No segmentation container found."

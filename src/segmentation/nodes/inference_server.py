@@ -130,11 +130,25 @@ def segment():
     feats = np.column_stack([rgb, pos_mask, neg_mask]).astype(np.float32)
     feats_tensor = torch.from_numpy(feats).float().to(device)
 
-    with torch.no_grad():
-        pred, _ = _inseg.prediction(feats_tensor, xyz, _model, device)
+    try:
+        with torch.no_grad():
+            pred, _ = _inseg.prediction(feats_tensor, xyz, _model, device)
+    except RuntimeError as exc:
+        # CUDA OOM or other GPU errors — clear cache and report
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        print(f"[inference_server] Inference error: {exc}", flush=True)
+        return jsonify({"error": f"Inference failed: {exc}"}), 500
+    except Exception as exc:
+        print(f"[inference_server] Unexpected inference error: {exc}", flush=True)
+        return jsonify({"error": f"Inference failed: {exc}"}), 500
 
     # Move to CPU for post-processing (click masks live on CPU as numpy arrays)
     pred = pred.cpu()
+
+    # Release GPU memory eagerly
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     # Enforce click constraints: clicked points are definitively fg/bg
     pred[pos_mask > 0.5] = 1

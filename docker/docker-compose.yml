@@ -90,8 +90,9 @@ services:
             # Persist model weights across container recreations (~200MB)
             - ${HOME}/prosthesis_data/weights:/weights:rw
         network_mode: host
+        restart: unless-stopped
         healthcheck:
-            test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')"]
+            test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')\""]
             interval: 10s
             timeout: 5s
             retries: 5
@@ -120,8 +121,9 @@ services:
             # Persist model weights across container recreations (~200MB)
             - ${HOME}/prosthesis_data/weights:/weights:rw
         network_mode: host
+        restart: unless-stopped
         healthcheck:
-            test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')"]
+            test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')\""]
             interval: 10s
             timeout: 5s
             retries: 5
