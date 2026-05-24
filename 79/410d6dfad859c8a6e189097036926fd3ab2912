@@ -1,0 +1,31 @@
+tests/test_imu_features.py
+  s_6a053cf002c2c5::t_3f76313809e374 1-139
+src/emg_bridge/scripts/train.py
+  s_6a053cf002c2c5::t_5cd278f1b16219 117-118,121-122,127,130-131,139,141-142,153-170,178
+  s_6a053cf002c2c5::t_d669319f77d51b 22-25
+  s_6a053cf002c2c5::t_7a2a43d8c8ba30 191-193,196-197,205-209,212-215,219-220
+  s_6a053cf002c2c5::t_e05d08115a3af8 228-234
+  s_6a053cf002c2c5::t_10a1804f1ed85b 39-42,46-48,60-64,81-92,99-108
+src/emg_bridge/emg_bridge/features.py
+  s_6a053cf002c2c5::t_fff5c67ec1f133 104-184
+src/emg_bridge/emg_bridge/classifier.py
+  s_6a053cf002c2c5::t_87c20eb82eea73 31
+  s_6a053cf002c2c5::t_e9f2641b192441 110,120
+  s_6a053cf002c2c5::t_7e558d00e3ab10 160-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "79410d6dfad859c8a6e189097036926fd3ab2912",
+  "prompts": {},
+  "sessions": {
+    "s_6a053cf002c2c5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a542d867ffem2rAk0lzel3omH",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
