@@ -357,7 +357,7 @@ _reference:
         segmentation:
             inference_url: "http://127.0.0.1:5678"
             cubeedge: 0.05
-            roi_radius_m: 0.3
+            roi_radius_m: 0.05
 
         # ── Grasp Preshaping ─────────────────────────────────────────────────
         preshaping:

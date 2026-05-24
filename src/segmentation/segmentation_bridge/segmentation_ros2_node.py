@@ -25,7 +25,7 @@ Parameters
 ----------
   cubeedge      (float, default 0.05) – half-width of the click cube in metres.
   inference_url (str,   default 'http://127.0.0.1:5678') – inference server URL.
-  roi_radius_m  (float, default 0.3)  – radius (m) for pre-inference ROI crop.
+  roi_radius_m  (float, default 0.05)  – radius (m) for pre-inference ROI crop.
                                         Set <=0 to disable.
   click_batch_debounce_s (float, default 0.02) – debounce window in seconds.
 
@@ -116,7 +116,7 @@ class SegmentationNode(Node):
         self.declare_parameter("cubeedge", 0.05)
         self.declare_parameter("inference_url", "http://127.0.0.1:5678")
         self.declare_parameter("click_batch_debounce_s", 0.02)
-        self.declare_parameter("roi_radius_m", 0.3)
+        self.declare_parameter("roi_radius_m", 0.05)
 
         self._lock = threading.Lock()
         self._cloud_xyz: np.ndarray | None = None

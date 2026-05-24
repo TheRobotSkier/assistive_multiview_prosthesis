@@ -307,17 +307,28 @@ robotlab-connect:
 # ── Clock sync between host and Jetson ────────────────────────────────────
 # Prevents TF2 "extrapolation into the past" errors caused by clock skew.
 #
-# WSL2 cannot run an NTP server (chrony can't bind UDP 123), so we use a
-# two-step approach:
+# Two-phase sync:
 #   1. One-shot SSH date sync (sets Jetson clock to host clock immediately)
-#   2. Chrony on the Jetson for ongoing drift correction (if NTP becomes
-#      available later, e.g. when running on bare metal)
+#   2. Chrony NTP on both sides for ongoing drift correction (sub-ms precision)
 #
-# timesync         — one-shot sync + configure chrony on Jetson
-# timesync-check   — compare clocks and show offset
-# timesync-host    — configure chrony on host only (for bare-metal setups)
+# NOTE: On WSL2, w32time (Windows Time service) must be disabled first —
+#   it holds UDP 123 and prevents chrony in WSL2 from binding.
+#   Run from elevated PowerShell: Stop-Service w32time; Set-Service w32time -StartupType Disabled
+#
+# timesync         — one-shot sync + configure chrony on host + Jetson
+# timesync-check   — compare clocks, show chrony status on both sides
+# timesync-host    — configure chrony on host only
 
 timesync: robotlab-connect
+	@echo "=== Configuring chrony on host ==="
+	@which chronyd >/dev/null 2>&1 || { echo "ERROR: chrony not installed on host. Run: sudo apt install -y chrony"; exit 1; }
+	-sudo systemctl stop systemd-timesyncd 2>/dev/null || true
+	-sudo systemctl disable systemd-timesyncd 2>/dev/null || true
+	@sudo cp config/chrony-host.conf /etc/chrony/chrony.conf
+	@grep -q 'SYNC_IN_CONTAINER="yes"' /etc/default/chrony 2>/dev/null || sudo sed -i 's/^SYNC_IN_CONTAINER=.*/SYNC_IN_CONTAINER="yes"/' /etc/default/chrony 2>/dev/null || echo 'SYNC_IN_CONTAINER="yes"' | sudo tee -a /etc/default/chrony > /dev/null
+	@sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || { echo "WARNING: Could not restart chronyd on host"; }
+	@echo "Host chrony configured and running."
+	@echo ""
 	@echo "=== One-shot clock sync (host -> Jetson) ==="
 	@HOST_EPOCH="$$(date +%s.%N)" && \
 		echo "Host time:     $$(date)" && \
@@ -325,31 +336,39 @@ timesync: robotlab-connect
 		ssh -T $(JETSON_HOST) "echo robotlab | sudo -S date -s @$${HOST_EPOCH}" && \
 		echo "Jetson after:  $$(ssh $(JETSON_HOST) date)"
 	@echo ""
-	@echo "=== Configuring chrony on Jetson for ongoing drift correction ==="
+	@echo "=== Configuring chrony on Jetson for ongoing NTP sync ==="
 	@CHRONY_B64="$$(base64 -w0 config/chrony-jetson.conf)" && \
 		ssh -T $(JETSON_HOST) "echo robotlab | sudo -S -v 2>/dev/null && \
 			{ which chronyd >/dev/null 2>&1 || sudo apt install -y chrony; } && \
 			{ sudo systemctl stop systemd-timesyncd 2>/dev/null || true; } && \
 			{ sudo systemctl disable systemd-timesyncd 2>/dev/null || true; } && \
 			echo '$$CHRONY_B64' | base64 -d | sudo tee /etc/chrony/chrony.conf > /dev/null && \
-			{ sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || true; }"
-	@echo "Clock sync complete. Use 'make timesync-check' to verify."
+			{ sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || true; } && \
+			echo 'Reconnecting WiFi (chrony Breaks: network-manager)...' && \
+			sleep 2 && \
+			sudo nmcli connection up eduroam 2>/dev/null || true"
+	@echo ""
+	@echo "Clock sync complete. Use 'make timesync-check' to verify NTP is active."
 
 timesync-host:
 	@echo "Configuring chrony on host only (Jetson not configured)..."
-	@echo "NOTE: On WSL2, chrony cannot serve NTP. Use 'make timesync' for SSH-based sync."
 	@which chronyd >/dev/null 2>&1 || { echo "ERROR: chrony not installed on host. Install with: sudo apt install chrony"; exit 1; }
-	-sudo systemctl stop systemd-timesyncd 2>/dev/null
-	-sudo systemctl disable systemd-timesyncd 2>/dev/null
-	sudo cp config/chrony-host.conf /etc/chrony/chrony.conf
+	-sudo systemctl stop systemd-timesyncd 2>/dev/null || true
+	-sudo systemctl disable systemd-timesyncd 2>/dev/null || true
+	@sudo cp config/chrony-host.conf /etc/chrony/chrony.conf
 	@grep -q 'SYNC_IN_CONTAINER="yes"' /etc/default/chrony 2>/dev/null || sudo sed -i 's/^SYNC_IN_CONTAINER=.*/SYNC_IN_CONTAINER="yes"/' /etc/default/chrony 2>/dev/null || echo 'SYNC_IN_CONTAINER="yes"' | sudo tee -a /etc/default/chrony > /dev/null
-	sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || { echo "WARNING: Could not restart chronyd"; }
-	@echo "Host chrony configured. On bare metal, the Jetson can sync to this machine."
+	@sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || { echo "WARNING: Could not restart chronyd"; }
+	@echo "Host chrony configured. Jetson can now sync via NTP to this machine."
 
 timesync-check: robotlab-connect
 	@echo "=== Clock comparison ==="
 	@echo "Host time:   $$(date)"
 	@echo "Jetson time: $$(ssh $(JETSON_HOST) date)"
+	@echo ""
+	@echo "=== Host chrony status ==="
+	@chronyc sources 2>/dev/null || echo "  chronyc not available on host"
+	@echo ""
+	@chronyc tracking 2>/dev/null | grep -E "(Reference|Stratum|Last offset|RMS offset)" || echo "  chrony tracking not available on host"
 	@echo ""
 	@echo "=== Jetson chrony status ==="
 	@ssh $(JETSON_HOST) 'chronyc sources 2>/dev/null || echo "  chronyc not available on Jetson"'

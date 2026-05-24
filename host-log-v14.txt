@@ -1,0 +1,250 @@
+prosthesis@KingBob:/prosthesis_ws$ make camera-test
+Starting >>> sensor_fusion_bringup
+Starting >>> prosthesis_launch
+Finished <<< sensor_fusion_bringup [0.59s]
+Finished <<< prosthesis_launch [2.50s]
+
+Summary: 2 packages finished [2.72s]
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-24-15-19-16-566340-KingBob-57268
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [57366]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [57367]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [57368]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [57369]
+[INFO] [pointcloud_fusion_node-5]: process started with pid [57370]
+[INFO] [odom_to_pose_relay-6]: process started with pid [57371]
+[INFO] [openvins_odom_tf_relay-7]: process started with pid [57372]
+[INFO] [segmentation_ros2_node-8]: process started with pid [57373]
+[INFO] [twist_propagation_node-9]: process started with pid [57374]
+[INFO] [preshaping_service_bridge_node-10]: process started with pid [57375]
+[INFO] [grasp_proximity_controller_node.py-11]: process started with pid [57376]
+[INFO] [rviz2-12]: process started with pid [57377]
+[rviz2-12] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[preshaping_service_bridge_node-10] [INFO] [1779635957.277601258] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-10] [INFO] [1779635957.286007667] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-12] [INFO] [1779635958.127307807] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-12] [INFO] [1779635958.127532359] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-12] [INFO] [1779635958.238325072] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-12] [INFO] [1779635958.438851133] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779635958.440858705] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779635958.517959702] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779635958.521993378] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779635958.973755857] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-12] [INFO] [1779635959.083515433] [rviz2]: Stereo is NOT SUPPORTED
+[grasp_proximity_controller_node.py-11] [INFO] [1779635959.455411970] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[pipeline_manager_node-1] [INFO] [1779635960.129821911] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tf_pipeline_diagnostics-4] [INFO] [1779635960.282293290] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[camera_mount_tf_publisher-3] [INFO] [1779635960.624982371] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1779635960.630166043] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[pointcloud_fusion_node-5] [INFO] [1779635960.702050116] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-5] [INFO] [1779635960.703543255] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779635960.791160833] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779635960.792529978] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[pointcloud_fusion_node-5] [INFO] [1779635960.842991959] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-5] [INFO] [1779635960.849850946] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779635960.896457110] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779635960.906390342] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779635960.908218752] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[twist_propagation_node-9] [INFO] [1779635960.974791232] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[segmentation_ros2_node-8] [INFO] [1779635960.995655711] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.3m
+[twist_propagation_node-9] [INFO] [1779635961.084610757] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-9] [INFO] [1779635961.087686211] [twist_propagation]: External twist source: /hand_twist (max_age=0.5s)
+[pointcloud_fusion_node-5] [WARN] [1779635965.785003791] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-5] [INFO] [1779635970.855740528] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:75, head_d435i_head_depth_optical_frame:77} last_publish_ago=10.0s
+[pointcloud_fusion_node-5] [WARN] [1779635970.858123967] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: fresh (0.09s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.13s); cam2 TF: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[tf_pipeline_diagnostics-4] [WARN] [1779635972.266763832] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [WARN] [1779635975.789625082] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779635977.630371030] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779635978.183672891] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779635981.271897378] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):OK | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779635981.394470028] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=17) dist_removed=0 bbox_removed=0 bbox_skipped=25 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:119, head_d435i_head_depth_optical_frame:99} last_publish_ago=20.1s
+[pointcloud_fusion_node-5] [WARN] [1779635981.663082710] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: fresh (0.27s); cam2: fresh (0.06s); cam2 TF: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779635982.951491967] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779635983.373703274] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779635985.803346349] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779635988.386918439] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779635988.931466154] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [INFO] [1779635990.921708773] [pointcloud_fusion]: Stats: published=32 (dual=0, cam1_only=36) dist_removed=0 bbox_removed=0 bbox_skipped=61 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:37} last_publish_ago=0.3s
+[pointcloud_fusion_node-5] [ERROR] [1779635990.923037959] [pointcloud_fusion]: Bbox removal success rate is 0% over 30s (0/95 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[tf_pipeline_diagnostics-4] [WARN] [1779635991.279460511] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):OK | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [WARN] [1779635993.510996790] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779635994.018559628] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779635995.916392370] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779635998.622447766] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779636000.222363082] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779636000.256779642] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779636002.001658061] [pointcloud_fusion]: Stats: published=45 (dual=1, cam1_only=44) dist_removed=52157 bbox_removed=0 bbox_skipped=102 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:39} last_publish_ago=0.1s
+[pointcloud_fusion_node-5] [WARN] [1779636003.950354294] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779636008.752974911] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779635999.953115 but the earliest data is at time 1779636001.518015, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779636009.326819450] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779636009.551637131] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779636010.257482858] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779636012.531431775] [pointcloud_fusion]: Stats: published=32 (dual=23, cam1_only=4) dist_removed=1569604 bbox_removed=0 bbox_skipped=63 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:9, head_d435i_head_depth_optical_frame:10} last_publish_ago=0.1s
+[pointcloud_fusion_node-5] [WARN] [1779636014.904347969] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779636020.272890890] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779636021.092647253] [pointcloud_fusion]: Stats: published=16 (dual=19, cam1_only=3) dist_removed=1009461 bbox_removed=0 bbox_skipped=1 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:20, head_d435i_head_depth_optical_frame:20} last_publish_ago=0.4s
+[pointcloud_fusion_node-5] [ERROR] [1779636023.254010145] [pointcloud_fusion]: Bbox removal success rate is 17% over 30s (33/199 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[tf_pipeline_diagnostics-4] [INFO] [1779636030.294812173] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[twist_propagation_node-9] [INFO] [1779636031.582137588] [twist_propagation]: Activated
+[pointcloud_fusion_node-5] [INFO] [1779636031.889820254] [pointcloud_fusion]: Stats: published=19 (dual=22, cam1_only=0) dist_removed=1319767 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=0.7s
+[pointcloud_fusion_node-5] [WARN] [1779636032.431013995] [pointcloud_fusion]: Using cached transform for palm_frame (age=1.01s) — fresh lookup failed
+[pointcloud_fusion_node-5] [WARN] [1779636034.844789642] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.5s > 2.0s), skipping
+[twist_propagation_node-9] [INFO] [1779636037.866021434] [twist_propagation]: Hit found at (0.100, -0.011, 0.133) in frame 'marker_map'
+[segmentation_ros2_node-8] [INFO] [1779636037.871962842] [segmentation_bridge]: [+] positive click at (0.100, -0.011, 0.133) (cloud frame)
+[twist_propagation_node-9] [INFO] [1779636037.878534132] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.100, -0.011, 0.133), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-8] [INFO] [1779636037.896545939] [segmentation_bridge]: Running inference with 1 positive, 0 negative clicks
+[segmentation_ros2_node-8] [INFO] [1779636037.938775732] [segmentation_bridge]: ROI crop: 13281/13994 points within 0.3m of click centroid
+[pointcloud_fusion_node-5] [WARN] [1779636037.976523446] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779636031.230632 but the earliest data is at time 1779636033.989535, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779636040.014215399] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (8.2s > 2.0s), skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779636040.265887048] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779636041.164204196] [pointcloud_fusion]: Stats: published=25 (dual=20, cam1_only=3) dist_removed=1377032 bbox_removed=0 bbox_skipped=41 bbox_cache_hits=10 tf_fail={head_d435i_head_depth_optical_frame:1} last_publish_ago=0.0s
+[twist_propagation_node-9] [WARN] [1779636042.885382099] [twist_propagation]: Segmentation timeout (5.0s), returning to IDLE
+[pointcloud_fusion_node-5] [WARN] [1779636045.605310952] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (13.4s > 2.0s), skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779636050.277866184] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779636050.761106599] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (19.7s > 2.0s), skipping
+[pointcloud_fusion_node-5] [INFO] [1779636051.146017077] [pointcloud_fusion]: Stats: published=26 (dual=20, cam1_only=4) dist_removed=757883 bbox_removed=0 bbox_skipped=42 bbox_cache_hits=0 last_publish_ago=0.3s
+[pointcloud_fusion_node-5] [ERROR] [1779636051.147304093] [pointcloud_fusion]: Bbox removal success rate is 35% over 30s (47/133 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779636054.399974287] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779636045.711553 but the earliest data is at time 1779636050.728916, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779636054.446797977] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779636055.806616067] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (23.7s > 2.0s), skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779636060.258979381] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779636060.600199349] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [INFO] [1779636060.998545435] [pointcloud_fusion]: Stats: published=28 (dual=17, cam1_only=16) dist_removed=1851498 bbox_removed=0 bbox_skipped=62 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:19, head_d435i_head_depth_optical_frame:5} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779636061.174904595] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (29.5s > 2.0s), skipping
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[preshaping_service_bridge_node-10] [INFO] [1779636068.787157644] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[rviz2-12] [INFO] [1779636068.803085710] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[tf_pipeline_diagnostics-4] Traceback (most recent call last):
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-4]     main()
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 143, in main
+[tf_pipeline_diagnostics-4]     rclpy.spin(node)
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[tf_pipeline_diagnostics-4]     executor.spin_once()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[tf_pipeline_diagnostics-4]     self._spin_once_impl(timeout_sec)
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[tf_pipeline_diagnostics-4]     raise handler.exception()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[tf_pipeline_diagnostics-4]     result = coro.send(None)
+[tf_pipeline_diagnostics-4]              ^^^^^^^^^^^^^^^
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 584, in handler
+[tf_pipeline_diagnostics-4]     call_coroutine = take_from_wait_list(entity)
+[tf_pipeline_diagnostics-4]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 470, in _take_subscription
+[tf_pipeline_diagnostics-4]     msg_info = sub.handle.take_message(sub.msg_type, sub.raw)
+[tf_pipeline_diagnostics-4]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[tf_pipeline_diagnostics-4] RuntimeError: Unable to convert call argument '0' to Python object (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)
+[pointcloud_fusion_node-5] Exception in thread Thread-509 (_process_clouds):
+[pointcloud_fusion_node-5] Traceback (most recent call last):
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[pointcloud_fusion_node-5]     self.run()
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[pointcloud_fusion_node-5]     self._target(*self._args, **self._kwargs)
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 565, in _process_clouds
+[pointcloud_fusion_node-5] Exception in thread Thread-508 (_process_clouds):
+[pointcloud_fusion_node-5] Traceback (most recent call last):
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[pointcloud_fusion_node-5]     self.run()
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[pointcloud_fusion_node-5]     self._target(*self._args, **self._kwargs)
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 565, in _process_clouds
+[pointcloud_fusion_node-5]     self._pub.publish(out_msg)
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/publisher.py", line 68, in publish
+[pointcloud_fusion_node-5]     with self.handle:
+[pointcloud_fusion_node-5] rclpy._rclpy_pybind11.InvalidHandle: cannot use Destroyable because destruction was requested
+[pointcloud_fusion_node-5]     self._pub.publish(out_msg)
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/publisher.py", line 68, in publish
+[openvins_realsense_tf_bridge_node-2] Traceback (most recent call last):
+[openvins_realsense_tf_bridge_node-2]   File "/prosthesis_ws/install/camera/lib/camera/openvins_realsense_tf_bridge_node", line 33, in <module>
+[openvins_realsense_tf_bridge_node-2]     sys.exit(load_entry_point('camera==0.1.0', 'console_scripts', 'openvins_realsense_tf_bridge_node')())
+[openvins_realsense_tf_bridge_node-2]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_realsense_tf_bridge_node-2]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/openvins_realsense_tf_bridge_node.py", line 499, in main
+[openvins_realsense_tf_bridge_node-2]     rclpy.spin(node)
+[openvins_realsense_tf_bridge_node-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[openvins_realsense_tf_bridge_node-2]     executor.spin_once()
+[openvins_realsense_tf_bridge_node-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[openvins_realsense_tf_bridge_node-2]     self._spin_once_impl(timeout_sec)
+[openvins_realsense_tf_bridge_node-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[openvins_realsense_tf_bridge_node-2]     raise handler.exception()
+[openvins_realsense_tf_bridge_node-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[openvins_realsense_tf_bridge_node-2]     result = coro.send(None)
+[openvins_realsense_tf_bridge_node-2]              ^^^^^^^^^^^^^^^
+[openvins_realsense_tf_bridge_node-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 584, in handler
+[openvins_realsense_tf_bridge_node-2]     call_coroutine = take_from_wait_list(entity)
+[openvins_realsense_tf_bridge_node-2]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_realsense_tf_bridge_node-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 470, in _take_subscription
+[openvins_realsense_tf_bridge_node-2]     msg_info = sub.handle.take_message(sub.msg_type, sub.raw)
+[openvins_realsense_tf_bridge_node-2]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_realsense_tf_bridge_node-2] RuntimeError: Unable to convert call argument '0' to Python object (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)
+[pointcloud_fusion_node-5]     with self.handle:
+[pointcloud_fusion_node-5] rclpy._rclpy_pybind11.InvalidHandle: cannot use Destroyable because destruction was requested
+[pointcloud_fusion_node-5] Exception in thread Thread-506 (_process_clouds):
+[pointcloud_fusion_node-5] Traceback (most recent call last):
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[ERROR] [openvins_realsense_tf_bridge_node-2]: process has died [pid 57367, exit code 1, cmd '/prosthesis_ws/install/camera/lib/camera/openvins_realsense_tf_bridge_node --ros-args -r __node:=openvins_realsense_tf_bridge --params-file /tmp/launch_params_13ym4c8c'].
+[INFO] [grasp_proximity_controller_node.py-11]: process has finished cleanly [pid 57376]
+[pointcloud_fusion_node-5] Exception in thread Thread-503 (_process_clouds):
+[pointcloud_fusion_node-5] Traceback (most recent call last):
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[camera_mount_tf_publisher-3] Traceback (most recent call last):
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-3]     main()
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-3]     rclpy.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-3]     _shutdown(context=context)
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-3]     context.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-3]     self.__context.shutdown()
+[camera_mount_tf_publisher-3] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[segmentation_ros2_node-8] Traceback (most recent call last):
+[segmentation_ros2_node-8]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-8]     sys.exit(load_entry_point('segmentation-bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 359, in main
+[segmentation_ros2_node-8]     rclpy.spin(node)
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[segmentation_ros2_node-8]     executor.spin_once()
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[segmentation_ros2_node-8]     self._spin_once_impl(timeout_sec)
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[segmentation_ros2_node-8]     handler, entity, node = self.wait_for_ready_callbacks(
+[segmentation_ros2_node-8]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[segmentation_ros2_node-8]     return next(self._cb_iter)
+[segmentation_ros2_node-8]            ^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 842, in _wait_for_ready_callbacks
+[segmentation_ros2_node-8]     if srv.handle.pointer in services_ready:
+[segmentation_ros2_node-8]        ^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/service.py", line 101, in handle
+[segmentation_ros2_node-8]     @property
+[segmentation_ros2_node-8]
+[segmentation_ros2_node-8] KeyboardInterrupt
+[INFO] [preshaping_service_bridge_node-10]: process has finished cleanly [pid 57375]
+[ERROR] [tf_pipeline_diagnostics-4]: process has died [pid 57369, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[ERROR] [camera_mount_tf_publisher-3]: process has died [pid 57368, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[ERROR] [segmentation_ros2_node-8]: process has died [pid 57373, exit code -2, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_95hbr410 -r /segmentation/input_cloud:=/fused_pointcloud'].
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 57366]
+[INFO] [odom_to_pose_relay-6]: process has finished cleanly [pid 57371]
+[INFO] [twist_propagation_node-9]: process has finished cleanly [pid 57374]
+[INFO] [openvins_odom_tf_relay-7]: process has finished cleanly [pid 57372]
+[pointcloud_fusion_node-5]     self.run()
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[pointcloud_fusion_node-5]     self.run()
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[pointcloud_fusion_node-5]     self._target(*self._args, **self._kwargs)
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 565, in _process_clouds
+[INFO] [pointcloud_fusion_node-5]: process has finished cleanly [pid 57370]
+[ERROR] [rviz2-12]: process[rviz2-12] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [rviz2-12]: sending signal 'SIGTERM' to process[rviz2-12]
+[ERROR] [rviz2-12]: process[rviz2-12] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'
+[INFO] [rviz2-12]: sending signal 'SIGKILL' to process[rviz2-12]
+[ERROR] [rviz2-12]: process has died [pid 57377, exit code -9, cmd '/opt/ros/jazzy/lib/rviz2/rviz2 -d /prosthesis_ws/rviz/prosthesis.rviz --ros-args -r __node:=rviz2'].
+
+prosthesis@KingBob:/prosthesis_ws$
