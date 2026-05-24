@@ -64,6 +64,7 @@ install(DIRECTORY
 install(PROGRAMS
   mia_hand_ros2_control/mia_safety_node.py
   mia_hand_ros2_control/emg_force_controller.py
+  mia_hand_ros2_control/emg_safety_preflight.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
