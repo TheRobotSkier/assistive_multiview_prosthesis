@@ -97,15 +97,9 @@ colcon build \
     --build-base /ws/build_overlay \
     --executor sequential \
     --parallel-workers 1 \
-    2>&1
-' 2>&1 | head -100
-DEP_RC=${PIPESTATUS[0]}
-if [ $DEP_RC -ne 0 ]; then
-    echo ""
-    echo "WARNING: Dependency build had non-zero exit ($DEP_RC)."
-    echo "If only ov_msckf is needed, this may be OK."
-    echo "Check logs in ${LOG_DIR}"
-fi
+     2>&1
+'
+echo "Step 1 complete."
 
 # ── Step 2: Configure ov_msckf with cmake ────────────────────────────────────
 echo ""
@@ -128,7 +122,8 @@ cmake /ws/src/open_vins/ov_msckf \
     -DCMAKE_PREFIX_PATH="/opt/ros/humble;/ws/install_overlay/ov_core;/ws/install_overlay/ov_init;/ws/install_overlay/sensor_fusion_msgs" \
     -DBUILD_TESTING=OFF \
     2>&1
-' 2>&1 | tail -20
+'
+echo "Step 2 complete."
 
 # ── Step 3: Compile each .o file ONE AT A TIME ───────────────────────────────
 echo ""
@@ -267,7 +262,7 @@ cmake --install . --prefix /ws/install_overlay/ov_msckf 2>&1 || {
 echo ''
 echo 'Ov_msckf build complete!'
 echo '.so: /ws/install_overlay/ov_msckf/lib/libov_msckf_lib.so'
-" 2>&1 | tail -20
+echo "Step 4 complete."
 
 # ── Verify ───────────────────────────────────────────────────────────────────
 echo ""
@@ -290,7 +285,7 @@ for sym in marker_noise_multiplier marker_reset_bias_policy initial_lock_zero_ve
         echo "  MISSING: $sym"
     fi
 done
-' 2>&1 | tail -10
+'
 
 echo ""
 echo "Build complete. Overlay installed at: ${OVERLAY_INSTALL_DIR}"
