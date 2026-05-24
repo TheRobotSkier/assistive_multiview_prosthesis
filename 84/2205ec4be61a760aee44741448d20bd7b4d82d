@@ -1,0 +1,25 @@
+config/emg_safety.yaml
+  s_10fa13a27408f4::t_117ba4ef230f8c 1-91
+src/mia_hand_ros2_control/mia_hand_ros2_control/emg_safety_preflight.py
+  s_10fa13a27408f4::t_117ba4ef230f8c 1-929
+src/mia_hand_ros2_control/CMakeLists.txt
+  ai_agent 67
+src/mia_hand_ros2_control/test_safety_preflight.py
+  s_10fa13a27408f4::t_117ba4ef230f8c 1-523
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "842205ec4be61a760aee44741448d20bd7b4d82d",
+  "prompts": {},
+  "sessions": {
+    "s_10fa13a27408f4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3e4c750ffeQkUx66gJ2MhvdU",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
