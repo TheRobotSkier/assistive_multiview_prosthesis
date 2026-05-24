@@ -1,0 +1,29 @@
+docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.h
+  s_14430be63187a9::t_103b86c0d0ce21 184-187,208
+docker_ws/src/open_vins/ov_msckf/src/core/VioManager.cpp
+  s_14430be63187a9::t_103b86c0d0ce21 206-209,212-213,216,218,221,223,226,228,233,236,243-246,248-249,253-254,257-263,267-271,273,275-276,280,282,286-290,292,295
+docker_ws/src/open_vins/ov_msckf/src/core/VioManager.h
+  s_14430be63187a9::t_103b86c0d0ce21 98,100
+docker_ws/src/open_vins/ov_msckf/src/core/VioManagerOptions.h
+  s_14430be63187a9::t_103b86c0d0ce21 145,210
+docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.h
+  s_14430be63187a9::t_103b86c0d0ce21 21,69,74-82
+docker_ws/src/open_vins/ov_msckf/src/ros/ROS2Visualizer.cpp
+  s_14430be63187a9::t_103b86c0d0ce21 154-158,262,839-841,853-855,863-864,976-1041
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "cfc0a596492f13e819229104a34678e945e6aa89",
+  "prompts": {},
+  "sessions": {
+    "s_14430be63187a9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5c0128cffe1r7WEnoiYrSuMC",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
