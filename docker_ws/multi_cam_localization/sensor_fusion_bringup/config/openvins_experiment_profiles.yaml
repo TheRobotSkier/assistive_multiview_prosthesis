@@ -94,23 +94,16 @@ profiles:
       marker_reset_window_s: 0.30
       marker_initial_lock_allow_zero_velocity: true
       marker_initial_lock_velocity_cov_std: 0.5
-    arm_marker:
-      marker_reset_translation_m: 0.80
-      marker_reset_rotation_deg: 30.0
-      marker_reset_min_samples: 3
-      marker_reset_window_s: 0.30
-      marker_initial_lock_allow_zero_velocity: true
-      marker_initial_lock_velocity_cov_std: 0.5
-
-  reset_bias_policy:
-    description: >
-      Aggressive IMU gyro / accel bias reset standard deviations
-      on marker lock, allowing the EKF to adjust biases faster.
-      Zeroes biases on initial lock to avoid bad seed bias values.
-    head_marker:
-      marker_reset_bias_gyro_std: 0.05
-      marker_reset_bias_accel_std: 0.50
       marker_reset_bias_policy: "zero_on_initial_lock"
+
+  marker_graph_correction:
+    description: >
+      Use the multi-marker graph to provide head-to-arm camera synchronization
+      via corrected odometry. The marker graph odom relay subscribes to
+      /marker_graph_estimator/head_to_arm and publishes
+      /ov_msckf_arm/odomimu_corrected.  Baseline odom topics remain available.
+      This profile does NOT alter internal OpenVINS state.
+
     arm_marker:
       marker_reset_bias_gyro_std: 0.05
       marker_reset_bias_accel_std: 0.50

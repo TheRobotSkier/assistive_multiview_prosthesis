@@ -75,6 +75,7 @@ def _setup(context, *args, **kwargs):
     start_preview = _as_bool(_arg_or_config(context, "start_preview", launch_cfg.get("start_preview", True)))
     start_rviz = _as_bool(_arg_or_config(context, "start_rviz", launch_cfg.get("start_rviz", False)))
     start_marker_graph = _as_bool(_arg_or_config(context, "start_marker_graph", launch_cfg.get("start_marker_graph", True)))
+    start_marker_graph_odom_relay = _as_bool(_arg_or_config(context, "start_marker_graph_odom_relay", launch_cfg.get("start_marker_graph_odom_relay", True)))
     record_bag = _as_bool(_arg_or_config(context, "record_bag", launch_cfg.get("record_bag", False)))
     enable_pointclouds = _as_bool(_arg_or_config(context, "enable_pointclouds", pointcloud_cfg.get("enable", False)))
     enable_marker_map_pointclouds = _as_bool(
@@ -280,6 +281,32 @@ def _setup(context, *args, **kwargs):
             )
         )
 
+    odom_relay_cfg = config.get("marker_graph_odom_relay", {})
+    if start_marker_graph_odom_relay:
+        actions.append(
+            Node(
+                package="sensor_fusion_bringup",
+                executable="marker_graph_odom_relay.py",
+                name="marker_graph_odom_relay",
+                output="screen",
+                parameters=[
+                    {"use_sim_time": use_sim_time},
+                    {"head_to_arm_topic": str(odom_relay_cfg.get("head_to_arm_topic", "/marker_graph_estimator/head_to_arm"))},
+                    {"graph_status_topic": str(odom_relay_cfg.get("graph_status_topic", "/marker_graph_estimator/status"))},
+                    {"head_odom_topic": str(odom_relay_cfg.get("head_odom_topic", "/ov_msckf/odomimu"))},
+                    {"arm_odom_topic": str(odom_relay_cfg.get("arm_odom_topic", "/ov_msckf_arm/odomimu"))},
+                    {"corrected_odom_topic": str(odom_relay_cfg.get("corrected_odom_topic", "/ov_msckf_arm/odomimu_corrected"))},
+                    {"correction_status_topic": str(odom_relay_cfg.get("correction_status_topic", "/marker_graph/correction_status"))},
+                    {"corrected_child_frame_id": str(odom_relay_cfg.get("corrected_child_frame_id", "arm_imu_corrected"))},
+                    {"min_graph_chain_quality": float(odom_relay_cfg.get("min_graph_chain_quality", 0.2))},
+                    {"publish_rate_hz": float(odom_relay_cfg.get("publish_rate_hz", 10.0))},
+                    {"max_head_odom_age_s": float(odom_relay_cfg.get("max_head_odom_age_s", 0.5))},
+                    {"max_arm_odom_age_s": float(odom_relay_cfg.get("max_arm_odom_age_s", 0.5))},
+                    {"max_graph_age_s": float(odom_relay_cfg.get("max_graph_age_s", 1.0))},
+                ],
+            )
+        )
+
     if start_preview:
         actions.append(
             IncludeLaunchDescription(
@@ -324,6 +351,11 @@ def _setup(context, *args, **kwargs):
             "/ov_msckf_arm/marker_map_locked",
             "/arm/marker_pose/head_derived/arm_camera_pose",
             "/arm/marker_pose/head_derived/path",
+            "/ov_msckf_arm/odomimu_corrected",
+            "/marker_graph/correction_status",
+            "/marker_graph_estimator/head_to_arm",
+            "/marker_graph_estimator/status",
+            "/marker_graph_estimator/edges",
         ]
         if record_pointclouds:
             topics.extend(
@@ -378,6 +410,7 @@ def generate_launch_description():
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("verbosity", default_value=""),
             DeclareLaunchArgument("hold_back_imu_for_frames", default_value=""),
+            DeclareLaunchArgument("start_marker_graph_odom_relay", default_value=""),
             DeclareLaunchArgument(
                 "openvins_experiment_profile",
                 default_value="",
