@@ -17,6 +17,7 @@ launch:
   # samples when image processing or Jetson load spikes.
   hold_back_imu_for_frames: true
   verbosity: INFO
+  start_marker_graph_odom_relay: true
 
 pointcloud:
   # Keep the 30 Hz RGB stream for OpenVINS. Pointclouds are opt-in for grasping
@@ -92,3 +93,17 @@ openvins:
   dynamic_arm_reanchor_cooldown_s: 5.0
   dynamic_arm_reanchor_skip_after_fixed_marker_s: 3.0
   dynamic_arm_reanchor_covariance_multiplier: 2.0
+
+marker_graph_odom_relay:
+  head_to_arm_topic: /marker_graph_estimator/head_to_arm
+  graph_status_topic: /marker_graph_estimator/status
+  head_odom_topic: /ov_msckf/odomimu
+  arm_odom_topic: /ov_msckf_arm/odomimu
+  corrected_odom_topic: /ov_msckf_arm/odomimu_corrected
+  correction_status_topic: /marker_graph/correction_status
+  corrected_child_frame_id: arm_imu_corrected
+  min_graph_chain_quality: 0.2
+  publish_rate_hz: 10.0
+  max_head_odom_age_s: 0.5
+  max_arm_odom_age_s: 0.5
+  max_graph_age_s: 1.0

@@ -64,6 +64,7 @@ install(
     scripts/head_derived_arm_pose_preview_node.py
     scripts/marker_graph_core.py
     scripts/marker_graph_estimator.py
+    scripts/marker_graph_odom_relay.py
     scripts/marker_quality_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
