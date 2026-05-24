@@ -1,0 +1,38 @@
+src/mia_hand_ros2_control/mia_hand_ros2_control/mia_safety_node.py
+  s_10fa13a27408f4::t_578178483e2032 70-71
+Makefile
+  s_10fa13a27408f4::t_578178483e2032 468,496,500,505-508,510-515
+  s_10fa13a27408f4::t_e575d0627d3335 517
+src/mia_hand_driver/src/mia_hand_driver/cpp_driver.cpp
+  s_10fa13a27408f4::t_578178483e2032 111,113-117,119,183,245,304,366,428,488,1041,1326
+src/mia_hand_ros2_control/include/mia_hand_ros2_control/mia_hand_system_interface.hpp
+  s_10fa13a27408f4::t_578178483e2032 171,178-181,184
+config/static_grasp_test.yaml
+  s_10fa13a27408f4::t_578178483e2032 23,30-44,48-50
+scripts/static_grasp_test.sh
+  s_10fa13a27408f4::t_578178483e2032 10,13,24-35,61-167,170-180,182,198-201,208-211,218-220,286-329,331-334,338,346-349,353,356-375,386-388,392-413,415-420,422-426,428-429,431-432,435-441,446-450,453,458-459,461-476,478-551,553-563,565-576
+src/mia_hand_driver/src/mia_hand_driver/ros_driver.cpp
+  s_10fa13a27408f4::t_578178483e2032 558-566
+src/mia_hand_driver/include/mia_hand_driver/cpp_driver.hpp
+  s_10fa13a27408f4::t_578178483e2032 112
+src/mia_hand_ros2_control/launch/mia_hand_system_interface_launch.py
+  s_10fa13a27408f4::t_578178483e2032 208
+src/mia_hand_ros2_control/src/mia_hand_ros2_control/mia_hand_system_interface.cpp
+  s_10fa13a27408f4::t_578178483e2032 13-29,102,106-108,137-147,222-228,380-399,412-417,428-432,436-441,452-456,460,516-519
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "cbc50f0afad97ea0b594497325ffd26f473382db",
+  "prompts": {},
+  "sessions": {
+    "s_10fa13a27408f4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3e4c750ffeQkUx66gJ2MhvdU",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
