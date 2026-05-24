@@ -1,0 +1,40 @@
+config/emg_experiment_config_sticky.yaml
+  s_6a053cf002c2c5::t_09ec86cdfe233b 1-10
+Makefile
+  s_6a053cf002c2c5::t_c60775f0af7d42 598
+  s_6a053cf002c2c5::t_7ba45466152139 57
+  s_6a053cf002c2c5::t_bc2edc9ffc6cef 576-578,580-583,585-597,599-607,610-623,625-642,645-650,656-681,683-688,694-696,698-703,709-736
+config/emg_experiment_config_sklearn_imu.yaml
+  s_6a053cf002c2c5::t_c3599a79f4979c 1-7
+config/emg_experiment_config_slew.yaml
+  s_6a053cf002c2c5::t_b1ca8bbb0a68d9 1-9
+config/emg_experiment_config_naviflame.yaml
+  s_6a053cf002c2c5::t_c8c4aa3ea33302 1-5
+docker/Dockerfile.emg-experiments
+  s_6a053cf002c2c5::t_7276f135d3f826 15
+  s_6a053cf002c2c5::t_96bfe7974e9737 2-3,8,10,21-30,33,38
+  s_6a053cf002c2c5::t_e8b170ebb20297 39-40
+src/emg_bridge/scripts/run_naviflame.py
+  s_6a053cf002c2c5::t_2aa68f8b3331b9 48-55
+  s_6a053cf002c2c5::t_9eb6c94ea79e99 1-47,56-57,65-182,186-206,214-220,224-243,257-274,278-284,288-327
+  s_6a053cf002c2c5::t_1b106d6c4753a5 207-213,244-256,275-277,285-287
+  s_6a053cf002c2c5::t_a0185ee349037f 221-223
+  s_6a053cf002c2c5::t_2a0c3a60fc5de6 183-185
+  s_6a053cf002c2c5::t_7878bedf9903e2 58-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "7c54a6c0acddc701eefaeaf93ac04b8cea4c2800",
+  "prompts": {},
+  "sessions": {
+    "s_6a053cf002c2c5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a542d867ffem2rAk0lzel3omH",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
