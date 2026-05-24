@@ -55,17 +55,23 @@ profiles:
   marker_easier_initial_lock:
     description: >
       Reduce the number of samples and tighten the velocity checks
-      required for the initial marker-map lock.
+      required for the initial marker-map lock.  When velocity fit is
+      unavailable, fall back to zero velocity with high covariance so
+      a stable marker can still lock the global gauge.
     head_marker:
       marker_reset_translation_m: 0.80
       marker_reset_rotation_deg: 30.0
       marker_reset_min_samples: 3
-      marker_reset_window_s: 1.00
+      marker_reset_window_s: 0.30
+      marker_initial_lock_allow_zero_velocity: true
+      marker_initial_lock_velocity_cov_std: 0.5
     arm_marker:
       marker_reset_translation_m: 0.80
       marker_reset_rotation_deg: 30.0
       marker_reset_min_samples: 3
-      marker_reset_window_s: 1.00
+      marker_reset_window_s: 0.30
+      marker_initial_lock_allow_zero_velocity: true
+      marker_initial_lock_velocity_cov_std: 0.5
 
   reset_bias_policy:
     description: >
@@ -111,9 +117,11 @@ profiles:
       marker_reset_translation_m: 0.80
       marker_reset_rotation_deg: 30.0
       marker_reset_min_samples: 3
-      marker_reset_window_s: 1.00
+      marker_reset_window_s: 0.30
       marker_reset_bias_gyro_std: 0.05
       marker_reset_bias_accel_std: 0.50
+      marker_initial_lock_allow_zero_velocity: true
+      marker_initial_lock_velocity_cov_std: 0.5
     arm_marker:
       marker_chi2_gate: 22.46
       marker_noise_multiplier: 0.5
@@ -122,6 +130,8 @@ profiles:
       marker_reset_translation_m: 0.80
       marker_reset_rotation_deg: 30.0
       marker_reset_min_samples: 3
-      marker_reset_window_s: 1.00
+      marker_reset_window_s: 0.30
       marker_reset_bias_gyro_std: 0.05
       marker_reset_bias_accel_std: 0.50
+      marker_initial_lock_allow_zero_velocity: true
+      marker_initial_lock_velocity_cov_std: 0.5
