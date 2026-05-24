@@ -1,0 +1,42 @@
+src/emg_bridge/scripts/collect_data.py
+  s_4e46b89a56d5e7::t_2a3141b19187f2 13
+  s_22b3a9066ec4a6::t_774388fb35755a 6-7
+  s_22b3a9066ec4a6::t_ea1498c8aee24f 37,41-55,60,71,77-87,91,94,100,104-124,131,134-157,169-171,187-189,202,204,208-210,219-229
+Makefile
+  s_22b3a9066ec4a6::t_ea1498c8aee24f 468,531-534
+  s_22b3a9066ec4a6::t_08afcae3ce31c6 501
+scripts/emg_train_and_test.sh
+  s_22b3a9066ec4a6::t_08afcae3ce31c6 5-9
+  s_4e46b89a56d5e7::t_26b03f1710fd83 78
+  s_22b3a9066ec4a6::t_ea1498c8aee24f 119-126
+  s_4e46b89a56d5e7::t_a97ec43a8398ea 76-77,79
+tests/test_emg_train_flow.py
+  s_22b3a9066ec4a6::t_db97fcccbc5f6e 1-66
+src/emg_bridge/scripts/collect_data_flow.py
+  s_22b3a9066ec4a6::t_ea1498c8aee24f 26-38
+  s_22b3a9066ec4a6::t_db97fcccbc5f6e 1-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "8213d77e1312934a3ea8f10fc38f1a971ce4dde7",
+  "prompts": {},
+  "sessions": {
+    "s_22b3a9066ec4a6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a6df4cc9ffeF08bwkl6r0ziZF",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    },
+    "s_4e46b89a56d5e7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e4c7e-1dcf-7882-908e-e67fe0d06151",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
