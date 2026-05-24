@@ -31,6 +31,9 @@ from twist_propagation_node import (  # noqa: E402
     _parse_xyz,
     _voxel_downsample,
     _quat_multiply,
+    _quat_rotate_vector,
+    _quat_to_rotation_matrix_cols,
+    _transform_twist_by_rotation,
     _propagate_pose,
     _propagate_covariance,
     _build_initial_covariance_from_odom,
@@ -400,6 +403,179 @@ class TestQuatMultiply:
         assert abs(result[0]) < 1e-10
         assert abs(result[1]) < 1e-10
         assert abs(result[2]) < 1e-10
+
+
+class TestQuatRotateVector:
+    """Tests for _quat_rotate_vector."""
+
+    def test_identity_rotation(self):
+        """Identity quaternion should not change the vector."""
+        q = (0.0, 0.0, 0.0, 1.0)
+        rx, ry, rz = _quat_rotate_vector(q, 1.0, 2.0, 3.0)
+        assert abs(rx - 1.0) < 1e-10
+        assert abs(ry - 2.0) < 1e-10
+        assert abs(rz - 3.0) < 1e-10
+
+    def test_90deg_rotation_z(self):
+        """90-degree rotation around Z should map X to Y."""
+        # 90-degree rotation about Z: q = (0, 0, sin(45), cos(45))
+        s = math.sin(math.pi / 4)
+        c = math.cos(math.pi / 4)
+        q = (0.0, 0.0, s, c)
+        rx, ry, rz = _quat_rotate_vector(q, 1.0, 0.0, 0.0)
+        assert abs(rx) < 1e-10
+        assert abs(ry - 1.0) < 1e-10
+        assert abs(rz) < 1e-10
+
+    def test_180deg_rotation_y(self):
+        """180-degree rotation around Y should map X to -X."""
+        s = math.sin(math.pi / 2)
+        c = math.cos(math.pi / 2)
+        q = (0.0, s, 0.0, c)
+        rx, ry, rz = _quat_rotate_vector(q, 1.0, 0.0, 0.0)
+        assert abs(rx - (-1.0)) < 1e-10
+        assert abs(ry) < 1e-10
+        assert abs(rz) < 1e-10
+
+
+class TestTransformTwistByRotation:
+    """Tests for _transform_twist_by_rotation."""
+
+    def test_identity_rotation_unchanged(self):
+        """Identity rotation matrix should not change the twist."""
+        twist = (1.0, 2.0, 3.0, 0.1, 0.2, 0.3)
+        result = _transform_twist_by_rotation(
+            twist,
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0,
+        )
+        assert result == twist
+
+    def test_90deg_z_rotation_swaps_xy(self):
+        """90-degree rotation about Z maps (vx,vy,vz) -> (-vy,vx,vz)."""
+        twist = (1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+        # R_z(90) = [[0, -1, 0], [1, 0, 0], [0, 0, 1]]
+        result = _transform_twist_by_rotation(
+            twist,
+            0.0, -1.0, 0.0,
+            1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0,
+        )
+        assert abs(result[0]) < 1e-10  # vx -> 0
+        assert abs(result[1] - 1.0) < 1e-10  # vy -> 1
+        assert abs(result[2]) < 1e-10  # vz -> 0
+        assert abs(result[3]) < 1e-10  # wx -> 0
+        assert abs(result[4]) < 1e-10  # wy -> 0
+        assert abs(result[5] - 1.0) < 1e-10  # wz -> 1
+
+    def test_rotation_with_quat_to_rotation_matrix_cols(self):
+        """Verify _quat_to_rotation_matrix_cols produces correct rotation."""
+        # 90-degree rotation about Z
+        s = math.sin(math.pi / 4)
+        c = math.cos(math.pi / 4)
+        q = (0.0, 0.0, s, c)
+        cols = _quat_to_rotation_matrix_cols(q)
+        twist = (1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+        result = _transform_twist_by_rotation(twist, *cols)
+        assert abs(result[0]) < 1e-10  # vx -> 0
+        assert abs(result[1] - 1.0) < 1e-10  # vy -> 1
+        assert abs(result[2]) < 1e-10  # vz -> 0
+        assert abs(result[5] - 1.0) < 1e-10  # wz -> 1
+
+    def test_forward_motion_optical_frame_rotation(self):
+        """Verify that forward motion in ROS frame becomes forward in optical frame.
+
+        This is the core bug scenario: in ROS frame, forward is +X. In optical
+        frame, forward is +Z. A 90-degree rotation about Y converts between
+        them. After the fix, a +X velocity in pose_frame should become +Z
+        velocity in the optical cloud_frame.
+        """
+        # Optical frame convention: rotate 90deg about Y then -90deg about Z
+        # For simplicity, just test a 90-deg rotation about Y:
+        # ROS X-forward -> optical Z-forward
+        s = math.sin(math.pi / 4)
+        c = math.cos(math.pi / 4)
+        q_y90 = (0.0, s, 0.0, c)  # 90-deg about Y
+        cols = _quat_to_rotation_matrix_cols(q_y90)
+
+        # Moving forward in ROS frame: vx=1, vy=0, vz=0
+        twist_ros = (1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        twist_optical = _transform_twist_by_rotation(twist_ros, *cols)
+
+        # After rotation about Y by 90deg, +X maps to -Z
+        assert abs(twist_optical[0]) < 1e-10  # vx -> 0
+        assert abs(twist_optical[1]) < 1e-10  # vy -> 0
+        assert abs(twist_optical[2] - (-1.0)) < 1e-10  # vz -> -1
+
+
+class TestPropagationWithFrameTransform:
+    """Tests that propagation produces correct paths after twist transform.
+
+    These tests simulate the frame-mismatch bug scenario: a twist estimated
+    in one frame must be transformed to another frame before propagation.
+    """
+
+    def test_forward_motion_after_90deg_z_rotation(self):
+        """After a 90-deg Z rotation, forward motion in source frame should
+        produce a path that moves in the +Y direction in the target frame."""
+        # Start at origin, identity orientation
+        px, py, pz = 0.0, 0.0, 0.0
+        qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0
+
+        # Velocity in source frame: forward = +X
+        vx_src, vy_src, vz_src = 1.0, 0.0, 0.0
+
+        # 90-deg rotation about Z: maps +X -> +Y
+        s = math.sin(math.pi / 4)
+        c = math.cos(math.pi / 4)
+        q_rot = (0.0, 0.0, s, c)
+        cols = _quat_to_rotation_matrix_cols(q_rot)
+        twist_rot = _transform_twist_by_rotation(
+            (vx_src, vy_src, vz_src, 0.0, 0.0, 0.0), *cols)
+
+        # Propagate with the rotated twist
+        dt = 0.02
+        for _ in range(50):
+            px, py, pz, qx, qy, qz, qw = _propagate_pose(
+                px, py, pz, qx, qy, qz, qw,
+                twist_rot[0], twist_rot[1], twist_rot[2],
+                twist_rot[3], twist_rot[4], twist_rot[5],
+                dt)
+
+        # After 50 steps at 1 m/s, total displacement = 1.0 m
+        # The motion should be in +Y (not +X) due to the 90-deg rotation
+        assert abs(px) < 1e-6  # X should be ~0
+        assert abs(py - 1.0) < 1e-3  # Y should be ~1.0
+        assert abs(pz) < 1e-6  # Z should be ~0
+
+    def test_forward_motion_after_90deg_y_rotation(self):
+        """After a 90-deg Y rotation, forward motion in source frame should
+        produce a path that moves in the -Z direction in the target frame."""
+        px, py, pz = 0.0, 0.0, 0.0
+        qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0
+
+        vx_src, vy_src, vz_src = 1.0, 0.0, 0.0
+
+        # 90-deg rotation about Y: maps +X -> -Z
+        s = math.sin(math.pi / 4)
+        c = math.cos(math.pi / 4)
+        q_rot = (0.0, s, 0.0, c)
+        cols = _quat_to_rotation_matrix_cols(q_rot)
+        twist_rot = _transform_twist_by_rotation(
+            (vx_src, vy_src, vz_src, 0.0, 0.0, 0.0), *cols)
+
+        dt = 0.02
+        for _ in range(50):
+            px, py, pz, qx, qy, qz, qw = _propagate_pose(
+                px, py, pz, qx, qy, qz, qw,
+                twist_rot[0], twist_rot[1], twist_rot[2],
+                twist_rot[3], twist_rot[4], twist_rot[5],
+                dt)
+
+        assert abs(px) < 1e-6
+        assert abs(py) < 1e-6
+        assert abs(pz - (-1.0)) < 1e-3  # Z should be ~-1.0
 
 
 # -- Retarget policy tests --

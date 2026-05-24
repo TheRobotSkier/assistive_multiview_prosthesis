@@ -80,6 +80,7 @@ def _launch_setup(context, *args, **kwargs):
     mia_serial_port = LaunchConfiguration("mia_serial_port").perform(context)
     wrist_serial_port = LaunchConfiguration("wrist_serial_port").perform(context)
     haptic_bt_addr = LaunchConfiguration("haptic_bt_addr1").perform(context)
+    roi_radius = LaunchConfiguration("roi_radius").perform(context)
     inference_url = LaunchConfiguration("inference_url").perform(context)
     camera_mount = LaunchConfiguration("camera_mount").perform(context)
     mounts_config = LaunchConfiguration("mounts_config").perform(context)
@@ -300,7 +301,7 @@ def _launch_setup(context, *args, **kwargs):
             executable="segmentation_ros2_node",
             name="segmentation_bridge",
             remappings={("/segmentation/input_cloud", "/fused_pointcloud")},
-            parameters=[{"inference_url": inference_url}],
+            parameters=[{"inference_url": inference_url, "roi_radius_m": float(roi_radius)}],
             output="screen",
         )
     )
@@ -457,6 +458,12 @@ def generate_launch_description():
                 "inference_url",
                 default_value="http://127.0.0.1:5678",
                 description="Segmentation inference server URL.",
+            ),
+            DeclareLaunchArgument(
+                "roi_radius",
+                default_value="0.3",
+                description="ROI crop radius (m) for pre-inference point cloud filtering. "
+                            "Set <=0 to disable.",
             ),
             DeclareLaunchArgument(
                 "tf_diagnostics",

@@ -22,14 +22,12 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 RESULTS_DIR = os.path.join(SCRIPT_DIR, "results")
 FIGURES_DIR = os.path.join(SCRIPT_DIR, "figures")
 
-
 def _load_csv(path: str) -> list[dict]:
     """Load a CSV file into a list of dicts."""
     if not os.path.isfile(path):
         return []
     with open(path, newline="") as f:
         return list(csv.DictReader(f))
-
 
 # Project color palette
 COLORS = {
@@ -44,7 +42,6 @@ COLORS = {
     "text": "#2c3e50",         # Dark text
     "grid": "#bdc3c7",         # Light grid
 }
-
 
 def _save_fig(fig, name: str, fmt: str = "pdf", dpi: int = 150):
     """Save a matplotlib figure with project styling."""
@@ -64,225 +61,18 @@ def _save_fig(fig, name: str, fmt: str = "pdf", dpi: int = 150):
     print(f"  Saved: {path}")
     matplotlib.pyplot.close(fig)
 
-
 # ---------------------------------------------------------------------------
-# Figure 1: Latency box plot per object
 # ---------------------------------------------------------------------------
-
-def plot_latency_boxplot(latency_rows: list[dict], fmt: str, dpi: int):
-    """Per-object latency box plot with threshold lines."""
-    import matplotlib.pyplot as plt
-
-    if not latency_rows:
-        print("  SKIP: No latency data")
-        return
-
-    # Group by object
-    by_object = defaultdict(list)
-    for row in latency_rows:
-        by_object[row["object"]].append(float(row["pipeline_time_ms"]))
-
-    objects = sorted(by_object.keys())
-    data = [by_object[o] for o in objects]
-
-    fig, ax = plt.subplots(figsize=(max(8, len(objects) * 1.2), 5))
-    bp = ax.boxplot(data, tick_labels=objects, patch_artist=True, widths=0.6)
-
-    for patch in bp["boxes"]:
-        patch.set_facecolor(COLORS["primary"])
-        patch.set_alpha(0.6)
-    for median in bp["medians"]:
-        median.set_color(COLORS["text"])
-        median.set_linewidth(1.5)
-
-    ax.axhline(y=400, color=COLORS["negative"], linestyle="--", linewidth=1.5, label="MAR (400 ms)")
-    ax.axhline(y=100, color=COLORS["positive"], linestyle="--", linewidth=1.5, label="IDE (100 ms)")
-
-    ax.set_ylabel("Pipeline Latency (ms)")
-    ax.set_title("Test 1a: Pipeline Latency per Object", fontweight="bold")
-    ax.legend(loc="upper right")
-    ax.tick_params(axis="x", rotation=45)
-    ax.grid(axis="y", alpha=0.3, color=COLORS["grid"])
-
-    # Add mean annotations
-    for i, (obj, times) in enumerate(zip(objects, data)):
-        mean_t = np.mean(times)
-        ax.annotate(f"{mean_t:.0f}", xy=(i + 1, mean_t),
-                    fontsize=7, ha="center", va="bottom")
-
-    fig.tight_layout()
-    _save_fig(fig, "fig1_latency_boxplot", fmt, dpi)
-
-
 # ---------------------------------------------------------------------------
-# Figure 2: Latency summary bar chart
 # ---------------------------------------------------------------------------
-
-def plot_latency_summary(latency_rows: list[dict], fmt: str, dpi: int):
-    """Mean +/- std latency bar chart with P95/P99 annotations."""
-    import matplotlib.pyplot as plt
-
-    if not latency_rows:
-        print("  SKIP: No latency data")
-        return
-
-    by_object = defaultdict(list)
-    for row in latency_rows:
-        by_object[row["object"]].append(float(row["pipeline_time_ms"]))
-
-    objects = sorted(by_object.keys())
-    means = [np.mean(by_object[o]) for o in objects]
-    stds = [np.std(by_object[o]) for o in objects]
-    p95s = [np.percentile(by_object[o], 95) for o in objects]
-    p99s = [np.percentile(by_object[o], 99) for o in objects]
-
-    fig, ax = plt.subplots(figsize=(max(8, len(objects) * 1.2), 5))
-    x = np.arange(len(objects))
-    bars = ax.bar(x, means, yerr=stds, capsize=4, color=COLORS["primary"],
-                  edgecolor=COLORS["text"], linewidth=0.5, alpha=0.7)
-
-    # P95/P99 markers
-    ax.scatter(x, p95s, marker="_", color=COLORS["negative"], s=100, zorder=5, label="P95")
-    ax.scatter(x, p99s, marker="_", color=COLORS["warning"], s=100, zorder=5, label="P99")
-
-    ax.axhline(y=400, color=COLORS["negative"], linestyle="--", linewidth=1, alpha=0.7, label="MAR (400 ms)")
-    ax.axhline(y=100, color=COLORS["positive"], linestyle="--", linewidth=1, alpha=0.7, label="IDE (100 ms)")
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(objects, rotation=45, ha="right")
-    ax.set_ylabel("Pipeline Latency (ms)")
-    ax.set_title("Test 1a: Latency Summary (mean +/- std, P95/P99)", fontweight="bold")
-    ax.legend(loc="upper right", fontsize=8)
-    ax.grid(axis="y", alpha=0.3, color=COLORS["grid"])
-
-    # Annotate P95 values
-    for i, p95 in enumerate(p95s):
-        ax.annotate(f"{p95:.0f}", xy=(i, p95), fontsize=7,
-                    ha="center", va="bottom", color=COLORS["negative"])
-
-    fig.tight_layout()
-    _save_fig(fig, "fig2_latency_summary", fmt, dpi)
-
-
-# ---------------------------------------------------------------------------
-# Figure 3: Intent precision bar chart (updated: grasp type + wrist error)
-# ---------------------------------------------------------------------------
-
-def plot_intent_precision(summary_rows: list[dict], delta_rows: list[dict],
-                          fmt: str, dpi: int):
-    """Grouped bar chart: single-view vs. multi-view per object.
-
-    Panel 1: Grasp type accuracy (%) — primary metric
-    Panel 2: Mean wrist rotation error (degrees)
-    Panel 3: Mean position error (mm) — diagnostic
-    """
-    import matplotlib.pyplot as plt
-
-    if not summary_rows:
-        print("  SKIP: No intent precision data")
-        return
-
-    # Group by object
-    by_object = defaultdict(dict)
-    for row in summary_rows:
-        by_object[row["object"]][row["condition"]] = row
-
-    objects = sorted(by_object.keys())
-    objects_with_both = [o for o in objects
-                         if "single_view" in by_object[o] and "multi_view" in by_object[o]]
-
-    if not objects_with_both:
-        print("  SKIP: No objects with both single-view and multi-view data")
-        return
-
-    fig, axes = plt.subplots(1, 3, figsize=(max(12, len(objects_with_both) * 1.5), 5))
-
-    metrics = [
-        ("grasp_accuracy_pct", "Grasp Type Accuracy vs Baseline (%)"),
-        ("mean_orientation_error_deg", "Wrist Rotation Error (deg)"),
-        ("mean_position_error_mm", "Position Error (mm)"),
-    ]
-
-    x = np.arange(len(objects_with_both))
-    width = 0.35
-
-    for ax, (metric_key, metric_label) in zip(axes, metrics):
-        sv_vals = [float(by_object[o]["single_view"].get(metric_key, 0))
-                   for o in objects_with_both]
-        mv_vals = [float(by_object[o]["multi_view"].get(metric_key, 0))
-                   for o in objects_with_both]
-
-        ax.bar(x - width / 2, sv_vals, width, label="Single-view",
-               color=COLORS["single_view"], edgecolor=COLORS["text"], linewidth=0.3)
-        ax.bar(x + width / 2, mv_vals, width, label="Multi-view",
-               color=COLORS["multi_view"], edgecolor=COLORS["text"], linewidth=0.3)
-
-        ax.set_xticks(x)
-        ax.set_xticklabels([o.replace("_", "\n") for o in objects_with_both],
-                           fontsize=7, rotation=45, ha="right")
-        ax.set_ylabel(metric_label)
-        ax.legend(fontsize=7)
-        ax.set_title(metric_label)
-        ax.grid(axis="y", alpha=0.3, color=COLORS["grid"])
-
-    fig.suptitle("Test 1b: Intent Precision -- Single-view vs. Multi-view",
-                 fontsize=12, fontweight="bold", color=COLORS["text"])
-    fig.tight_layout()
-    _save_fig(fig, "fig3_intent_precision", fmt, dpi)
-
-
-# ---------------------------------------------------------------------------
-# Figure 4: Intent precision delta (grasp-type-only)
-# ---------------------------------------------------------------------------
-
-def plot_intent_delta(delta_rows: list[dict], fmt: str, dpi: int):
-    """Bar chart of delta (multi - single) grasp correctness per object."""
-    import matplotlib.pyplot as plt
-
-    if not delta_rows:
-        print("  SKIP: No delta data")
-        return
-
-    objects = [d["object"] for d in delta_rows]
-    # Use the primary metric: grasp accuracy vs baseline
-    deltas = [float(d.get("delta_grasp_accuracy_pct",
-                           d.get("delta_fully_correct_pct", 0))) for d in delta_rows]
-
-    fig, ax = plt.subplots(figsize=(max(8, len(objects) * 1.2), 5))
-    x = np.arange(len(objects))
-    colors = [COLORS["positive"] if d > 0 else COLORS["negative"] for d in deltas]
-    bars = ax.bar(x, deltas, color=colors, edgecolor=COLORS["text"], linewidth=0.5)
-
-    ax.axhline(y=0, color=COLORS["text"], linewidth=0.5)
-    ax.axhline(y=10, color=COLORS["positive"], linestyle="--", linewidth=1.5, label="IDE ($\\geq$10%)")
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(objects, rotation=45, ha="right")
-    ax.set_ylabel("$\\Delta$ Grasp Correct (%)")
-    ax.set_title("Test 1b: Intent Precision $\\Delta$ (Multi-view $-$ Single-view)",
-                 fontweight="bold")
-    ax.legend()
-    ax.grid(axis="y", alpha=0.3, color=COLORS["grid"])
-
-    # Annotate values
-    for i, d in enumerate(deltas):
-        ax.annotate(f"{d:+.1f}%", xy=(i, d), fontsize=8,
-                    ha="center", va="bottom" if d >= 0 else "top")
-
-    fig.tight_layout()
-    _save_fig(fig, "fig4_intent_delta", fmt, dpi)
-
-
 # ---------------------------------------------------------------------------
 # Figure 5: Cumulative wrist error CDF + grasp correctness
+# Figure 5: Cumulative wrist error CDF
 # ---------------------------------------------------------------------------
 
-def plot_wrist_error_cdf(occlusion_rows: list[dict], summary_rows: list[dict],
-                         fmt: str, dpi: int):
-    """Two-panel figure:
-      Left:  Cumulative distribution of wrist rotation errors (CDF)
-             for single-view vs. multi-view.
-      Right: Grasp type correctness rate per object (grouped bar).
+def plot_wrist_error_cdf(occlusion_rows: list[dict], fmt: str, dpi: int):
+    """Cumulative distribution of wrist rotation errors (CDF)
+    for single-view vs. multi-view.
     """
     import matplotlib.pyplot as plt
 
@@ -290,9 +80,8 @@ def plot_wrist_error_cdf(occlusion_rows: list[dict], summary_rows: list[dict],
         print("  SKIP: No occlusion data for CDF plot")
         return
 
-    # --- Left panel: CDF of wrist errors ---
-    fig, (ax_cdf, ax_bar) = plt.subplots(1, 2, figsize=(14, 5),
-                                          gridspec_kw={"width_ratios": [1, 1.2]})
+    # --- CDF of wrist errors ---
+    fig, ax = plt.subplots(figsize=(8, 5))
 
     for cond, color, label in [("single_view", COLORS["single_view"], "Single-view"),
                                 ("multi_view", COLORS["multi_view"], "Multi-view")]:
@@ -304,173 +93,31 @@ def plot_wrist_error_cdf(occlusion_rows: list[dict], summary_rows: list[dict],
             continue
         errors = np.sort(errors)
         cdf = np.arange(1, len(errors) + 1) / len(errors)
-        ax_cdf.plot(errors, cdf, color=color, linewidth=2, label=label)
+        ax.plot(errors, cdf, color=color, linewidth=2, label=label)
 
         # Annotate median and P90
         median = np.median(errors)
         p90 = np.percentile(errors, 90)
-        ax_cdf.axvline(median, color=color, linestyle=":", alpha=0.5, linewidth=1)
-        ax_cdf.annotate(f"median={median:.0f}°", xy=(median, 0.5),
-                        fontsize=7, color=color, ha="left", va="bottom",
-                        xytext=(5, 0), textcoords="offset points")
+        ax.axvline(median, color=color, linestyle=":", alpha=0.5, linewidth=1)
+        ax.annotate(f"median={median:.0f}°", xy=(median, 0.5),
+                    fontsize=7, color=color, ha="left", va="bottom",
+                    xytext=(5, 0), textcoords="offset points")
 
-    ax_cdf.set_xlabel("Wrist Rotation Error (deg)")
-    ax_cdf.set_ylabel("Cumulative Fraction")
-    ax_cdf.set_title("Wrist Rotation Error CDF", fontweight="bold")
-    ax_cdf.legend(loc="lower right")
-    ax_cdf.set_xlim(0, None)
-    ax_cdf.set_ylim(0, 1.05)
-    ax_cdf.grid(True, alpha=0.3, color=COLORS["grid"])
-
-    # --- Right panel: Grasp correctness per object ---
-    if summary_rows:
-        by_object = defaultdict(dict)
-        for row in summary_rows:
-            by_object[row["object"]][row["condition"]] = row
-
-        objects = sorted(by_object.keys())
-        objects_with_both = [o for o in objects
-                             if "single_view" in by_object[o]
-                             and "multi_view" in by_object[o]]
-
-        if objects_with_both:
-            x = np.arange(len(objects_with_both))
-            width = 0.35
-
-            sv_vals = [float(by_object[o]["single_view"].get("grasp_accuracy_pct",
-                        by_object[o]["single_view"].get("grasp_correct_pct", 0)))
-                       for o in objects_with_both]
-            mv_vals = [float(by_object[o]["multi_view"].get("grasp_accuracy_pct",
-                        by_object[o]["multi_view"].get("grasp_correct_pct", 0)))
-                       for o in objects_with_both]
-
-            ax_bar.bar(x - width / 2, sv_vals, width, label="Single-view",
-                       color=COLORS["single_view"], edgecolor=COLORS["text"], linewidth=0.3)
-            ax_bar.bar(x + width / 2, mv_vals, width, label="Multi-view",
-                       color=COLORS["multi_view"], edgecolor=COLORS["text"], linewidth=0.3)
-
-            ax_bar.set_xticks(x)
-            ax_bar.set_xticklabels([o.replace("_", "\n") for o in objects_with_both],
-                                   fontsize=6, rotation=45, ha="right")
-            ax_bar.set_ylabel("Grasp Type Correct (%)")
-            ax_bar.set_title("Grasp Type Correctness", fontweight="bold")
-            ax_bar.legend(fontsize=7)
-            ax_bar.set_ylim(0, 105)
-            ax_bar.grid(axis="y", alpha=0.3, color=COLORS["grid"])
-
-            # Annotate values
-            for i, (sv, mv) in enumerate(zip(sv_vals, mv_vals)):
-                ax_bar.annotate(f"{sv:.0f}", xy=(i - width / 2, sv), fontsize=6,
-                                ha="center", va="bottom")
-                ax_bar.annotate(f"{mv:.0f}", xy=(i + width / 2, mv), fontsize=6,
-                                ha="center", va="bottom")
-
-    fig.suptitle("Test 1b: Wrist Error Distribution & Grasp Correctness",
-                 fontsize=12, fontweight="bold", color=COLORS["text"])
-    fig.tight_layout()
-    _save_fig(fig, "fig5_wrist_cdf_grasp_correct", fmt, dpi)
-
-
-# ---------------------------------------------------------------------------
-# Figure 6: Pose error scatter
-# ---------------------------------------------------------------------------
-
-def plot_pose_error_scatter(occlusion_rows: list[dict], fmt: str, dpi: int):
-    """Scatter plot: position error vs. orientation error, colored by condition."""
-    import matplotlib.pyplot as plt
-
-    if not occlusion_rows:
-        print("  SKIP: No occlusion data")
-        return
-
-    fig, ax = plt.subplots(figsize=(7, 6))
-
-    for cond, color, marker in [("single_view", COLORS["single_view"], "o"),
-                                 ("multi_view", COLORS["multi_view"], "s")]:
-        rows = [r for r in occlusion_rows
-                if r.get("condition") == cond
-                and "position_error_mm" in r
-                and "orientation_error_deg" in r]
-        if not rows:
-            continue
-        pos_err = [float(r["position_error_mm"]) for r in rows]
-        orient_err = [float(r["orientation_error_deg"]) for r in rows]
-        ax.scatter(pos_err, orient_err, c=color, marker=marker,
-                   alpha=0.6, s=30, label=cond.replace("_", "-"))
-
-    ax.axvline(x=10, color=COLORS["grid"], linestyle=":", alpha=0.5, label="10 mm threshold")
-    ax.axhline(y=15, color=COLORS["grid"], linestyle="--", alpha=0.5, label="15 deg threshold")
-
-    ax.set_xlabel("Position Error (mm)")
-    ax.set_ylabel("Orientation Error (deg)")
-    ax.set_title("Test 1b: Pose Error -- Single-view vs. Multi-view", fontweight="bold")
-    ax.legend(fontsize=8)
+    ax.set_xlabel("Wrist Rotation Error (deg)")
+    ax.set_ylabel("Cumulative Fraction")
+    ax.set_title("Wrist Rotation Error CDF", fontweight="bold")
+    ax.legend(loc="lower right")
+    ax.set_xlim(0, None)
+    ax.set_ylim(0, 1.05)
     ax.grid(True, alpha=0.3, color=COLORS["grid"])
 
+    fig.suptitle("Test 1b: Wrist Rotation Error CDF",
+                 fontsize=12, fontweight="bold", color=COLORS["text"])
     fig.tight_layout()
-    _save_fig(fig, "fig6_pose_error_scatter", fmt, dpi)
-
+    _save_fig(fig, "fig5_wrist_error_cdf", fmt, dpi)
 
 # ---------------------------------------------------------------------------
-# Figure 7: Point cloud coverage comparison
 # ---------------------------------------------------------------------------
-
-def plot_cloud_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
-    """Bar chart showing % of full cloud visible in each condition."""
-    import matplotlib.pyplot as plt
-
-    if not occlusion_rows:
-        print("  SKIP: No occlusion data")
-        return
-
-    # Get per-object, per-condition cloud sizes
-    by_obj_cond = defaultdict(lambda: {"n_cloud": [], "n_full": []})
-    for row in occlusion_rows:
-        key = (row["object"], row["condition"])
-        by_obj_cond[key]["n_cloud"].append(int(row.get("n_cloud_points", 0)))
-        by_obj_cond[key]["n_full"].append(int(row.get("n_full_points", 1)))
-
-    objects = sorted(set(k[0] for k in by_obj_cond))
-    objects_with_both = [o for o in objects
-                         if (o, "single_view") in by_obj_cond
-                         and (o, "multi_view") in by_obj_cond]
-
-    if not objects_with_both:
-        print("  SKIP: No objects with both conditions")
-        return
-
-    sv_pct = []
-    mv_pct = []
-    for o in objects_with_both:
-        sv_data = by_obj_cond[(o, "single_view")]
-        mv_data = by_obj_cond[(o, "multi_view")]
-        sv_pct.append(np.mean(sv_data["n_cloud"]) / max(np.mean(sv_data["n_full"]), 1) * 100)
-        mv_pct.append(np.mean(mv_data["n_cloud"]) / max(np.mean(mv_data["n_full"]), 1) * 100)
-
-    fig, ax = plt.subplots(figsize=(max(8, len(objects_with_both) * 1.2), 5))
-    x = np.arange(len(objects_with_both))
-    width = 0.35
-
-    ax.bar(x - width / 2, sv_pct, width, label="Single-view", color=COLORS["single_view"])
-    ax.bar(x + width / 2, mv_pct, width, label="Multi-view", color=COLORS["multi_view"])
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(objects_with_both, rotation=45, ha="right")
-    ax.set_ylabel("Cloud Coverage (%)")
-    ax.set_title("Test 1b: Point Cloud Coverage by Condition", fontweight="bold")
-    ax.legend()
-    ax.grid(axis="y", alpha=0.3, color=COLORS["grid"])
-
-    for i, (sv, mv) in enumerate(zip(sv_pct, mv_pct)):
-        ax.annotate(f"{sv:.0f}%", xy=(i - width / 2, sv), fontsize=7,
-                    ha="center", va="bottom")
-        ax.annotate(f"{mv:.0f}%", xy=(i + width / 2, mv), fontsize=7,
-                    ha="center", va="bottom")
-
-    fig.tight_layout()
-    _save_fig(fig, "fig7_cloud_coverage", fmt, dpi)
-
-
 # ---------------------------------------------------------------------------
 # Figure 7b: Convexity-based analysis
 # ---------------------------------------------------------------------------
@@ -564,7 +211,6 @@ def plot_convexity_analysis(delta_rows: list[dict], summary_rows: list[dict],
                  fontsize=12, fontweight="bold", color=COLORS["text"])
     fig.tight_layout()
     _save_fig(fig, "fig7b_convexity_analysis", fmt, dpi)
-
 
 # ---------------------------------------------------------------------------
 # Figure 7c: Per-view point cloud coverage comparison
@@ -670,17 +316,10 @@ def plot_per_view_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
     ax1 = fig.add_subplot(2, 2, 1, projection="3d", facecolor=COLORS["panel_bg"])
     ax1.scatter(full[:, 0], full[:, 1], full[:, 2],
                 c=cmap[colors], s=0.3, depthshade=True)
-    for label, cf in [("Head", cam_frames[0]), ("Wrist", cam_frames[1])]:
-        p = cf["position"]
-        clr = "#e74c3c" if label == "Head" else "#2c3e50"
-        ax1.scatter(*p, c=clr, s=80, marker="^", label=label, zorder=10)
-        fwd = cf["forward"] * 0.15
-        ax1.quiver(*p, *fwd, color=clr, arrow_length_ratio=0.15, linewidth=2)
     ax1.set_title(f"Combined — {obj_name}\n"
                   f"Head-only: {n_head_only}  Wrist-only: {n_wrist_only}  "
                   f"Both: {n_both}  Unseen: {n_neither}",
                   fontsize=9, fontweight="bold")
-    ax1.legend(fontsize=7, loc="upper right")
     ax1.view_init(elev=25, azim=-55)
     _set_equal_axes(ax1)
 
@@ -728,20 +367,30 @@ def plot_per_view_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
     ax4.view_init(elev=25, azim=-55)
     _set_equal_axes(ax4)
 
+    # Add shared colour legend at the bottom of the figure
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor=cmap[1], label='Head camera only'),
+        Patch(facecolor=cmap[2], label='Wrist camera only'),
+        Patch(facecolor=cmap[3], label='Both cameras'),
+        Patch(facecolor=cmap[4], label='Unseen'),
+    ]
+    fig.legend(handles=legend_elements, loc='lower center', ncol=4, fontsize=9,
+               framealpha=0.9, edgecolor='#cccccc')
+
     fig.suptitle(f"Per-View Point Cloud Coverage: {obj_name.replace('_', ' ').title()}",
                  fontsize=12, fontweight="bold", color=COLORS["text"])
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0.06, 1, 0.95])
     _save_fig(fig, "fig7c_per_view_coverage", fmt, dpi)
-
 
 # ---------------------------------------------------------------------------
 # Figure 7d-bench: Benchmark comparison (baseline vs SV vs MV per object)
 # ---------------------------------------------------------------------------
 
 def plot_benchmark_comparison(occlusion_rows: list[dict], summary_rows: list[dict], fmt: str, dpi: int):
-    """Violin plot: baseline vs single-view vs multi-view score distributions per object.
+    """Box plot: baseline vs single-view vs multi-view score distributions per object.
 
-    Shows the full score distribution for each condition as violin plots, with
+    Shows the full score distribution for each condition as box plots, with
     median markers and quartile ranges. Baseline uses all individual repetitions
     from baseline_all_scores.csv for a fair distribution comparison.
     """
@@ -795,11 +444,11 @@ def plot_benchmark_comparison(occlusion_rows: list[dict], summary_rows: list[dic
     fig.patch.set_facecolor(COLORS["bg"])
     ax.set_facecolor(COLORS["panel_bg"])
 
-    # Build violin data: for each object, 3 violins (BL, SV, MV)
-    positions = []
-    violin_data = []
-    colors = []
-    labels_added = {'Baseline': False, 'Single-view': False, 'Multi-view': False}
+    # Build boxplot data: for each object, 3 boxes (BL, SV, MV)
+    box_data = []  # list of (position, [scores], color)
+    box_positions = []
+    box_scores = []
+    box_colors = []
 
     for i, obj in enumerate(plot_objects):
         for j, (data, color, label) in enumerate([
@@ -808,46 +457,35 @@ def plot_benchmark_comparison(occlusion_rows: list[dict], summary_rows: list[dic
             (mv_data[obj], '#55a868', 'Multi-view (head+wrist)'),
         ]):
             pos = i * 4 + j
-            positions.append(pos)
-            violin_data.append(data)
-            colors.append(color)
+            box_positions.append(pos)
+            box_scores.append(data)
+            box_colors.append(color)
 
-    parts = ax.violinplot(violin_data, positions=positions, widths=2.8,
-                          showmeans=False, showmedians=False, showextrema=False)
+    bp = ax.boxplot(box_scores, positions=box_positions, widths=2.4,
+                    patch_artist=True, showfliers=False,
+                    medianprops=dict(color='black', linewidth=1.5),
+                    whiskerprops=dict(linewidth=0.8),
+                    capprops=dict(linewidth=0.8),
+                    boxprops=dict(linewidth=0.8))
 
-    # Style each violin
-    for i, pc in enumerate(parts['bodies']):
-        obj_idx = i // 3
-        cond_idx = i % 3
-        pc.set_facecolor(colors[i])
-        pc.set_edgecolor('white')
-        pc.set_linewidth(0.5)
-        pc.set_alpha(0.7)
-
-    # Add median markers and quartile whiskers
-    for i, data in enumerate(violin_data):
-        if not data:
-            continue
-        med = np.median(data)
-        q25 = np.percentile(data, 25)
-        q75 = np.percentile(data, 75)
-        # Median dot
-        ax.scatter(positions[i], med, s=30, color=colors[i], edgecolors='black',
-                   linewidth=0.5, zorder=5)
-        # Quartile whisker
-        ax.vlines(positions[i], q25, q75, color='black', linewidth=1, zorder=4)
+    for i, patch in enumerate(bp['boxes']):
+        patch.set_facecolor(box_colors[i])
+        patch.set_alpha(0.7)
+        patch.set_edgecolor('white')
+        patch.set_linewidth(0.5)
 
     # Annotate convexity with colored dots below x-axis
     for i, obj in enumerate(plot_objects):
         c = get_convexity(obj)
         color = '#aaaaaa' if c == 'convex' else '#e6550d'
-        ax.plot(i * 4 + 1, -0.02, 'o', color=color, markersize=5, clip_on=False,
+        ax.plot(i * 4 + 1, -0.08, 'o', color=color, markersize=5, clip_on=False,
                 transform=ax.get_xaxis_transform())
 
     # X-axis labels (centered on each object group)
     ax.set_xticks([i * 4 + 1 for i in range(n)])
     ax.set_xticklabels([o.replace('_', '\n') for o in plot_objects],
                        fontsize=7, rotation=0, ha='center')
+    ax.tick_params(axis='x', pad=15)
     ax.set_ylabel('Combined Score', fontsize=10)
 
     # Legend
@@ -876,84 +514,6 @@ def plot_benchmark_comparison(occlusion_rows: list[dict], summary_rows: list[dic
     plt.close(fig)
     print(f"  [OK] {os.path.basename(path)}")
 
-
-# Figure 7d: Score distribution comparison (SV vs MV per object)
-# ---------------------------------------------------------------------------
-
-def plot_score_distribution(occlusion_rows: list[dict], fmt: str, dpi: int):
-    """Score distribution histograms: single-view vs multi-view per object.
-
-    Uses kernel density estimates over 100 trials to show whether the
-    multi-view condition shifts the combined_score distribution upward.
-    """
-    import matplotlib.pyplot as plt
-
-    if not occlusion_rows:
-        print("  SKIP: No occlusion data")
-        return
-
-    # Group scores by object and condition
-    from collections import defaultdict
-    scores = defaultdict(lambda: {"single_view": [], "multi_view": []})
-    for row in occlusion_rows:
-        obj = row["object"]
-        cond = row["condition"]
-        sc = float(row.get("combined_score", 0))
-        scores[obj][cond].append(sc)
-
-    objects = sorted(k for k in scores
-                     if scores[k]["single_view"] and scores[k]["multi_view"])
-
-    n = len(objects)
-    ncols = min(4, n)
-    nrows = (n + ncols - 1) // ncols
-    fig, axes = plt.subplots(nrows, ncols,
-                             figsize=(ncols * 3.5, nrows * 3),
-                             squeeze=False)
-
-    for ax_idx, obj in enumerate(objects):
-        ax = axes[ax_idx // ncols][ax_idx % ncols]
-        sv_scores = scores[obj]["single_view"]
-        mv_scores = scores[obj]["multi_view"]
-
-        # Compute histogram bins covering union range
-        all_scores = np.array(sv_scores + mv_scores)
-        bins = np.linspace(min(all_scores), max(all_scores) + 1e-6, 20)
-
-        ax.hist(sv_scores, bins=bins, alpha=0.5, density=True,
-                color=COLORS["single_view"], label=f"SV (n={len(sv_scores)})")
-        ax.hist(mv_scores, bins=bins, alpha=0.5, density=True,
-                color=COLORS["multi_view"], label=f"MV (n={len(mv_scores)})")
-
-        # Vertical lines for means
-        sv_mean = np.mean(sv_scores)
-        mv_mean = np.mean(mv_scores)
-        ax.axvline(sv_mean, color=COLORS["single_view"], linestyle="--", linewidth=1.5)
-        ax.axvline(mv_mean, color=COLORS["multi_view"], linestyle="--", linewidth=1.5)
-
-        # Delta annotation
-        delta_mean = mv_mean - sv_mean
-        color = COLORS["positive"] if delta_mean > 0 else COLORS["negative"]
-        ax.set_title(f"{obj}\n$\\Delta$={delta_mean:+.3f}",
-                     fontsize=9, fontweight="bold", color=color)
-        ax.set_xlabel("Combined Score", fontsize=7)
-        ax.set_ylabel("Density", fontsize=7)
-        ax.tick_params(labelsize=7)
-        ax.grid(alpha=0.2, color=COLORS["grid"])
-
-        if ax_idx == 0:
-            ax.legend(fontsize=6, loc="upper left")
-
-    # Hide unused subplots
-    for ax_idx in range(len(objects), nrows * ncols):
-        axes[ax_idx // ncols][ax_idx % ncols].set_visible(False)
-
-    fig.suptitle("Test 1b: Combined Score Distribution — Single-view vs. Multi-view",
-                 fontsize=11, fontweight="bold", color=COLORS["text"])
-    fig.tight_layout()
-    _save_fig(fig, "fig7d_score_distribution", fmt, dpi)
-
-
 # ---------------------------------------------------------------------------
 # Figure 7e: Best score by grasp type (SV vs MV)
 # ---------------------------------------------------------------------------
@@ -978,6 +538,8 @@ def plot_best_score_by_type(occlusion_rows: list[dict], fmt: str, dpi: int):
         obj = row["object"]
         cond = row["condition"]
         gtype = row["grasp_type_name"]
+        if gtype.lower() in ("unknown", ""):
+            continue
         sc = float(row.get("combined_score", 0))
         data[obj][cond][gtype].append(sc)
 
@@ -1055,7 +617,6 @@ def plot_best_score_by_type(occlusion_rows: list[dict], fmt: str, dpi: int):
                  fontsize=10, fontweight="bold", color=COLORS["text"])
     fig.tight_layout()
     _save_fig(fig, "fig7e_best_score_by_type", fmt, dpi)
-
 
 # ---------------------------------------------------------------------------
 # Figure 7f: Score vs wrist angle scatter (by condition, per object)
@@ -1142,106 +703,7 @@ def plot_score_vs_wrist_angle(occlusion_rows: list[dict], fmt: str, dpi: int):
     fig.tight_layout()
     _save_fig(fig, "fig7f_score_vs_wrist_angle", fmt, dpi)
 
-
 # ---------------------------------------------------------------------------
-# Figure 8: Tier A vs Tier B latency comparison
-# ---------------------------------------------------------------------------
-
-def plot_tier_ab_latency(tier_a_rows: list[dict], tier_b_rows: list[dict],
-                         fmt: str, dpi: int):
-    """Grouped bar chart comparing Tier A (grasp planning) and Tier B (full pipeline) latency.
-
-    Tier B rows may contain multiple methods (emg, service). If both are present,
-    only the EMG method is used for the primary comparison. Otherwise the available
-    method is used.
-    """
-    import matplotlib.pyplot as plt
-
-    if not tier_a_rows and not tier_b_rows:
-        print("  SKIP: No latency data for Tier A/B comparison")
-        return
-
-    # Collect Tier A means per object
-    by_object_a = defaultdict(list)
-    for row in tier_a_rows:
-        by_object_a[row["object"]].append(float(row["pipeline_time_ms"]))
-
-    # Collect Tier B means per object (prefer EMG method, fall back to service)
-    by_object_b = defaultdict(list)
-    for row in tier_b_rows:
-        t = row.get("total_latency_ms", "")
-        status = row.get("status", "")
-        if not t or t == "nan" or status in ("not_implemented", "timeout", "no_service"):
-            continue
-        # If method column exists, prefer emg; otherwise include all
-        method = row.get("method", "")
-        if method == "emg":
-            by_object_b[row["object"]].append(("emg", float(t)))
-        elif method == "service":
-            by_object_b[row["object"]].append(("service", float(t)))
-        else:
-            by_object_b[row["object"]].append(("unknown", float(t)))
-
-    # For each object, pick the best method (prefer emg)
-    by_object_b_means = {}
-    for obj, entries in by_object_b.items():
-        emg_vals = [v for m, v in entries if m == "emg"]
-        svc_vals = [v for m, v in entries if m == "service"]
-        if emg_vals:
-            by_object_b_means[obj] = np.mean(emg_vals)
-        elif svc_vals:
-            by_object_b_means[obj] = np.mean(svc_vals)
-        else:
-            by_object_b_means[obj] = np.mean([v for _, v in entries])
-
-    # Use union of objects
-    all_objects = sorted(set(by_object_a.keys()) | set(by_object_b_means.keys()))
-    if not all_objects:
-        return
-
-    tier_a_means = [np.mean(by_object_a[o]) if o in by_object_a else 0 for o in all_objects]
-    tier_b_means = [by_object_b_means.get(o, 0) for o in all_objects]
-    has_a = [o in by_object_a for o in all_objects]
-    has_b = [o in by_object_b_means for o in all_objects]
-
-    fig, ax = plt.subplots(figsize=(max(8, len(all_objects) * 1.2), 5))
-    x = np.arange(len(all_objects))
-    width = 0.35
-
-    bars_a = ax.bar(x - width / 2, tier_a_means, width, label="Tier A (Grasp Planning)",
-                    color=COLORS["primary"], edgecolor=COLORS["text"], linewidth=0.3)
-    bars_b = ax.bar(x + width / 2, tier_b_means, width, label="Tier B (Full Pipeline)",
-                    color=COLORS["warning"], edgecolor=COLORS["text"], linewidth=0.3)
-
-    # Dim bars where data is missing
-    for i, (bar, has) in enumerate(zip(bars_a, has_a)):
-        if not has:
-            bar.set_alpha(0.2)
-    for i, (bar, has) in enumerate(zip(bars_b, has_b)):
-        if not has:
-            bar.set_alpha(0.2)
-
-    ax.axhline(y=400, color=COLORS["negative"], linestyle="--", linewidth=1.5, label="MAR (400 ms)")
-    ax.axhline(y=100, color=COLORS["positive"], linestyle="--", linewidth=1.5, label="IDE (100 ms)")
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(all_objects, rotation=45, ha="right")
-    ax.set_ylabel("Latency (ms)")
-    ax.set_title("Test 1: Tier A vs. Tier B Latency Comparison", fontweight="bold")
-    ax.legend(fontsize=8)
-    ax.grid(axis="y", alpha=0.3, color=COLORS["grid"])
-
-    # Annotate overhead where both tiers have data
-    for i, o in enumerate(all_objects):
-        if has_a[i] and has_b[i]:
-            overhead = tier_b_means[i] - tier_a_means[i]
-            ax.annotate(f"+{overhead:.0f}", xy=(i, tier_b_means[i]),
-                        fontsize=7, ha="center", va="bottom", color=COLORS["warning"])
-
-    fig.tight_layout()
-    _save_fig(fig, "fig8_tier_ab_latency", fmt, dpi)
-
-
 # ---------------------------------------------------------------------------
 # LaTeX table fragment
 # ---------------------------------------------------------------------------
@@ -1345,7 +807,6 @@ def generate_latex_table(latency_rows: list[dict], delta_rows: list[dict],
     with open(path, "w") as f:
         f.write("\n".join(lines))
     print(f"  Saved: {path}")
-
 
 # ---------------------------------------------------------------------------
 # Figure 9: 3D Synthetic Setup Visualization
@@ -1540,89 +1001,6 @@ def plot_synthetic_setup(fmt: str, dpi: int):
     _save_fig(fig, "fig9_synthetic_setup_3d", fmt, dpi)
 
 # ---------------------------------------------------------------------------
-# Figure 10: Per-stage latency stacked bar chart
-# ---------------------------------------------------------------------------
-
-def plot_per_stage_latency(fmt: str = "pdf", dpi: int = 150):
-    """Stacked bar chart showing latency breakdown by pipeline stage."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    import matplotlib.ticker as mticker
-
-    rows = _load_csv(os.path.join(RESULTS_DIR, "latency_per_stage_results.csv"))
-    if not rows:
-        print("  Skipping per-stage latency figure (no data)")
-        return
-
-    stage_fields = [
-        ("pipeline_manager_ms", "Pipeline Manager", "#3498db"),
-        ("twist_propagation_ms", "Twist Propagation", "#2ecc71"),
-        ("segmentation_ms", "Segmentation", "#e67e22"),
-        ("pm_cloud_handling_ms", "PM Cloud Handling", "#9b59b6"),
-        ("preshaping_ms", "Grasp Preshaping", "#e74c3c"),
-    ]
-
-    # Compute mean per object per stage
-    from collections import defaultdict
-    import numpy as np
-
-    groups = defaultdict(list)
-    for r in rows:
-        if r.get("status") == "ok":
-            groups[r["object"]].append(r)
-
-    objects = sorted(groups.keys())
-    if not objects:
-        return
-
-    stage_means = {}
-    for field, label, _ in stage_fields:
-        stage_means[label] = []
-        for obj in objects:
-            values = [float(r[field]) for r in groups[obj]
-                      if r.get(field) and r[field] != "nan"
-                      and not _is_nan(r[field])]
-            stage_means[label].append(np.mean(values) if values else 0)
-
-    # Plot stacked bars
-    fig, ax = plt.subplots(figsize=(max(8, len(objects) * 1.2), 5))
-    x = np.arange(len(objects))
-    width = 0.6
-    bottom = np.zeros(len(objects))
-
-    for field, label, color in stage_fields:
-        values = stage_means[label]
-        ax.bar(x, values, width, bottom=bottom, label=label, color=color)
-        bottom += np.array(values)
-
-    # MAR threshold line
-    ax.axhline(y=400, color=COLORS["negative"], linestyle="--", linewidth=1.5,
-               label="MAR (400 ms)")
-    ax.axhline(y=100, color=COLORS["warning"], linestyle=":", linewidth=1.0,
-               label="IDE (100 ms)")
-
-    ax.set_xlabel("Object")
-    ax.set_ylabel("Latency (ms)")
-    ax.set_title("Per-Stage Pipeline Latency Breakdown")
-    ax.set_xticks(x)
-    ax.set_xticklabels(objects, rotation=45, ha="right", fontsize=8)
-    ax.legend(loc="upper right", fontsize=7)
-    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.0f"))
-
-    _save_fig(fig, "fig10_per_stage_latency", fmt, dpi)
-
-
-def _is_nan(val) -> bool:
-    """Check if a CSV value represents NaN."""
-    if val is None:
-        return True
-    try:
-        return str(val).lower() == "nan" or float(val) != float(val)
-    except (ValueError, TypeError):
-        return True
-
-
 # ---------------------------------------------------------------------------
 # Figure 11: Per-stage latency waterfall chart
 # ---------------------------------------------------------------------------
@@ -1644,11 +1022,16 @@ def plot_per_stage_waterfall(fmt: str = "pdf", dpi: int = 150):
     if not ok_rows:
         return
 
+    # Combine Pipeline Manager + PM Cloud Handling into "ROS Overhead"
+    for r in ok_rows:
+        pm = float(r.get("pipeline_manager_ms", 0) or 0)
+        pc = float(r.get("pm_cloud_handling_ms", 0) or 0)
+        r["ros_overhead_ms"] = pm + pc
+
     stage_fields = [
-        ("pipeline_manager_ms", "Pipeline Manager", "#3498db"),
+        ("ros_overhead_ms", "ROS Overhead", "#3498db"),
         ("twist_propagation_ms", "Twist Propagation", "#2ecc71"),
         ("segmentation_ms", "Segmentation", "#e67e22"),
-        ("pm_cloud_handling_ms", "PM Cloud Handling", "#9b59b6"),
         ("preshaping_ms", "Grasp Preshaping", "#e74c3c"),
     ]
 
@@ -1688,15 +1071,219 @@ def plot_per_stage_waterfall(fmt: str = "pdf", dpi: int = 150):
     ax.set_title("Pipeline Latency Waterfall (Mean Across All Objects)")
     ax.legend(loc="upper left", fontsize=8)
 
+    # Rotate x-axis labels to prevent overlap
+    for label in ax.get_xticklabels():
+        label.set_ha('center')
+        label.set_rotation(25)
+
     _save_fig(fig, "fig11_latency_waterfall", fmt, dpi)
 
+# ---------------------------------------------------------------------------
+# Figure 12: Object Gallery (with superquadric estimation overlays)
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Figure 12: Object Gallery
-# ---------------------------------------------------------------------------
+# Cached debug dumps for SQ lookups (lazy-loaded on first gallery render).
+_SQ_CACHE: dict | None = None
+
+def _load_sq_cache() -> dict:
+    """Scan known debug-dump directories and return {object_name_or_idx: sq_params}.
+
+    The debug dumps don't embed the object name directly, so we match by
+    point-cloud centroid + extent to gallery objects loaded later.
+    """
+    global _SQ_CACHE
+    if _SQ_CACHE is not None:
+        return _SQ_CACHE
+
+    _SQ_CACHE = {}
+    search_dirs = [
+        os.path.join(SCRIPT_DIR, "results", "debug_dumps"),
+        os.path.join(SCRIPT_DIR, "..", "..", "src", "grasp_preshaping", "data", "debug"),
+    ]
+
+    for sdir in search_dirs:
+        if not os.path.isdir(sdir):
+            continue
+        for fname in sorted(os.listdir(sdir)):
+            if not fname.endswith(".npz"):
+                continue
+            path = os.path.join(sdir, fname)
+            try:
+                data = np.load(path, allow_pickle=True)
+                if "sq_params" not in data:
+                    continue
+                sq_raw = data["sq_params"]
+                if len(sq_raw) != 14:
+                    continue
+
+                sq = {
+                    "epsilon1": max(float(sq_raw[0]), 1e-3),
+                    "epsilon2": max(float(sq_raw[1]), 1e-3),
+                    "a": float(sq_raw[2]),
+                    "b": float(sq_raw[3]),
+                    "c": float(sq_raw[4]),
+                    "translation": sq_raw[5:8].astype(np.float64),
+                    "rotation": sq_raw[8:14].reshape(2, 3).astype(np.float64),
+                }
+
+                # Also store the point cloud centroid for matching
+                if "point_cloud" in data:
+                    pc_raw = data["point_cloud"]
+                    pc_centroid = np.mean(pc_raw.reshape(-1, 3), axis=0)
+                else:
+                    pc_centroid = None
+
+                _SQ_CACHE[fname] = {"sq": sq, "centroid": pc_centroid, "path": path}
+            except Exception:
+                continue
+
+    return _SQ_CACHE
+
+def _generate_sq_surface(sq_params: dict, n_eta: int = 24, n_omega: int = 24):
+    """Generate a superquadric surface mesh from fitted parameters.
+
+    Returns:
+        (x, y, z) arrays in metres suitable for ax.plot_wireframe().
+    """
+    e1 = sq_params["epsilon1"]
+    e2 = sq_params["epsilon2"]
+    a, b, c = sq_params["a"], sq_params["b"], sq_params["c"]
+    translation = sq_params["translation"]
+    rot_flat = sq_params["rotation"]
+
+    eta = np.linspace(-np.pi / 2, np.pi / 2, n_eta)
+    omega = np.linspace(-np.pi, np.pi, n_omega)
+    E, O = np.meshgrid(eta, omega)
+
+    # Parametric superquadric (local frame)
+    cosE = np.cos(E)
+    sinE = np.sin(E)
+    cosO = np.cos(O)
+    sinO = np.sin(O)
+
+    sgn_cosE = np.sign(cosE)
+    sgn_sinE = np.sign(sinE)
+    sgn_cosO = np.sign(cosO)
+    sgn_sinO = np.sign(sinO)
+
+    abs_cosE = np.abs(cosE)
+    abs_sinE = np.abs(sinE)
+
+    x_local = a * sgn_cosE * (abs_cosE ** e1) * sgn_cosO * (np.abs(cosO) ** e2)
+    y_local = b * sgn_cosE * (abs_cosE ** e1) * sgn_sinO * (np.abs(sinO) ** e2)
+    z_local = c * sgn_sinE * (abs_sinE ** e1)
+
+    # Build rotation matrix from first two rows (third = cross product)
+    rot = np.eye(3)
+    rot[0, :] = rot_flat[0]
+    rot[1, :] = rot_flat[1]
+    rot[2, :] = np.cross(rot_flat[0], rot_flat[1])
+    # Ensure orthonormal
+    rot[2, :] = np.cross(rot[0, :], rot[1, :])
+    norm = np.linalg.norm(rot[2, :])
+    if norm > 0:
+        rot[2, :] /= norm
+
+    shape = x_local.shape
+    pts_local = np.stack([x_local.ravel(), y_local.ravel(), z_local.ravel()], axis=0)  # (3, N)
+    pts_world = rot @ pts_local + translation.reshape(3, 1)
+
+    return (
+        pts_world[0].reshape(shape),
+        pts_world[1].reshape(shape),
+        pts_world[2].reshape(shape),
+    )
+
+def _find_sq_for_object(obj_name: str, pts: np.ndarray) -> dict | None:
+    """Try to find SQ parameters matching this gallery object.
+
+    Matches by point-cloud centroid against cached debug dumps.
+    Returns sq_params dict or None.
+    """
+    cache = _load_sq_cache()
+    if not cache:
+        return None
+
+    obj_centroid = np.mean(pts, axis=0)
+
+    best_match = None
+    best_dist = float("inf")
+    for key, entry in cache.items():
+        if entry["centroid"] is None:
+            continue
+        dist = np.linalg.norm(entry["centroid"] - obj_centroid)
+        if dist < best_dist and dist < 0.3:  # within 30cm
+            best_dist = dist
+            best_match = entry["sq"]
+
+    return best_match
+
+def _draw_obb_wireframe(ax, pts_cm: np.ndarray, color: str = "#c0392b", alpha: float = 0.4):
+    """Draw an oriented bounding box (OBB) wireframe from PCA of the point cloud.
+
+    Args:
+        ax: 3D matplotlib axis.
+        pts_cm: (N, 3) point cloud already in cm.
+        color: Wireframe colour.
+        alpha: Transparency.
+    """
+    if len(pts_cm) < 4:
+        return
+
+    # PCA to find principal axes
+    mean = np.mean(pts_cm, axis=0)
+    centered = pts_cm - mean
+    cov = np.cov(centered.T)
+    try:
+        eigenvalues, eigenvectors = np.linalg.eigh(cov)
+    except np.linalg.LinAlgError:
+        return
+
+    # Sort by eigenvalue descending
+    idx = np.argsort(eigenvalues)[::-1]
+    eigenvectors = eigenvectors[:, idx]
+
+    # Project points onto principal axes to find extents
+    proj = centered @ eigenvectors
+    mins = np.min(proj, axis=0)
+    maxs = np.max(proj, axis=0)
+
+    # 8 corners of the OBB
+    corners_local = np.array([
+        [mins[0], mins[1], mins[2]],
+        [maxs[0], mins[1], mins[2]],
+        [maxs[0], maxs[1], mins[2]],
+        [mins[0], maxs[1], mins[2]],
+        [mins[0], mins[1], maxs[2]],
+        [maxs[0], mins[1], maxs[2]],
+        [maxs[0], maxs[1], maxs[2]],
+        [mins[0], maxs[1], maxs[2]],
+    ])
+
+    corners_world = corners_local @ eigenvectors.T + mean
+
+    # 12 edges of the box
+    edges = [
+        (0, 1), (1, 2), (2, 3), (3, 0),  # bottom face
+        (4, 5), (5, 6), (6, 7), (7, 4),  # top face
+        (0, 4), (1, 5), (2, 6), (3, 7),  # vertical edges
+    ]
+
+    for i, j in edges:
+        ax.plot(
+            [corners_world[i, 0], corners_world[j, 0]],
+            [corners_world[i, 1], corners_world[j, 1]],
+            [corners_world[i, 2], corners_world[j, 2]],
+            color=color, linewidth=0.5, alpha=alpha,
+        )
 
 def plot_object_gallery(fmt: str, dpi: int):
-    """Show all 13 test objects as 3D point clouds in a grid, colored by convexity."""
+    """Show all test objects as 3D point clouds in a grid, coloured by convexity.
+
+    Overlays superquadric (SQ) wireframe meshes where debug-dump data is
+    available, falling back to an oriented bounding box (OBB) wireframe
+    computed via PCA.
+    """
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
@@ -1714,6 +1301,9 @@ def plot_object_gallery(fmt: str, dpi: int):
 
     convex_color = COLORS["primary"]
     nonconvex_color = COLORS["warning"]
+    sq_wire_color = COLORS["negative"]
+    obb_wire_color = "#8e44ad"  # purple for fallback OBB
+    sq_found_count = 0
 
     for idx, ax in enumerate(axes.flat):
         if idx < n_obj:
@@ -1725,11 +1315,30 @@ def plot_object_gallery(fmt: str, dpi: int):
                 continue
 
             pts = obj["points"]
+            pts_cm = pts * 100  # convert to cm for display
             c = get_convexity(obj_name)
             color = convex_color if c == "convex" else nonconvex_color
 
-            ax.scatter(pts[:, 0] * 100, pts[:, 1] * 100, pts[:, 2] * 100,
+            ax.scatter(pts_cm[:, 0], pts_cm[:, 1], pts_cm[:, 2],
                        c=color, s=0.3, alpha=0.5, depthshade=True)
+
+            # --- SQ / OBB overlay ---
+            sq = _find_sq_for_object(obj_name, pts)
+            if sq is not None:
+                # Superquadric wireframe from fitted params
+                try:
+                    xs, ys, zs = _generate_sq_surface(sq)
+                    ax.plot_wireframe(
+                        xs * 100, ys * 100, zs * 100,
+                        color=sq_wire_color, alpha=0.35, linewidth=0.4,
+                        rstride=2, cstride=2,
+                    )
+                    sq_found_count += 1
+                except Exception:
+                    _draw_obb_wireframe(ax, pts_cm, color=obb_wire_color, alpha=0.3)
+            else:
+                # Fallback: oriented bounding box from PCA
+                _draw_obb_wireframe(ax, pts_cm, color=obb_wire_color, alpha=0.3)
 
             # Equal axis scaling
             ranges = np.array([
@@ -1761,6 +1370,13 @@ def plot_object_gallery(fmt: str, dpi: int):
         else:
             ax.axis("off")
 
+    # Summary line
+    if sq_found_count > 0:
+        print(f"  [SQ]  {sq_found_count}/{n_obj} objects matched debug-dump SQ params")
+    else:
+        print(f"  [OBB] No SQ debug dumps matched — showing PCA bounding boxes "
+              f"(run 'python run.py --debug' to generate SQ data)")
+
     # Legend
     from matplotlib.lines import Line2D
     legend_elements = [
@@ -1769,14 +1385,18 @@ def plot_object_gallery(fmt: str, dpi: int):
         Line2D([0], [0], marker='o', color='w', markerfacecolor=nonconvex_color,
                markersize=10, label='Non-convex'),
     ]
-    fig.legend(handles=legend_elements, loc='lower center', ncol=2,
+    if sq_found_count > 0:
+        legend_elements.append(
+            Line2D([0], [0], color=sq_wire_color, linewidth=1.5, label='SQ fit'))
+    legend_elements.append(
+        Line2D([0], [0], color=obb_wire_color, linewidth=1.5, label='OBB (PCA)'))
+    fig.legend(handles=legend_elements, loc='lower center', ncol=len(legend_elements),
                fontsize=11, frameon=False)
 
     fig.suptitle("Test 1 Object Gallery", fontsize=14, color=COLORS["text"],
                  fontweight="bold", y=0.98)
     fig.tight_layout(rect=[0, 0.03, 1, 0.96])
     _save_fig(fig, "fig12_object_gallery", fmt, dpi)
-
 
 # ---------------------------------------------------------------------------
 # Figure 13: Score vs Samples Sweep
@@ -1875,7 +1495,6 @@ def plot_score_vs_samples(fmt: str, dpi: int):
     fig.tight_layout()
     _save_fig(fig, "fig13_score_vs_samples", fmt, dpi)
 
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1895,35 +1514,22 @@ def main():
     occlusion_rows = _load_csv(os.path.join(RESULTS_DIR, "occlusion_results.csv"))
     summary_rows = _load_csv(os.path.join(RESULTS_DIR, "intent_precision_summary.csv"))
     delta_rows = _load_csv(os.path.join(RESULTS_DIR, "intent_precision_delta.csv"))
-    tier_b_rows = _load_csv(os.path.join(RESULTS_DIR, "tier_b_latency_results.csv"))
-    per_stage_rows = _load_csv(os.path.join(RESULTS_DIR, "latency_per_stage_results.csv"))
 
     print(f"  Latency rows: {len(latency_rows)}")
     print(f"  Occlusion rows: {len(occlusion_rows)}")
     print(f"  Summary rows: {len(summary_rows)}")
     print(f"  Delta rows: {len(delta_rows)}")
-    print(f"  Tier B rows: {len(tier_b_rows)}")
-    print(f"  Per-stage rows: {len(per_stage_rows)}")
 
     print("\nGenerating figures...")
-    plot_latency_boxplot(latency_rows, args.format, args.dpi)
-    plot_latency_summary(latency_rows, args.format, args.dpi)
-    plot_intent_precision(summary_rows, delta_rows, args.format, args.dpi)
-    plot_intent_delta(delta_rows, args.format, args.dpi)
-    plot_wrist_error_cdf(occlusion_rows, summary_rows, args.format, args.dpi)
-    plot_pose_error_scatter(occlusion_rows, args.format, args.dpi)
-    plot_cloud_coverage(occlusion_rows, args.format, args.dpi)
+    plot_wrist_error_cdf(occlusion_rows, args.format, args.dpi)
     plot_convexity_analysis(delta_rows, summary_rows, args.format, args.dpi)
     plot_per_view_coverage(occlusion_rows, args.format, args.dpi)
 
     # Score-based analysis figures (Figures 7d-7f)
     plot_benchmark_comparison(occlusion_rows, summary_rows, args.format, args.dpi)
-    plot_score_distribution(occlusion_rows, args.format, args.dpi)
     plot_best_score_by_type(occlusion_rows, args.format, args.dpi)
     plot_score_vs_wrist_angle(occlusion_rows, args.format, args.dpi)
 
-    plot_tier_ab_latency(latency_rows, tier_b_rows, args.format, args.dpi)
-    plot_per_stage_latency(args.format, args.dpi)
     plot_per_stage_waterfall(args.format, args.dpi)
     generate_latex_table(latency_rows, delta_rows, summary_rows)
 
@@ -1937,7 +1543,6 @@ def main():
     plot_score_vs_samples(args.format, args.dpi)
 
     print(f"\nDone. Figures in: {FIGURES_DIR}")
-
 
 if __name__ == "__main__":
     main()

@@ -320,16 +320,19 @@ robotlab-connect:
 timesync: robotlab-connect
 	@echo "=== One-shot clock sync (host -> Jetson) ==="
 	@HOST_EPOCH="$$(date +%s.%N)" && \
-		echo "Host time:   $$(date)" && \
+		echo "Host time:     $$(date)" && \
 		echo "Jetson before: $$(ssh $(JETSON_HOST) date)" && \
-		ssh $(JETSON_HOST) "echo robotlab | sudo -S date -s @$${HOST_EPOCH}" 2>/dev/null && \
+		ssh -T $(JETSON_HOST) "echo robotlab | sudo -S date -s @$${HOST_EPOCH}" && \
 		echo "Jetson after:  $$(ssh $(JETSON_HOST) date)"
 	@echo ""
 	@echo "=== Configuring chrony on Jetson for ongoing drift correction ==="
-	ssh $(JETSON_HOST) 'which chronyd >/dev/null 2>&1 || (echo robotlab | sudo -S apt install -y chrony); echo robotlab | sudo -S systemctl stop systemd-timesyncd 2>/dev/null; echo robotlab | sudo -S systemctl disable systemd-timesyncd 2>/dev/null'
-	scp config/chrony-jetson.conf $(JETSON_HOST):/tmp/chrony-jetson.conf
-	ssh $(JETSON_HOST) 'echo robotlab | sudo -S cp /tmp/chrony-jetson.conf /etc/chrony/chrony.conf && rm /tmp/chrony-jetson.conf'
-	-ssh $(JETSON_HOST) 'echo robotlab | sudo -S systemctl restart chronyd 2>/dev/null || echo robotlab | sudo -S systemctl restart chrony 2>/dev/null'
+	@CHRONY_B64="$$(base64 -w0 config/chrony-jetson.conf)" && \
+		ssh -T $(JETSON_HOST) "echo robotlab | sudo -S -v 2>/dev/null && \
+			{ which chronyd >/dev/null 2>&1 || sudo apt install -y chrony; } && \
+			{ sudo systemctl stop systemd-timesyncd 2>/dev/null || true; } && \
+			{ sudo systemctl disable systemd-timesyncd 2>/dev/null || true; } && \
+			echo '$$CHRONY_B64' | base64 -d | sudo tee /etc/chrony/chrony.conf > /dev/null && \
+			{ sudo systemctl restart chronyd 2>/dev/null || sudo systemctl restart chrony 2>/dev/null || true; }"
 	@echo "Clock sync complete. Use 'make timesync-check' to verify."
 
 timesync-host:

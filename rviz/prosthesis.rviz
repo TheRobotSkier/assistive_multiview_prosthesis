@@ -4,7 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /TF1
+        - /TF1/Status1
         - /TF1/Frames1
       Splitter Ratio: 0.5354523062705994
     Tree Height: 186
@@ -51,6 +51,12 @@ Visualization Manager:
           Value: false
         arm_d435i_arm_color_optical_frame:
           Value: false
+        arm_d435i_arm_color_optical_frame_body_display:
+          Value: false
+        arm_d435i_arm_color_optical_frame_from_marker:
+          Value: false
+        arm_d435i_arm_color_optical_frame_raw:
+          Value: false
         arm_d435i_arm_depth_frame:
           Value: false
         arm_d435i_arm_depth_optical_frame:
@@ -65,6 +71,10 @@ Visualization Manager:
           Value: false
         arm_d435i_arm_link:
           Value: false
+        arm_imu:
+          Value: false
+        arm_imu_from_marker:
+          Value: true
         bb_corner:
           Value: true
         bb_opposite:
@@ -89,6 +99,12 @@ Visualization Manager:
           Value: false
         head_d435i_head_color_optical_frame:
           Value: false
+        head_d435i_head_color_optical_frame_body_display:
+          Value: false
+        head_d435i_head_color_optical_frame_from_marker:
+          Value: false
+        head_d435i_head_color_optical_frame_raw:
+          Value: false
         head_d435i_head_depth_frame:
           Value: false
         head_d435i_head_depth_optical_frame:
@@ -103,6 +119,14 @@ Visualization Manager:
           Value: false
         head_d435i_head_link:
           Value: false
+        head_imu:
+          Value: false
+        head_imu_from_marker:
+          Value: true
+        marker_0:
+          Value: false
+        marker_map:
+          Value: true
         palm_frame:
           Value: true
       Marker Scale: 0.30000001192092896
@@ -111,7 +135,73 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        {}
+        marker_map:
+          arm_d435i_arm_color_optical_frame_body_display:
+            {}
+          arm_d435i_arm_color_optical_frame_from_marker:
+            {}
+          arm_imu:
+            arm_cam0:
+              arm_d435i_arm_link:
+                arm_d435i_arm_accel_frame:
+                  arm_d435i_arm_accel_optical_frame:
+                    {}
+                arm_d435i_arm_color_frame:
+                  arm_d435i_arm_color_optical_frame:
+                    {}
+                arm_d435i_arm_depth_frame:
+                  arm_d435i_arm_depth_optical_frame:
+                    {}
+                arm_d435i_arm_gyro_frame:
+                  arm_d435i_arm_gyro_optical_frame:
+                    {}
+                arm_d435i_arm_imu_frame:
+                  arm_d435i_arm_imu_optical_frame:
+                    {}
+                d435i_arm_bottom_screw_frame_8_cm_cam_mount:
+                  bbcam1_frame:
+                    {}
+                  bbcam2_frame:
+                    {}
+                  d435i_arm_link_8_cm_cam_mount:
+                    {}
+                  palm_frame:
+                    bb_corner:
+                      bb_opposite:
+                        {}
+                    grasp_contact_frame:
+                      {}
+          arm_imu_from_marker:
+            {}
+          head_d435i_head_color_optical_frame_body_display:
+            {}
+          head_d435i_head_color_optical_frame_from_marker:
+            {}
+          head_imu:
+            head_cam0:
+              head_d435i_head_link:
+                head_d435i_head_accel_frame:
+                  head_d435i_head_accel_optical_frame:
+                    {}
+                head_d435i_head_color_frame:
+                  head_d435i_head_color_optical_frame:
+                    {}
+                head_d435i_head_depth_frame:
+                  head_d435i_head_depth_optical_frame:
+                    {}
+                head_d435i_head_gyro_frame:
+                  head_d435i_head_gyro_optical_frame:
+                    {}
+                head_d435i_head_imu_frame:
+                  head_d435i_head_imu_optical_frame:
+                    {}
+          head_imu_from_marker:
+            {}
+          marker_0:
+            arm_d435i_arm_color_optical_frame_raw:
+              {}
+            head_d435i_head_color_optical_frame_raw:
+              {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -249,7 +339,7 @@ Visualization Manager:
       Channel Name: intensity
       Class: rviz_default_plugins/PointCloud2
       Color: 255; 255; 255
-      Color Transformer: AxisColor
+      Color Transformer: RGB8
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false

@@ -171,6 +171,71 @@ def _quat_diff(q1: tuple, q0: tuple) -> tuple:
     return _quat_to_rotation_vec(q_diff)
 
 
+def _quat_rotate_vector(q: tuple, vx: float, vy: float, vz: float) -> tuple:
+    """Rotate a 3D vector by a quaternion (x, y, z, w).
+
+    Returns (rx, ry, rz) -- the rotated vector.
+    Uses the rotation matrix form for efficiency.
+    """
+    qx, qy, qz, qw = q
+    r00 = 1.0 - 2.0 * (qy * qy + qz * qz)
+    r01 = 2.0 * (qx * qy - qz * qw)
+    r02 = 2.0 * (qx * qz + qy * qw)
+    r10 = 2.0 * (qx * qy + qz * qw)
+    r11 = 1.0 - 2.0 * (qx * qx + qz * qz)
+    r12 = 2.0 * (qy * qz - qx * qw)
+    r20 = 2.0 * (qx * qz - qy * qw)
+    r21 = 2.0 * (qy * qz + qx * qw)
+    r22 = 1.0 - 2.0 * (qx * qx + qy * qy)
+    return (
+        r00 * vx + r01 * vy + r02 * vz,
+        r10 * vx + r11 * vy + r12 * vz,
+        r20 * vx + r21 * vy + r22 * vz,
+    )
+
+
+def _quat_to_rotation_matrix_cols(q: tuple) -> tuple:
+    """Return the 9 elements of the rotation matrix for quaternion q.
+
+    Returns (r00, r01, r02, r10, r11, r12, r20, r21, r22) suitable for
+    passing to ``_transform_twist_by_rotation``.
+    """
+    qx, qy, qz, qw = q
+    return (
+        1.0 - 2.0 * (qy * qy + qz * qz),
+        2.0 * (qx * qy - qz * qw),
+        2.0 * (qx * qz + qy * qw),
+        2.0 * (qx * qy + qz * qw),
+        1.0 - 2.0 * (qx * qx + qz * qz),
+        2.0 * (qy * qz - qx * qw),
+        2.0 * (qx * qz - qy * qw),
+        2.0 * (qy * qz + qx * qw),
+        1.0 - 2.0 * (qx * qx + qy * qy),
+    )
+
+
+def _transform_twist_by_rotation(
+    twist: tuple, r00: float, r01: float, r02: float,
+    r10: float, r11: float, r12: float,
+    r20: float, r21: float, r22: float,
+) -> tuple:
+    """Transform a twist (vx, vy, vz, wx, wy, wz) by a rotation matrix.
+
+    Both linear and angular velocity are rotated by the same rotation
+    matrix.  No translation is applied (velocities are vectors, not points).
+    Returns the transformed twist tuple.
+    """
+    vx, vy, vz, wx, wy, wz = twist
+    return (
+        r00 * vx + r01 * vy + r02 * vz,
+        r10 * vx + r11 * vy + r12 * vz,
+        r20 * vx + r21 * vy + r22 * vz,
+        r00 * wx + r01 * wy + r02 * wz,
+        r10 * wx + r11 * wy + r12 * wz,
+        r20 * wx + r21 * wy + r22 * wz,
+    )
+
+
 def _propagate_pose(
     px: float, py: float, pz: float,
     qx: float, qy: float, qz: float, qw: float,
@@ -563,6 +628,9 @@ class TwistPropagationNode(Node):
         self._seg_trigger_time: float = 0.0
         self._preshaping_call_timer = None  # one-shot timer for delayed preshaping call
 
+        # One-time frame mismatch log flag
+        self._frame_mismatch_logged: bool = False
+
         # Current accepted segmentation target (cloud frame)
         self._current_segmentation_target: tuple[float, float, float] | None = None
 
@@ -742,10 +810,6 @@ class TwistPropagationNode(Node):
             # Use wall-clock time (not message stamp) so the age check
             # in _estimate_twist is reliable regardless of clock domain.
             self._external_twist_time = now_s
-        self.get_logger().info(
-            f"External twist received: ({msg.twist.linear.x:.3f}, "
-            f"{msg.twist.linear.y:.3f}, {msg.twist.linear.z:.3f})"
-        )
 
     def _on_odom(self, msg: Odometry):
         """Store the latest odometry for covariance initialization."""
@@ -788,7 +852,16 @@ class TwistPropagationNode(Node):
         Prefers the external twist (from odometry) when fresh.
         Falls back to finite-difference estimation from the pose buffer.
 
-        Returns (vx, vy, vz, wx, wy, wz).
+        Returns (vx, vy, vz, wx, wy, wz) **in the pose frame** (the same
+        frame as the poses in the buffer, typically ``marker_map``).
+
+        Note
+        ----
+        The external twist from OpenVINS odometry is in the **body frame**
+        (child_frame_id of the odom, e.g. ``arm_cam0``).  We rotate it to
+        the pose frame using the latest pose orientation so that all
+        downstream consumers (especially the cloud-frame twist transform
+        in ``_run_idle_cycle``) can treat it uniformly.
         """
         # Check for fresh external twist first
         if self._external_twist is not None:
@@ -796,6 +869,16 @@ class TwistPropagationNode(Node):
             age = now_s - self._external_twist_time
             if age <= self._external_twist_max_age:
                 self._twist_source = "external"
+                # Transform body-frame twist to pose frame using the
+                # latest pose orientation.  The body frame's axes are
+                # rotated by the pose quaternion relative to the pose
+                # frame, so v_pose = R(q) * v_body.
+                if len(self._pose_buf) >= 1:
+                    _, _, _, _, qx, qy, qz, qw, _ = self._pose_buf[-1]
+                    return _transform_twist_by_rotation(
+                        self._external_twist,
+                        *_quat_to_rotation_matrix_cols((qx, qy, qz, qw)),
+                    )
                 return self._external_twist
             else:
                 self.get_logger().info(
@@ -921,12 +1004,6 @@ class TwistPropagationNode(Node):
         # Collect predicted positions for visualization
         positions: list[tuple[float, float, float]] = []
 
-        self.get_logger().info(
-            f"Propagation start: pose=({px:.3f},{py:.3f},{pz:.3f}) "
-            f"twist=({vx:.3f},{vy:.3f},{vz:.3f}) horizon={self._horizon} dt={self._dt} "
-            f"cloud_pts={len(self._cloud_xyz) if self._cloud_xyz is not None else 0}"
-        )
-
         t = 0.0
         while t < self._horizon:
             t += self._dt
@@ -943,7 +1020,7 @@ class TwistPropagationNode(Node):
                 P = _propagate_covariance(P, self._dt, self._sigma_v_sq, self._sigma_w_sq)
                 cov_trace = float(np.trace(P))
                 if cov_trace > self._max_cov_trace:
-                    self.get_logger().info(
+                    self.get_logger().debug(
                         f"Covariance trace {cov_trace:.2f} exceeds max "
                         f"{self._max_cov_trace} at t={t:.3f}s, truncating horizon"
                     )
@@ -962,35 +1039,37 @@ class TwistPropagationNode(Node):
                 hit_point = self._cloud_xyz[idx]
                 return (float(hit_point[0]), float(hit_point[1]), float(hit_point[2]), t)
 
-        self.get_logger().info(
-            f"Propagation end: {len(positions)} positions, "
-            f"hit={'yes' if positions and 'return' in str(self._last_predicted_positions) else 'no'}, "
-            f"final=({px:.3f},{py:.3f},{pz:.3f})"
-        )
         self._last_predicted_positions = positions
         return None
 
-    # ── TF transform helper ────────────────────────────────────────────────
+    # ── TF transform helpers ────────────────────────────────────────────────
 
-    def _transform_pose_to_cloud_frame(
-        self, px: float, py: float, pz: float, frame_id: str
+    def _lookup_pose_to_cloud_transform(
+        self, frame_id: str,
     ) -> tuple | None:
-        """Transform a point from the given frame to the cloud frame via TF2.
+        """Look up the TF from frame_id to cloud_frame.
 
-        Returns (x, y, z) in cloud frame, or the original coordinates on
-        failure.
+        Returns a tuple of 16 floats:
+          (tx, ty, tz,
+           r00, r01, r02,
+           r10, r11, r12,
+           r20, r21, r22,
+           qx_tf, qy_tf, qz_tf, qw_tf)
+        where (tx, ty, tz) is the translation, r* is the 3x3 rotation
+        matrix, and q*_tf is the rotation as a quaternion.
+
+        Returns None if the transform is unavailable.
         """
         if self._tf_buffer is None or not self._cloud_frame:
-            return (px, py, pz)
+            return None
 
         if frame_id == self._cloud_frame:
-            return (px, py, pz)
+            return None  # identity — caller handles this
 
         try:
             t = self._tf_buffer.lookup_transform(
                 self._cloud_frame, frame_id, Time()
             )
-            # Apply the transform manually to avoid blocking.
             tx = t.transform.translation.x
             ty = t.transform.translation.y
             tz = t.transform.translation.z
@@ -999,8 +1078,6 @@ class TwistPropagationNode(Node):
             qz = t.transform.rotation.z
             qw = t.transform.rotation.w
 
-            # Rotate the point: p_out = R * p_in + t
-            # Quaternion rotation matrix (row-major).
             r00 = 1.0 - 2.0 * (qy * qy + qz * qz)
             r01 = 2.0 * (qx * qy - qz * qw)
             r02 = 2.0 * (qx * qz + qy * qw)
@@ -1011,16 +1088,107 @@ class TwistPropagationNode(Node):
             r21 = 2.0 * (qy * qz + qx * qw)
             r22 = 1.0 - 2.0 * (qx * qx + qy * qy)
 
-            rx = r00 * px + r01 * py + r02 * pz + tx
-            ry = r10 * px + r11 * py + r12 * pz + ty
-            rz = r20 * px + r21 * py + r22 * pz + tz
-            return (rx, ry, rz)
+            return (
+                tx, ty, tz,
+                r00, r01, r02,
+                r10, r11, r12,
+                r20, r21, r22,
+                qx, qy, qz, qw,
+            )
         except Exception as exc:
             self.get_logger().warn(
                 f"TF transform from '{frame_id}' to '{self._cloud_frame}' "
                 f"failed: {exc}. Using raw coordinates."
             )
+            return None
+
+    def _transform_pose_to_cloud_frame(
+        self, px: float, py: float, pz: float, frame_id: str
+    ) -> tuple:
+        """Transform a point from the given frame to the cloud frame via TF2.
+
+        Returns (x, y, z) in cloud frame, or the original coordinates on
+        failure.
+        """
+        tf = self._lookup_pose_to_cloud_transform(frame_id)
+        if tf is None:
             return (px, py, pz)
+
+        tx, ty, tz = tf[0], tf[1], tf[2]
+        r00, r01, r02 = tf[3], tf[4], tf[5]
+        r10, r11, r12 = tf[6], tf[7], tf[8]
+        r20, r21, r22 = tf[9], tf[10], tf[11]
+
+        rx = r00 * px + r01 * py + r02 * pz + tx
+        ry = r10 * px + r11 * py + r12 * pz + ty
+        rz = r20 * px + r21 * py + r22 * pz + tz
+        return (rx, ry, rz)
+
+    def _transform_full_pose_to_cloud_frame(
+        self,
+        px: float, py: float, pz: float,
+        qx: float, qy: float, qz: float, qw: float,
+        frame_id: str,
+    ) -> tuple:
+        """Transform a full pose (position + orientation) to the cloud frame.
+
+        Returns (px, py, pz, qx, qy, qz, qw) in the cloud frame.
+        Falls back to the original pose on failure.
+        """
+        tf = self._lookup_pose_to_cloud_transform(frame_id)
+        if tf is None:
+            return (px, py, pz, qx, qy, qz, qw)
+
+        tx, ty, tz = tf[0], tf[1], tf[2]
+        r00, r01, r02 = tf[3], tf[4], tf[5]
+        r10, r11, r12 = tf[6], tf[7], tf[8]
+        r20, r21, r22 = tf[9], tf[10], tf[11]
+        tf_qx, tf_qy, tf_qz, tf_qw = tf[12], tf[13], tf[14], tf[15]
+
+        # Transform position: p_cloud = R * p_pose + t
+        rx = r00 * px + r01 * py + r02 * pz + tx
+        ry = r10 * px + r11 * py + r12 * pz + ty
+        rz = r20 * px + r21 * py + r22 * pz + tz
+
+        # Transform orientation: q_cloud = q_tf * q_pose
+        nqx, nqy, nqz, nqw = _quat_multiply(
+            (tf_qx, tf_qy, tf_qz, tf_qw),
+            (qx, qy, qz, qw),
+        )
+        # Normalize
+        norm = math.sqrt(nqx ** 2 + nqy ** 2 + nqz ** 2 + nqw ** 2)
+        if norm > 1e-10:
+            nqx /= norm
+            nqy /= norm
+            nqz /= norm
+            nqw /= norm
+
+        return (rx, ry, rz, nqx, nqy, nqz, nqw)
+
+    def _transform_twist_to_cloud_frame(
+        self, twist: tuple, frame_id: str,
+    ) -> tuple:
+        """Transform a twist (vx,vy,vz, wx,wy,wz) to the cloud frame.
+
+        Both linear and angular velocity are rotated by the frame-to-cloud
+        rotation matrix.  No translation is applied (velocities are free
+        vectors, not points).
+        Falls back to the original twist on failure.
+        """
+        tf = self._lookup_pose_to_cloud_transform(frame_id)
+        if tf is None:
+            return twist
+
+        r00, r01, r02 = tf[3], tf[4], tf[5]
+        r10, r11, r12 = tf[6], tf[7], tf[8]
+        r20, r21, r22 = tf[9], tf[10], tf[11]
+
+        return _transform_twist_by_rotation(
+            twist,
+            r00, r01, r02,
+            r10, r11, r12,
+            r20, r21, r22,
+        )
 
     # ── Visualization helpers ──────────────────────────────────────────────
 
@@ -1344,43 +1512,64 @@ class TwistPropagationNode(Node):
         latest = self._pose_buf[-1]
         _, px, py, pz, qx, qy, qz, qw, pose_frame = latest
 
+        # Log frame mismatch once (useful for debugging axis issues)
+        if (not self._frame_mismatch_logged
+                and pose_frame != self._cloud_frame
+                and self._cloud_frame):
+            self._frame_mismatch_logged = True
+            self.get_logger().info(
+                f"Frame mismatch detected: pose_frame='{pose_frame}' "
+                f"!= cloud_frame='{self._cloud_frame}'. "
+                f"Twist and orientation will be transformed to cloud frame "
+                f"before propagation."
+            )
+
         # Apply propagation origin offset (rotate offset by pose orientation,
         # then add to position).  This shifts the propagation start from the
         # tracked camera origin to the grasp contact point (fingertips).
+        # The offset is applied BEFORE the frame transform so that the
+        # offset is correctly expressed in the pose's local frame.
         ox, oy, oz = self._propagation_offset
         if any(abs(v) > 1e-6 for v in (ox, oy, oz)):
-            # Quaternion rotation of offset vector
-            r00 = 1.0 - 2.0 * (qy * qy + qz * qz)
-            r01 = 2.0 * (qx * qy - qz * qw)
-            r02 = 2.0 * (qx * qz + qy * qw)
-            r10 = 2.0 * (qx * qy + qz * qw)
-            r11 = 1.0 - 2.0 * (qx * qx + qz * qz)
-            r12 = 2.0 * (qy * qz - qx * qw)
-            r20 = 2.0 * (qx * qz - qy * qw)
-            r21 = 2.0 * (qy * qz + qx * qw)
-            r22 = 1.0 - 2.0 * (qx * qx + qy * qy)
-            px += r00 * ox + r01 * oy + r02 * oz
-            py += r10 * ox + r11 * oy + r12 * oz
-            pz += r20 * ox + r21 * oy + r22 * oz
+            dpx, dpy, dpz = _quat_rotate_vector(
+                (qx, qy, qz, qw), ox, oy, oz)
+            px += dpx
+            py += dpy
+            pz += dpz
 
-        # Transform hand pose position to the cloud frame via TF2
-        transformed = self._transform_pose_to_cloud_frame(px, py, pz, pose_frame)
-        px_cloud, py_cloud, pz_cloud = transformed
+        # Transform the full pose (position + orientation) to the cloud
+        # frame via TF2.  This ensures both position and orientation are
+        # expressed in the same frame as the point cloud before propagation.
+        pose_cloud = self._transform_full_pose_to_cloud_frame(
+            px, py, pz, qx, qy, qz, qw, pose_frame)
+        px_cloud, py_cloud, pz_cloud = pose_cloud[0], pose_cloud[1], pose_cloud[2]
+        qx_cloud, qy_cloud, qz_cloud, qw_cloud = pose_cloud[3], pose_cloud[4], pose_cloud[5], pose_cloud[6]
+
+        # Transform the twist (linear + angular velocity) to the cloud
+        # frame.  The twist is estimated from pose differences in
+        # pose_frame, so it must be rotated to match the cloud-frame pose
+        # before propagation.  Without this, velocity axes are misaligned
+        # when pose_frame != cloud_frame (e.g. moving forward in marker_map
+        # would appear as moving up in an optical frame).
+        twist_cloud = self._transform_twist_to_cloud_frame(
+            self._twist, pose_frame)
 
         # Publish current pose in cloud frame
-        self._publish_current_pose(px_cloud, py_cloud, pz_cloud, qx, qy, qz, qw)
+        self._publish_current_pose(
+            px_cloud, py_cloud, pz_cloud,
+            qx_cloud, qy_cloud, qz_cloud, qw_cloud)
 
-        # Publish twist in the hand pose's frame
+        # Publish twist in the hand pose's original frame (unchanged)
         self._publish_twist(self._twist, pose_frame)
 
-        # Propagate and find hit (in cloud frame)
+        # Propagate and find hit (all in cloud frame)
         # Initialize the positions list that _propagate_and_find_hit will fill
         self._last_predicted_positions: list[tuple[float, float, float]] = []
         hit_result = self._propagate_and_find_hit(
-            (px_cloud, py_cloud, pz_cloud, qx, qy, qz, qw),
-            self._twist,
+            (px_cloud, py_cloud, pz_cloud,
+             qx_cloud, qy_cloud, qz_cloud, qw_cloud),
+            twist_cloud,
         )
-
         positions = self._last_predicted_positions
 
         # Always publish visualization (even when no hit)

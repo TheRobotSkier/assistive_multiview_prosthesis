@@ -503,20 +503,13 @@ class PointCloudFusionNode(Node):
 
         # ── Step 4: Hand/arm bbox removal (multiple pruning boxes) ─────
         if self._enable_hand_removal:
-            # Use a recent-but-not-zero timestamp for bbox TF lookups.
-            # rclpy.time.Time() (= zero) means "latest", but can cause
-            # extrapolation-into-the-past errors when the TF buffer only has
-            # data starting slightly after the requested time.  A 100ms offset
-            # gives the buffer a safe margin while still being recent enough.
-            lookup_stamp = (self.get_clock().now()
-                            - rclpy.duration.Duration(seconds=0.1))
-
+            # Use latest-available TF for bbox lookups (rclpy.time.Time()).
             for frame, bbox_min, bbox_max in self._pruning_boxes:
                 self._bbox_attempts += 1
 
-                # Try instant (non-blocking) TF lookup; falls back to cache
+                # Try non-blocking TF lookup with a short timeout; falls back to cache
                 transform_result = self._lookup_bbox_transform(
-                    frame, lookup_stamp, xyz_all)
+                    frame, xyz_all)
 
                 if transform_result is not None:
                     R, t_vec, xyz_box = transform_result
@@ -542,7 +535,7 @@ class PointCloudFusionNode(Node):
                     # Fresh lookup failed — apply fallback strategy
                     handled = self._bbox_fallback(
                         frame, bbox_min, bbox_max,
-                        xyz_all, rgb_all, lookup_stamp)
+                        xyz_all, rgb_all)
                     if handled is not None:
                         xyz_all, rgb_all = handled[0], handled[1]
                     # else: bbox_skipped already counted in _bbox_fallback
@@ -574,20 +567,24 @@ class PointCloudFusionNode(Node):
             self._stats["published"] += 1
         self._last_publish_time = self.get_clock().now()
 
-    def _lookup_bbox_transform(self, frame: str, stamp, xyz_all: np.ndarray):
+    def _lookup_bbox_transform(self, frame: str, xyz_all: np.ndarray):
         """Try to look up the transform for a bbox pruning box.
 
         Returns (R, t_vec, xyz_box) on success, or None if lookup fails.
-        Uses a zero timeout (instant, non-blocking) to avoid adding latency
-        to the fusion pipeline.  The cache fallback in _bbox_fallback handles
-        the case where the transform is not yet in the buffer.
+        Uses rclpy.time.Time() (= latest available) with a 500 ms timeout
+        to accommodate multi-edge TF chains (6+ edges for palm_frame ->
+        marker_map).  This matches the timeout used by tf_pipeline_diagnostics
+        which checks the same chains successfully.
         """
         try:
             t = self._tf_buffer.lookup_transform(
-                frame, self._target_frame, stamp,
-                timeout=rclpy.duration.Duration(seconds=0),
+                frame, self._target_frame, rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.5),
             )
-        except Exception:
+        except Exception as e:
+            self.get_logger().debug(
+                f"TF bbox lookup failed for {frame} -> {self._target_frame}: {e}"
+            )
             return None
 
         R, t_vec = _extract_rotation_translation(t)
@@ -595,7 +592,7 @@ class PointCloudFusionNode(Node):
         return R, t_vec, xyz_box.astype(np.float32)
 
     def _bbox_fallback(self, frame: str, bbox_min, bbox_max,
-                       xyz_all, rgb_all, lookup_stamp):
+                       xyz_all, rgb_all):
         """Handle bbox removal when fresh TF lookup fails.
 
         Returns (xyz_all, rgb_all) if fallback was applied, or None if

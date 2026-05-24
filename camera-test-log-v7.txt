@@ -1,0 +1,152 @@
+prosthesis@KingBob:/prosthesis_ws$ make camera-test
+Starting >>> sensor_fusion_bringup
+Starting >>> prosthesis_launch
+Finished <<< sensor_fusion_bringup [0.56s]
+Finished <<< prosthesis_launch [2.06s]
+
+Summary: 2 packages finished [2.25s]
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-24-11-22-32-709939-KingBob-10145
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [10353]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [10354]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [10355]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [10356]
+[INFO] [pointcloud_fusion_node-5]: process started with pid [10357]
+[INFO] [odom_to_pose_relay-6]: process started with pid [10358]
+[INFO] [openvins_odom_tf_relay-7]: process started with pid [10359]
+[INFO] [segmentation_ros2_node-8]: process started with pid [10360]
+[INFO] [twist_propagation_node-9]: process started with pid [10361]
+[INFO] [preshaping_service_bridge_node-10]: process started with pid [10362]
+[INFO] [grasp_proximity_controller_node.py-11]: process started with pid [10363]
+[INFO] [rviz2-12]: process started with pid [10364]
+[rviz2-12] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[preshaping_service_bridge_node-10] [INFO] [1779621753.469062355] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-10] [INFO] [1779621753.477531324] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-12] [INFO] [1779621753.892545504] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-12] [INFO] [1779621753.892797586] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-12] [INFO] [1779621753.970476074] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-12] [INFO] [1779621754.111197768] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779621754.118650225] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779621754.154897704] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779621754.161834381] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779621754.379617463] [rviz2]: Stereo is NOT SUPPORTED
+[grasp_proximity_controller_node.py-11] [INFO] [1779621754.403540528] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[rviz2-12] [INFO] [1779621754.490361321] [rviz2]: Stereo is NOT SUPPORTED
+[pipeline_manager_node-1] [INFO] [1779621755.876766769] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tf_pipeline_diagnostics-4] [INFO] [1779621756.396254284] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[openvins_odom_tf_relay-7] Traceback (most recent call last):
+[openvins_odom_tf_relay-7]   File "/prosthesis_ws/install/camera/lib/camera/openvins_odom_tf_relay", line 33, in <module>
+[openvins_odom_tf_relay-7]     sys.exit(load_entry_point('camera==0.1.0', 'console_scripts', 'openvins_odom_tf_relay')())
+[openvins_odom_tf_relay-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/openvins_odom_tf_relay.py", line 219, in main
+[openvins_odom_tf_relay-7]     node = OpenVINSOdomTFRelay()
+[openvins_odom_tf_relay-7]            ^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/openvins_odom_tf_relay.py", line 106, in __init__
+[openvins_odom_tf_relay-7]     self.declare_parameter(
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 389, in declare_parameter
+[openvins_odom_tf_relay-7]     return self.declare_parameters('', [args], ignore_override)[0]
+[openvins_odom_tf_relay-7]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 507, in declare_parameters
+[openvins_odom_tf_relay-7]     descriptor.type = Parameter.Type.from_parameter_value(value).value
+[openvins_odom_tf_relay-7]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/parameter.py", line 88, in from_parameter_value
+[openvins_odom_tf_relay-7]     raise TypeError(
+[openvins_odom_tf_relay-7] TypeError: The given value is not one of the allowed types '{'x': 0.0, 'y': 0.015, 'z': 0.0, 'roll': -1.57079632679, 'pitch': 0.0, 'yaw': -1.57079632679}'.
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779621756.957217984] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779621756.958231299] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779621757.088158894] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779621757.105798111] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779621757.108487383] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[ERROR] [openvins_odom_tf_relay-7]: process has died [pid 10359, exit code 1, cmd '/prosthesis_ws/install/camera/lib/camera/openvins_odom_tf_relay --ros-args --log-level warn --ros-args -r __node:=openvins_odom_tf_relay --params-file /tmp/launch_params_czx0v12q'].
+[segmentation_ros2_node-8] Traceback (most recent call last):
+[segmentation_ros2_node-8]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-8]     sys.exit(load_entry_point('segmentation-bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 357, in main
+[segmentation_ros2_node-8]     node = SegmentationNode()
+[segmentation_ros2_node-8]            ^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 119, in __init__
+[segmentation_ros2_node-8]     self.declare_parameter("roi_radius_m", 0.3)
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 389, in declare_parameter
+[segmentation_ros2_node-8]     return self.declare_parameters('', [args], ignore_override)[0]
+[segmentation_ros2_node-8]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 528, in declare_parameters
+[segmentation_ros2_node-8]     self._declare_parameter_common(
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 584, in _declare_parameter_common
+[segmentation_ros2_node-8]     raise InvalidParameterTypeException(
+[segmentation_ros2_node-8] rclpy.exceptions.InvalidParameterTypeException: Trying to set parameter 'roi_radius_m' to '0.3' of type 'STRING', expecting type 'DOUBLE': roi_radius_m
+[pointcloud_fusion_node-5] [INFO] [1779621757.217902438] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-5] [INFO] [1779621757.219043464] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-5] [INFO] [1779621757.277386119] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-5] [INFO] [1779621757.280702114] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[camera_mount_tf_publisher-3] [INFO] [1779621757.293921789] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1779621757.295916812] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[twist_propagation_node-9] [INFO] [1779621757.313725873] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-9] [INFO] [1779621757.427860854] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-9] [INFO] [1779621757.430008608] [twist_propagation]: External twist source: /hand_twist (max_age=0.5s)
+[pointcloud_fusion_node-5] [WARN] [1779621757.430260741] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[ERROR] [segmentation_ros2_node-8]: process has died [pid 10360, exit code 1, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_3uex9y4e -r /segmentation/input_cloud:=/fused_pointcloud'].
+[pointcloud_fusion_node-5] [WARN] [1779621760.480087759] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621765.611972098] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779621767.331677579] [pointcloud_fusion]: Stats: published=21 (dual=0, cam1_only=28) dist_removed=400269 bbox_removed=0 bbox_skipped=52 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:42, head_d435i_head_depth_optical_frame:81} last_publish_ago=0.1s
+[tf_pipeline_diagnostics-4] [WARN] [1779621767.380962567] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [WARN] [1779621767.448403220] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621770.626235717] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621775.628106970] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621777.369899620] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779621777.405966001] [pointcloud_fusion]: Stats: published=33 (dual=0, cam1_only=41) dist_removed=251958 bbox_removed=0 bbox_skipped=84 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:42} last_publish_ago=0.2s
+[pointcloud_fusion_node-5] [WARN] [1779621777.752480849] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621780.807887687] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621786.202542860] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621787.374319560] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [WARN] [1779621788.412557458] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [INFO] [1779621789.005087800] [pointcloud_fusion]: Stats: published=40 (dual=0, cam1_only=42) dist_removed=684045 bbox_removed=0 bbox_skipped=79 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:39} last_publish_ago=0.9s
+[pointcloud_fusion_node-5] [ERROR] [1779621790.017636222] [pointcloud_fusion]: Bbox removal success rate is 0% over 32s (0/221 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779621791.252994760] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621796.558895747] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621797.381433226] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779621797.623177660] [pointcloud_fusion]: Stats: published=38 (dual=0, cam1_only=32) dist_removed=550217 bbox_removed=0 bbox_skipped=64 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:37} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779621798.505748060] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621801.977339517] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621807.056674247] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621807.373869534] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779621807.841417118] [pointcloud_fusion]: Stats: published=33 (dual=0, cam1_only=38) dist_removed=576167 bbox_removed=0 bbox_skipped=77 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:33} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779621808.568768884] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621812.148960212] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621817.149385443] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621817.379624728] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779621818.063113903] [pointcloud_fusion]: Stats: published=43 (dual=0, cam1_only=42) dist_removed=811007 bbox_removed=0 bbox_skipped=80 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:53} last_publish_ago=1.5s
+[pointcloud_fusion_node-5] [ERROR] [1779621818.343317245] [pointcloud_fusion]: Bbox removal success rate is 0% over 29s (0/219 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779621818.624971770] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621822.235898141] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621827.338627473] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621827.380480814] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779621827.728475617] [pointcloud_fusion]: Stats: published=40 (dual=0, cam1_only=39) dist_removed=737789 bbox_removed=0 bbox_skipped=86 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:44} last_publish_ago=0.2s
+[pointcloud_fusion_node-5] [WARN] [1779621828.706815779] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621832.378679457] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621837.376928407] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [WARN] [1779621837.529606355] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779621838.007024602] [pointcloud_fusion]: Stats: published=47 (dual=0, cam1_only=41) dist_removed=508819 bbox_removed=0 bbox_skipped=85 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:44} last_publish_ago=0.2s
+[pointcloud_fusion_node-5] [WARN] [1779621838.847028145] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621842.613077958] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621847.396607558] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779621847.538424034] [pointcloud_fusion]: Stats: published=40 (dual=0, cam1_only=43) dist_removed=636540 bbox_removed=0 bbox_skipped=84 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:45} last_publish_ago=0.5s
+[pointcloud_fusion_node-5] [ERROR] [1779621847.649571080] [pointcloud_fusion]: Bbox removal success rate is 0% over 29s (0/258 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779621847.736258339] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621848.902252855] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621852.764939515] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621857.376236074] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779621857.493219863] [pointcloud_fusion]: Stats: published=46 (dual=0, cam1_only=40) dist_removed=580681 bbox_removed=0 bbox_skipped=78 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:41} last_publish_ago=0.4s
+[pointcloud_fusion_node-5] [WARN] [1779621857.971122845] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621859.021700494] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621863.004951741] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621867.398942763] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [INFO] [1779621867.950666805] [pointcloud_fusion]: Stats: published=39 (dual=0, cam1_only=39) dist_removed=625932 bbox_removed=0 bbox_skipped=85 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:42} last_publish_ago=0.9s
+[pointcloud_fusion_node-5] [WARN] [1779621868.200515196] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779621869.030085144] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779621873.423077606] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [WARN] [1779621877.379980287] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.

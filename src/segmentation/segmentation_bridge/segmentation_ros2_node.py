@@ -25,6 +25,9 @@ Parameters
 ----------
   cubeedge      (float, default 0.05) – half-width of the click cube in metres.
   inference_url (str,   default 'http://127.0.0.1:5678') – inference server URL.
+  roi_radius_m  (float, default 0.3)  – radius (m) for pre-inference ROI crop.
+                                        Set <=0 to disable.
+  click_batch_debounce_s (float, default 0.02) – debounce window in seconds.
 
 Inference is triggered only on click changes (new click or reset-then-click),
 not on periodic cloud republishes.
@@ -113,6 +116,7 @@ class SegmentationNode(Node):
         self.declare_parameter("cubeedge", 0.05)
         self.declare_parameter("inference_url", "http://127.0.0.1:5678")
         self.declare_parameter("click_batch_debounce_s", 0.02)
+        self.declare_parameter("roi_radius_m", 0.3)
 
         self._lock = threading.Lock()
         self._cloud_xyz: np.ndarray | None = None
@@ -141,8 +145,11 @@ class SegmentationNode(Node):
         self._pub = self.create_publisher(
             PointCloud2, "/segmentation/object_cloud", 10)
 
+        self._roi_radius = float(self.get_parameter("roi_radius_m").value)
+
         self.get_logger().info(
-            f"Segmentation node ready. click_batch_debounce_s={self._debounce_s}s")
+            f"Segmentation node ready. debounce={self._debounce_s}s, "
+            f"roi_radius={self._roi_radius}m" + (" (disabled)" if self._roi_radius <= 0 else ""))
 
     # --- helpers ------------------------------------------------------------
 
@@ -164,6 +171,46 @@ class SegmentationNode(Node):
             raise RuntimeError(
                 f"TF transform from '{msg.header.frame_id}' to '{cloud_frame}' failed: {exc}"
             ) from exc
+
+    @staticmethod
+    def _crop_to_roi(
+        xyz: np.ndarray,
+        rgb: np.ndarray,
+        pos_clicks: list[list[float]],
+        neg_clicks: list[list[float]],
+        radius: float,
+        cubeedge: float,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Crop cloud to a sphere around the positive click centroid.
+
+        Points within *radius* of the mean of all positive clicks are retained.
+        Points within *cubeedge* of any negative click are also always retained
+        so that negative-click constraints are preserved during inference.
+
+        Returns
+        -------
+        (cropped_xyz, cropped_rgb, indices)
+            cropped_xyz, cropped_rgb are the filtered arrays.
+            indices is an (M,) int64 array mapping each cropped point back to
+            its original position in the input *xyz* array.
+        """
+        n = len(xyz)
+        if len(pos_clicks) == 0 or radius <= 0:
+            return xyz, rgb, np.arange(n, dtype=np.int64)
+
+        centroid = np.mean(pos_clicks, axis=0)  # (3,)
+        dists_sq = np.sum((xyz - centroid) ** 2, axis=1)  # (N,)
+        keep = dists_sq <= radius ** 2
+
+        # Always keep points near negative clicks so their constraints survive
+        if len(neg_clicks) > 0 and cubeedge > 0:
+            for neg in neg_clicks:
+                neg_arr = np.array(neg, dtype=np.float32)
+                near_neg = np.all(np.abs(xyz - neg_arr) < cubeedge, axis=1)
+                keep |= near_neg
+
+        indices = np.where(keep)[0].astype(np.int64)
+        return xyz[keep], rgb[keep], indices
 
     # --- subscribers --------------------------------------------------------
 
@@ -250,6 +297,19 @@ class SegmentationNode(Node):
         cubeedge = self.get_parameter("cubeedge").value
         url = self.get_parameter("inference_url").value
 
+        # ── Optional ROI crop: only send points near click centroid ──────
+        cropped_indices: np.ndarray | None = None
+        if self._roi_radius > 0 and len(pos_clicks) > 0:
+            cropped_xyz, cropped_rgb, cropped_indices = self._crop_to_roi(
+                xyz, rgb, pos_clicks, neg_clicks,
+                self._roi_radius, cubeedge,
+            )
+            self.get_logger().info(
+                f"ROI crop: {len(cropped_xyz)}/{len(xyz)} points within "
+                f"{self._roi_radius}m of click centroid")
+            original_xyz = xyz  # keep for mask remapping
+            xyz, rgb = cropped_xyz, cropped_rgb
+
         payload = {
             "xyz": base64.b64encode(xyz.tobytes()).decode(),
             "rgb": base64.b64encode(rgb.tobytes()).decode(),
@@ -265,6 +325,13 @@ class SegmentationNode(Node):
         except Exception as exc:
             self.get_logger().error(f"Inference request failed: {exc}")
             return
+
+        # ── Remap cropped mask back to full cloud ────────────────────────
+        if cropped_indices is not None:
+            full_mask = np.zeros(len(original_xyz), dtype=bool)
+            full_mask[cropped_indices] = mask
+            mask = full_mask
+            xyz = original_xyz
 
         fg_xyz = xyz[mask]
         out_header = header

@@ -157,13 +157,32 @@ openvins_odom_tf_relay:
         head_cam_frame: "head_cam0"
         arm_cam_frame: "arm_cam0"
         publish_imu_to_cam_tf: true
-        # Nominal D435i imu->cam0 (color_optical) extrinsic.
-        # OpenVINS cam0 == color_optical_frame.  The imu frame is at the link
-        # origin; color_optical is (0, 0.015, 0) with optical rotation.
-        imu_to_cam_extrinsics_head:
-            {x: 0.0, y: 0.015, z: 0.0, roll: -1.570796, pitch: 0.0, yaw: -1.570796}
-        imu_to_cam_extrinsics_arm:
-            {x: 0.0, y: 0.015, z: 0.0, roll: -1.570796, pitch: 0.0, yaw: -1.570796}
+        # Kalibr-calibrated imu->cam0 extrinsic from the OpenVINS config on the
+        # Jetson.  OpenVINS cam0 == color_optical_frame; the IMU frame used by
+        # OpenVINS is already in optical convention (RealSense publishes
+        # combined IMU in *_imu_optical_frame).  T_cam_imu is near-identity
+        # (~1 deg rotation, ~2-7cm translation).
+        #
+        # OpenVINS publishes cam0->imu as T_cam_imu.  The relay publishes the
+        # inverse direction (imu->cam0).  Since the rotation is near-identity:
+        #   T_imu_cam = inv(T_cam_imu)  ≈  (identity rotation, -translation)
+        #
+        # These values are taken from OpenVINS' live output (cam0 extrinsics)
+        # observed on the Jetson during the v12 test:
+        #   head (marker-6): T_cam_imu t=[ 0.015,  0.011, -0.066]
+        #   arm  (marker-7): T_cam_imu t=[ 0.002,  0.003,  0.007]
+        imu_to_cam_x_head: -0.015
+        imu_to_cam_y_head: -0.011
+        imu_to_cam_z_head: 0.066
+        imu_to_cam_roll_head: 0.0
+        imu_to_cam_pitch_head: 0.0
+        imu_to_cam_yaw_head: 0.0
+        imu_to_cam_x_arm: -0.002
+        imu_to_cam_y_arm: -0.003
+        imu_to_cam_z_arm: -0.007
+        imu_to_cam_roll_arm: 0.0
+        imu_to_cam_pitch_arm: 0.0
+        imu_to_cam_yaw_arm: 0.0
 
 openvins_realsense_tf_bridge:
     ros__parameters:
@@ -338,6 +357,7 @@ _reference:
         segmentation:
             inference_url: "http://127.0.0.1:5678"
             cubeedge: 0.05
+            roi_radius_m: 0.3
 
         # ── Grasp Preshaping ─────────────────────────────────────────────────
         preshaping:

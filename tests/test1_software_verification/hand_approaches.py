@@ -1,10 +1,10 @@
 """Hand approach poses and twists for each test object.
 
 For each object, defines a canonical hand approach:
-  - pose: hand position ~15cm away from the object (grasp-planning distance),
-    oriented toward it. All poses are rotated 45° around the Z-axis so that
-    the hand approaches from the side, giving the wrist camera a complementary
-    viewing angle to the head camera (top-down).
+  - pose: hand position ~50cm away from the object (grasp-planning distance),
+    oriented straight toward it (no rotation — the hand approaches along -X
+    in the object frame). The cameras are in their natural orientation:
+    head camera offset behind/above, wrist camera from its mount position.
   - twist: small forward linear velocity, near-zero angular velocity
 
 The SMC sampler's ROI prediction must cover the object for the planner
@@ -12,105 +12,80 @@ to work. These poses may need iterative tuning — run with debug_visualization
 enabled and verify the ROI covers the object.
 """
 
-import numpy as np
 
-# 45° Z-rotation constants
-_COS45 = 0.7071067811865476
-_SIN45 = 0.7071067811865475
-_QW45 = 0.9238795325112867   # cos(22.5°)
-_QZ45 = 0.3826834323650898   # sin(22.5°)
-
-
-def _rotated_pose(px, py, pz, qw=1.0, qx=0.0, qy=0.0, qz=0.0):
-    """Rotate a pose 45° around the Z-axis.
-    
-    Multiplies the existing orientation quaternion by a 45° Z-rotation
-    and rotates the position vector by 45° around Z.
-    """
-    # Rotate position
-    px_new = px * _COS45 - py * _SIN45
-    py_new = px * _SIN45 + py * _COS45
-    # Multiply quaternions: q_rot(45° Z) * q_current
-    qw_new = _QW45 * qw - _QZ45 * qz
-    qx_new = _QW45 * qx + _QZ45 * qy
-    qy_new = _QW45 * qy - _QZ45 * qx
-    qz_new = _QW45 * qz + _QZ45 * qw
-    n = np.sqrt(qw_new**2 + qx_new**2 + qy_new**2 + qz_new**2)
+def _pose(px, py, pz, qw=1.0, qx=0.0, qy=0.0, qz=0.0):
+    """Build a pose dict (no rotation applied — hand approaches straight ahead)."""
     return {
-        "px": px_new, "py": py_new, "pz": pz,
-        "qx": qx_new / n, "qy": qy_new / n, "qz": qz_new / n, "qw": qw_new / n,
+        "px": px, "py": py, "pz": pz,
+        "qx": qx, "qy": qy, "qz": qz, "qw": qw,
     }
 
 
-def _rotated_twist(lx, ly=0.0, lz=0.0, ax=0.0, ay=0.0, az=0.0):
-    """Rotate a twist vector 45° around the Z-axis."""
+def _twist(lx, ly=0.0, lz=0.0, ax=0.0, ay=0.0, az=0.0):
+    """Build a twist dict (no rotation applied)."""
     return {
-        "lx": lx * _COS45 - ly * _SIN45,
-        "ly": lx * _SIN45 + ly * _COS45,
-        "lz": lz,
+        "lx": lx, "ly": ly, "lz": lz,
         "ax": ax, "ay": ay, "az": az,
     }
 
 
-# Default approach rotated 45° around Z
-_DEFAULT_POSE_15CM = _rotated_pose(-0.15, 0.0, 0.0)
-_DEFAULT_POSE_12CM = _rotated_pose(-0.12, 0.0, 0.0)
-_DEFAULT_TWIST_10 = _rotated_twist(0.10)
-_DEFAULT_TWIST_08 = _rotated_twist(0.08)
+# Default approach: hand 50 cm in front of object, no rotation
+_DEFAULT_POSE = _pose(-0.50, 0.0, 0.0)
+_DEFAULT_TWIST = _twist(0.10)
 
 APPROACHES = {
     # ---- Parametric objects ----
     "cylinder_upright": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.0),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.0),
+        "twist": _DEFAULT_TWIST,
     },
     "cylinder_tilted": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.0),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.0),
+        "twist": _DEFAULT_TWIST,
     },
     "ellipsoid": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.0),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.0),
+        "twist": _DEFAULT_TWIST,
     },
     "tapered_bottle": {
-        "pose": _rotated_pose(-0.15, 0.0, -0.02),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, -0.02),
+        "twist": _DEFAULT_TWIST,
     },
     "l_block": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.01),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.01),
+        "twist": _DEFAULT_TWIST,
     },
     "small_cube": {
-        "pose": _rotated_pose(-0.12, 0.0, 0.0),
-        "twist": _DEFAULT_TWIST_08,
+        "pose": _pose(-0.50, 0.0, 0.0),
+        "twist": _DEFAULT_TWIST,
     },
     "thin_plate": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.005),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.005),
+        "twist": _DEFAULT_TWIST,
     },
 
     # ---- Non-convex objects ----
     "notched_box": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.0),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.0),
+        "twist": _DEFAULT_TWIST,
     },
     "cross_shape": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.0),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.0),
+        "twist": _DEFAULT_TWIST,
     },
 
     # ---- YCB objects ----
     "banana": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.0),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.0),
+        "twist": _DEFAULT_TWIST,
     },
     "mug": {
-        "pose": _rotated_pose(-0.15, 0.0, 0.0),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, 0.0),
+        "twist": _DEFAULT_TWIST,
     },
     "power_drill": {
-        "pose": _rotated_pose(-0.15, 0.0, -0.03),
-        "twist": _DEFAULT_TWIST_10,
+        "pose": _pose(-0.50, 0.0, -0.03),
+        "twist": _DEFAULT_TWIST,
     },
 }
 

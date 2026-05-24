@@ -23,7 +23,6 @@ of the upper portion of objects at typical grasp-planning distances (~25cm).
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Camera definitions (relative to hand/palm frame)
 # ---------------------------------------------------------------------------
@@ -43,12 +42,12 @@ import numpy as np
 # (the face facing the approaching hand). This creates meaningful
 # occlusion that the wrist camera's forward-looking view can resolve.
 HEAD_CAMERA_LOCAL = {
-    "position": np.array([-0.40, 0.0, 0.45], dtype=np.float32),
+    "position": np.array([-0.30, 0.20, 0.45], dtype=np.float32),
     # Forward + downward: the user looks at their hand which is in front and below
-    "forward": np.array([0.65, 0.0, -0.76], dtype=np.float32),
+    "forward": np.array([0.80, 0.0, -0.76], dtype=np.float32),
     "up": np.array([0.0, 0.0, 1.0], dtype=np.float32),
-    "fov_h_deg": 58.0,   # D435 horizontal FOV
-    "fov_v_deg": 45.0,   # D435 vertical FOV
+    "fov_h_deg": 58.0,  # D435 horizontal FOV
+    "fov_v_deg": 45.0,  # D435 vertical FOV
     "near_m": 0.20,
     "far_m": 3.00,
 }
@@ -91,8 +90,8 @@ WRIST_CAMERA_LOCAL = {
     "up": _WRIST_UP,
     "fov_h_deg": 58.0,
     "fov_v_deg": 45.0,
-    "near_m": 0.05,
-    "far_m": 1.00,
+    "near_m": 0.20,
+    "far_m": 3.00,
 }
 
 
@@ -100,17 +99,33 @@ WRIST_CAMERA_LOCAL = {
 # World-frame camera computation
 # ---------------------------------------------------------------------------
 
+
 def _quat_to_rotation_matrix(qx, qy, qz, qw):
     """Convert quaternion to 3x3 rotation matrix."""
     # Normalize
-    n = np.sqrt(qx*qx + qy*qy + qz*qz + qw*qw)
-    qx, qy, qz, qw = qx/n, qy/n, qz/n, qw/n
+    n = np.sqrt(qx * qx + qy * qy + qz * qz + qw * qw)
+    qx, qy, qz, qw = qx / n, qy / n, qz / n, qw / n
 
-    return np.array([
-        [1 - 2*(qy*qy + qz*qz), 2*(qx*qy - qw*qz),     2*(qx*qz + qw*qy)],
-        [2*(qx*qy + qw*qz),     1 - 2*(qx*qx + qz*qz), 2*(qy*qz - qw*qx)],
-        [2*(qx*qz - qw*qy),     2*(qy*qz + qw*qx),     1 - 2*(qx*qx + qy*qy)],
-    ], dtype=np.float32)
+    return np.array(
+        [
+            [
+                1 - 2 * (qy * qy + qz * qz),
+                2 * (qx * qy - qw * qz),
+                2 * (qx * qz + qw * qy),
+            ],
+            [
+                2 * (qx * qy + qw * qz),
+                1 - 2 * (qx * qx + qz * qz),
+                2 * (qy * qz - qw * qx),
+            ],
+            [
+                2 * (qx * qz - qw * qy),
+                2 * (qy * qz + qw * qx),
+                1 - 2 * (qx * qx + qy * qy),
+            ],
+        ],
+        dtype=np.float32,
+    )
 
 
 def get_camera_world_positions(hand_pose: dict) -> list[tuple[float, float, float]]:
@@ -122,7 +137,9 @@ def get_camera_world_positions(hand_pose: dict) -> list[tuple[float, float, floa
     Returns:
         List of (x, y, z) camera positions in world frame.
     """
-    pos = np.array([hand_pose["px"], hand_pose["py"], hand_pose["pz"]], dtype=np.float32)
+    pos = np.array(
+        [hand_pose["px"], hand_pose["py"], hand_pose["pz"]], dtype=np.float32
+    )
     R = _quat_to_rotation_matrix(
         hand_pose["qx"], hand_pose["qy"], hand_pose["qz"], hand_pose["qw"]
     )
@@ -142,7 +159,9 @@ def get_camera_world_frames(hand_pose: dict) -> list[dict]:
     Returns:
         List of dicts with 'position', 'forward', 'up', 'fov_h_deg', etc.
     """
-    pos = np.array([hand_pose["px"], hand_pose["py"], hand_pose["pz"]], dtype=np.float32)
+    pos = np.array(
+        [hand_pose["px"], hand_pose["py"], hand_pose["pz"]], dtype=np.float32
+    )
     R = _quat_to_rotation_matrix(
         hand_pose["qx"], hand_pose["qy"], hand_pose["qz"], hand_pose["qw"]
     )
@@ -154,21 +173,24 @@ def get_camera_world_frames(hand_pose: dict) -> list[dict]:
         world_fwd /= np.linalg.norm(world_fwd)
         world_up = R @ cam_def["up"]
 
-        frames.append({
-            "position": world_pos,
-            "forward": world_fwd,
-            "up": world_up,
-            "fov_h_deg": cam_def["fov_h_deg"],
-            "fov_v_deg": cam_def["fov_v_deg"],
-            "near_m": cam_def["near_m"],
-            "far_m": cam_def["far_m"],
-        })
+        frames.append(
+            {
+                "position": world_pos,
+                "forward": world_fwd,
+                "up": world_up,
+                "fov_h_deg": cam_def["fov_h_deg"],
+                "fov_v_deg": cam_def["fov_v_deg"],
+                "near_m": cam_def["near_m"],
+                "far_m": cam_def["far_m"],
+            }
+        )
 
     return frames
 
 
-def validate_camera_frustum(camera_def: dict, test_point: tuple = (0, 0, 0),
-                            label: str = "camera") -> dict:
+def validate_camera_frustum(
+    camera_def: dict, test_point: tuple = (0, 0, 0), label: str = "camera"
+) -> dict:
     """Check if a test point falls within a camera frustum.
 
     Args:
@@ -194,8 +216,13 @@ def validate_camera_frustum(camera_def: dict, test_point: tuple = (0, 0, 0),
     dist = np.linalg.norm(rel)
 
     if dist < 1e-6:
-        return {"in_frustum": False, "distance": 0, "angle_h": 0, "angle_v": 0,
-                "label": label}
+        return {
+            "in_frustum": False,
+            "distance": 0,
+            "angle_h": 0,
+            "angle_v": 0,
+            "label": label,
+        }
 
     z = np.dot(rel, fwd)
     x = np.dot(rel, right)

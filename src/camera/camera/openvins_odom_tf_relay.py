@@ -8,9 +8,9 @@ needs, bypassing unreliable DDS ``/tf`` delivery from the Jetson.
 
 The odometry messages arrive at ~200 Hz on separate topics (one per camera).
 Each message carries ``T(marker_map -> imu)`` in its pose field.  We extract
-that pose and publish it as a local TF transform stamped with the **host clock**
-to avoid the "extrapolation into the past" errors caused by Jetson-host clock
-skew.
+that pose and publish it as a local TF transform stamped with the **odom
+message timestamp** so that TF timestamps share the same time domain as the
+point clouds arriving from the Jetson.
 
 Parameters
 ----------
@@ -24,8 +24,8 @@ arm_imu_frame            str   child frame for arm  (default: arm_imu)
 head_cam_frame           str   head camera frame from OpenVINS (default: head_cam0)
 arm_cam_frame            str   arm camera frame from OpenVINS  (default: arm_cam0)
 publish_imu_to_cam_tf    bool  publish static *_imu -> *_cam0 edges (default: True)
-imu_to_cam_extrinsics_head  dict  nominal head imu->cam0 {x,y,z,roll,pitch,yaw}
-imu_to_cam_extrinsics_arm   dict  nominal arm  imu->cam0 {x,y,z,roll,pitch,yaw}
+imu_to_cam_{x,y,z,roll,pitch,yaw}_head  double  nominal head imu->cam0 extrinsic components
+imu_to_cam_{x,y,z,roll,pitch,yaw}_arm   double  nominal arm  imu->cam0 extrinsic components
 
 Publishes
 ---------
@@ -103,16 +103,26 @@ class OpenVINSOdomTFRelay(Node):
         self.declare_parameter("head_cam_frame", "head_cam0")
         self.declare_parameter("arm_cam_frame", "arm_cam0")
         self.declare_parameter("publish_imu_to_cam_tf", True)
-        self.declare_parameter(
-            "imu_to_cam_extrinsics_head",
-            {"x": 0.0, "y": 0.015, "z": 0.0,
-             "roll": -1.57079632679, "pitch": 0.0, "yaw": -1.57079632679},
-        )
-        self.declare_parameter(
-            "imu_to_cam_extrinsics_arm",
-            {"x": 0.0, "y": 0.015, "z": 0.0,
-             "roll": -1.57079632679, "pitch": 0.0, "yaw": -1.57079632679},
-        )
+        # Head IMU->cam0 extrinsic from OpenVINS live output (v12 log).
+        # OpenVINS' IMU frame is already in optical convention, so T_cam_imu
+        # is near-identity rotation with a small translation.
+        #   head (marker-6): T_cam_imu t=[0.015,0.011, -0.066]
+        # T_imu_cam = inv(T_cam_imu) ≈ (-0.015, -0.011,0.066)
+        self.declare_parameter("imu_to_cam_x_head", -0.015)
+        self.declare_parameter("imu_to_cam_y_head", -0.011)
+        self.declare_parameter("imu_to_cam_z_head",0.066)
+        self.declare_parameter("imu_to_cam_roll_head",0.0)
+        self.declare_parameter("imu_to_cam_pitch_head",0.0)
+        self.declare_parameter("imu_to_cam_yaw_head",0.0)
+        # Arm IMU->cam0 extrinsic from OpenVINS live output (v12 log).
+        #   arm (marker-7): T_cam_imu t=[0.002,0.003,0.007]
+        # T_imu_cam = inv(T_cam_imu) ≈ (-0.002, -0.003, -0.007)
+        self.declare_parameter("imu_to_cam_x_arm", -0.002)
+        self.declare_parameter("imu_to_cam_y_arm", -0.003)
+        self.declare_parameter("imu_to_cam_z_arm", -0.007)
+        self.declare_parameter("imu_to_cam_roll_arm",0.0)
+        self.declare_parameter("imu_to_cam_pitch_arm",0.0)
+        self.declare_parameter("imu_to_cam_yaw_arm",0.0)
 
         # ── Read parameters ───────────────────────────────────────────────
         head_odom_topic = self.get_parameter("head_odom_topic").value
@@ -123,8 +133,22 @@ class OpenVINSOdomTFRelay(Node):
         self._head_cam = self.get_parameter("head_cam_frame").value
         self._arm_cam = self.get_parameter("arm_cam_frame").value
         publish_imu_to_cam = self.get_parameter("publish_imu_to_cam_tf").value
-        head_extrinsics = self.get_parameter("imu_to_cam_extrinsics_head").value
-        arm_extrinsics = self.get_parameter("imu_to_cam_extrinsics_arm").value
+        head_extrinsics = {
+            "x": self.get_parameter("imu_to_cam_x_head").value,
+            "y": self.get_parameter("imu_to_cam_y_head").value,
+            "z": self.get_parameter("imu_to_cam_z_head").value,
+            "roll": self.get_parameter("imu_to_cam_roll_head").value,
+            "pitch": self.get_parameter("imu_to_cam_pitch_head").value,
+            "yaw": self.get_parameter("imu_to_cam_yaw_head").value,
+        }
+        arm_extrinsics = {
+            "x": self.get_parameter("imu_to_cam_x_arm").value,
+            "y": self.get_parameter("imu_to_cam_y_arm").value,
+            "z": self.get_parameter("imu_to_cam_z_arm").value,
+            "roll": self.get_parameter("imu_to_cam_roll_arm").value,
+            "pitch": self.get_parameter("imu_to_cam_pitch_arm").value,
+            "yaw": self.get_parameter("imu_to_cam_yaw_arm").value,
+        }
 
         # ── QoS — OpenVINS publishes odom with BEST_EFFORT ────────────────
         best_effort = QoSProfile(
@@ -134,22 +158,25 @@ class OpenVINSOdomTFRelay(Node):
         )
 
         # ── Publishers ────────────────────────────────────────────────────
+        # -- Publishers ---------------------------------------------------
         self._tf_broadcaster = TransformBroadcaster(self)
         self._static_tf_broadcaster = StaticTransformBroadcaster(self)
 
-        # ── Subscribers ───────────────────────────────────────────────────
+        # -- Subscribers ---------------------------------------------------
         self.create_subscription(
             Odometry, head_odom_topic, self._on_head_odom, best_effort)
         self.create_subscription(
             Odometry, arm_odom_topic, self._on_arm_odom, best_effort)
 
-        # ── Counters for throttled logging ─────────────────────────────────
+        # -- Counters for throttled logging ---------------------------------
         self._head_count = 0
         self._arm_count = 0
 
-        # ── Publish static *_imu -> *_cam0 edges ──────────────────────────
+        # -- Publish static *_imu -> *_cam0 edges --------------------------
+        # Stored for liveness re-send on /tf, matching the same pattern
+        # used by openvins_realsense_tf_bridge_node for DDS reliability.
+        self._imu_to_cam_tfs: list[TransformStamped] = []
         if publish_imu_to_cam:
-            static_tfs: list[TransformStamped] = []
             stamp = self.get_clock().now().to_msg()
 
             for imu_frame, cam_frame, extrinsics, name in [
@@ -158,11 +185,12 @@ class OpenVINSOdomTFRelay(Node):
             ]:
                 qx, qy, qz, qw = _quaternion_from_rpy(
                     extrinsics["roll"], extrinsics["pitch"], extrinsics["yaw"])
-                static_tfs.append(_make_transform(
+                tf_msg = _make_transform(
                     imu_frame, cam_frame,
                     extrinsics["x"], extrinsics["y"], extrinsics["z"],
                     qx, qy, qz, qw, stamp,
-                ))
+                )
+                self._imu_to_cam_tfs.append(tf_msg)
                 self.get_logger().info(
                     f"{name}: publishing static {imu_frame} -> {cam_frame} "
                     f"from nominal extrinsics "
@@ -172,9 +200,17 @@ class OpenVINSOdomTFRelay(Node):
                     f"{extrinsics['yaw']:.3f}))"
                 )
 
-            if static_tfs:
-                self._static_tf_broadcaster.sendTransform(static_tfs)
-
+            if self._imu_to_cam_tfs:
+                # Publish on /tf_static for persistent storage.
+                self._static_tf_broadcaster.sendTransform(self._imu_to_cam_tfs)
+                # Also on /tf immediately so late-joining nodes don't miss it
+                # (CycloneDDS TRANSIENT_LOCAL latch is unreliable).
+                self._tf_broadcaster.sendTransform(self._imu_to_cam_tfs)
+                # Liveness timer: re-send on /tf at 2 Hz so nodes that join
+                # after startup can still pick up the chain.
+                self._liveness_timer = self.create_timer(0.5, self._liveness_tick)
+            else:
+                self._liveness_timer = None
         self.get_logger().info(
             f"OpenVINS odometry TF relay active: "
             f"{self._target_frame} -> {self._head_imu} "
@@ -190,15 +226,17 @@ class OpenVINSOdomTFRelay(Node):
         self._on_odom(msg, self._target_frame, self._arm_imu, "arm")
 
     def _on_odom(self, msg: Odometry, parent: str, child: str, name: str):
-        """Extract pose from odom and publish as TF with host clock stamp."""
+        """Extract pose from odom and publish as TF with odom's timestamp."""
         x, y, z = _extract_translation_from_odom(msg)
         qx, qy, qz, qw = _extract_quaternion_from_odom(msg)
 
-        # Use host clock stamp — avoids extrapolation-into-the-past errors
-        # that occur when the Jetson clock and host clock differ.
+        # Use the odom message's timestamp so TF stamps share the same
+        # time domain as the point clouds from the Jetson.  The fusion
+        # node re-stamps the output cloud with the host clock, so
+        # downstream consumers are unaffected.
         tf_msg = _make_transform(
             parent, child, x, y, z, qx, qy, qz, qw,
-            self.get_clock().now().to_msg(),
+            msg.header.stamp,
         )
         self._tf_broadcaster.sendTransform(tf_msg)
 
@@ -212,6 +250,19 @@ class OpenVINSOdomTFRelay(Node):
                 f"{parent} -> {child} "
                 f"t=({x:.3f}, {y:.3f}, {z:.3f})"
             )
+
+    def _liveness_tick(self):
+        """Re-send imu->cam0 static transforms on /tf periodically.
+
+        This is a workaround for CycloneDDS /tf_static latch unreliability,
+        matching the pattern used by openvins_realsense_tf_bridge_node.
+        """
+        if not self._imu_to_cam_tfs or self._liveness_timer is None:
+            return
+        stamp = self.get_clock().now().to_msg()
+        for tf_msg in self._imu_to_cam_tfs:
+            tf_msg.header.stamp = stamp
+        self._tf_broadcaster.sendTransform(self._imu_to_cam_tfs)
 
 
 def main(args=None):
