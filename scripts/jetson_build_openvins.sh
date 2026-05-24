@@ -163,7 +163,7 @@ for src_file in "${LIB_SOURCES[@]}"; do
     obj_dir="$(dirname "${obj_file}")"
     mkdir -p "${obj_dir}"
 
-    echo "  [${COMPILED}/${TOTAL}] ${src_file}"
+    echo -n "  [${COMPILED}/${TOTAL}] ${src_file} ... "
 
     set +e
     docker_build "
@@ -171,34 +171,20 @@ source /opt/ros/humble/setup.bash
 source /ws/install_overlay/setup.bash 2>/dev/null || true
 cd /ws/build_overlay/ov_msckf
 
-# Remove old object file for clean recompile
+# Use cmake-generated rules (correct include paths) to compile single .o
+# Remove the .o first for clean recompile, then compile it solo
 rm -f 'CMakeFiles/ov_msckf_lib.dir/${src_file}.o'
-
-# Compile with explicit flags, no optimization body (saves RAM on templates)
-/usr/bin/c++ \
-    -DROS_AVAILABLE=2 -DENABLE_ARUCO_TAGS=1 \
-    -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-    -std=c++14 -fPIC -${OPT_LEVEL} -pipe -g0 \
-    -fno-omit-frame-pointer \
-    -I/ws/src/open_vins/ov_msckf/src \
-    -I/opt/ros/humble/include \
-    -I/ws/install_overlay/ov_core/include \
-    -I/ws/install_overlay/ov_init/include \
-    -I/ws/install_overlay/sensor_fusion_msgs/include \
-    -I/usr/include/eigen3 \
-    -I/usr/include/opencv4 \
-    -I/usr/include/boost \
-    -I/usr/include/suitesparse \
-    -c /ws/src/open_vins/ov_msckf/${src_file} \
-    -o 'CMakeFiles/ov_msckf_lib.dir/${src_file}.o' \
+make -f CMakeFiles/ov_msckf_lib.dir/build.make \
+    -j1 \
+    'CMakeFiles/ov_msckf_lib.dir/${src_file}.o' \
     2>&1
-" 2>&1 | grep -v "^========$\|^== CUDA\|Container image\|This container\|By pulling\|A copy\|WARNING\|NGC-DL\|site:" || true
+" 2>&1 | grep -E "(error|Error|fatal|warning|Warning)" | head -1 || echo "OK"
 
     rc=${PIPESTATUS[0]}
     set -e
 
     if [ "$rc" -ne 0 ]; then
-        echo "    FAILED (exit code $rc)"
+        echo "    FAILED"
         FAILED+=("${src_file}")
     fi
 done
