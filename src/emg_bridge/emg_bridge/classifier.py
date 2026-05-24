@@ -12,12 +12,15 @@ cross-val accuracy < 85 %).
 from __future__ import annotations
 
 from pathlib import Path
+import warnings
 
 import numpy as np
 from numpy.typing import NDArray
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -25,12 +28,13 @@ from sklearn.svm import SVC
 import joblib
 from collections import deque
 
-from .config import CONFIDENCE_THRESHOLD, GESTURE_NAMES, REST_LABEL
+from .config import CONFIDENCE_THRESHOLD, GESTURE_NAMES, REST_LABEL, N_GESTURES
 
 # Default filenames inside the model directory
 SCALER_FILE = "scaler.pkl"
 CLF_FILE = "classifier.pkl"
 META_FILE = "meta.pkl"
+_MODEL_PREFERENCE = ("MLP", "LDA", "SVM")
 
 
 def _build_lda() -> Pipeline:
@@ -47,6 +51,55 @@ def _build_svm() -> Pipeline:
     ])
 
 
+def _build_mlp() -> Pipeline:
+    return Pipeline([
+        ("scaler", StandardScaler()),
+        (
+            "clf",
+            MLPClassifier(
+                hidden_layer_sizes=(128, 64),
+                activation="relu",
+                solver="adam",
+                alpha=1e-4,
+                batch_size="auto",
+                learning_rate_init=1e-3,
+                max_iter=400,
+                early_stopping=True,
+                n_iter_no_change=20,
+                random_state=42,
+            ),
+        ),
+    ])
+
+
+def _pick_best_candidate(scores: dict[str, float]) -> tuple[str, float]:
+    best_name = max(
+        scores,
+        key=lambda name: (scores[name], -_MODEL_PREFERENCE.index(name)),
+    )
+    return best_name, scores[best_name]
+
+
+def _cross_validate_candidate(
+    name: str,
+    pipe: Pipeline,
+    X: NDArray,
+    y: NDArray,
+    cv: StratifiedKFold,
+    *,
+    verbose: bool,
+) -> tuple[float, NDArray]:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConvergenceWarning)
+        y_pred_cv = cross_val_predict(pipe, X, y, cv=cv)
+
+    accuracy = float(np.mean(y_pred_cv == y))
+    if verbose:
+        print(f"\n{name} cross-val accuracy ({cv.n_splits}-fold): {accuracy * 100:.1f} %")
+        _print_confusion(y, y_pred_cv)
+    return accuracy, y_pred_cv
+
+
 def train(
     X: NDArray,
     y: NDArray,
@@ -54,6 +107,7 @@ def train(
     model_dir: str | Path = "models",
     cv_folds: int = 5,
     verbose: bool = True,
+    feature_set: str = "emg_only",
 ) -> Pipeline:
     """Train (and cross-validate) a classifier on feature matrix X and labels y.
 
@@ -63,6 +117,7 @@ def train(
         model_dir: directory to save fitted pipeline
         cv_folds: number of stratified cross-validation folds
         verbose: print diagnostics
+        feature_set: "emg_only" or "emg_imu" — recorded in meta.pkl
 
     Returns:
         Fitted scikit-learn Pipeline (scaler → classifier)
@@ -70,40 +125,41 @@ def train(
     model_dir = Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── cross-validate LDA ───────────────────────────────────────────────────
-    pipe_lda = _build_lda()
     cv = StratifiedKFold(n_splits=cv_folds, shuffle=True, random_state=42)
-    y_pred_cv = cross_val_predict(pipe_lda, X, y, cv=cv)
-    lda_acc = float(np.mean(y_pred_cv == y))
+    candidate_builders = {
+        "MLP": _build_mlp,
+        "LDA": _build_lda,
+        "SVM": _build_svm,
+    }
+    candidate_scores: dict[str, float] = {}
+    candidate_pipes: dict[str, Pipeline] = {}
 
-    if verbose:
-        print(f"\nLDA cross-val accuracy ({cv_folds}-fold): {lda_acc * 100:.1f} %")
-        _print_confusion(y, y_pred_cv)
+    for name in _MODEL_PREFERENCE:
+        pipe = candidate_builders[name]()
+        score, _ = _cross_validate_candidate(name, pipe, X, y, cv, verbose=verbose)
+        candidate_scores[name] = score
+        candidate_pipes[name] = pipe
 
-    # ── choose model ─────────────────────────────────────────────────────────
-    if lda_acc >= 0.85:
-        pipe = pipe_lda
-        algo = "LDA"
-    else:
-        if verbose:
-            print(f"LDA accuracy < 85 %, switching to SVM …")
-        pipe_svm = _build_svm()
-        y_pred_svm = cross_val_predict(pipe_svm, X, y, cv=cv)
-        svm_acc = float(np.mean(y_pred_svm == y))
-        if verbose:
-            print(f"SVM cross-val accuracy ({cv_folds}-fold): {svm_acc * 100:.1f} %")
-            _print_confusion(y, y_pred_svm)
-        pipe = pipe_svm if svm_acc >= lda_acc else pipe_lda
-        algo = "SVM" if svm_acc >= lda_acc else "LDA"
+    algo, best_score = _pick_best_candidate(candidate_scores)
+    pipe = candidate_pipes[algo]
 
     # ── final fit on full dataset ─────────────────────────────────────────────
-    pipe.fit(X, y)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConvergenceWarning)
+        pipe.fit(X, y)
     if verbose:
         print(f"\nFinal model: {algo} — fit on {len(y)} windows.")
 
     # ── save ─────────────────────────────────────────────────────────────────
     joblib.dump(pipe, model_dir / CLF_FILE)
-    meta = {"algorithm": algo, "cv_accuracy": lda_acc, "classes": np.unique(y).tolist()}
+    meta = {
+        "algorithm": algo,
+        "cv_accuracy": best_score,
+        "candidate_scores": candidate_scores,
+        "classes": np.unique(y).tolist(),
+        "feature_set": feature_set,
+        "feature_dim": int(X.shape[1]),
+    }
     joblib.dump(meta, model_dir / META_FILE)
 
     if verbose:

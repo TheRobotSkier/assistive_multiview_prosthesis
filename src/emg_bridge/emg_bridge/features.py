@@ -101,3 +101,84 @@ def feature_names() -> list[str]:
         for s in short:
             names.append(f"ch{ch}_{s}")
     return names
+
+
+# ── IMU feature extraction ─────────────────────────────────────────────────────
+
+# Per-axis features for gyro/accel windows
+_IMU_FEATURE_FUNCS = [
+    ("mean", lambda x: float(np.mean(x))),
+    ("std", lambda x: float(np.std(x))),
+    ("min", lambda x: float(np.min(x))),
+    ("max", lambda x: float(np.max(x))),
+    ("rms", lambda x: float(np.sqrt(np.mean(x**2)))),
+    ("abs_mean", lambda x: float(np.mean(np.abs(x)))),
+    ("range", lambda x: float(np.max(x) - np.min(x))),
+    ("diff_energy", lambda x: float(np.sum(np.diff(x) ** 2) / max(len(x) - 1, 1))),
+]
+
+N_IMU_FEATURES_PER_AXIS = len(_IMU_FEATURE_FUNCS)
+
+
+def compute_imu_features(
+    gyro_window: NDArray | None = None,
+    accel_window: NDArray | None = None,
+) -> NDArray:
+    """Compute per-axis IMU features for a gyro and/or accelerometer window.
+
+    Args:
+        gyro_window: (N_gyro_channels, window_len) or None
+        accel_window: (N_accel_channels, window_len) or None
+
+    Returns:
+        1-D ndarray of concatenated gyro features + accel features.
+        Empty array if both are None.
+    """
+    feats: list[float] = []
+
+    for imu_data, prefix in [(gyro_window, "gyro"), (accel_window, "accel")]:
+        if imu_data is None:
+            continue
+        if imu_data.size == 0:
+            continue
+        if imu_data.ndim == 1:
+            imu_data = imu_data.reshape(1, -1)
+        for ch in range(imu_data.shape[0]):
+            x = imu_data[ch]
+            for _name, fn in _IMU_FEATURE_FUNCS:
+                feats.append(fn(x))
+
+    return np.array(feats, dtype=np.float64)
+
+
+def compute_augmented_features(
+    emg_window: NDArray,
+    gyro_window: NDArray | None = None,
+    accel_window: NDArray | None = None,
+) -> NDArray:
+    """Concatenate EMG features and IMU features for sklearn_imu backend.
+
+    Args:
+        emg_window: (N_channels, window_len)
+        gyro_window: (N_gyro, window_len) or None
+        accel_window: (N_accel, window_len) or None
+
+    Returns:
+        1-D ndarray: [EMG features | gyro features | accel features]
+    """
+    emg_feats = compute_features(emg_window)
+    imu_feats = compute_imu_features(gyro_window, accel_window)
+    return np.concatenate([emg_feats, imu_feats])
+
+
+def imu_feature_names(n_gyro_channels: int = 3, n_accel_channels: int = 3) -> list[str]:
+    """Return human-readable IMU feature names."""
+    names: list[str] = []
+    short = [name for name, _ in _IMU_FEATURE_FUNCS]
+    for ch in range(n_gyro_channels):
+        for s in short:
+            names.append(f"gyro{ch}_{s}")
+    for ch in range(n_accel_channels):
+        for s in short:
+            names.append(f"accel{ch}_{s}")
+    return names
