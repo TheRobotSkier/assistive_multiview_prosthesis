@@ -28,9 +28,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── Paths ────────────────────────────────────────────────────────────────────
-DOCKER_WS="${REPO_ROOT}/docker_ws"
+DOCKER_WS="${DOCKER_WS:-${REPO_ROOT}/docker_ws}"
 OPENVINS_SRC_DIR="${OPENVINS_SRC_DIR:-${DOCKER_WS}/src/open_vins}"
-MULTI_CAM_DIR="${DOCKER_WS}/multi_cam_localization"
+MULTI_CAM_DIR="${MULTI_CAM_DIR:-${DOCKER_WS}/multi_cam_localization}"
 OVERLAY_INSTALL_DIR="${OVERLAY_INSTALL_DIR:-${DOCKER_WS}/install_overlay}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-prosthesis:latest}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
