@@ -68,6 +68,9 @@ def _setup(context, *args, **kwargs):
     pointcloud_cfg = config.get("pointcloud", {})
 
     mode = str(_arg_or_config(context, "mode", launch_cfg.get("mode", "observe"))).strip()
+    openvins_experiment_profile = str(
+        _arg_or_config(context, "openvins_experiment_profile", "baseline")
+    ).strip()
     start_cameras = _as_bool(_arg_or_config(context, "start_cameras", launch_cfg.get("start_cameras", True)))
     start_preview = _as_bool(_arg_or_config(context, "start_preview", launch_cfg.get("start_preview", True)))
     start_rviz = _as_bool(_arg_or_config(context, "start_rviz", launch_cfg.get("start_rviz", False)))
@@ -126,6 +129,7 @@ def _setup(context, *args, **kwargs):
                 "pointcloud_decimation_magnitude": pointcloud_decimation_magnitude,
                 "pointcloud_require_marker_map_locked": pointcloud_require_marker_map_locked,
                 "enable_pointcloud_neon_fix": enable_pointcloud_neon_fix,
+                "openvins_experiment_profile": openvins_experiment_profile,
             }.items(),
         ),
         IncludeLaunchDescription(
@@ -182,6 +186,7 @@ def _setup(context, *args, **kwargs):
                     dynamic_params.get("dynamic_arm_reanchor_skip_after_fixed_marker_s", 3.0)
                 ),
                 "dynamic_arm_reanchor_covariance_multiplier": str(dynamic_params.get("dynamic_arm_reanchor_covariance_multiplier", 2.0)),
+                "openvins_experiment_profile": openvins_experiment_profile,
             }.items(),
         ),
         IncludeLaunchDescription(
@@ -342,6 +347,15 @@ def generate_launch_description():
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("verbosity", default_value=""),
             DeclareLaunchArgument("hold_back_imu_for_frames", default_value=""),
+            DeclareLaunchArgument(
+                "openvins_experiment_profile",
+                default_value="",
+                description=(
+                    "Named experiment profile forwarded to head/arm OpenVINS launches. "
+                    "Empty/unset = baseline (unchanged defaults). "
+                    "See config/openvins_experiment_profiles.yaml for available profiles."
+                ),
+            ),
             OpaqueFunction(function=_setup),
         ]
     )

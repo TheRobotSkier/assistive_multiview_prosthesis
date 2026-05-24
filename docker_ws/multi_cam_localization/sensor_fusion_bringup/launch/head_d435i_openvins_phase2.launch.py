@@ -1,21 +1,81 @@
+from pathlib import Path
+
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, TimerAction
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
+import openvins_profile
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _create_openvins_node(context, *args, **kwargs):
+    package_dir = Path(FindPackageShare("sensor_fusion_bringup").perform(context))
+    profile_name = LaunchConfiguration("openvins_experiment_profile").perform(context).strip()
+    overrides = openvins_profile.get_profile_overrides(package_dir, profile_name)
+
+    head_config = overrides.get("head_config")
+    if head_config:
+        ov_config = str(package_dir / "config" / "openvins" / head_config)
+    else:
+        ov_config = str(
+            package_dir / "config" / "openvins" / "head_d435i_336222071386" / "estimator_config.yaml"
+        )
+
+    marker_overrides = overrides.get("head_marker", {})
+
+    params = {
+        "use_sim_time": _as_bool(LaunchConfiguration("use_sim_time").perform(context)),
+        "verbosity": LaunchConfiguration("verbosity").perform(context),
+        "use_stereo": False,
+        "max_cameras": 1,
+        "config_path": ov_config,
+        "global_frame_id": "marker_map",
+        "imu_frame_id": "head_imu",
+        "camera_frame_prefix": "head_cam",
+        "publish_global_to_imu_tf": True,
+        "publish_calibration_tf": True,
+        "use_marker_pose_updates": True,
+        "marker_pose_topic": "/head/marker_pose/observation",
+        "marker_global_frame_id": "marker_map",
+        "marker_target_frame": "head_imu",
+        "marker_fixed_ids": "0",
+        "marker_time_tolerance_s": 0.05,
+        "marker_chi2_gate": 16.81,
+        "marker_noise_multiplier": 1.0,
+        "marker_max_update_translation_m": 0.25,
+        "marker_max_update_rotation_deg": 25.0,
+        "marker_reset_translation_m": 0.50,
+        "marker_reset_rotation_deg": 20.0,
+        "marker_reset_min_samples": 5,
+        "marker_reset_window_s": 0.50,
+        "marker_reset_min_sample_dt_s": 0.10,
+        "marker_reset_max_velocity_mps": 2.0,
+        "marker_reset_min_velocity_std_mps": 0.05,
+        "marker_reset_bias_gyro_std": 0.02,
+        "marker_reset_bias_accel_std": 0.20,
+    }
+    params.update(marker_overrides)
+
+    return Node(
+        package="ov_msckf",
+        executable="run_subscribe_msckf_marker",
+        namespace="ov_msckf",
+        name="run_subscribe_msckf_marker",
+        output="screen",
+        parameters=[params],
+    )
+
 
 def generate_launch_description():
-    ov_config = PathJoinSubstitution([
-        FindPackageShare("sensor_fusion_bringup"),
-        "config",
-        "openvins",
-        "head_d435i_336222071386",
-        "estimator_config.yaml",
-    ])
-
     pointcloud_marker_map_enabled = PythonExpression([
         "'",
         LaunchConfiguration("enable_pointclouds"),
@@ -135,45 +195,6 @@ def generate_launch_description():
         ],
     )
 
-    openvins_phase2 = Node(
-        package="ov_msckf",
-        executable="run_subscribe_msckf_marker",
-        namespace="ov_msckf",
-        name="run_subscribe_msckf_marker",
-        output="screen",
-        parameters=[
-            {"use_sim_time": LaunchConfiguration("use_sim_time")},
-            {"verbosity": LaunchConfiguration("verbosity")},
-            {"use_stereo": False},
-            {"max_cameras": 1},
-            {"config_path": ov_config},
-            {"global_frame_id": "marker_map"},
-            {"imu_frame_id": "head_imu"},
-            {"camera_frame_prefix": "head_cam"},
-            {"publish_global_to_imu_tf": True},
-            {"publish_calibration_tf": True},
-            {"use_marker_pose_updates": True},
-            {"marker_pose_topic": "/head/marker_pose/observation"},
-            {"marker_global_frame_id": "marker_map"},
-            {"marker_target_frame": "head_imu"},
-            {"marker_fixed_ids": "0"},
-            {"marker_time_tolerance_s": 0.05},
-            {"marker_chi2_gate": 16.81},
-            {"marker_noise_multiplier": 1.0},
-            {"marker_max_update_translation_m": 0.25},
-            {"marker_max_update_rotation_deg": 25.0},
-            {"marker_reset_translation_m": 0.50},
-            {"marker_reset_rotation_deg": 20.0},
-            {"marker_reset_min_samples": 5},
-            {"marker_reset_window_s": 0.50},
-            {"marker_reset_min_sample_dt_s": 0.10},
-            {"marker_reset_max_velocity_mps": 2.0},
-            {"marker_reset_min_velocity_std_mps": 0.05},
-            {"marker_reset_bias_gyro_std": 0.02},
-            {"marker_reset_bias_accel_std": 0.20},
-        ],
-    )
-
     return LaunchDescription([
         DeclareLaunchArgument("verbosity", default_value="INFO"),
         DeclareLaunchArgument(
@@ -226,8 +247,18 @@ def generate_launch_description():
             default_value="false",
             description="Legacy delayed Jetson pointcloud__neon_.enable fix. Startup parameters normally handle this.",
         ),
+        DeclareLaunchArgument(
+            "openvins_experiment_profile",
+            default_value="baseline",
+            description=(
+                "Named experiment profile from config/openvins_experiment_profiles.yaml. "
+                "'baseline' = unchanged defaults. "
+                "Available: baseline, marker_strong_ekf, marker_easier_initial_lock, "
+                "reset_bias_policy, calib_extrinsics, zupt, imu_frame_variant, all_changes"
+            ),
+        ),
         head_camera,
         pointcloud_neon_fix,
         pointcloud_marker_map,
-        TimerAction(period=5.0, actions=[openvins_phase2]),
+        TimerAction(period=5.0, actions=[OpaqueFunction(function=_create_openvins_node)]),
     ])

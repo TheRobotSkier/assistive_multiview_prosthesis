@@ -1,0 +1,127 @@
+# ---------------------------------------------------------------------------
+# OpenVINS experiment profiles — shared mechanism for selecting marker/IMU
+# fusion experiments on Jetson without editing launch files.
+#
+# Usage:
+#   ros2 launch sensor_fusion_bringup head_d435i_openvins_phase2.launch.py \
+#       openvins_experiment_profile:=marker_strong_ekf
+#   ros2 launch sensor_fusion_bringup arm_d435i_openvins_phase2.launch.py \
+#       openvins_experiment_profile:=marker_strong_ekf
+#   ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py \
+#       openvins_experiment_profile:=marker_easier_initial_lock
+#
+# Named profiles (see below for details):
+#   baseline                    unchanged defaults
+#   marker_strong_ekf           relaxed marker rejection, trust markers more
+#   marker_easier_initial_lock  lower threshold for initial marker lock
+#   reset_bias_policy           aggressive IMU bias reset on marker lock
+#   calib_extrinsics            high-noise profile for extrinsic estimation
+#   zupt                        placeholder for zero-velocity updates
+#   imu_frame_variant           placeholder for IMU frame remapping
+#   all_changes                 combine all non-contradictory overrides
+#
+# Each profile can contain (all keys optional):
+#   head_marker       — marker param overrides for head OpenVINS node
+#   arm_marker        — marker param overrides for arm OpenVINS node
+#   arm_dynamic_arm   — dynamic-arm param overrides for arm OpenVINS node
+#   head_config       — path relative to config/openvins/ for head
+#   arm_config        — path relative to config/openvins/ for arm
+#   marker_detector   — placeholder for marker detector param overrides
+#   realsense         — placeholder for RealSense camera param overrides
+#
+# To add new params from later beads: add a new key under the desired
+# profile and the launch OpaqueFunction will forward it automatically.
+# ---------------------------------------------------------------------------
+
+profiles:
+  baseline:
+    description: Default baseline — no overrides, uses hardcoded launch-file defaults.
+
+  marker_strong_ekf:
+    description: >
+      Relax marker rejection thresholds and increase marker trust.
+      Uses 99% DOF chi2 critical value (22.46 for 2 DOF).
+    head_marker:
+      marker_chi2_gate: 22.46
+      marker_noise_multiplier: 0.5
+      marker_max_update_translation_m: 0.40
+      marker_max_update_rotation_deg: 35.0
+    arm_marker:
+      marker_chi2_gate: 22.46
+      marker_noise_multiplier: 0.5
+      marker_max_update_translation_m: 0.40
+      marker_max_update_rotation_deg: 35.0
+
+  marker_easier_initial_lock:
+    description: >
+      Reduce the number of samples and tighten the velocity checks
+      required for the initial marker-map lock.
+    head_marker:
+      marker_reset_translation_m: 0.80
+      marker_reset_rotation_deg: 30.0
+      marker_reset_min_samples: 3
+      marker_reset_window_s: 1.00
+    arm_marker:
+      marker_reset_translation_m: 0.80
+      marker_reset_rotation_deg: 30.0
+      marker_reset_min_samples: 3
+      marker_reset_window_s: 1.00
+
+  reset_bias_policy:
+    description: >
+      Aggressive IMU gyro / accel bias reset standard deviations
+      on marker lock, allowing the EKF to adjust biases faster.
+    head_marker:
+      marker_reset_bias_gyro_std: 0.05
+      marker_reset_bias_accel_std: 0.50
+    arm_marker:
+      marker_reset_bias_gyro_std: 0.05
+      marker_reset_bias_accel_std: 0.50
+
+  calib_extrinsics:
+    description: >
+      High-noise calibration profile to let the EKF estimate camera-IMU
+      extrinsics more freely.
+    head_marker:
+      marker_noise_multiplier: 10.0
+      marker_chi2_gate: 22.46
+    arm_marker:
+      marker_noise_multiplier: 10.0
+      marker_chi2_gate: 22.46
+
+  zupt:
+    description: >
+      Placeholder for zero-velocity update experiments.
+      No overrides yet — add keys here when the ZUPT bead lands.
+
+  imu_frame_variant:
+    description: >
+      Placeholder for IMU frame remapping experiments.
+      No overrides yet — add keys here when the IMU frame bead lands.
+
+  all_changes:
+    description: >
+      Merge all non-contradictory overrides from the other profiles
+      into a single experiment. Useful for quick A/B testing.
+    head_marker:
+      marker_chi2_gate: 22.46
+      marker_noise_multiplier: 0.5
+      marker_max_update_translation_m: 0.40
+      marker_max_update_rotation_deg: 35.0
+      marker_reset_translation_m: 0.80
+      marker_reset_rotation_deg: 30.0
+      marker_reset_min_samples: 3
+      marker_reset_window_s: 1.00
+      marker_reset_bias_gyro_std: 0.05
+      marker_reset_bias_accel_std: 0.50
+    arm_marker:
+      marker_chi2_gate: 22.46
+      marker_noise_multiplier: 0.5
+      marker_max_update_translation_m: 0.40
+      marker_max_update_rotation_deg: 35.0
+      marker_reset_translation_m: 0.80
+      marker_reset_rotation_deg: 30.0
+      marker_reset_min_samples: 3
+      marker_reset_window_s: 1.00
+      marker_reset_bias_gyro_std: 0.05
+      marker_reset_bias_accel_std: 0.50

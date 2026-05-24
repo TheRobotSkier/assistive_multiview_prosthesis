@@ -1,21 +1,157 @@
+from pathlib import Path
+
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, TimerAction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, TimerAction
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
+import openvins_profile
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _create_openvins_node(context, *args, **kwargs):
+    package_dir = Path(FindPackageShare("sensor_fusion_bringup").perform(context))
+    profile_name = LaunchConfiguration("openvins_experiment_profile").perform(context).strip()
+    overrides = openvins_profile.get_profile_overrides(package_dir, profile_name)
+
+    arm_config = overrides.get("arm_config")
+    if arm_config:
+        ov_config = str(package_dir / "config" / "openvins" / arm_config)
+    else:
+        ov_config = str(
+            package_dir / "config" / "openvins" / "arm_d435i_310622071850" / "estimator_config.yaml"
+        )
+
+    marker_overrides = overrides.get("arm_marker", {})
+    dynamic_arm_overrides = overrides.get("arm_dynamic_arm", {})
+
+    params = {
+        "use_sim_time": _as_bool(LaunchConfiguration("use_sim_time").perform(context)),
+        "verbosity": LaunchConfiguration("verbosity").perform(context),
+        "use_stereo": False,
+        "max_cameras": 1,
+        "config_path": ov_config,
+        "global_frame_id": "marker_map",
+        "imu_frame_id": "arm_imu",
+        "camera_frame_prefix": "arm_cam",
+        "publish_global_to_imu_tf": True,
+        "publish_calibration_tf": True,
+        "use_marker_pose_updates": True,
+        "marker_pose_topic": "/arm/marker_pose/observation",
+        "marker_global_frame_id": "marker_map",
+        "marker_target_frame": "arm_imu",
+        "marker_fixed_ids": "0",
+        "marker_time_tolerance_s": 0.05,
+        "marker_chi2_gate": 16.81,
+        "marker_noise_multiplier": 1.0,
+        "marker_max_update_translation_m": 0.25,
+        "marker_max_update_rotation_deg": 25.0,
+        "marker_reset_translation_m": 0.50,
+        "marker_reset_rotation_deg": 20.0,
+        "marker_reset_min_samples": 5,
+        "marker_reset_window_s": 0.50,
+        "marker_reset_min_sample_dt_s": 0.10,
+        "marker_reset_max_velocity_mps": 2.0,
+        "marker_reset_min_velocity_std_mps": 0.05,
+        "marker_reset_bias_gyro_std": 0.02,
+        "marker_reset_bias_accel_std": 0.20,
+        "use_dynamic_arm_pose_updates": _as_bool(
+            LaunchConfiguration("use_dynamic_arm_pose_updates").perform(context)
+        ),
+        "dynamic_arm_measurement_only": _as_bool(
+            LaunchConfiguration("dynamic_arm_measurement_only").perform(context)
+        ),
+        "dynamic_arm_pose_topic": LaunchConfiguration("dynamic_arm_pose_topic").perform(context),
+        "dynamic_arm_status_topic": LaunchConfiguration("dynamic_arm_status_topic").perform(context),
+        "dynamic_arm_global_frame_id": LaunchConfiguration("dynamic_arm_global_frame_id").perform(context),
+        "dynamic_arm_target_frame": LaunchConfiguration("dynamic_arm_target_frame").perform(context),
+        "dynamic_arm_source_camera_frame": LaunchConfiguration("dynamic_arm_source_camera_frame").perform(context),
+        "dynamic_arm_marker_frame": LaunchConfiguration("dynamic_arm_marker_frame").perform(context),
+        "dynamic_arm_marker_id": int(LaunchConfiguration("dynamic_arm_marker_id").perform(context)),
+        "dynamic_arm_time_tolerance_s": float(
+            LaunchConfiguration("dynamic_arm_time_tolerance_s").perform(context)
+        ),
+        "dynamic_arm_noise_multiplier": float(
+            LaunchConfiguration("dynamic_arm_noise_multiplier").perform(context)
+        ),
+        "dynamic_arm_chi2_gate": float(LaunchConfiguration("dynamic_arm_chi2_gate").perform(context)),
+        "dynamic_arm_max_update_translation_m": float(
+            LaunchConfiguration("dynamic_arm_max_update_translation_m").perform(context)
+        ),
+        "dynamic_arm_max_update_rotation_deg": float(
+            LaunchConfiguration("dynamic_arm_max_update_rotation_deg").perform(context)
+        ),
+        "dynamic_arm_min_update_interval_s": float(
+            LaunchConfiguration("dynamic_arm_min_update_interval_s").perform(context)
+        ),
+        "dynamic_arm_skip_after_fixed_marker_s": float(
+            LaunchConfiguration("dynamic_arm_skip_after_fixed_marker_s").perform(context)
+        ),
+        "dynamic_arm_allow_initial_lock": _as_bool(
+            LaunchConfiguration("dynamic_arm_allow_initial_lock").perform(context)
+        ),
+        "dynamic_arm_allow_reanchor": _as_bool(
+            LaunchConfiguration("dynamic_arm_allow_reanchor").perform(context)
+        ),
+        "dynamic_arm_reanchor_measurement_only": _as_bool(
+            LaunchConfiguration("dynamic_arm_reanchor_measurement_only").perform(context)
+        ),
+        "dynamic_arm_reanchor_min_samples": int(
+            LaunchConfiguration("dynamic_arm_reanchor_min_samples").perform(context)
+        ),
+        "dynamic_arm_reanchor_window_s": float(
+            LaunchConfiguration("dynamic_arm_reanchor_window_s").perform(context)
+        ),
+        "dynamic_arm_reanchor_min_sample_dt_s": float(
+            LaunchConfiguration("dynamic_arm_reanchor_min_sample_dt_s").perform(context)
+        ),
+        "dynamic_arm_reanchor_max_velocity_mps": float(
+            LaunchConfiguration("dynamic_arm_reanchor_max_velocity_mps").perform(context)
+        ),
+        "dynamic_arm_reanchor_max_sample_translation_std_m": float(
+            LaunchConfiguration("dynamic_arm_reanchor_max_sample_translation_std_m").perform(context)
+        ),
+        "dynamic_arm_reanchor_max_sample_rotation_std_deg": float(
+            LaunchConfiguration("dynamic_arm_reanchor_max_sample_rotation_std_deg").perform(context)
+        ),
+        "dynamic_arm_reanchor_trigger_translation_m": float(
+            LaunchConfiguration("dynamic_arm_reanchor_trigger_translation_m").perform(context)
+        ),
+        "dynamic_arm_reanchor_trigger_rotation_deg": float(
+            LaunchConfiguration("dynamic_arm_reanchor_trigger_rotation_deg").perform(context)
+        ),
+        "dynamic_arm_reanchor_cooldown_s": float(
+            LaunchConfiguration("dynamic_arm_reanchor_cooldown_s").perform(context)
+        ),
+        "dynamic_arm_reanchor_skip_after_fixed_marker_s": float(
+            LaunchConfiguration("dynamic_arm_reanchor_skip_after_fixed_marker_s").perform(context)
+        ),
+        "dynamic_arm_reanchor_covariance_multiplier": float(
+            LaunchConfiguration("dynamic_arm_reanchor_covariance_multiplier").perform(context)
+        ),
+    }
+    params.update(marker_overrides)
+    params.update(dynamic_arm_overrides)
+
+    return Node(
+        package="ov_msckf",
+        executable="run_subscribe_msckf_marker",
+        namespace="ov_msckf_arm",
+        name="run_subscribe_msckf_marker",
+        output="screen",
+        parameters=[params],
+    )
+
 
 def generate_launch_description():
-    ov_config = PathJoinSubstitution([
-        FindPackageShare("sensor_fusion_bringup"),
-        "config",
-        "openvins",
-        "arm_d435i_310622071850",
-        "estimator_config.yaml",
-    ])
-
     pointcloud_marker_map_enabled = PythonExpression([
         "'",
         LaunchConfiguration("enable_pointclouds"),
@@ -135,165 +271,6 @@ def generate_launch_description():
         ],
     )
 
-    openvins_phase2 = Node(
-        package="ov_msckf",
-        executable="run_subscribe_msckf_marker",
-        namespace="ov_msckf_arm",
-        name="run_subscribe_msckf_marker",
-        output="screen",
-        parameters=[
-            {"use_sim_time": LaunchConfiguration("use_sim_time")},
-            {"verbosity": LaunchConfiguration("verbosity")},
-            {"use_stereo": False},
-            {"max_cameras": 1},
-            {"config_path": ov_config},
-            {"global_frame_id": "marker_map"},
-            {"imu_frame_id": "arm_imu"},
-            {"camera_frame_prefix": "arm_cam"},
-            {"publish_global_to_imu_tf": True},
-            {"publish_calibration_tf": True},
-            {"use_marker_pose_updates": True},
-            {"marker_pose_topic": "/arm/marker_pose/observation"},
-            {"marker_global_frame_id": "marker_map"},
-            {"marker_target_frame": "arm_imu"},
-            {"marker_fixed_ids": "0"},
-            {"marker_time_tolerance_s": 0.05},
-            {"marker_chi2_gate": 16.81},
-            {"marker_noise_multiplier": 1.0},
-            {"marker_max_update_translation_m": 0.25},
-            {"marker_max_update_rotation_deg": 25.0},
-            {"marker_reset_translation_m": 0.50},
-            {"marker_reset_rotation_deg": 20.0},
-            {"marker_reset_min_samples": 5},
-            {"marker_reset_window_s": 0.50},
-            {"marker_reset_min_sample_dt_s": 0.10},
-            {"marker_reset_max_velocity_mps": 2.0},
-            {"marker_reset_min_velocity_std_mps": 0.05},
-            {"marker_reset_bias_gyro_std": 0.02},
-            {"marker_reset_bias_accel_std": 0.20},
-            {
-                "use_dynamic_arm_pose_updates": ParameterValue(
-                    LaunchConfiguration("use_dynamic_arm_pose_updates"),
-                    value_type=bool,
-                )
-            },
-            {
-                "dynamic_arm_measurement_only": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_measurement_only"),
-                    value_type=bool,
-                )
-            },
-            {"dynamic_arm_pose_topic": LaunchConfiguration("dynamic_arm_pose_topic")},
-            {"dynamic_arm_status_topic": LaunchConfiguration("dynamic_arm_status_topic")},
-            {"dynamic_arm_global_frame_id": LaunchConfiguration("dynamic_arm_global_frame_id")},
-            {"dynamic_arm_target_frame": LaunchConfiguration("dynamic_arm_target_frame")},
-            {"dynamic_arm_source_camera_frame": LaunchConfiguration("dynamic_arm_source_camera_frame")},
-            {"dynamic_arm_marker_frame": LaunchConfiguration("dynamic_arm_marker_frame")},
-            {"dynamic_arm_marker_id": ParameterValue(LaunchConfiguration("dynamic_arm_marker_id"), value_type=int)},
-            {
-                "dynamic_arm_time_tolerance_s": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_time_tolerance_s"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_noise_multiplier": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_noise_multiplier"),
-                    value_type=float,
-                )
-            },
-            {"dynamic_arm_chi2_gate": ParameterValue(LaunchConfiguration("dynamic_arm_chi2_gate"), value_type=float)},
-            {
-                "dynamic_arm_max_update_translation_m": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_max_update_translation_m"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_max_update_rotation_deg": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_max_update_rotation_deg"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_min_update_interval_s": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_min_update_interval_s"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_skip_after_fixed_marker_s": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_skip_after_fixed_marker_s"),
-                    value_type=float,
-                )
-            },
-            {"dynamic_arm_allow_initial_lock": ParameterValue(LaunchConfiguration("dynamic_arm_allow_initial_lock"), value_type=bool)},
-            {"dynamic_arm_allow_reanchor": ParameterValue(LaunchConfiguration("dynamic_arm_allow_reanchor"), value_type=bool)},
-            {
-                "dynamic_arm_reanchor_measurement_only": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_measurement_only"),
-                    value_type=bool,
-                )
-            },
-            {"dynamic_arm_reanchor_min_samples": ParameterValue(LaunchConfiguration("dynamic_arm_reanchor_min_samples"), value_type=int)},
-            {"dynamic_arm_reanchor_window_s": ParameterValue(LaunchConfiguration("dynamic_arm_reanchor_window_s"), value_type=float)},
-            {
-                "dynamic_arm_reanchor_min_sample_dt_s": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_min_sample_dt_s"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_reanchor_max_velocity_mps": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_max_velocity_mps"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_reanchor_max_sample_translation_std_m": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_max_sample_translation_std_m"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_reanchor_max_sample_rotation_std_deg": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_max_sample_rotation_std_deg"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_reanchor_trigger_translation_m": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_trigger_translation_m"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_reanchor_trigger_rotation_deg": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_trigger_rotation_deg"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_reanchor_cooldown_s": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_cooldown_s"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_reanchor_skip_after_fixed_marker_s": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_skip_after_fixed_marker_s"),
-                    value_type=float,
-                )
-            },
-            {
-                "dynamic_arm_reanchor_covariance_multiplier": ParameterValue(
-                    LaunchConfiguration("dynamic_arm_reanchor_covariance_multiplier"),
-                    value_type=float,
-                )
-            },
-        ],
-    )
-
     return LaunchDescription([
         DeclareLaunchArgument("verbosity", default_value="INFO"),
         DeclareLaunchArgument(
@@ -392,8 +369,18 @@ def generate_launch_description():
         DeclareLaunchArgument("dynamic_arm_reanchor_cooldown_s", default_value="5.0"),
         DeclareLaunchArgument("dynamic_arm_reanchor_skip_after_fixed_marker_s", default_value="3.0"),
         DeclareLaunchArgument("dynamic_arm_reanchor_covariance_multiplier", default_value="2.0"),
+        DeclareLaunchArgument(
+            "openvins_experiment_profile",
+            default_value="baseline",
+            description=(
+                "Named experiment profile from config/openvins_experiment_profiles.yaml. "
+                "'baseline' = unchanged defaults. "
+                "Available: baseline, marker_strong_ekf, marker_easier_initial_lock, "
+                "reset_bias_policy, calib_extrinsics, zupt, imu_frame_variant, all_changes"
+            ),
+        ),
         arm_camera,
         pointcloud_neon_fix,
         pointcloud_marker_map,
-        TimerAction(period=5.0, actions=[openvins_phase2]),
+        TimerAction(period=5.0, actions=[OpaqueFunction(function=_create_openvins_node)]),
     ])
