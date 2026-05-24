@@ -1,0 +1,27 @@
+README.md
+  s_6a053cf002c2c5::t_fc787ef9ff1936 318-418
+tests/test_simulation.py
+  s_6a053cf002c2c5::t_2f500f737dabbf 45-46
+  s_6a053cf002c2c5::t_a1ad4565ec4ce8 1-44,47-61,64-67,70-72,75-85,88,91-148,152,154-156
+  s_6a053cf002c2c5::t_92f2d4942bc425 149-151,153
+  s_6a053cf002c2c5::t_f17baf2330e4cd 86-87,89-90
+  s_6a053cf002c2c5::t_01e31424749ddf 62-63,68-69,73-74
+src/emg_bridge/scripts/run_classifier.py
+  s_6a053cf002c2c5::t_59ce5b0e93ec28 327
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "2a5b65433d6798cd3ce84a6fac46a3a9d3f93fa5",
+  "prompts": {},
+  "sessions": {
+    "s_6a053cf002c2c5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a542d867ffem2rAk0lzel3omH",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
