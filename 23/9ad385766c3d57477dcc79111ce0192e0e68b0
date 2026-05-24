@@ -1,0 +1,22 @@
+scripts/jetson_build_openvins.sh
+  s_14430be63187a9::t_744711141fe57c 288
+  s_14430be63187a9::t_46cb82ddfb6ccb 265
+  s_14430be63187a9::t_02b5db35d93d62 100-102
+  s_14430be63187a9::t_39021df20d0786 125-126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "239ad385766c3d57477dcc79111ce0192e0e68b0",
+  "prompts": {},
+  "sessions": {
+    "s_14430be63187a9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5c0128cffe1r7WEnoiYrSuMC",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
