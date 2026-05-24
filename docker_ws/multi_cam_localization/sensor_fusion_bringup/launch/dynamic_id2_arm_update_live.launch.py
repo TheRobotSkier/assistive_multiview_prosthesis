@@ -74,6 +74,7 @@ def _setup(context, *args, **kwargs):
     start_cameras = _as_bool(_arg_or_config(context, "start_cameras", launch_cfg.get("start_cameras", True)))
     start_preview = _as_bool(_arg_or_config(context, "start_preview", launch_cfg.get("start_preview", True)))
     start_rviz = _as_bool(_arg_or_config(context, "start_rviz", launch_cfg.get("start_rviz", False)))
+    start_marker_graph = _as_bool(_arg_or_config(context, "start_marker_graph", launch_cfg.get("start_marker_graph", True)))
     record_bag = _as_bool(_arg_or_config(context, "record_bag", launch_cfg.get("record_bag", False)))
     enable_pointclouds = _as_bool(_arg_or_config(context, "enable_pointclouds", pointcloud_cfg.get("enable", False)))
     enable_marker_map_pointclouds = _as_bool(
@@ -248,6 +249,36 @@ def _setup(context, *args, **kwargs):
             ],
         ),
     ]
+
+    marker_graph_cfg = config.get("marker_graph", {})
+    if start_marker_graph:
+        actions.append(
+            Node(
+                package="sensor_fusion_bringup",
+                executable="marker_graph_estimator.py",
+                name="marker_graph_estimator",
+                output="screen",
+                parameters=[
+                    {"use_sim_time": use_sim_time},
+                    {"head_observation_topic": str(marker_graph_cfg.get("head_observation_topic", "/head/marker_pose/observation"))},
+                    {"arm_observation_topic": str(marker_graph_cfg.get("arm_observation_topic", "/arm/marker_pose/observation"))},
+                    {"max_edge_age_s": float(marker_graph_cfg.get("max_edge_age_s", 30.0))},
+                    {"coobservation_time_window_s": float(marker_graph_cfg.get("coobservation_time_window_s", 0.05))},
+                    {"min_edge_quality": float(marker_graph_cfg.get("min_edge_quality", 0.2))},
+                    {"max_hops": int(marker_graph_cfg.get("max_hops", 10))},
+                    {"max_observation_age_s": float(marker_graph_cfg.get("max_observation_age_s", 5.0))},
+                    {"covariance_growth_xyz_m": float(marker_graph_cfg.get("covariance_growth_xyz_m", 0.01))},
+                    {"covariance_growth_rpy_rad": float(marker_graph_cfg.get("covariance_growth_rpy_rad", 0.0174533))},
+                    {"head_source_name": str(marker_graph_cfg.get("head_source_name", "head"))},
+                    {"arm_source_name": str(marker_graph_cfg.get("arm_source_name", "arm"))},
+                    {"head_imu_frame": str(marker_graph_cfg.get("head_imu_frame", "head_imu"))},
+                    {"arm_imu_frame": str(marker_graph_cfg.get("arm_imu_frame", "arm_imu"))},
+                    {"map_frame": str(marker_graph_cfg.get("map_frame", "marker_map"))},
+                    {"publish_rate_hz": float(marker_graph_cfg.get("publish_rate_hz", 10.0))},
+                    {"observation_buffer_s": float(marker_graph_cfg.get("observation_buffer_s", 0.5))},
+                ],
+            )
+        )
 
     if start_preview:
         actions.append(

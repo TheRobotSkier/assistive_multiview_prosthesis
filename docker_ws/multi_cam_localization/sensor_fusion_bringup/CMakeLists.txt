@@ -49,6 +49,8 @@ install(
     scripts/calibrate_arm_marker_extrinsic.py
     scripts/dynamic_arm_pose_measurement_node.py
     scripts/head_derived_arm_pose_preview_node.py
+    scripts/marker_graph_core.py
+    scripts/marker_graph_estimator.py
     scripts/marker_quality_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
@@ -56,6 +58,7 @@ install(
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_aruco_marker_pose_math test/test_aruco_marker_pose_math.py)
+  ament_add_pytest_test(test_marker_graph test/test_marker_graph.py)
   ament_add_pytest_test(test_openvins_profiles test/test_openvins_profiles.py)
 endif()
 
