@@ -535,15 +535,9 @@ up-grasp-test-train:
 	@echo ""
 	$(MAKE) up-grasp-test
 
-# -- Train + EMG terminal inference (interactive: collect -> train -> classify) --
-# Stays entirely in the EMG path and does not launch the grasp pipeline or send
-# control signals to hand/wrist hardware after training.
-
 up-emg-test-train:
 	@mkdir -p $(CURDIR)/data $(CURDIR)/models
-	@echo "==============================================="
 	@echo "  EMG Train + Terminal Inference"
-	@echo "==============================================="
 	@echo ""
 	@echo "Phase 1: collect data (interactive)"
 	@echo "Phase 2: train model on the latest collected session"
@@ -577,6 +571,141 @@ up-emg-test-train:
 		$$(test -e /dev/ttyUSB1 && echo '--device /dev/ttyUSB1:/dev/ttyUSB1' || true) \
 		prosthesis:latest \
 		/bin/bash /prosthesis_ws/scripts/emg_train_and_test.sh
+
+# ── EMG Experiment Mode Launch Targets ───────────────────────────────────────
+# Each target launches run_classifier with a pre-made experiment config.
+# Config templates are in config/emg_experiment_config.yaml — copy and edit.
+#
+# Default mode (no experiments — standard sklearn EMG-only):
+#   make emg-run
+#
+# Quick experiment modes:
+#   make emg-sklearn-imu    # EMG + IMU features with sklearn
+#   make emg-slew           # Proportional slew limiting
+#   make emg-sticky         # Sticky gesture hysteresis
+#   make emg-naviflame      # NaviFlame backend (needs separate container!)
+#
+# Full pipeline with experiment config:
+#   make emg-pipeline MODE=naviflame
+
+EMG_CONFIG ?= config/emg_experiment_config.yaml
+
+emg-default:
+	@echo "=== EMG Classifier (default sklearn) ==="
+	$(DOCKER_CMD) run --rm -it --name emg-default \
+		--network host --privileged --ipc host --userns=keep-id \
+		-e DISPLAY=$${DISPLAY:-:0} \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e ROS_DOMAIN_ID=0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:rw \
+		-v $(CURDIR)/config:/prosthesis_ws/config:rw \
+		-v $(CURDIR)/models:/prosthesis_ws/models:rw \
+		-v prosthesis-build:/prosthesis_ws/build \
+		-v prosthesis-install:/prosthesis_ws/install \
+		prosthesis:latest \
+		python3 /prosthesis_ws/src/emg_bridge/scripts/run_classifier.py --model-dir /prosthesis_ws/models
+
+emg-sklearn-imu:
+	@echo "=== EMG Classifier (sklearn + IMU) ==="
+	@test -f $(EMG_CONFIG) || { echo "Error: $(EMG_CONFIG) not found. Run: cp config/emg_experiment_config.yaml $(EMG_CONFIG)"; exit 1; }
+	$(DOCKER_CMD) run --rm -it --name emg-sklearn-imu \
+		--network host --privileged --ipc host --userns=keep-id \
+		-e DISPLAY=$${DISPLAY:-:0} \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e ROS_DOMAIN_ID=0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:rw \
+		-v $(CURDIR)/config:/prosthesis_ws/config:rw \
+		-v $(CURDIR)/models:/prosthesis_ws/models:rw \
+		-v prosthesis-build:/prosthesis_ws/build \
+		-v prosthesis-install:/prosthesis_ws/install \
+		prosthesis:latest \
+		python3 /prosthesis_ws/src/emg_bridge/scripts/run_classifier.py \
+			--model-dir /prosthesis_ws/models \
+			--config /prosthesis_ws/config/emg_experiment_config_sklearn_imu.yaml
+
+emg-slew:
+	@echo "=== EMG Classifier (proportional slew limiting) ==="
+	@test -f $(EMG_CONFIG) || { echo "Error: $(EMG_CONFIG) not found."; exit 1; }
+	$(DOCKER_CMD) run --rm -it --name emg-slew \
+		--network host --privileged --ipc host --userns=keep-id \
+		-e DISPLAY=$${DISPLAY:-:0} \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e ROS_DOMAIN_ID=0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:rw \
+		-v $(CURDIR)/config:/prosthesis_ws/config:rw \
+		-v $(CURDIR)/models:/prosthesis_ws/models:rw \
+		-v prosthesis-build:/prosthesis_ws/build \
+		-v prosthesis-install:/prosthesis_ws/install \
+		prosthesis:latest \
+		python3 /prosthesis_ws/src/emg_bridge/scripts/run_classifier.py \
+			--model-dir /prosthesis_ws/models \
+			--config /prosthesis_ws/config/emg_experiment_config_slew.yaml
+
+emg-sticky:
+	@echo "=== EMG Classifier (sticky gesture selection) ==="
+	@test -f $(EMG_CONFIG) || { echo "Error: $(EMG_CONFIG) not found."; exit 1; }
+	$(DOCKER_CMD) run --rm -it --name emg-sticky \
+		--network host --privileged --ipc host --userns=keep-id \
+		-e DISPLAY=$${DISPLAY:-:0} \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e ROS_DOMAIN_ID=0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:rw \
+		-v $(CURDIR)/config:/prosthesis_ws/config:rw \
+		-v $(CURDIR)/models:/prosthesis_ws/models:rw \
+		-v prosthesis-build:/prosthesis_ws/build \
+		-v prosthesis-install:/prosthesis_ws/install \
+		prosthesis:latest \
+		python3 /prosthesis_ws/src/emg_bridge/scripts/run_classifier.py \
+			--model-dir /prosthesis_ws/models \
+			--config /prosthesis_ws/config/emg_experiment_config_sticky.yaml
+
+# NaviFlame runs in its own container (Python 3.10 + TF 2.12, not ROS)
+emg-naviflame:
+	@echo "=== NaviFlame Backend ==="
+	@echo "NaviFlame requires Python 3.10 + TensorFlow 2.12 — not compatible with ROS Jazzy container."
+	@echo "Run in a separate podman container:"
+	@echo "  pip install tensorflow==2.12.0 scikit-learn && pip install -r NaviFlame/requirements.txt"
+	@echo "  python scripts/run_classifier.py --config config/emg_experiment_config_naviflame.yaml"
+
+# Full pipeline launch with experiment config override
+# Usage: make emg-pipeline MODE=naviflame
+emg-pipeline:
+	@echo "=== EMG Pipeline (mode: $(MODE)) ==="
+	cd $(COMPOSE_DIR) && $(COMPOSE) run --rm --name emg-pipeline-$(MODE) \
+		prosthesis \
+		ros2 launch prosthesis_launch pipeline.launch.py \
+			emg:=true \
+			emg_config:=/prosthesis_ws/config/emg_experiment_config_$(MODE).yaml \
+			mia_hand:=false wrist:=false camera:=false rviz:=false
+
+# ── Hardware validation checklist ─────────────────────────────────────────────
+# Requires: MindRove WiFi armband connected and trained models in models/
+emg-validate:
+	@echo "=== EMG Experiment Mode Validation ==="
+	@echo ""
+	@echo "1. Baseline (EMG-only sklearn):"
+	@echo "   python scripts/run_classifier.py --model-dir models/"
+	@echo "   Verify /emg/gesture_label, /emg/confidence, /emg/proportional publish."
+	@echo ""
+	@echo "2. IMU mode:"
+	@echo "   python scripts/collect_data.py --include-imu --output-dir data/"
+	@echo "   python scripts/train.py --classifier-backend sklearn_imu --data-dir data/"
+	@echo "   python scripts/run_classifier.py --config config/emg_experiment_config.yaml"
+	@echo "   Edit config to set classifier_backend: sklearn_imu + imu_features.enabled: true"
+	@echo ""
+	@echo "3. Proportional limiter:"
+	@echo "   Set proportional_slew.enabled: true in config."
+	@echo "   Verify /emg/proportional ramps smoothly (no sudden jumps)."
+	@echo ""
+	@echo "4. Sticky gestures:"
+	@echo "   Set gesture_stability.enabled: true in config."
+	@echo "   Induce brief ambiguous transitions — label should hold."
+	@echo ""
+	@echo "5. NaviFlame (separate container):"
+	@echo "   Requires Python 3.10 + tensorflow==2.12.0."
+	@echo "   Set classifier_backend: naviflame, naviflame.enabled: true."
+	@echo ""
+	@echo "Record exact configs, command lines, and observations."
 
 print-force:
 	@echo "=== MIA Hand Force Monitor ==="
