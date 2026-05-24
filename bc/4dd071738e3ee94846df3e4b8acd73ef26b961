@@ -1,0 +1,19 @@
+mvp-cox-14-1-aruco-report.md
+  s_1ff1afd3492dc2::t_be58b8404f56f4 1-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "bc4dd071738e3ee94846df3e4b8acd73ef26b961",
+  "prompts": {},
+  "sessions": {
+    "s_1ff1afd3492dc2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a59dd4baffeyJvJ0z1iVlFgrS",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
