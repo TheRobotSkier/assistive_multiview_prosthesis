@@ -1,0 +1,21 @@
+Makefile
+  s_10fa13a27408f4::t_a42fd8746f606f 57,507-554
+scripts/emg_grasp_test.sh
+  s_10fa13a27408f4::t_a42fd8746f606f 1-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "8b7ada90b8a809b8b8cff5c0e7c5606157fbca6e",
+  "prompts": {},
+  "sessions": {
+    "s_10fa13a27408f4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3e4c750ffeQkUx66gJ2MhvdU",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
