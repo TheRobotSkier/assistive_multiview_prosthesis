@@ -842,6 +842,7 @@ class ArucoMarkerPoseNode(Node):
         self._diag_corrections_accepted: int = 0
         self._diag_corrections_rejected: int = 0
         self._diag_rejection_reasons: Counter = Counter()
+        self._diag_quality_rejections: Counter = Counter()
         self._diag_last_log_sec: float = 0.0
 
         self.T_map_global: Optional[np.ndarray] = None
@@ -961,6 +962,7 @@ class ArucoMarkerPoseNode(Node):
                 )
                 if measurement is None:
                     reject_reasons.append(reason)
+                    self._diag_quality_rejections[reason] += 1
                     continue
                 fixed_candidates.append(measurement)
             else:
@@ -973,6 +975,7 @@ class ArucoMarkerPoseNode(Node):
                 )
                 if dynamic_measurement is None:
                     reject_reasons.append(f"dynamic_{reason}")
+                    self._diag_quality_rejections[f"dynamic_{reason}"] += 1
                     continue
                 dynamic_measurements.append(dynamic_measurement)
 
@@ -980,6 +983,85 @@ class ArucoMarkerPoseNode(Node):
             self.publish_dynamic_marker_observation(dynamic_measurement)
 
         if not fixed_candidates:
+            # Part 4: Fallback — if markers were detected but all failed quality gates,
+            # attempt a correction with the least-bad candidate when VIO is invalid.
+            # This allows the reanchor mechanism to rescue a drifting VIO.
+            if not self.vio_valid and len(ids) > 0:
+                fallback_measurement = None
+                fallback_reason = ""
+                for idx, marker_id in enumerate(marker_ids):
+                    if marker_id not in self.markers:
+                        continue
+                    if id_counts[marker_id] > 1:
+                        continue
+                    image_points = corners[idx].reshape(4, 2).astype(np.float32)
+                    # Bypass quality gates — just solve the pose directly
+                    marker_cfg = self.markers[marker_id]
+                    T_cam_marker, metrics, solve_reason = self.solve_marker_pose(marker_cfg, image_points)
+                    if T_cam_marker is None:
+                        continue
+                    T_map_marker = marker_cfg["T_map_marker"]
+                    T_map_cam, T_map_imu = compute_marker_map_poses(T_map_marker, T_cam_marker, self.T_cam_imu)
+                    # Check temporal stability only (bypass jump/distance/geometry checks)
+                    temporal_stats = self.record_marker_history(marker_id, T_map_imu, None, None)
+                    if temporal_stats.stable:
+                        covariance_estimate = self.estimate_marker_covariance(
+                            metrics, T_map_cam, 0.5, temporal_stats,
+                        )
+                        fallback_measurement = MarkerMeasurement(
+                            stamp=msg.header.stamp,
+                            stamp_sec=stamp_to_sec(msg.header.stamp),
+                            marker_id=marker_id,
+                            marker_frame=marker_cfg["frame_id"],
+                            T_cam_marker=T_cam_marker,
+                            T_marker_cam=T_inv(T_cam_marker),
+                            T_map_cam=T_map_cam,
+                            T_map_imu=T_map_imu,
+                            T_map_marker=T_map_marker,
+                            area_px2=metrics.area_px2,
+                            sqrt_area_px=metrics.sqrt_area_px,
+                            side_mean_px=metrics.side_mean_px,
+                            side_min_px=metrics.side_min_px,
+                            distance_m=metrics.distance_m,
+                            reprojection_error_px=metrics.reprojection_error_px,
+                            view_angle_deg=metrics.view_angle_deg,
+                            view_penalty=covariance_estimate.view_penalty,
+                            covariance_diag=covariance_estimate.diag,
+                            covariance_std_diag=covariance_estimate.std_diag,
+                            covariance_camera_std_diag=covariance_estimate.camera_std_diag,
+                            covariance_sigma_px=covariance_estimate.sigma_px,
+                            stable_frames=temporal_stats.stable_frames,
+                            stable=True,
+                            stability_factor=temporal_stats.stability_factor,
+                            temporal_detection_translation_m=temporal_stats.detection_translation_delta_m,
+                            temporal_detection_rotation_deg=temporal_stats.detection_rotation_delta_deg,
+                            temporal_correction_translation_m=temporal_stats.correction_translation_delta_m,
+                            temporal_correction_rotation_deg=temporal_stats.correction_rotation_delta_deg,
+                            temporal_odom_match_dt=temporal_stats.odom_match_dt,
+                            geometry_score=0.5,
+                            image_width=gray.shape[1],
+                            image_height=gray.shape[0],
+                        )
+                        fallback_reason = ""
+                        break
+                    else:
+                        fallback_reason = f"not_stable({temporal_stats.stable_frames}/{self.stable_frames_required})"
+
+                if fallback_measurement is not None:
+                    self.get_logger().warning(
+                        f"[FALLBACK] Applying VIO-invalid reanchor despite quality gate failures "
+                        f"(marker {fallback_measurement.marker_id}, "
+                        f"reproj={fallback_measurement.reprojection_error_px:.1f}px, "
+                        f"dist={fallback_measurement.distance_m:.2f}m)"
+                    )
+                    self.last_marker_measurement = fallback_measurement
+                    self.publish_marker_state(True, fallback_measurement.marker_id)
+                    self.publish_marker_poses(fallback_measurement)
+                    self.try_apply_marker_correction(fallback_measurement, force_manual=False)
+                    return
+                elif len(ids) > 0:
+                    self._diag_quality_rejections[f"fallback_{fallback_reason}"] += 1
+
             self.publish_marker_state(False, -1)
             if reject_reasons:
                 self.publish_reanchor_event(
@@ -2088,19 +2170,25 @@ class ArucoMarkerPoseNode(Node):
             top = self._diag_rejection_reasons.most_common(5)
             reasons_str = " | rejections: " + ", ".join(f"{r}={c}" for r, c in top)
 
+        quality_str = ""
+        if self._diag_quality_rejections:
+            top_q = self._diag_quality_rejections.most_common(5)
+            quality_str = " | quality_reject: " + ", ".join(f"{r}={c}" for r, c in top_q)
+
         self.get_logger().info(
             f"[DIAG] markers_detected={self._diag_markers_detected} "
             f"corrections={self._diag_corrections_accepted}/{self._diag_corrections_accepted + self._diag_corrections_rejected} "
             f"vio={'valid' if self.vio_valid else 'INVALID'} "
             f"pos_norm={position_norm:.2f}m "
             f"odom={odom_status} "
-            f"locked={correction_locked}{grace_str}{reasons_str}"
+            f"locked={correction_locked}{grace_str}{reasons_str}{quality_str}"
         )
 
         self._diag_markers_detected = 0
         self._diag_corrections_accepted = 0
         self._diag_corrections_rejected = 0
         self._diag_rejection_reasons.clear()
+        self._diag_quality_rejections.clear()
 
     def qos_watchdog_cb(self) -> None:
         if self.last_odom_wall_time_sec is None:

@@ -29,10 +29,10 @@ timing:
 
 quality:
   min_marker_area_px2: 800.0
-  max_marker_distance_m: 2.0
+  max_marker_distance_m: 3.0
   stable_frames_required: 3
-  max_marker_translation_jump_m: 0.20
-  max_marker_rotation_jump_deg: 15.0
+  max_marker_translation_jump_m: 0.50
+  max_marker_rotation_jump_deg: 30.0
   max_reprojection_error_px: 3.0
   border_margin_px: 8.0
   min_corner_angle_deg: 25.0
