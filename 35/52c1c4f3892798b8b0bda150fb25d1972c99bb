@@ -1,0 +1,28 @@
+src/emg_bridge/emg_bridge/emg_status_publisher.py
+  s_3e74e9c336db68::t_2a1ac265440d78 411-420
+  s_3e74e9c336db68::t_ac3d7315356964 1-410,421-437,466
+  s_3e74e9c336db68::t_08340cf18a45b2 438-465,467-485
+src/emg_bridge/test_status_publisher.py
+  s_3e74e9c336db68::t_f897cb9af404a2 253,255
+  s_3e74e9c336db68::t_7217fe6ca2affd 407-408,420-421
+  s_3e74e9c336db68::t_44b1a937b457db 144-145
+  s_3e74e9c336db68::t_a18d21d5d955ad 146-150,154
+  s_3e74e9c336db68::t_1ceb10d9edce5f 1-143,153,155-252,254,256-406,409-419,422-460
+  s_3e74e9c336db68::t_05b9a874d661ff 151-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "3552c1c4f3892798b8b0bda150fb25d1972c99bb",
+  "prompts": {},
+  "sessions": {
+    "s_3e74e9c336db68": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3c4229fffe3wdHt5IC3kWllW",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
