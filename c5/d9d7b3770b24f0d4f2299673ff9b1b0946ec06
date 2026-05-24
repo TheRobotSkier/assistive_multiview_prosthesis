@@ -1,0 +1,19 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins_experiment_profiles.yaml
+  s_14430be63187a9::t_8d1cd5baa98ee3 157-178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "c5d9d7b3770b24f0d4f2299673ff9b1b0946ec06",
+  "prompts": {},
+  "sessions": {
+    "s_14430be63187a9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5c0128cffe1r7WEnoiYrSuMC",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
