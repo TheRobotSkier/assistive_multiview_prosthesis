@@ -20,9 +20,6 @@ from collections import deque
 from pathlib import Path
 
 import numpy as np
-
-from emg_bridge import classifier as clf_mod
-from emg_bridge import proportional as prop_mod
 from emg_bridge.board_reader import BoardReader
 from emg_bridge.classifier import PredictionSmoother, predict
 from emg_bridge.config import (
@@ -33,13 +30,19 @@ from emg_bridge.config import (
     WINDOW_LEN,
     WINDOW_STEP,
 )
+from emg_bridge.experiment_config import ExperimentConfig, load_config
 from emg_bridge.features import compute_features
 from emg_bridge.preprocessing import OnlineFilter, RingBuffer
+
+from emg_bridge import classifier as clf_mod
+from emg_bridge import proportional as prop_mod
 
 # ── Optional ROS 2 bridge ──────────────────────────────────────────────────────
 _ros_state = None
 try:
-    from emg_bridge.ros_bridge_node import EmgState, spin_in_thread as _ros_spin
+    from emg_bridge.ros_bridge_node import EmgState
+    from emg_bridge.ros_bridge_node import spin_in_thread as _ros_spin
+
     _ros_state = EmgState()
     _ros_spin(_ros_state)
     print("ROS 2 bridge active — publishing on /emg/* topics.")
@@ -48,12 +51,30 @@ except ImportError:
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
 
-def _bold(s: str) -> str:   return f"\033[1m{s}\033[0m"
-def _green(s: str) -> str:  return f"\033[92m{s}\033[0m"
-def _yellow(s: str) -> str: return f"\033[93m{s}\033[0m"
-def _cyan(s: str) -> str:   return f"\033[96m{s}\033[0m"
-def _red(s: str) -> str:    return f"\033[91m{s}\033[0m"
-def _dim(s: str) -> str:    return f"\033[2m{s}\033[0m"
+
+def _bold(s: str) -> str:
+    return f"\033[1m{s}\033[0m"
+
+
+def _green(s: str) -> str:
+    return f"\033[92m{s}\033[0m"
+
+
+def _yellow(s: str) -> str:
+    return f"\033[93m{s}\033[0m"
+
+
+def _cyan(s: str) -> str:
+    return f"\033[96m{s}\033[0m"
+
+
+def _red(s: str) -> str:
+    return f"\033[91m{s}\033[0m"
+
+
+def _dim(s: str) -> str:
+    return f"\033[2m{s}\033[0m"
+
 
 # ANSI move-up N lines and clear to end
 _UP = "\033[A"
@@ -74,7 +95,7 @@ def _conf_bar(val: float, width: int = 15) -> str:
 
 # ── Display ───────────────────────────────────────────────────────────────────
 
-_DISPLAY_LINES = 7   # how many lines the display occupies (for refresh)
+_DISPLAY_LINES = 8  # how many lines the display occupies (for refresh)
 _first_draw = True
 
 
@@ -82,6 +103,7 @@ def _draw(
     label: int,
     confidence: float,
     proportional: float,
+    mode: str,
     probs: np.ndarray,
     gesture_names: list[str],
     frame_count: int,
@@ -102,12 +124,9 @@ def _draw(
         + f"  {_dim(f'(frame {frame_count})')}"
         + "\n"
     )
-    sys.stdout.write(
-        f"  {_bold('Confidence')}: {_conf_bar(confidence)}\n"
-    )
-    sys.stdout.write(
-        f"  {_bold('Prop. ctrl')}: {_prop_bar(proportional)}\n"
-    )
+    sys.stdout.write(f"  {_bold('Mode')}     : {_cyan(mode.upper())}\n")
+    sys.stdout.write(f"  {_bold('Confidence')}: {_conf_bar(confidence)}\n")
+    sys.stdout.write(f"  {_bold('Prop. ctrl')}: {_prop_bar(proportional)}\n")
     # Per-class probability row
     prob_parts = []
     for i, name in enumerate(gesture_names):
@@ -127,16 +146,35 @@ def _draw(
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     global _first_draw
 
     parser = argparse.ArgumentParser(description="Real-time EMG gesture classifier")
-    parser.add_argument("--model-dir", type=Path, default=Path("/app/models"),
-                        help="Directory containing trained model files")
-    parser.add_argument("--threshold", type=float, default=CONFIDENCE_THRESHOLD,
-                        help=f"Confidence threshold (default: {CONFIDENCE_THRESHOLD})")
-    parser.add_argument("--smooth", type=int, default=PREDICTION_SMOOTHING_FRAMES,
-                        help=f"Smoothing window in frames (default: {PREDICTION_SMOOTHING_FRAMES})")
+    parser.add_argument(
+        "--model-dir",
+        type=Path,
+        default=Path("/app/models"),
+        help="Directory containing trained model files",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=CONFIDENCE_THRESHOLD,
+        help=f"Confidence threshold (default: {CONFIDENCE_THRESHOLD})",
+    )
+    parser.add_argument(
+        "--smooth",
+        type=int,
+        default=PREDICTION_SMOOTHING_FRAMES,
+        help=f"Smoothing window in frames (default: {PREDICTION_SMOOTHING_FRAMES})",
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to EMG experiment config YAML file",
+    )
     args = parser.parse_args()
 
     print()
@@ -148,13 +186,15 @@ def main() -> None:
     print(f"{_cyan('Loading classifier from')} {args.model_dir} …")
     model_path = args.model_dir / "classifier.pkl"
     if not model_path.exists():
-        print(_red(
-            f"Model file not found: {model_path}\n"
-            f"  Please train a model first:\n"
-            f"    ros2 run emg_bridge train --data-dir /app/data --model-dir {args.model_dir}\n"
-            f"  Or run collect_data to record training data:\n"
-            f"    ros2 run emg_bridge collect_data --output-dir /app/data"
-        ))
+        print(
+            _red(
+                f"Model file not found: {model_path}\n"
+                f"  Please train a model first:\n"
+                f"    ros2 run emg_bridge train --data-dir /app/data --model-dir {args.model_dir}\n"
+                f"  Or run collect_data to record training data:\n"
+                f"    ros2 run emg_bridge collect_data --output-dir /app/data"
+            )
+        )
         sys.exit(1)
     try:
         pipe = clf_mod.load(args.model_dir)
@@ -164,10 +204,35 @@ def main() -> None:
 
     calibration = prop_mod.load(args.model_dir)
     if calibration is None:
-        print(_yellow("No proportional calibration found — using fallback normalisation."))
+        print(
+            _yellow("No proportional calibration found — using fallback normalisation.")
+        )
 
     gesture_names = GESTURE_NAMES
     print(_green("Models loaded.\n"))
+
+    # ── Load experiment config ─────────────────────────────────────────────────
+    experiment = ExperimentConfig()  # defaults (all experiments off)
+    if args.config and args.config.strip():
+        try:
+            experiment = load_config(args.config.strip())
+        except FileNotFoundError:
+            print(_yellow(f"Experiment config not found: {args.config} — using defaults."))
+        except ValueError as exc:
+            print(_yellow(f"Invalid experiment config: {exc} — using defaults."))
+    if experiment.classifier_backend != "sklearn":
+        label_lut: dict[str, str] = {"sklearn_imu": "sklearn + IMU", "naviflame": "NaviFlame"}
+        backend_display = label_lut.get(experiment.classifier_backend, experiment.classifier_backend)
+        print(_cyan(f"Experiment config loaded — backend: {backend_display}"))
+        if experiment.imu_features.enabled:
+            print(_cyan("  IMU features enabled"))
+        if experiment.naviflame.enabled:
+            print(_cyan("  NaviFlame adapter enabled"))
+        if experiment.proportional_slew.enabled:
+            print(_cyan("  Proportional slew limiting enabled"))
+        if experiment.gesture_stability.enabled:
+            print(_cyan("  Gesture stability enabled"))
+        print()
 
     # ── Connect ───────────────────────────────────────────────────────────────
     print(_cyan("Connecting to MindRove WiFi board …"))
@@ -218,15 +283,20 @@ def main() -> None:
             smoothed_label = smoother.update(label)
 
             # Proportional control
-            prop_val = prop_mod.compute_proportional(window, smoothed_label, calibration)
+            prop_val = prop_mod.compute_proportional(
+                window, smoothed_label, calibration
+            )
+
+            mode_name = "moving"
 
             # Update ROS state (if bridge is active)
             if _ros_state is not None:
                 with _ros_state.lock:
-                    _ros_state.label        = smoothed_label
-                    _ros_state.name         = gesture_names[smoothed_label]
-                    _ros_state.confidence   = float(confidence)
+                    _ros_state.label = smoothed_label
+                    _ros_state.name = gesture_names[smoothed_label]
+                    _ros_state.confidence = float(confidence)
                     _ros_state.proportional = float(prop_val)
+                    mode_name = _ros_state.mode
 
             # FPS estimate
             now = time.monotonic()
@@ -235,7 +305,16 @@ def main() -> None:
             fps = float(np.mean(fps_history))
 
             frame_count += 1
-            _draw(smoothed_label, confidence, prop_val, probs, gesture_names, frame_count, fps)
+            _draw(
+                smoothed_label,
+                confidence,
+                prop_val,
+                mode_name,
+                probs,
+                gesture_names,
+                frame_count,
+                fps,
+            )
 
     except KeyboardInterrupt:
         print(f"\n\n{_yellow('Stopped.')}")

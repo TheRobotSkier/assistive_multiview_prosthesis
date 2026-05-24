@@ -1,0 +1,62 @@
+# ── EMG Experiment Configuration ───────────────────────────────────────────────
+# Toggle experimental EMG modes without editing code.
+# All values shown are the defaults — the system behaves identically to the
+# current master-branch code when every `enabled` flag is false.
+#
+# Usage:
+#   python scripts/run_classifier.py --config config/emg_experiment_config.yaml
+#   ros2 launch prosthesis_launch pipeline.launch.py emg_config:=/path/to/this/file
+
+# ── Classifier backend ─────────────────────────────────────────────────────────
+# sklearn       — scikit-learn EMG-only pipeline (current default)
+# sklearn_imu   — sklearn with additional IMU channel features
+# naviflame     — use official NaviFlame deep model for gesture, keep project
+#                 proportional control
+classifier_backend: sklearn
+
+# ── IMU feature augmentation ───────────────────────────────────────────────────
+# Requires MindRove board to expose gyro (and optionally accel) channels.
+imu_features:
+  enabled: false
+  gyro: true
+  accel: false
+  movement_gate: 0.0
+
+# ── NaviFlame adapter ──────────────────────────────────────────────────────────
+# Requires NaviFlame/ directory with config.json and models.
+naviflame:
+  enabled: false
+  config_path: /prosthesis_ws/NaviFlame/config.json
+  # Mapping from NaviFlame class indices to project GESTURE_NAMES indices.
+  # Unmapped classes default to REST (0).  The map is stored as string keys
+  # because YAML coerces numeric keys to strings.
+  gesture_mapping:
+    "0": 0    # REST
+    "1": 1    # POWER
+    "2": 2    # OPEN
+    "3": 3    # FLEXION
+    "4": 4    # EXTENSION
+
+# ── Proportional slew / acceleration limiting ──────────────────────────────────
+# Wraps prop_mod.compute_proportional output before publishing.
+proportional_slew:
+  enabled: false
+  max_velocity_per_s: 0.0
+  max_accel_per_s2: 0.0
+  max_delta_per_step: 0.0
+  max_fall_velocity_per_s: 0.0      # asymmetric falling limit; 0 = same as rise
+  reset_on_rest: true
+  initial_value: 0.0
+  snap_to_zero_below: 0.0
+
+# ── Sticky gesture selection ───────────────────────────────────────────────────
+# Confidence-hysteresis stabilizer applied after the classifier backend.
+gesture_stability:
+  enabled: false
+  min_confidence_to_switch: 0.55
+  min_margin_to_switch: 0.0
+  min_frames: 3
+  min_hold_s: 0.0
+  release_behavior: allow_rest_immediately
+  fallback_behavior: hold_previous
+  release_lower_threshold: 0.0

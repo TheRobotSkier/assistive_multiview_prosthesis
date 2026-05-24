@@ -61,8 +61,9 @@ def _extract_ros_param(args: list[str], name: str) -> tuple[str | None, list[str
 
 
 def main():
-    # Check for model_dir in ROS parameters or regular args
+    # Check for model_dir and config in ROS parameters or regular args
     model_dir, remaining = _extract_ros_param(sys.argv[1:], "model_dir")
+    config_path, remaining = _extract_ros_param(remaining, "config")
 
     # Also check regular --model-dir in remaining args
     i = 0
@@ -75,6 +76,8 @@ def main():
     # If found via ROS param but not in regular args, inject it
     if model_dir is not None and "--model-dir" not in remaining:
         remaining = ["--model-dir", model_dir] + remaining
+    if config_path is not None and "--config" not in remaining:
+        remaining = ["--config", config_path] + remaining
 
     # Replace sys.argv so the script sees the intended arguments
     sys.argv = [sys.argv[0]] + remaining

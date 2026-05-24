@@ -147,12 +147,16 @@ def _launch_setup(context, *args, **kwargs):
 
     if _as_bool(context, "emg"):
         model_dir = LaunchConfiguration("model_dir").perform(context)
+        emg_config = LaunchConfiguration("emg_config").perform(context)
+        args = ["--model-dir", model_dir]
+        if emg_config:
+            args.extend(["--config", emg_config])
         nodes.append(
             Node(
                 package="emg_bridge",
                 executable="run_classifier",
                 name="emg_bridge",
-                arguments=["--model-dir", model_dir],
+                arguments=args,
                 output="screen",
             )
         )
@@ -420,6 +424,11 @@ def generate_launch_description():
                 "model_dir",
                 default_value="/app/models",
                 description="Directory containing trained EMG classifier models.",
+            ),
+            DeclareLaunchArgument(
+                "emg_config",
+                default_value="",
+                description="Path to emg_experiment_config.yaml for experimental modes.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]
