@@ -73,7 +73,9 @@ def record_gesture(
     reader: BoardReader,
     duration_s: float,
     sampling_rate: int,
-) -> np.ndarray:
+    *,
+    include_imu: bool = False,
+) -> np.ndarray | dict:
     """Record roughly `duration_s` seconds of raw EMG.
 
     Older logic waited for the board ring buffer count to reach the expected
@@ -86,7 +88,9 @@ def record_gesture(
       2. allow a short grace period for trailing samples to land,
       3. read up to the expected number of samples from the buffer.
 
-    Returns ndarray of shape (n_samples, N_CHANNELS).
+    When *include_imu* is True, returns a dict with keys:
+        emg, gyro, accel, timestamps
+    Otherwise returns ndarray of shape (n_samples, N_CHANNELS).
     """
     n_expected = int(duration_s * sampling_rate)
     reader.flush()  # discard any buffered samples before recording
@@ -121,6 +125,11 @@ def record_gesture(
             flush=True,
         )
 
+    if include_imu:
+        frame = reader.read_frame(n_to_read)
+        print(f"\r  {_progress(duration_s, duration_s)}  ✓", flush=True)
+        return frame
+
     data = reader.read(n_to_read)
     print(f"\r  {_progress(duration_s, duration_s)}  ✓", flush=True)
     return data  # (n_samples, N_CHANNELS)
@@ -154,6 +163,12 @@ def main() -> None:
         nargs="+",
         default=GESTURE_NAMES,
         help="Gesture names (space-separated, must start with REST)",
+    )
+    parser.add_argument(
+        "--include-imu",
+        action="store_true",
+        default=False,
+        help="Record gyro/accel IMU data alongside EMG (saved as extra keys in .npz)",
     )
     args = parser.parse_args()
 
@@ -202,6 +217,9 @@ def main() -> None:
     all_emg: list[np.ndarray] = []  # list of (n_samples, N_CHANNELS)
     all_labels: list[np.ndarray] = []
     segment_ends: list[int] = []  # cumulative end index of each gesture recording
+    all_gyro: list[np.ndarray] = []
+    all_accel: list[np.ndarray] = []
+    include_imu: bool = args.include_imu
 
     try:
         for rep in range(1, args.reps + 1):
@@ -229,7 +247,17 @@ def main() -> None:
                 )
                 print(_cyan(f"  Recording {args.duration} s …"))
 
-                chunk = record_gesture(reader, args.duration, sampling_rate)
+                result = record_gesture(
+                    reader, args.duration, sampling_rate, include_imu=include_imu,
+                )
+                if include_imu:
+                    chunk = result["emg"]
+                    if result.get("gyro") is not None:
+                        all_gyro.append(result["gyro"])
+                    if result.get("accel") is not None:
+                        all_accel.append(result["accel"])
+                else:
+                    chunk = result
                 n_samp = chunk.shape[0]
                 labels = np.full(n_samp, g_id, dtype=np.int32)
 
@@ -256,14 +284,20 @@ def main() -> None:
     emg_arr = np.concatenate(all_emg, axis=0)  # (total_samples, N_CHANNELS)
     label_arr = np.concatenate(all_labels, axis=0)  # (total_samples,)
 
-    np.savez_compressed(
-        out_path,
-        emg=emg_arr,
-        labels=label_arr,
-        segment_ends=np.array(segment_ends, dtype=np.int64),
-        sampling_rate=np.array(sampling_rate),
-        gesture_names=np.array(gesture_names),
-    )
+    save_kwargs: dict = {
+        "emg": emg_arr,
+        "labels": label_arr,
+        "segment_ends": np.array(segment_ends, dtype=np.int64),
+        "sampling_rate": np.array(sampling_rate),
+        "gesture_names": np.array(gesture_names),
+    }
+    if include_imu:
+        if all_gyro:
+            save_kwargs["gyro"] = np.concatenate(all_gyro, axis=0)
+        if all_accel:
+            save_kwargs["accel"] = np.concatenate(all_accel, axis=0)
+
+    np.savez_compressed(out_path, **save_kwargs)
 
     print()
     print(_bold("=" * 58))
@@ -273,6 +307,11 @@ def main() -> None:
     }
     for name, count in class_counts.items():
         print(f"    {name:>8}: {count} samples  ({count / sampling_rate:.1f} s)")
+    if include_imu:
+        if all_gyro:
+            print(_green(f"  IMU gyro: {save_kwargs['gyro'].shape[1]} channels"))
+        if all_accel:
+            print(_green(f"  IMU accel: {save_kwargs['accel'].shape[1]} channels"))
     print(_bold("=" * 58))
     print()
 
