@@ -1,0 +1,23 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins/arm_d435i_310622071850/estimator_config_zupt.yaml
+  s_b2355f5088d492::t_c9eb8d8975a0ed 1-119
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/estimator_config_zupt.yaml
+  s_b2355f5088d492::t_e3e685035fae4a 1-119
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins_experiment_profiles.yaml
+  s_b2355f5088d492::t_eb42d9186c73e8 93-94,96-100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "5a5aedeb1bb86bebd9cbffe816ab878e9b7670d6",
+  "prompts": {},
+  "sessions": {
+    "s_b2355f5088d492": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5aeca72ffe6YVCb3WehNMZyp",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
