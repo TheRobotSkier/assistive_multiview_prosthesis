@@ -1,0 +1,91 @@
+# EMG Grasp Safety Configuration
+# Load with: --ros-args --params-file config/emg_safety.yaml
+#
+# This file configures all preflight checks, runtime safety monitors,
+# and cleanup behavior for the EMG-to-grasp pipeline.
+
+emg_safety_preflight:
+  ros__parameters:
+
+    # ── Connection / service names ───────────────────────────────────────
+    # Emergency-stop/play services (from mia_safety_node)
+    emergency_stop_service: "/mia_hand/emergency_stop"
+    play_service:           "/mia_hand/play"
+
+    # Controller manager top-level namespace (no trailing slash)
+    controller_manager_ns:  ""
+
+    # Required controllers that must be available before hand motion
+    # These are checked via /controller_manager/list_controllers
+    required_controllers:
+      - "joint_state_broadcaster"
+      - "thumb_pos_ff_controller"
+      - "index_pos_ff_controller"
+      - "mrl_pos_ff_controller"
+
+    # ── Data-freshness topics ───────────────────────────────────────────
+    force_data_topic:      "data_streams/fingers/forces/data"
+    joint_states_topic:    "/joint_states"
+    emg_label_topic:       "/emg/gesture_label"
+    emg_confidence_topic:  "/emg/confidence"
+
+    # ── Wrist topics (checked when wrist_enabled is true) ────────────────
+    wrist_command_topic:   "/wrist/set_position"
+    wrist_state_topic:     "/wrist/state"
+
+    # ── Hand command topics (checked for command-source conflicts) ───────
+    hand_command_topics:
+      - "/thumb_pos_ff_controller/commands"
+      - "/index_pos_ff_controller/commands"
+      - "/mrl_pos_ff_controller/commands"
+
+    # ── Safe open-hand joint positions (radians, order: thumb/index/mrl) ─
+    # These are commanded during preflight open and cleanup.
+    safe_open_positions:   [0.0, 0.0, 0.0]
+    safe_open_speed_pct:   80
+
+    # ── Preflight timeouts (seconds) ─────────────────────────────────────
+    preflight_force_timeout_s:    5.0
+    preflight_emg_timeout_s:      5.0
+    preflight_controller_timeout_s: 10.0
+    preflight_service_timeout_s:  3.0
+
+    # ── Runtime safety thresholds ────────────────────────────────────────
+    # Stale data timeouts: if no message arrives within this window, trigger
+    # warning or emergency action.
+    stale_emg_timeout_s:          0.5
+    stale_force_timeout_s:        0.5
+    stale_force_emergency_s:      2.0    # emergency stop if >2 s without force
+
+    # Max force limit: if any normal force exceeds this (raw units), open hand
+    max_force_limit:              500
+
+    # Max wrist error: if wrist position error (deg) exceeds this, stop wrist
+    max_wrist_error_deg:          45.0
+
+    # Max command rate: if command rate (Hz) exceeds this, throttle
+    max_command_rate_hz:          50.0
+
+    # ── Runtime safety behavior ──────────────────────────────────────────
+    # Whether to enable runtime safety monitoring (heartbeat timer)
+    enable_runtime_monitor:       true
+
+    # Heartbeat rate for runtime safety checks (Hz)
+    runtime_check_rate_hz:        20.0
+
+    # Whether to automatically call cleanup on safety violation
+    auto_cleanup_on_violation:    true
+
+    # Whether wrist safety is enabled (requires wrist hardware present)
+    wrist_enabled:                false
+
+    # ── Command-source conflict detection ────────────────────────────────
+    # Nodes whose namespace/name suggests they may command the hand
+    command_source_patterns:
+      - "force_controller"
+      - "command_bridge"
+      - "emg_grasp"
+      - "grasp_proximity"
+    # Max distinct nodes allowed to publish on hand_command_topics
+    # (excluding this node itself)
+    max_command_publishers:       3
