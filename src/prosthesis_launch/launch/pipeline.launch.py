@@ -7,10 +7,9 @@ Launches the complete prosthesis pipeline:
    4. EMG bridge (MindRove)
    5. Haptic bridge and controller
    6. Pointcloud fusion (TF-transforms + merges Jetson camera clouds)
-   7. Pointcloud relay (fused -> segmentation input)
-   8. Odom-to-pose relay (OpenVINS odom -> /hand_pose)
-   9. Segmentation ROS bridge
-  10. Twist propagation target selector
+   7. Odom-to-pose relay (OpenVINS odom -> /hand_pose)
+   8. Segmentation ROS bridge (subscribes directly to /fused_pointcloud)
+   9. Twist propagation target selector
   11. Grasp preshaping service
   12. Grasp proximity controller
   13. Force controller
@@ -27,7 +26,7 @@ import os
 
 import yaml
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -82,6 +81,10 @@ def _launch_setup(context, *args, **kwargs):
     wrist_serial_port = LaunchConfiguration("wrist_serial_port").perform(context)
     haptic_bt_addr = LaunchConfiguration("haptic_bt_addr1").perform(context)
     inference_url = LaunchConfiguration("inference_url").perform(context)
+    camera_mount = LaunchConfiguration("camera_mount").perform(context)
+    mounts_config = LaunchConfiguration("mounts_config").perform(context)
+    mounts_link_frame = LaunchConfiguration("mounts_link_frame").perform(context)
+    tf_diagnostics = LaunchConfiguration("tf_diagnostics").perform(context)
 
     if (
         mia_serial_port == wrist_serial_port
@@ -184,6 +187,8 @@ def _launch_setup(context, *args, **kwargs):
                 "cam1_topic": cam1_topic,
                 "cam2_topic": cam2_topic,
                 "arm_frame": arm_frame,
+                "mounts_config_path": mounts_config,
+                "active_mount": camera_mount,
             }
         )
         camera_nodes = []
@@ -197,6 +202,70 @@ def _launch_setup(context, *args, **kwargs):
                     output="screen",
                 )
             )
+        # Publish camera mount TFs (palm_frame, bounding boxes, grasp contact)
+        # so the fusion node can look up pruning box frames.
+        if mounts_config:
+            mounts_script = os.path.join(
+                os.path.dirname(__file__), "..", "..", "..",
+                "src", "sensor_fusion_bringup", "scripts",
+                "publish_camera_mounts.py")
+            if not os.path.isfile(mounts_script):
+                # Installed layout
+                import ament_index_python
+                try:
+                    share = ament_index_python.get_package_share_directory(
+                        "sensor_fusion_bringup")
+                    mounts_script = os.path.join(
+                        share, "scripts", "publish_camera_mounts.py")
+                except Exception:
+                    mounts_script = ""
+            if mounts_script and os.path.isfile(mounts_script):
+                mounts_cmd = ["python3", mounts_script,
+                              "--mount", camera_mount,
+                              "--config", mounts_config]
+                if mounts_link_frame:
+                    mounts_cmd.extend(["--link-frame", mounts_link_frame])
+                camera_nodes.append(
+                    ExecuteProcess(
+                        cmd=mounts_cmd,
+                        name="camera_mount_tf_publisher",
+                        output="screen",
+                    )
+                )
+            else:
+                print(f"[pipeline] WARNING: camera mount TF publisher script not found "
+                      f"(tried source-tree and installed layouts). "
+                      f"mounts_config={mounts_config!r}, mounts_script={mounts_script!r}. "
+                      f"Camera mount TFs (palm_frame, grasp_contact_frame, etc.) will NOT "
+                      f"be published. Rebuild prosthesis_launch and sensor_fusion_bringup.")
+        # TF pipeline diagnostics — logs clear one-line summaries of which TF
+        # chains are healthy vs. disconnected (OpenVINS vs. camera mounts).
+        if _as_bool(context, "tf_diagnostics"):
+            diag_script = os.path.join(
+                os.path.dirname(__file__), "..", "..", "..",
+                "src", "sensor_fusion_bringup", "scripts",
+                "tf_pipeline_diagnostics.py")
+            if not os.path.isfile(diag_script):
+                import ament_index_python
+                try:
+                    share = ament_index_python.get_package_share_directory(
+                        "sensor_fusion_bringup")
+                    diag_script = os.path.join(share, "scripts",
+                                               "tf_pipeline_diagnostics.py")
+                except Exception:
+                    diag_script = ""
+            if diag_script and os.path.isfile(diag_script):
+                camera_nodes.append(
+                    ExecuteProcess(
+                        cmd=["python3", diag_script],
+                        name="tf_pipeline_diagnostics",
+                        output="screen",
+                    )
+                )
+            else:
+                print(f"[pipeline] WARNING: TF diagnostics script not found "
+                      f"(tried source-tree and installed layouts). "
+                      f"diag_script={diag_script!r}.")
         camera_nodes.extend(
             [
                 Node(
@@ -204,12 +273,6 @@ def _launch_setup(context, *args, **kwargs):
                     executable="pointcloud_fusion_node",
                     name="pointcloud_fusion",
                     parameters=[fusion_params],
-                    output="screen",
-                ),
-                Node(
-                    package="camera",
-                    executable="pointcloud_relay_node",
-                    name="pointcloud_relay",
                     output="screen",
                 ),
                 Node(
@@ -227,16 +290,28 @@ def _launch_setup(context, *args, **kwargs):
                     output="screen",
                     arguments=["--ros-args", "--log-level", "warn"],
                 ),
+                # OpenVINS odometry-to-TF relay: publishes marker_map -> *_imu
+                # from odom messages so the host doesn't depend on Jetson /tf.
+                Node(
+                    package="camera",
+                    executable="openvins_odom_tf_relay",
+                    name="openvins_odom_tf_relay",
+                    parameters=[_node_params(config, "openvins_odom_tf_relay")],
+                    output="screen",
+                    arguments=["--ros-args", "--log-level", "warn"],
+                ),
             ]
         )
         nodes.extend(camera_nodes)
 
     # Segmentation ROS bridge (talks to inference server over HTTP)
+    # Subscribes directly to /fused_pointcloud via remapping.
     nodes.append(
         Node(
             package="segmentation_bridge",
             executable="segmentation_ros2_node",
             name="segmentation_bridge",
+            remappings={("/segmentation/input_cloud", "/fused_pointcloud")},
             parameters=[{"inference_url": inference_url}],
             output="screen",
         )
@@ -376,6 +451,21 @@ def generate_launch_description():
                 description="Arm camera depth frame for hand/arm bbox removal.",
             ),
             DeclareLaunchArgument(
+                "camera_mount",
+                default_value="8_cm_cam_mount",
+                description="Camera mount name for publish_camera_mounts.py and pruning boxes.",
+            ),
+            DeclareLaunchArgument(
+                "mounts_config",
+                default_value="/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml",
+                description="Path to camera_mounts.yaml (empty = skip mount TF publisher).",
+            ),
+            DeclareLaunchArgument(
+                "mounts_link_frame",
+                default_value="arm_d435i_arm_link",
+                description="TF frame to anchor the camera mounts tree under (empty = use 'world').",
+            ),
+            DeclareLaunchArgument(
                 "inference_url",
                 default_value="http://127.0.0.1:5678",
                 description="Segmentation inference server URL.",
@@ -384,6 +474,12 @@ def generate_launch_description():
                 "model_dir",
                 default_value="/app/models",
                 description="Directory containing trained EMG classifier models.",
+            ),
+            DeclareLaunchArgument(
+                "tf_diagnostics",
+                default_value="true",
+                description="Launch lightweight TF diagnostics node that logs "
+                            "OpenVINS and camera-mount chain health.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]

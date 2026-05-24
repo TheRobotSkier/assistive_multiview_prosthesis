@@ -64,6 +64,9 @@ struct GraspComputeRequestFFI
   PointCloudViewFFI cloud;
   CameraPositionFFI cameras[4];
   std::uint32_t n_cameras;
+  /// Predicted time-to-hit in seconds from twist propagation.
+  /// Set to -1.0 if no hit time is available (fall back to uniform sampling).
+  double hit_time_s;
 };
 
 struct GraspComputeResponseFFI

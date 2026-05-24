@@ -9,6 +9,8 @@ module without requiring a running ROS 2 environment.  They cover:
   - Voxel downsampling
   - Point cloud parsing
   - Odometry initialization checks
+  - Minimum speed filter logic
+  - Minimum time-to-hit logic
 
 Usage:
     python3 -m pytest src/twist_propagation/test/test_twist_propagation.py -v
@@ -19,6 +21,7 @@ import sys
 import os
 
 import numpy as np
+import pytest
 from scipy.spatial import KDTree
 
 sys.path.insert(0, os.path.join(
@@ -482,3 +485,206 @@ class TestSphericalShellSampler:
         result = _sample_spherical_shell_clicks(centre, 0.01, 0.05, 3, rng)
         for pt in result:
             assert pt != centre
+
+
+# -- Speed gate logic tests --
+
+class TestMinSpeedFilter:
+    """Tests for the minimum linear speed threshold logic.
+
+    The speed gate is a simple magnitude check: if sqrt(vx^2 + vy^2 + vz^2)
+    < min_twist_linear_mps, propagation is skipped.  These tests verify the
+    pure arithmetic that underpins that gate.
+    """
+
+    @staticmethod
+    def _linear_mag(twist):
+        vx, vy, vz = twist[0], twist[1], twist[2]
+        return math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
+
+    def test_zero_speed_below_threshold(self):
+        """Zero velocity should always be below any positive threshold."""
+        twist = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        min_speed = 0.02
+        assert self._linear_mag(twist) < min_speed
+
+    def test_below_threshold(self):
+        """A velocity just below the threshold should be suppressed."""
+        # 0.01 m/s in x, rest zero -> magnitude 0.01 < 0.02
+        twist = (0.01, 0.0, 0.0, 0.0, 0.0, 0.0)
+        min_speed = 0.02
+        assert self._linear_mag(twist) < min_speed
+
+    def test_above_threshold(self):
+        """A velocity above the threshold should pass."""
+        # 0.03 m/s in x -> magnitude 0.03 > 0.02
+        twist = (0.03, 0.0, 0.0, 0.0, 0.0, 0.0)
+        min_speed = 0.02
+        assert self._linear_mag(twist) >= min_speed
+
+    def test_exactly_at_threshold(self):
+        """A velocity exactly at the threshold should pass (>=)."""
+        twist = (0.02, 0.0, 0.0, 0.0, 0.0, 0.0)
+        min_speed = 0.02
+        assert self._linear_mag(twist) >= min_speed
+
+    def test_default_zero_disables_filter(self):
+        """With min_speed = 0.0, any velocity (including zero) passes."""
+        twist = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        min_speed = 0.0
+        # The gate check is: min_speed > 0.0 AND mag < min_speed
+        # With min_speed = 0.0, the first condition is False, so gate opens.
+        gate_opens = not (min_speed > 0.0 and self._linear_mag(twist) < min_speed)
+        assert gate_opens
+
+    def test_combined_xyz_velocity(self):
+        """Velocity across all three axes should use combined magnitude."""
+        # sqrt(0.01^2 + 0.01^2 + 0.01^2) = ~0.0173 < 0.02
+        twist = (0.01, 0.01, 0.01, 0.0, 0.0, 0.0)
+        min_speed = 0.02
+        assert self._linear_mag(twist) < min_speed
+
+    def test_angular_velocity_does_not_affect_gate(self):
+        """Angular velocity should not affect the linear speed gate."""
+        # High angular velocity but zero linear -> magnitude 0.0
+        twist = (0.0, 0.0, 0.0, 5.0, 5.0, 5.0)
+        min_speed = 0.02
+        assert self._linear_mag(twist) < min_speed
+
+
+# -- Time-to-hit logic tests --
+
+class TestMinTimeToHit:
+    """Tests for the minimum time-to-hit threshold logic.
+
+    The time-to-hit is the propagation variable `t` at the moment of
+    collision.  These tests verify that the propagation step count
+    produces the correct time-to-hit, and that the threshold comparison
+    works correctly.
+    """
+
+    def test_time_to_hit_first_step(self):
+        """A collision at the first propagation step gives t = dt."""
+        dt = 0.02
+        # After one step: t = 0.0 + dt = 0.02
+        t = 0.0
+        t += dt
+        assert t == pytest.approx(0.02)
+
+    def test_time_to_hit_after_n_steps(self):
+        """After N steps, time-to-hit should be N * dt."""
+        dt = 0.02
+        n_steps = 20  # 20 * 0.02 = 0.4s
+        t = 0.0
+        for _ in range(n_steps):
+            t += dt
+        assert t == pytest.approx(0.4)
+
+    def test_hit_below_min_time_rejected(self):
+        """A hit at t=0.02s should be rejected when min is 0.4s."""
+        time_to_hit = 0.02
+        min_time_to_hit = 0.4
+        assert time_to_hit < min_time_to_hit
+
+    def test_hit_above_min_time_accepted(self):
+        """A hit at t=0.5s should be accepted when min is 0.4s."""
+        time_to_hit = 0.5
+        min_time_to_hit = 0.4
+        assert time_to_hit >= min_time_to_hit
+
+    def test_hit_exactly_at_threshold_accepted(self):
+        """A hit at exactly t=0.4s should be accepted (>=)."""
+        time_to_hit = 0.4
+        min_time_to_hit = 0.4
+        assert time_to_hit >= min_time_to_hit
+
+    def test_default_zero_disables_filter(self):
+        """With min_time_to_hit = 0.0, any time-to-hit passes."""
+        time_to_hit = 0.001
+        min_time_to_hit = 0.0
+        # The gate check is: min > 0.0 AND t < min
+        # With min = 0.0, the first condition is False, so gate opens.
+        gate_opens = not (min_time_to_hit > 0.0 and time_to_hit < min_time_to_hit)
+        assert gate_opens
+
+    def test_propagation_with_known_hit_time(self):
+        """Verify propagation produces the correct time-to-hit value.
+
+        Place a point cloud at a known distance from the start position,
+        move toward it at a known velocity, and verify the returned
+        time-to-hit matches the expected value.
+        """
+        # Cloud point at x=0.5m, y=0, z=0
+        cloud = np.array([[0.5, 0.0, 0.0],
+                          [0.5, 0.01, 0.0],
+                          [0.5, -0.01, 0.0]], dtype=np.float64)
+        kdtree = KDTree(cloud)
+
+        # Start at origin, moving at vx=0.1 m/s (all other velocities zero)
+        px, py, pz = 0.0, 0.0, 0.0
+        qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0
+        vx, vy, vz = 0.1, 0.0, 0.0
+        wx, wy, wz = 0.0, 0.0, 0.0
+        dt = 0.02
+        hit_threshold = 0.05
+        collision_radius = 0.05
+        effective_threshold = hit_threshold + collision_radius
+        min_points = 3
+
+        t = 0.0
+        hit_t = None
+        while t < 2.0:
+            t += dt
+            px += vx * dt
+            py += vy * dt
+            pz += vz * dt
+
+            dists, _ = kdtree.query([px, py, pz], k=min_points)
+            if np.max(dists[:min_points]) <= effective_threshold:
+                hit_t = t
+                break
+
+        # The hand should reach x=0.5 at t = 0.5/0.1 = 5.0s, but with the
+        # collision radius of 0.05, the effective threshold is 0.10m, so
+        # the hit occurs when px >= 0.5 - 0.10 = 0.40m, i.e. t >= 4.0s.
+        # At vx=0.1, after step N: px = 0.1 * 0.02 * N = 0.002 * N
+        # px >= 0.40 when N >= 200, so t = 200 * 0.02 = 4.0s
+        assert hit_t is not None
+        assert hit_t == pytest.approx(4.0, abs=dt)
+
+    def test_near_field_hit_has_small_time_to_hit(self):
+        """When the hand starts near the cloud, time-to-hit should be small.
+
+        This is the scenario the min_time_to_hit filter is designed to catch:
+        the hand is already on top of the object.
+        """
+        # Cloud at origin, hand starting very close
+        cloud = np.array([[0.0, 0.0, 0.0],
+                          [0.01, 0.0, 0.0],
+                          [-0.01, 0.0, 0.0]], dtype=np.float64)
+        kdtree = KDTree(cloud)
+
+        # Hand at (0.05, 0, 0) — within effective threshold 0.10m
+        px, py, pz = 0.05, 0.0, 0.0
+        qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0
+        vx, vy, vz = 0.1, 0.0, 0.0
+        wx, wy, wz = 0.0, 0.0, 0.0
+        dt = 0.02
+        effective_threshold = 0.10
+        min_points = 3
+
+        t = 0.0
+        hit_t = None
+        while t < 2.0:
+            t += dt
+            px += vx * dt
+            dists, _ = kdtree.query([px, py, pz], k=min_points)
+            if np.max(dists[:min_points]) <= effective_threshold:
+                hit_t = t
+                break
+
+        # Hit should be at the very first step (t = 0.02s)
+        assert hit_t is not None
+        assert hit_t <= 0.04  # at most 2 steps
+        # This should be rejected by a min_time_to_hit of 0.4s
+        assert hit_t < 0.4

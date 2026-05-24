@@ -152,16 +152,61 @@ fn compute_sample_probability(
     (-0.5 * (d_omega_sq + d_v_sq)).exp().clamp(0.0, 1.0)
 }
 
+/// Sample a prediction time, optionally using a peaked distribution around
+/// the known hit time from twist propagation.
+///
+/// When `hit_time_opt` is `Some(t_hit)` and `t_hit >= 0`:
+/// - `(1 - exploration_fraction)` of calls return a uniform sample around `t_hit`,
+///   with an asymmetric window biased forward in time
+///   [`t_hit - spread`, `t_hit + 1.5*spread`], clamped to `[0, t_max]`.
+/// - The remaining `exploration_fraction` of calls return a uniform sample
+///   across the full `[0, t_max]` horizon (diversity / robustness).
+///
+/// When `hit_time_opt` is `None` or negative, falls back to `Uniform(0, t_max)`.
+fn sample_prediction_time(
+    t_max: f64,
+    hit_time_opt: Option<f64>,
+    exploration_fraction: f64,
+    spread: f64,
+    rng: &mut impl Rng,
+) -> f64 {
+    match hit_time_opt {
+        Some(t_hit) if t_hit >= 0.0 => {
+            if rng.random::<f64>() < exploration_fraction {
+                // Exploration: uniform across full horizon.
+                rng.random_range(0.0..t_max)
+            } else {
+                // Peaked: uniform around hit time, asymmetric (more room forward).
+                let lo = (t_hit - spread).max(0.0);
+                let hi = (t_hit + 1.5 * spread).min(t_max);
+                if hi > lo {
+                    rng.random_range(lo..hi)
+                } else {
+                    // Spread too narrow or hit_time at boundary — fall back.
+                    rng.random_range(0.0..t_max)
+                }
+            }
+        }
+        _ => {
+            // No hit time available — standard uniform sampling.
+            rng.random_range(0.0..t_max)
+        }
+    }
+}
+
 pub fn sample_future_poses(
     current_pose: &DualQuaternion,
     twist: &Twist6,
     covariance: &TwistCovariance,
     config: &PredictionConfig,
     rng: &mut impl Rng,
+    hit_time_opt: Option<f64>,
 ) -> Vec<SampledPose> {
+    let exploration_fraction = config::HIT_TIME_EXPLORATION_FRACTION();
+    let spread = config::HIT_TIME_SPREAD_S();
     let mut poses = Vec::with_capacity(config.n_samples);
     for _ in 0..config.n_samples {
-        let t: f64 = rng.random_range(0.0..config.t_max);
+        let t: f64 = sample_prediction_time(config.t_max, hit_time_opt, exploration_fraction, spread, rng);
         let sampled = sample_twist(twist, covariance, t, rng);
         let displacement_se3 = twist_to_se3(&sampled.twist.omega, &sampled.twist.v);
         let displacement_dq = DualQuaternion::from_se3(&displacement_se3);
@@ -230,10 +275,13 @@ pub fn sample_initial_particles(
     n_samples: usize,
     t_max: f64,
     rng: &mut impl Rng,
+    hit_time_opt: Option<f64>,
 ) -> Vec<SmcParticle> {
+    let exploration_fraction = config::HIT_TIME_EXPLORATION_FRACTION();
+    let spread = config::HIT_TIME_SPREAD_S();
     let mut particles = Vec::with_capacity(n_samples);
     for _ in 0..n_samples {
-        let t: f64 = rng.random_range(0.0..t_max);
+        let t: f64 = sample_prediction_time(t_max, hit_time_opt, exploration_fraction, spread, rng);
         let sampled = sample_twist(twist, covariance, t, rng);
         let displacement_se3 = twist_to_se3(&sampled.twist.omega, &sampled.twist.v);
         let displacement_dq = DualQuaternion::from_se3(&displacement_se3);
@@ -567,9 +615,10 @@ pub fn predict_roi_with_samples(
     covariance: &TwistCovariance,
     index_tip_local: &Vector3<f64>,
     config: &PredictionConfig,
+    hit_time_opt: Option<f64>,
 ) -> (Aabb, Vec<SampledPose>) {
     let mut rng = rand::rng();
-    let sampled_poses = sample_future_poses(current_pose, twist, covariance, config, &mut rng);
+    let sampled_poses = sample_future_poses(current_pose, twist, covariance, config, &mut rng, hit_time_opt);
     let points = project_index_tips(&sampled_poses, current_pose, index_tip_local);
     let anchor = current_pose.location();
     let anchor_f32 = Vector3::new(anchor.x as f32, anchor.y as f32, anchor.z as f32);
@@ -646,6 +695,7 @@ mod tests {
             &zero_cov,
             &config,
             &mut rng,
+            None,  // no hit time available
         );
         assert_eq!(poses.len(), 20);
         for sp in &poses {
@@ -696,7 +746,7 @@ mod tests {
         };
         let cov = TwistCovariance::fixed();
 
-        let (aabb, _) = predict_roi_with_samples(&pose, &zero_twist, &cov, &tip_local, &config);
+        let (aabb, _) = predict_roi_with_samples(&pose, &zero_twist, &cov, &tip_local, &config, None);
 
         let size = aabb.max - aabb.min;
         assert!(
@@ -718,5 +768,64 @@ mod tests {
         let center = (aabb.min + aabb.max) * 0.5;
         assert!(center.x > -1.0 && center.x < 1.0, "center x = {}", center.x);
         assert!(center.z > -1.0 && center.z < 1.0, "center z = {}", center.z);
+    }
+
+    #[test]
+    fn sample_prediction_time_with_hit_time_clusters() {
+        // With hit_time=Some(1.0) and no exploration, all samples should fall
+        // within the peaked window [1.0 - 0.5, 1.0 + 1.5*0.5] = [0.5, 1.75].
+        let t_max = 5.0;
+        let exploration_fraction = 0.0; // No exploration — all peaked.
+        let spread = 0.5;
+        let mut rng = rand::rng();
+        for _ in 0..1000 {
+            let t = sample_prediction_time(t_max, Some(1.0), exploration_fraction, spread, &mut rng);
+            assert!(
+                t >= 0.5 && t <= 1.75,
+                "hit-time-peaked sample {} outside [0.5, 1.75]",
+                t
+            );
+        }
+    }
+
+    #[test]
+    fn sample_prediction_time_exploration_covers_full_range() {
+        // With exploration_fraction=1.0, all samples should be uniform over [0, t_max).
+        let t_max = 5.0;
+        let exploration_fraction = 1.0;
+        let spread = 0.5;
+        let mut rng = rand::rng();
+        let mut min_t = f64::MAX;
+        let mut max_t = f64::MIN;
+        for _ in 0..2000 {
+            let t = sample_prediction_time(t_max, Some(1.0), exploration_fraction, spread, &mut rng);
+            min_t = min_t.min(t);
+            max_t = max_t.max(t);
+        }
+        // With 2000 samples from Uniform(0,5), we should see near the extremes.
+        assert!(min_t < 0.1, "exploration should sample near 0, got min={}", min_t);
+        assert!(max_t > 4.9, "exploration should sample near 5, got max={}", max_t);
+    }
+
+    #[test]
+    fn sample_prediction_time_no_hit_time_is_uniform() {
+        // When hit_time is None, behaves exactly like previous uniform sampling.
+        let t_max = 5.0;
+        let mut rng = rand::rng();
+        for _ in 0..100 {
+            let t = sample_prediction_time(t_max, None, 0.1, 0.5, &mut rng);
+            assert!(t >= 0.0 && t < t_max, "uniform sample {} outside [0, {})", t, t_max);
+        }
+    }
+
+    #[test]
+    fn sample_prediction_time_negative_hit_time_is_uniform() {
+        // Negative hit time sentinel should fall back to uniform.
+        let t_max = 5.0;
+        let mut rng = rand::rng();
+        for _ in 0..100 {
+            let t = sample_prediction_time(t_max, Some(-1.0), 0.1, 0.5, &mut rng);
+            assert!(t >= 0.0 && t < t_max, "fallback sample {} outside [0, {})", t, t_max);
+        }
     }
 }

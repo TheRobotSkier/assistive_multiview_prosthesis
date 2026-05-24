@@ -75,6 +75,9 @@ pub struct GraspComputeRequestFFI {
     pub cloud: PointCloudViewFFI,
     pub cameras: [CameraPositionFFI; 4],
     pub n_cameras: u32,
+    /// Predicted time-to-hit in seconds from twist propagation.
+    /// Negative value means no hit time is available; fall back to uniform sampling.
+    pub hit_time_s: f64,
 }
 
 #[repr(C)]
@@ -147,6 +150,7 @@ type ScorerFn = fn(
     &crate::pointcloud_helper::Tsdf,
     &Matrix4<f64>,
     f32,
+    Option<&crate::superquadric::SuperquadricParams>,
 ) -> GraspScoreResult;
 
 struct ComputeOutput {
@@ -211,6 +215,7 @@ fn score_all_particles(
     tsdf: &crate::pointcloud_helper::Tsdf,
     particles: &mut [SmcParticle],
     collision_tol: f32,
+    sq_params: Option<&crate::superquadric::SuperquadricParams>,
 ) -> Vec<ScoredGrasp> {
     let weights = GraspWeights::default();
 
@@ -230,7 +235,7 @@ fn score_all_particles(
                 _ => GraspType::Lateral,
             };
 
-            let result = scorer(lut, tsdf, &base_transform, collision_tol);
+            let result = scorer(lut, tsdf, &base_transform, collision_tol, sq_params);
             let combined = result.combined_score(&weights, p.sample_probability);
             (
                 ScoredGrasp {
@@ -368,15 +373,32 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     let pred_config = get_prediction_config();
     let index_tip_local = get_index_tip_local();
 
+    // --- Extract hit time (negative sentinel = no hit time available) ---
+    let hit_time_opt = if request.hit_time_s >= 0.0 {
+        Some(request.hit_time_s)
+    } else {
+        None
+    };
+    if let Some(ht) = hit_time_opt {
+        eprintln!(
+            "[hit_time] using hit_time_s={:.3}s (spread={:.3}s)",
+            ht,
+            config::HIT_TIME_SPREAD_S(),
+        );
+    } else {
+        eprintln!("[hit_time] no hit time available, using uniform sampling");
+    }
+
     // --- ROI and TSDF construction (one-time cost) ---
-    // Use the original sample_future_poses for ROI prediction so the AABB
-    // covers the full initial search space.
+    // With hit time available, sample_future_poses concentrates particles
+    // around the predicted contact horizon, which also focuses the ROI.
     let (roi, _samples_for_roi) = predict_roi_with_samples(
         &current_pose,
         &twist_with_cov.twist,
         &twist_with_cov.covariance,
         index_tip_local,
         pred_config,
+        hit_time_opt,
     );
 
     let pruned = prune(&cloud, Some(roi));
@@ -428,6 +450,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
         n_samples,
         pred_config.t_max,
         &mut rng,
+        hit_time_opt,
     );
 
     // Collect debug data across all iterations: (particle_index, scored_grasp, iteration).
@@ -440,16 +463,11 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
 
     let mut scored: Vec<ScoredGrasp> = Vec::new();
 
-    // Track best score for early termination.
-    let mut prev_best_score: Option<f64> = None;
     let mut iterations_used: u32 = 0;
 
     for iteration in 0..n_iterations {
         iterations_used = iteration as u32 + 1;
-        scored = score_all_particles(lut, &tsdf, &mut particles, collision_tol);
-
-        // Find best score in this iteration for convergence checking.
-        let current_best_score = scored.iter().map(|sg| sg.combined).fold(f64::NEG_INFINITY, f64::max);
+        scored = score_all_particles(lut, &tsdf, &mut particles, collision_tol, sq_params.as_ref());
 
         // Store debug data for this iteration.
         if let Some(ref mut debug) = all_debug {
@@ -457,17 +475,6 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
                 debug.push((i, sg.clone(), iteration, particles[i].clone()));
             }
         }
-
-        // Check for convergence (early termination) after minimum iterations.
-        if iteration >= config::SMC_MIN_ITERATIONS() {
-            if let Some(prev) = prev_best_score {
-                if (current_best_score - prev).abs() < config::SMC_CONVERGENCE_TOL() {
-                    // Converged - stop iterating.
-                    break;
-                }
-            }
-        }
-        prev_best_score = Some(current_best_score);
 
         // Last iteration: no resampling needed.
         if iteration == n_iterations - 1 {
@@ -639,10 +646,15 @@ fn write_message(buf: *mut c_char, buf_len: usize, msg: &str) {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn grasp_preshaping_api_version() -> u32 {
-    5
+pub extern "C" fn grasp_preshaping_reload_config() {
+    crate::runtime_config::reload();
 }
 
+/// Expose API version constant for FFI consumers.
+#[unsafe(no_mangle)]
+pub extern "C" fn grasp_preshaping_api_version() -> u32 {
+    1
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn grasp_preshaping_compute(
     request: *const GraspComputeRequestFFI,

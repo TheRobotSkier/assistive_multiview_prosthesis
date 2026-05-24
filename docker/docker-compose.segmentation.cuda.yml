@@ -7,7 +7,7 @@
 # Prerequisites:
 #   - NVIDIA Container Toolkit installed on host
 #   - nvidia-docker2 or docker >= 19.03 with nvidia-container-runtime
-#   - Host GPU driver compatible with CUDA 11.8
+#   - Host GPU driver compatible with CUDA 11.6
 
 services:
     segmentation-cuda:

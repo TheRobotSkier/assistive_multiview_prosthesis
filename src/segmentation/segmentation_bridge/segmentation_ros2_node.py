@@ -112,7 +112,7 @@ class SegmentationNode(Node):
 
         self.declare_parameter("cubeedge", 0.05)
         self.declare_parameter("inference_url", "http://127.0.0.1:5678")
-        self.declare_parameter("click_batch_debounce_s", 0.2)
+        self.declare_parameter("click_batch_debounce_s", 0.02)
 
         self._lock = threading.Lock()
         self._cloud_xyz: np.ndarray | None = None
@@ -220,11 +220,14 @@ class SegmentationNode(Node):
                 self._debounce_timer = None
             header = self._cloud_header
         self.get_logger().info("Clicks reset.")
-        # Publish an empty cloud to clear the RViz2 display
-        if header is not None:
-            empty_msg = _empty_pointcloud2(header)
-            empty_msg.header.stamp = self.get_clock().now().to_msg()
-            self._pub.publish(empty_msg)
+        # Do NOT publish an empty cloud on /segmentation/object_cloud here.
+        # Publishing an empty cloud with a new timestamp causes a race: the
+        # twist_propagation node detects the stamp change and calls the
+        # preshaping service before the real segmented cloud arrives, leading
+        # to a "PointCloud data pointer is null" error.  Downstream consumers
+        # (twist_propagation, preshaping_service_bridge) already skip empty
+        # clouds.  The RViz2 display will be overwritten when the new
+        # segmented cloud is published after inference completes.
 
     # --- inference ----------------------------------------------------------
 

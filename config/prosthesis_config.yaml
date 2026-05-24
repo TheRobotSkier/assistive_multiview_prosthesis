@@ -119,6 +119,7 @@ preshaping_service:
         target_closures_topic: "/grasp_preshaping/target_finger_closures"
         grasp_type_topic: "/grasp_preshaping/grasp_type"
         compute_service: "/grasp_preshaping/compute_grasp"
+        hit_time_topic: "/grasp_preshaping/hit_time"
         camera_lookup_target_frame: "marker_map"
         camera_frames:
             [
@@ -142,7 +143,27 @@ pointcloud_fusion:
         enable_downsampling: true
         enable_distance_filter: true
         enable_hand_removal: true
-        cloud_max_age_s: 1.5
+        cloud_max_age_s: 0.5
+        mounts_config_path: ""
+        active_mount: "8_cm_cam_mount"
+
+openvins_odom_tf_relay:
+    ros__parameters:
+        head_odom_topic: "/ov_msckf/odomimu"
+        arm_odom_topic: "/ov_msckf_arm/odomimu"
+        target_frame: "marker_map"
+        head_imu_frame: "head_imu"
+        arm_imu_frame: "arm_imu"
+        head_cam_frame: "head_cam0"
+        arm_cam_frame: "arm_cam0"
+        publish_imu_to_cam_tf: true
+        # Nominal D435i imu->cam0 (color_optical) extrinsic.
+        # OpenVINS cam0 == color_optical_frame.  The imu frame is at the link
+        # origin; color_optical is (0, 0.015, 0) with optical rotation.
+        imu_to_cam_extrinsics_head:
+            {x: 0.0, y: 0.015, z: 0.0, roll: -1.570796, pitch: 0.0, yaw: -1.570796}
+        imu_to_cam_extrinsics_arm:
+            {x: 0.0, y: 0.015, z: 0.0, roll: -1.570796, pitch: 0.0, yaw: -1.570796}
 
 openvins_realsense_tf_bridge:
     ros__parameters:
@@ -164,18 +185,29 @@ openvins_realsense_tf_bridge:
                 "head_d435i_head_depth_optical_frame",
                 "arm_d435i_arm_depth_optical_frame",
             ]
-        publish_rate_hz: 2.0
+        publish_rate_hz: 10.0
+        # Liveness re-sends bridge edges on /tf to work around CycloneDDS
+        # /tf_static latch unreliability.  10 Hz ensures the TF buffer always
+        # has a fresh entry for the fusion node (15 Hz, 0.5s cloud max age).
+        liveness_rate_hz: 10.0
         publish_nominal_static_chain: true
 
 twist_propagation:
     ros__parameters:
-        cycle_delay_s: 0.1
+        cycle_delay_s: 0.02
         propagation_time_horizon_s: 2.0
         propagation_dt_s: 0.02
         hit_threshold_m: 0.05
         min_points_near_hit: 3
         collision_geometry_radius_m: 0.05
         twist_estimation_window: 5
+        # Minimum linear speed (m/s) below which hit detection is suppressed.
+        # Prevents false hits when the hand is stationary or drifting near geometry.
+        min_twist_linear_mps: 0.02
+        # Minimum predicted time-to-hit (s) below which hits are rejected.
+        # If the collision is closer than this, the pipeline (~1.4s) cannot
+        # complete in time.  Rejecting avoids wasted computation.
+        min_time_to_hit_s: 0.4
         active: false
         input_cloud_topic: "/fused_pointcloud"
         segmented_cloud_topic: "/segmentation/object_cloud"
@@ -183,6 +215,8 @@ twist_propagation:
         odom_topic: ""
         click_positive_topic: "/segmentation/click_positive"
         hand_twist_topic: "/hand_twist"
+        hand_twist_input_topic: "/hand_twist"
+        external_twist_max_age_s: 0.5
         segmentation_reset_topic: "/segmentation/reset"
         segmentation_retarget_distance_m: 0.10
         compute_grasp_service: "/grasp_preshaping/compute_grasp"
@@ -194,205 +228,226 @@ twist_propagation:
         process_noise_linear_mps2_per_s: 0.1
         process_noise_angular_radps2_per_s: 0.5
         enable_covariance_propagation: true
-
-        # ── Multi-click segmentation seeding ────────────────────────────────
-        # Number of synthetic positive clicks to publish around each collision hit.
-        # Total clicks sent = 1 (original hit) + click_count (synthetic).
-        # click_count=0 preserves the original single-click behavior.
-        click_count: 0
-        click_radius_m: 0.03
-        click_min_radius_m: 0.005
-        click_random_seed: 42
+        # Offset from tracked pose origin (camera) to grasp contact point
+        # (fingertips), expressed in the pose's local frame.  Applied by
+        # rotating by pose orientation before propagation.
+        # Computed from camera_mounts.yaml for 8_cm_cam_mount:
+        #   cam0 -> link (RealSense extrinsic) -> screw -> palm -> grasp_contact
+        propagation_origin_offset: [0.1543, -0.1485, 0.1352]
+        preshaping_call_delay_s: 0.15
+        background_cycle_enabled: true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)
-# ═══════════════════════════════════════════════════════════════════════════════
+# Wrapped under a dummy node to satisfy ROS 2 --params-file parser.
+# Test scripts should use yaml.safe_load and access _reference.topics, etc.
 
-# ── ROS Topics ────────────────────────────────────────────────────────────────
-topics:
-    # Hand tracking
-    hand_pose: "/hand_pose"
-    hand_twist: "/hand_twist"
+_reference:
+    ros__parameters:
 
-    # Segmentation
-    segmentation_input_cloud: "/segmentation/input_cloud"
-    segmentation_click_positive: "/segmentation/click_positive"
-    segmentation_click_negative: "/segmentation/click_negative"
-    segmentation_reset: "/segmentation/reset"
-    segmented_object_cloud: "/segmentation/object_cloud"
+        # ── ROS Topics ────────────────────────────────────────────────────────
+        topics:
+            hand_pose: "/hand_pose"
+            hand_twist: "/hand_twist"
 
-    # Grasp preshaping
-    compute_grasp_service: "/grasp_preshaping/compute_grasp"
-    preshaping_wrist_pose: "/grasp_preshaping/wrist_pose"
-    preshaping_target_hand_pose: "/grasp_preshaping/target_hand_pose"
-    preshaping_target_closures: "/grasp_preshaping/target_finger_closures"
-    preshaping_grasp_type: "/grasp_preshaping/grasp_type"
+            # Segmentation
+            segmentation_input_cloud: "/segmentation/input_cloud"
+            segmentation_click_positive: "/segmentation/click_positive"
+            segmentation_click_negative: "/segmentation/click_negative"
+            segmentation_reset: "/segmentation/reset"
+            segmented_object_cloud: "/segmentation/object_cloud"
 
-    # Joint commands (forward position controllers)
-    thumb_cmd: "/thumb_pos_ff_controller/commands"
-    index_cmd: "/index_pos_ff_controller/commands"
-    mrl_cmd: "/mrl_pos_ff_controller/commands"
+            # Grasp preshaping
+            compute_grasp_service: "/grasp_preshaping/compute_grasp"
+            preshaping_wrist_pose: "/grasp_preshaping/wrist_pose"
+            preshaping_target_hand_pose: "/grasp_preshaping/target_hand_pose"
+            preshaping_target_closures: "/grasp_preshaping/target_finger_closures"
+            preshaping_grasp_type: "/grasp_preshaping/grasp_type"
 
-    # Wrist
-    wrist_set_position: "/wrist/set_position"
-    wrist_state: "/wrist/state"
+            # Joint commands (forward position controllers)
+            thumb_cmd: "/thumb_pos_ff_controller/commands"
+            index_cmd: "/index_pos_ff_controller/commands"
+            mrl_cmd: "/mrl_pos_ff_controller/commands"
 
-    # EMG
-    emg_gesture_label: "/emg/gesture_label"
-    emg_gesture_name: "/emg/gesture_name"
-    emg_confidence: "/emg/confidence"
-    emg_proportional: "/emg/proportional"
+            # Wrist
+            wrist_set_position: "/wrist/set_position"
+            wrist_state: "/wrist/state"
 
-    # Pipeline
-    pipeline_state: "/pipeline/state"
-    pipeline_state_name: "/pipeline/state_name"
+            # EMG
+            emg_gesture_label: "/emg/gesture_label"
+            emg_gesture_name: "/emg/gesture_name"
+            emg_confidence: "/emg/confidence"
+            emg_proportional: "/emg/proportional"
 
-    # Haptic
-    haptic_motors: "/haptic_band/motors"
+            # Pipeline
+            pipeline_state: "/pipeline/state"
+            pipeline_state_name: "/pipeline/state_name"
 
-    # Force
-    finger_forces: "data_streams/fingers/forces/data"
-    force_stream_switch: "data_streams/fingers/forces/switch"
-    force_controller_status: "/force_controller/status"
-    joint_states: "/joint_states"
+            # Haptic
+            haptic_motors: "/haptic_band/motors"
 
-    # Twist Propagation
-    twist_activate_service: "/twist_propagation/activate"
-    twist_deactivate_service: "/twist_propagation/deactivate"
+            # Force
+            finger_forces: "data_streams/fingers/forces/data"
+            force_stream_switch: "data_streams/fingers/forces/switch"
+            force_controller_status: "/force_controller/status"
+            joint_states: "/joint_states"
 
-# ── TF Frames ─────────────────────────────────────────────────────────────────
-frames:
-    world: "world"
-    hand: "hand_link"
-    camera_front: "camera_front_depth"
-    camera_wrist: "camera_wrist"
-    target: "marker_map"
-    head_openvins_camera: "head_cam0"
-    arm_openvins_camera: "arm_cam0"
-    head_realsense_link: "head_d435i_head_link"
-    arm_realsense_link: "arm_d435i_arm_link"
-    head_depth_optical: "head_d435i_head_depth_optical_frame"
-    arm_depth_optical: "arm_d435i_arm_depth_optical_frame"
+            # Twist Propagation
+            twist_activate_service: "/twist_propagation/activate"
+            twist_deactivate_service: "/twist_propagation/deactivate"
 
-# ── Camera TF Bridge ─────────────────────────────────────────────────────────
-camera_tf_bridge:
-    parent_frames: ["head_cam0", "arm_cam0"]
-    link_frames: ["head_d435i_head_link", "arm_d435i_arm_link"]
-    anchor_frames:
-        [
-            "head_d435i_head_color_optical_frame_from_marker",
-            "arm_d435i_arm_color_optical_frame_from_marker",
-        ]
-    fallback_optical_frames:
-        [
-            "head_d435i_head_depth_optical_frame",
-            "arm_d435i_arm_depth_optical_frame",
-        ]
+        # ── TF Frames ─────────────────────────────────────────────────────────
+        frames:
+            world: "world"
+            hand: "hand_link"
+            camera_front: "camera_front_depth"
+            camera_wrist: "camera_wrist"
+            target: "marker_map"
+            head_openvins_camera: "head_cam0"
+            arm_openvins_camera: "arm_cam0"
+            head_realsense_link: "head_d435i_head_link"
+            arm_realsense_link: "arm_d435i_arm_link"
+            head_depth_optical: "head_d435i_head_depth_optical_frame"
+            arm_depth_optical: "arm_d435i_arm_depth_optical_frame"
 
-# ── EMG ───────────────────────────────────────────────────────────────────────
-emg:
-    confidence_threshold: 0.8
-    gesture_names: ["REST", "POWER", "PINCH", "OPEN", "POINT"]
-    # Gesture to pipeline action mapping
-    gesture_actions:
-        POWER: "start_grasp"
-        OPEN: "release"
+        # ── Camera TF Bridge ─────────────────────────────────────────────────
+        camera_tf_bridge:
+            parent_frames: ["head_cam0", "arm_cam0"]
+            link_frames: ["head_d435i_head_link", "arm_d435i_arm_link"]
+            anchor_frames:
+                [
+                    "head_d435i_head_color_optical_frame_from_marker",
+                    "arm_d435i_arm_color_optical_frame_from_marker",
+                ]
+            fallback_optical_frames:
+                [
+                    "head_d435i_head_depth_optical_frame",
+                    "arm_d435i_arm_depth_optical_frame",
+                ]
 
-# ── Segmentation ──────────────────────────────────────────────────────────────
-segmentation:
-    inference_url: "http://127.0.0.1:5678"
-    cubeedge: 0.05
+        # ── EMG ───────────────────────────────────────────────────────────────
+        emg:
+            confidence_threshold: 0.8
+            gesture_names: ["REST", "POWER", "PINCH", "OPEN", "POINT"]
+            # Gesture to pipeline action mapping
+            gesture_actions:
+                POWER: "start_grasp"
+                OPEN: "release"
 
-# ── Grasp Preshaping ─────────────────────────────────────────────────────────
-preshaping:
-    min_closure_amount: 0.1
-    preshaping_closure_fraction: 0.3
-    publish_initial_commands: false
-    camera_lookup_target_frame: "marker_map"
-    camera_frames:
-        [
-            "head_d435i_head_depth_optical_frame",
-            "arm_d435i_arm_depth_optical_frame",
-        ]
+        # ── Segmentation ──────────────────────────────────────────────────────
+        segmentation:
+            inference_url: "http://127.0.0.1:5678"
+            cubeedge: 0.05
 
-# ── Proximity Execution ──────────────────────────────────────────────────────
-execution:
-    proximity_enter_threshold_m: 0.08
-    proximity_exit_threshold_m: 0.10
-    partial_closure_factor: 0.3
-    min_closure_amount: 0.1
-    wrist_accel_deg_s2: 180.0
-    control_rate_hz: 10.0
+        # ── Grasp Preshaping ─────────────────────────────────────────────────
+        preshaping:
+            min_closure_amount: 0.1
+            preshaping_closure_fraction: 0.3
+            publish_initial_commands: false
+            camera_lookup_target_frame: "marker_map"
+            camera_frames:
+                [
+                    "head_d435i_head_depth_optical_frame",
+                    "arm_d435i_arm_depth_optical_frame",
+                ]
 
-# ── Force Control ─────────────────────────────────────────────────────────────
-force:
-    target_force_min: 50.0
-    target_force_max: 200.0
-    kp: 0.01
-    ki: 0.001
-    update_rate_hz: 10.0
-    max_position_step: 0.05       # Max position increment per tick (rad)
-    integral_limit: 50.0          # Anti-windup: max integral accumulator
-    stability_window_s: 1.0       # Seconds forces must be stable before declaring HOLDING
-    stability_tolerance: 15.0     # Raw sensor units — force must be within this of target
-    slip_threshold: 30.0          # Tangential force rate-of-change threshold for slip detection
-    emergency_force: 500.0        # Emergency release threshold (raw sensor units)
-    stale_data_timeout_s: 0.5     # Seconds without force data before warning
-    emergency_backoff_factor: 2.0 # Multiplier for max_step on emergency release
-    force_filter_window: 5        # Moving-average window for force readings
-    max_current_percent: 60.0     # Safety: max motor current as percentage (0-80)
+        # ── Proximity Execution ──────────────────────────────────────────────
+        execution:
+            proximity_enter_threshold_m: 0.08
+            proximity_exit_threshold_m: 0.10
+            partial_closure_factor: 0.3
+            min_closure_amount: 0.1
+            wrist_accel_deg_s2: 180.0
+            control_rate_hz: 10.0
 
-# ── Haptic ────────────────────────────────────────────────────────────────────
-haptic:
-    pipeline_state_topic: "/pipeline/state"
-    release_buzz_duration_s: 0.5
-    release_buzz_intensity: 60.0
-    force_max_raw: 500.0
-    force_stale_timeout_s: 1.0
+        # ── Force Control ─────────────────────────────────────────────────────
+        force:
+            target_force_min: 50.0
+            target_force_max: 200.0
+            kp: 0.01
+            ki: 0.001
+            update_rate_hz: 10.0
+            max_position_step: 0.05       # Max position increment per tick (rad)
+            integral_limit: 50.0          # Anti-windup: max integral accumulator
+            stability_window_s: 1.0       # Seconds forces must be stable before declaring HOLDING
+            stability_tolerance: 15.0     # Raw sensor units — force must be within this of target
+            slip_threshold: 30.0          # Tangential force rate-of-change threshold for slip detection
+            emergency_force: 500.0        # Emergency release threshold (raw sensor units)
+            stale_data_timeout_s: 0.5     # Seconds without force data before warning
+            emergency_backoff_factor: 2.0 # Multiplier for max_step on emergency release
+            force_filter_window: 5        # Moving-average window for force readings
+            max_current_percent: 60.0     # Safety: max motor current as percentage (0-80)
 
-# ── Hardware ──────────────────────────────────────────────────────────────────
-hardware:
-    mia_serial_port: "/dev/ttyUSB0"
-    wrist_port: "/dev/ttyUSB0"
-    wrist_baudrate: 57600
-    wrist_motor_id: 1
-    haptic_bt_addr1: "84:2E:14:09:E1:4E"
+        # ── Haptic ────────────────────────────────────────────────────────────
+        haptic:
+            pipeline_state_topic: "/pipeline/state"
+            release_buzz_duration_s: 0.5
+            release_buzz_intensity: 60.0
+            force_max_raw: 500.0
+            force_stale_timeout_s: 1.0
 
-# ── Twist Propagation ─────────────────────────────────────────────────────────
-# NOTE: The canonical parameter set is in
-#   src/twist_propagation/config/twist_propagation.yaml
-# This flat section is kept for test scripts and documentation that read this
-# file with yaml.safe_load.  The ROS2 node section above is the source of
-# truth for runtime parameters.
-twist_propagation:
-    cycle_delay_s: 0.1
-    propagation_time_horizon_s: 2.0
-    propagation_dt_s: 0.02
-    hit_threshold_m: 0.05
-    min_points_near_hit: 3
-    collision_geometry_radius_m: 0.05
-    twist_estimation_window: 5
-    active: false
-    input_cloud_topic: "/fused_pointcloud"
-    segmented_cloud_topic: "/segmentation/object_cloud"
-    hand_pose_topic: "/hand_pose"
-    odom_topic: ""
-    click_positive_topic: "/segmentation/click_positive"
-    hand_twist_topic: "/hand_twist"
-    segmentation_reset_topic: "/segmentation/reset"
-    segmentation_retarget_distance_m: 0.10
-    compute_grasp_service: "/grasp_preshaping/compute_grasp"
-    segmentation_timeout_s: 5.0
-    cloud_max_age_s: 2.0
-    pose_max_age_s: 1.0
-    voxel_leaf_m: 0.02
-    max_prediction_covariance_trace: 100.0
-    process_noise_linear_mps2_per_s: 0.1
-    process_noise_angular_radps2_per_s: 0.5
-    enable_covariance_propagation: true
+        # ── Hardware ──────────────────────────────────────────────────────────
+        hardware:
+            mia_serial_port: "/dev/ttyUSB0"
+            wrist_port: "/dev/ttyUSB0"
+            wrist_baudrate: 57600
+            wrist_motor_id: 1
+            haptic_bt_addr1: "84:2E:14:09:E1:4E"
 
-    # Multi-click segmentation seeding
-    click_count: 0
-    click_radius_m: 0.03
-    click_min_radius_m: 0.005
-    click_random_seed: 42
+        # ── Twist Propagation ─────────────────────────────────────────────────
+        # NOTE: The canonical parameter set is in
+        #   src/twist_propagation/config/twist_propagation.yaml
+        # This flat section is kept for test scripts and documentation that read this
+        # file with yaml.safe_load.  The ROS2 node section above is the source of
+        # truth for runtime parameters.
+        twist_propagation:
+            cycle_delay_s: 0.02
+            propagation_time_horizon_s: 2.0
+            propagation_dt_s: 0.02
+            hit_threshold_m: 0.05
+            min_points_near_hit: 3
+            collision_geometry_radius_m: 0.05
+            twist_estimation_window: 5
+            min_twist_linear_mps: 0.02
+            min_time_to_hit_s: 0.4
+            active: false
+            input_cloud_topic: "/fused_pointcloud"
+            segmented_cloud_topic: "/segmentation/object_cloud"
+            hand_pose_topic: "/hand_pose"
+            odom_topic: ""
+            click_positive_topic: "/segmentation/click_positive"
+            hand_twist_topic: "/hand_twist"
+            hand_twist_input_topic: "/hand_twist"
+            external_twist_max_age_s: 0.5
+            segmentation_reset_topic: "/segmentation/reset"
+            segmentation_retarget_distance_m: 0.10
+            compute_grasp_service: "/grasp_preshaping/compute_grasp"
+            segmentation_timeout_s: 5.0
+            cloud_max_age_s: 2.0
+            pose_max_age_s: 1.0
+            voxel_leaf_m: 0.02
+            max_prediction_covariance_trace: 100.0
+            process_noise_linear_mps2_per_s: 0.1
+            process_noise_angular_radps2_per_s: 0.5
+            enable_covariance_propagation: true
+            # Offset from tracked pose origin (camera) to grasp contact point
+            # (fingertips), expressed in the pose's local frame.
+            # Computed from camera_mounts.yaml for 8_cm_cam_mount.
+            propagation_origin_offset: [0.1543, -0.1485, 0.1352]
+
+            # ── Multi-click segmentation seeding ────────────────────────────
+            # Number of synthetic positive clicks to publish around each collision hit.
+            # Total clicks sent = 1 (original hit) + click_count (synthetic).
+            # click_count=0 preserves the original single-click behavior.
+            click_count: 4
+            click_radius_m: 0.03
+            click_min_radius_m: 0.005
+            click_random_seed: 42
+
+            # Delay between detecting a new segmented cloud and calling the
+            # preshaping service (seconds).  Gives the preshaping bridge time to
+            # receive the cloud via its own subscription.  Set to 0 to disable.
+            preshaping_call_delay_s: 0.15
+
+            # Background warm cache: maintain twist and KDTree while inactive.
+            background_cycle_enabled: true

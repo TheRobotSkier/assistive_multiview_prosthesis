@@ -62,6 +62,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy, HistoryPolicy
+from rclpy.time import Time
 
 from geometry_msgs.msg import (
     PoseStamped,
@@ -71,7 +72,7 @@ from geometry_msgs.msg import (
 )
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import PointCloud2, PointField
-from std_msgs.msg import String, ColorRGBA, Empty
+from std_msgs.msg import String, ColorRGBA, Empty, Float64
 from std_srvs.srv import Trigger
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -168,22 +169,6 @@ def _quat_diff(q1: tuple, q0: tuple) -> tuple:
     ix, iy, iz, iw = -q0[0], -q0[1], -q0[2], q0[3]
     q_diff = _quat_multiply((ix, iy, iz, iw), q1)
     return _quat_to_rotation_vec(q_diff)
-
-
-def _rotate_vector_by_quat(q: tuple, v: tuple) -> tuple:
-    """Rotate a 3-D vector by a quaternion (x, y, z, w)."""
-    qx, qy, qz, qw = q
-    vx, vy, vz = v
-    # q * v_quat * q_conj  where v_quat = (vx, vy, vz, 0)
-    tqx, tqy, tqz, tqw = _quat_multiply(
-        (qx, qy, qz, qw),
-        (vx, vy, vz, 0.0),
-    )
-    cqx, cqy, cqz, cqw = _quat_multiply(
-        (tqx, tqy, tqz, tqw),
-        (-qx, -qy, -qz, qw),
-    )
-    return (cqx, cqy, cqz)
 
 
 def _propagate_pose(
@@ -421,7 +406,7 @@ class TwistPropagationNode(Node):
 
         # ── Parameters ─────────────────────────────────────────────────────
         # Core propagation
-        self.declare_parameter("cycle_delay_s", 0.1)
+        self.declare_parameter("cycle_delay_s", 0.02)
         self.declare_parameter("propagation_time_horizon_s", 2.0)
         self.declare_parameter("propagation_dt_s", 0.02)
 
@@ -432,6 +417,10 @@ class TwistPropagationNode(Node):
 
         # Twist estimation
         self.declare_parameter("twist_estimation_window", 5)
+        self.declare_parameter("min_twist_linear_mps", 0.0)
+
+        # Hit validation
+        self.declare_parameter("min_time_to_hit_s", 0.0)
 
         # Activation
         self.declare_parameter("active", False)
@@ -443,17 +432,17 @@ class TwistPropagationNode(Node):
         self.declare_parameter("odom_topic", "")  # optional: nav_msgs/Odometry
         self.declare_parameter("click_positive_topic", "/segmentation/click_positive")
         self.declare_parameter("hand_twist_topic", "/hand_twist")
+        self.declare_parameter("hand_twist_input_topic", "/hand_twist")  # external twist source
+        self.declare_parameter("external_twist_max_age_s", 0.5)
         self.declare_parameter("segmentation_reset_topic", "/segmentation/reset")
 
         # Segmentation retarget policy
         self.declare_parameter("segmentation_retarget_distance_m", 0.10)
 
         # Service names
+        self.declare_parameter("compute_grasp_service", "/grasp_preshaping/compute_grasp")
         self.declare_parameter("activate_service", "/twist_propagation/activate")
         self.declare_parameter("deactivate_service", "/twist_propagation/deactivate")
-
-        # Twist frame matching
-        self.declare_parameter("assert_twist_frames_match", False)
 
         # Timeouts / staleness
         self.declare_parameter("segmentation_timeout_s", 5.0)
@@ -469,11 +458,29 @@ class TwistPropagationNode(Node):
         self.declare_parameter("process_noise_angular_radps2_per_s", 0.5)
         self.declare_parameter("enable_covariance_propagation", True)
 
+        # Propagation origin offset (in the pose's local frame)
+        # Shifts the propagation start point from the tracked pose origin
+        # (camera) to the grasp contact point (fingertips).  Applied by
+        # rotating the offset by the pose orientation and adding to the
+        # position before propagation.
+        self.declare_parameter("propagation_origin_offset", [0.0, 0.0, 0.0])
+
         # Multi-click segmentation seeding
         self.declare_parameter("click_count", 0)
         self.declare_parameter("click_radius_m", 0.03)
         self.declare_parameter("click_min_radius_m", 0.005)
         self.declare_parameter("click_random_seed", 42)
+
+        # Delay between detecting a new segmented cloud and calling the
+        # preshaping service.  Gives the preshaping bridge time to receive
+        # the same cloud via its own subscription before the service call
+        # arrives.  Without this delay the bridge may still hold the previous
+        # (empty/reset) cloud, causing a "PointCloud data pointer is null"
+        # error.
+        self.declare_parameter("preshaping_call_delay_s", 0.15)
+
+        # Background warm cache
+        self.declare_parameter("background_cycle_enabled", True)
 
         # ── Read parameters ────────────────────────────────────────────────
         self._cycle_delay = self.get_parameter("cycle_delay_s").value
@@ -483,6 +490,8 @@ class TwistPropagationNode(Node):
         self._min_points = self.get_parameter("min_points_near_hit").value
         self._collision_radius = self.get_parameter("collision_geometry_radius_m").value
         self._twist_window = self.get_parameter("twist_estimation_window").value
+        self._min_twist_linear = self.get_parameter("min_twist_linear_mps").value
+        self._min_time_to_hit = self.get_parameter("min_time_to_hit_s").value
         self._seg_timeout = self.get_parameter("segmentation_timeout_s").value
         self._cloud_max_age = self.get_parameter("cloud_max_age_s").value
         self._pose_max_age = self.get_parameter("pose_max_age_s").value
@@ -493,13 +502,24 @@ class TwistPropagationNode(Node):
         self._enable_cov = self.get_parameter("enable_covariance_propagation").value
         self._seg_reset_topic = self.get_parameter("segmentation_reset_topic").value
         self._seg_retarget_distance = self.get_parameter("segmentation_retarget_distance_m").value
-        self._assert_twist_frames_match = self.get_parameter("assert_twist_frames_match").value
+
+        # Propagation origin offset (3D vector in pose local frame)
+        offset_raw = self.get_parameter("propagation_origin_offset").value
+        self._propagation_offset = tuple(float(v) for v in offset_raw)
+        if any(abs(v) > 1e-6 for v in self._propagation_offset):
+            self.get_logger().info(
+                f"Propagation origin offset: {self._propagation_offset} "
+                f"(shifts start point in pose local frame)"
+            )
 
         # Multi-click seeding parameters
         self._click_count = int(self.get_parameter("click_count").value)
         self._click_radius = float(self.get_parameter("click_radius_m").value)
         self._click_min_radius = float(self.get_parameter("click_min_radius_m").value)
         self._click_random_seed = int(self.get_parameter("click_random_seed").value)
+        self._preshaping_call_delay = float(self.get_parameter("preshaping_call_delay_s").value)
+        self._background_cycle_enabled = bool(self.get_parameter("background_cycle_enabled").value)
+        self._external_twist_max_age = float(self.get_parameter("external_twist_max_age_s").value)
 
         # Validation
         if self._click_count < 0:
@@ -541,9 +561,21 @@ class TwistPropagationNode(Node):
         self._seg_cloud_stamp: float = 0.0
         self._seg_cloud_stamp_at_trigger: float = 0.0
         self._seg_trigger_time: float = 0.0
+        self._preshaping_call_timer = None  # one-shot timer for delayed preshaping call
 
         # Current accepted segmentation target (cloud frame)
         self._current_segmentation_target: tuple[float, float, float] | None = None
+
+        # External twist from odometry (None when unavailable)
+        self._external_twist: tuple | None = None
+        self._external_twist_time: float = 0.0
+        self._twist_source: str = "estimated"  # "external" or "estimated"
+
+        # Activation fast-path flag
+        self._just_activated: bool = False
+
+        # Status publication throttle counter
+        self._status_counter: int = 0
 
         # Marker ID counters for RViz visualization
         self._sphere_marker_ns = "collision_spheres"
@@ -564,6 +596,12 @@ class TwistPropagationNode(Node):
         odom_topic = self.get_parameter("odom_topic").value
 
         self.create_subscription(PoseStamped, hand_pose_topic, self._on_hand_pose, 10)
+
+        # Optional external twist subscription (e.g. from odom_to_pose_relay)
+        hand_twist_input = self.get_parameter("hand_twist_input_topic").value
+        self._has_external_twist_sub = bool(hand_twist_input)
+        if hand_twist_input:
+            self.create_subscription(TwistStamped, hand_twist_input, self._on_hand_twist, 10)
 
         # RELIABLE — the fusion node publishes with RELIABLE QoS; the
         # RealSense publishers on the Jetson also use RELIABLE, so this
@@ -604,6 +642,8 @@ class TwistPropagationNode(Node):
             MarkerArray, "/twist_propagation/hit_marker", 10)
         self._trajectory_line_pub = self.create_publisher(
             MarkerArray, "/twist_propagation/trajectory_line", 10)
+        self._hit_time_pub = self.create_publisher(
+            Float64, "/grasp_preshaping/hit_time", 10)
 
         # ── Service servers ────────────────────────────────────────────────
         self.create_service(
@@ -617,6 +657,12 @@ class TwistPropagationNode(Node):
             self._on_deactivate,
         )
 
+        # ── Service client ─────────────────────────────────────────────────
+        self._compute_client = self.create_client(
+            Trigger,
+            self.get_parameter("compute_grasp_service").value,
+        )
+
         # ── Cycle timer ────────────────────────────────────────────────────
         self.create_timer(self._cycle_delay, self._cycle_callback)
 
@@ -626,8 +672,21 @@ class TwistPropagationNode(Node):
             f"hit_thresh={self._hit_thresh}m, "
             f"collision_radius={self._collision_radius}m, "
             f"effective_thresh={self._effective_hit_thresh}m, "
-            f"multi_click={self._click_count} (r={self._click_radius}m, r_min={self._click_min_radius}m)"
+            f"multi_click={self._click_count} (r={self._click_radius}m, r_min={self._click_min_radius}m), "
+            f"background_cycle={self._background_cycle_enabled}, "
+            f"cycle_rate={1.0/self._cycle_delay:.0f}Hz"
         )
+        if self._has_external_twist_sub:
+            twist_input_topic = self.get_parameter("hand_twist_input_topic").value
+            self.get_logger().info(
+                f"External twist source: {twist_input_topic} "
+                f"(max_age={self._external_twist_max_age}s)"
+            )
+        else:
+            self.get_logger().info(
+                "No external twist topic configured -- "
+                "using pose finite-difference estimation"
+            )
 
     # ── Service callbacks ──────────────────────────────────────────────────
 
@@ -637,6 +696,7 @@ class TwistPropagationNode(Node):
             self._cycle_state = CycleState.IDLE
             self._pose_buf.clear()
             self._seg_trigger_time = 0.0
+            self._just_activated = True
         self.get_logger().info("Activated")
         resp.success = True
         resp.message = "twist_propagation activated"
@@ -671,6 +731,22 @@ class TwistPropagationNode(Node):
                 frame_id,
             ))
 
+    def _on_hand_twist(self, msg: TwistStamped):
+        """Store the latest external twist from odometry."""
+        now_s = self.get_clock().now().nanoseconds / 1e-9
+        with self._lock:
+            self._external_twist = (
+                msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z,
+                msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z,
+            )
+            # Use wall-clock time (not message stamp) so the age check
+            # in _estimate_twist is reliable regardless of clock domain.
+            self._external_twist_time = now_s
+        self.get_logger().info(
+            f"External twist received: ({msg.twist.linear.x:.3f}, "
+            f"{msg.twist.linear.y:.3f}, {msg.twist.linear.z:.3f})"
+        )
+
     def _on_odom(self, msg: Odometry):
         """Store the latest odometry for covariance initialization."""
         with self._lock:
@@ -694,6 +770,12 @@ class TwistPropagationNode(Node):
             self._cloud_kdtree = None
 
     def _on_segmented_cloud(self, msg: PointCloud2):
+        # Skip empty clouds — the segmentation node publishes an empty cloud on
+        # reset to clear RViz2, and we must not treat that as a valid result.
+        # An empty cloud would trigger premature preshaping with a null data
+        # pointer in the preshaping bridge.
+        if msg.width * msg.height == 0:
+            return
         stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
         with self._lock:
             self._seg_cloud_stamp = stamp
@@ -701,16 +783,30 @@ class TwistPropagationNode(Node):
     # ── Twist estimation ───────────────────────────────────────────────────
 
     def _estimate_twist(self) -> tuple:
-        """Estimate twist from the pose buffer using finite differences.
+        """Estimate twist from external source or pose buffer.
 
-        Uses the last two poses for a simple estimate, or a least-squares
-        linear fit over the full window if enough poses are available.
+        Prefers the external twist (from odometry) when fresh.
+        Falls back to finite-difference estimation from the pose buffer.
 
         Returns (vx, vy, vz, wx, wy, wz).
         """
+        # Check for fresh external twist first
+        if self._external_twist is not None:
+            now_s = self.get_clock().now().nanoseconds / 1e9
+            age = now_s - self._external_twist_time
+            if age <= self._external_twist_max_age:
+                self._twist_source = "external"
+                return self._external_twist
+            else:
+                self.get_logger().info(
+                    f"External twist stale: age={age:.3f}s > max={self._external_twist_max_age:.3f}s"
+                )
+
+        self._twist_source = "estimated"
+
         buf = list(self._pose_buf)
         if len(buf) < 2:
-            return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            return self._twist  # return previous estimate
 
         # Simple finite difference using last two poses
         t0, px0, py0, pz0, qx0, qy0, qz0, qw0, _ = buf[-2]
@@ -799,7 +895,7 @@ class TwistPropagationNode(Node):
     ) -> tuple | None:
         """Propagate the pose forward and check for cloud intersection.
 
-        Returns (hit_x, hit_y, hit_z) in the cloud frame, or None.
+        Returns (hit_x, hit_y, hit_z, time_to_hit_s) in the cloud frame, or None.
         Also populates self._last_predicted_positions for visualization.
         """
         tree = self._get_kdtree()
@@ -825,6 +921,12 @@ class TwistPropagationNode(Node):
         # Collect predicted positions for visualization
         positions: list[tuple[float, float, float]] = []
 
+        self.get_logger().info(
+            f"Propagation start: pose=({px:.3f},{py:.3f},{pz:.3f}) "
+            f"twist=({vx:.3f},{vy:.3f},{vz:.3f}) horizon={self._horizon} dt={self._dt} "
+            f"cloud_pts={len(self._cloud_xyz) if self._cloud_xyz is not None else 0}"
+        )
+
         t = 0.0
         while t < self._horizon:
             t += self._dt
@@ -841,7 +943,7 @@ class TwistPropagationNode(Node):
                 P = _propagate_covariance(P, self._dt, self._sigma_v_sq, self._sigma_w_sq)
                 cov_trace = float(np.trace(P))
                 if cov_trace > self._max_cov_trace:
-                    self.get_logger().debug(
+                    self.get_logger().info(
                         f"Covariance trace {cov_trace:.2f} exceeds max "
                         f"{self._max_cov_trace} at t={t:.3f}s, truncating horizon"
                     )
@@ -853,11 +955,18 @@ class TwistPropagationNode(Node):
             dists, _ = tree.query([px, py, pz], k=max(self._min_points, 1))
             if np.max(dists[:self._min_points]) <= self._effective_hit_thresh:
                 self._last_predicted_positions = positions
-                # Return the nearest surface point, not the sphere center
+                # Return the nearest surface point, not the sphere center,
+                # along with the predicted time-to-hit.
                 _, nearest_idx = tree.query([px, py, pz], k=1)
                 idx = int(nearest_idx) if np.ndim(nearest_idx) == 0 else int(nearest_idx[0])
-                return tuple(self._cloud_xyz[idx].tolist())
+                hit_point = self._cloud_xyz[idx]
+                return (float(hit_point[0]), float(hit_point[1]), float(hit_point[2]), t)
 
+        self.get_logger().info(
+            f"Propagation end: {len(positions)} positions, "
+            f"hit={'yes' if positions and 'return' in str(self._last_predicted_positions) else 'no'}, "
+            f"final=({px:.3f},{py:.3f},{pz:.3f})"
+        )
         self._last_predicted_positions = positions
         return None
 
@@ -877,19 +986,35 @@ class TwistPropagationNode(Node):
         if frame_id == self._cloud_frame:
             return (px, py, pz)
 
-        ps = PointStamped()
-        ps.header.frame_id = frame_id
-        ps.header.stamp = self.get_clock().now().to_msg()
-        ps.point.x = px
-        ps.point.y = py
-        ps.point.z = pz
-
         try:
-            transformed = self._tf_buffer.transform(
-                ps, self._cloud_frame,
-                timeout=rclpy.duration.Duration(seconds=0.5),
+            t = self._tf_buffer.lookup_transform(
+                self._cloud_frame, frame_id, Time()
             )
-            return (transformed.point.x, transformed.point.y, transformed.point.z)
+            # Apply the transform manually to avoid blocking.
+            tx = t.transform.translation.x
+            ty = t.transform.translation.y
+            tz = t.transform.translation.z
+            qx = t.transform.rotation.x
+            qy = t.transform.rotation.y
+            qz = t.transform.rotation.z
+            qw = t.transform.rotation.w
+
+            # Rotate the point: p_out = R * p_in + t
+            # Quaternion rotation matrix (row-major).
+            r00 = 1.0 - 2.0 * (qy * qy + qz * qz)
+            r01 = 2.0 * (qx * qy - qz * qw)
+            r02 = 2.0 * (qx * qz + qy * qw)
+            r10 = 2.0 * (qx * qy + qz * qw)
+            r11 = 1.0 - 2.0 * (qx * qx + qz * qz)
+            r12 = 2.0 * (qy * qz - qx * qw)
+            r20 = 2.0 * (qx * qz - qy * qw)
+            r21 = 2.0 * (qy * qz + qx * qw)
+            r22 = 1.0 - 2.0 * (qx * qx + qy * qy)
+
+            rx = r00 * px + r01 * py + r02 * pz + tx
+            ry = r10 * px + r11 * py + r12 * pz + ty
+            rz = r20 * px + r21 * py + r22 * pz + tz
+            return (rx, ry, rz)
         except Exception as exc:
             self.get_logger().warn(
                 f"TF transform from '{frame_id}' to '{self._cloud_frame}' "
@@ -1068,6 +1193,7 @@ class TwistPropagationNode(Node):
         status = {
             "active": self._active,
             "state": self._cycle_state.value,
+            "twist_source": self._twist_source,
             **kwargs,
         }
         msg = String()
@@ -1077,24 +1203,33 @@ class TwistPropagationNode(Node):
     # ── Main cycle callback ────────────────────────────────────────────────
 
     def _cycle_callback(self):
+        # Snapshot state under lock, then decide what to do.
+        # The lock is released before any blocking operations (service calls).
+        should_call_preshaping = False
+
         try:
             with self._lock:
                 active = self._active
                 state = self._cycle_state
 
                 if not active:
-                    self._publish_status()
+                    if self._background_cycle_enabled:
+                        self._run_background_cycle()
+                    self._status_counter += 1
+                    if self._status_counter % 5 == 1:
+                        self._publish_status()
                     return
 
                 # -- State: WAITING_FOR_SEGMENTATION ----------------------------
                 if state == CycleState.WAITING_FOR_SEGMENTATION:
                     elapsed = time.time() - self._seg_trigger_time
                     if self._seg_cloud_stamp > self._seg_cloud_stamp_at_trigger:
-                        # New segmented cloud arrived -- pipeline_manager owns preshaping
+                        # New segmented cloud arrived -- transition and call preshaping
                         self.get_logger().info(
-                            "Segmented cloud received, returning to IDLE"
+                            "Segmented cloud received, calling preshaping service"
                         )
-                        self._cycle_state = CycleState.IDLE
+                        self._cycle_state = CycleState.WAITING_FOR_PRESHAPING
+                        should_call_preshaping = True
                     elif elapsed > self._seg_timeout:
                         self.get_logger().warn(
                             f"Segmentation timeout ({elapsed:.1f}s), "
@@ -1109,21 +1244,63 @@ class TwistPropagationNode(Node):
                         )
                     self._publish_status()
 
+                # -- State: WAITING_FOR_PRESHAPING ------------------------------
+                elif state == CycleState.WAITING_FOR_PRESHAPING:
+                    # Just wait -- the future callback will transition back to IDLE
+                    self._publish_status()
+
                 # -- State: IDLE -- run propagation -----------------------------
                 else:
                     self._run_idle_cycle()
+
+                # Throttled status for active non-IDLE states handled above;
+                # IDLE cycle publishes its own status internally.
+                self._status_counter += 1
+
+            # -- Outside the lock: call preshaping service if needed -------------
+            if should_call_preshaping:
+                self._schedule_preshaping_call()
         except Exception as exc:
             import traceback
             self.get_logger().error(
                 f"EXCEPTION in _cycle_callback: {exc}\n{traceback.format_exc()}"
             )
 
+    def _run_background_cycle(self):
+        """Warm the twist and KDTree caches while inactive.
+
+        Runs a read-only subset of _run_idle_cycle: estimates twist
+        (from external source or pose buffer) and ensures the KDTree
+        is built.  Does NOT publish clicks, resets, state transitions,
+        or visualization markers.
+        """
+        # Update twist estimate (side-effect: updates self._twist)
+        self._estimate_twist()
+
+        # Ensure KDTree is built from current cloud
+        if self._cloud_xyz is not None:
+            self._get_kdtree()
+
     def _run_idle_cycle(self):
         """Run one propagation cycle.  Called under self._lock."""
-        # Need at least 2 poses and a cloud
-        if len(self._pose_buf) < 2:
-            self._publish_status(reason="waiting_for_poses")
-            return
+        # -- Handle _just_activated fast path --------------------------------
+        if self._just_activated:
+            # Background cycle already warmed the twist — allow single pose
+            if len(self._pose_buf) < 1:
+                self._publish_status(reason="waiting_for_poses")
+                return
+            self._just_activated = False
+            # Use self._twist as-is (pre-computed by background cycle or
+            # external source).  Do NOT re-estimate — the pose buffer was
+            # just cleared on activation.
+        else:
+            # Normal path: check pose buffer requirement
+            min_poses = 1 if self._twist_source == "external" else 2
+            if len(self._pose_buf) < min_poses:
+                self._publish_status(reason="waiting_for_poses")
+                return
+            # Estimate twist (updates self._twist and self._twist_source)
+            self._twist = self._estimate_twist()
         if self._cloud_xyz is None:
             self._publish_status(reason="waiting_for_cloud")
             return
@@ -1148,62 +1325,58 @@ class TwistPropagationNode(Node):
             )
             return
 
-        # Estimate twist
-        self._twist = self._estimate_twist()
+        # (twist already estimated above or inherited from background cycle)
+
+        # Speed gate: skip propagation when the hand is essentially
+        # stationary.  Prevents false hits from tracking drift and
+        # near-geometry false positives when the hand is at rest.
+        vx, vy, vz, wx, wy, wz = self._twist
+        lin_mag = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
+        if self._min_twist_linear > 0.0 and lin_mag < self._min_twist_linear:
+            self._publish_status(
+                reason="below_min_speed",
+                twist_linear_mag=round(lin_mag, 4),
+                min_twist_linear_mps=self._min_twist_linear,
+            )
+            return
 
         # Get latest pose and its frame
         latest = self._pose_buf[-1]
         _, px, py, pz, qx, qy, qz, qw, pose_frame = latest
 
+        # Apply propagation origin offset (rotate offset by pose orientation,
+        # then add to position).  This shifts the propagation start from the
+        # tracked camera origin to the grasp contact point (fingertips).
+        ox, oy, oz = self._propagation_offset
+        if any(abs(v) > 1e-6 for v in (ox, oy, oz)):
+            # Quaternion rotation of offset vector
+            r00 = 1.0 - 2.0 * (qy * qy + qz * qz)
+            r01 = 2.0 * (qx * qy - qz * qw)
+            r02 = 2.0 * (qx * qz + qy * qw)
+            r10 = 2.0 * (qx * qy + qz * qw)
+            r11 = 1.0 - 2.0 * (qx * qx + qz * qz)
+            r12 = 2.0 * (qy * qz - qx * qw)
+            r20 = 2.0 * (qx * qz - qy * qw)
+            r21 = 2.0 * (qy * qz + qx * qw)
+            r22 = 1.0 - 2.0 * (qx * qx + qy * qy)
+            px += r00 * ox + r01 * oy + r02 * oz
+            py += r10 * ox + r11 * oy + r12 * oz
+            pz += r20 * ox + r21 * oy + r22 * oz
+
         # Transform hand pose position to the cloud frame via TF2
         transformed = self._transform_pose_to_cloud_frame(px, py, pz, pose_frame)
         px_cloud, py_cloud, pz_cloud = transformed
 
-        # Also transform twist vectors into the cloud frame
-        vx, vy, vz, wx, wy, wz = self._twist
-        if pose_frame != self._cloud_frame and _HAS_TF2 and self._tf_buffer is not None:
-            try:
-                tf = self._tf_buffer.lookup_transform(
-                    self._cloud_frame, pose_frame,
-                    rclpy.time.Time(),
-                    timeout=rclpy.duration.Duration(seconds=0.5),
-                )
-                q_tf = (tf.transform.rotation.x, tf.transform.rotation.y,
-                        tf.transform.rotation.z, tf.transform.rotation.w)
-                vx, vy, vz = _rotate_vector_by_quat(q_tf, (vx, vy, vz))
-                wx, wy, wz = _rotate_vector_by_quat(q_tf, (wx, wy, wz))
-                self._twist = (vx, vy, vz, wx, wy, wz)
-            except Exception as exc:
-                self.get_logger().warn(
-                    f"TF twist rotation from '{pose_frame}' to '{self._cloud_frame}' "
-                    f"failed: {exc}. Using twist in original frame."
-                )
-        elif pose_frame != self._cloud_frame:
-            if self._assert_twist_frames_match:
-                self.get_logger().error(
-                    f"Twist frame '{pose_frame}' differs from cloud frame "
-                    f"'{self._cloud_frame}' and TF2 is unavailable. "
-                    "Skipping propagation (assert_twist_frames_match=True)."
-                )
-                self._publish_status(reason="twist_frame_mismatch_no_tf2")
-                return
-            else:
-                self.get_logger().warn(
-                    f"Twist frame '{pose_frame}' differs from cloud frame "
-                    f"'{self._cloud_frame}' and TF2 is unavailable. "
-                    "Using twist in original frame."
-                )
-
         # Publish current pose in cloud frame
         self._publish_current_pose(px_cloud, py_cloud, pz_cloud, qx, qy, qz, qw)
 
-        # Publish twist in the cloud frame
-        self._publish_twist(self._twist, self._cloud_frame)
+        # Publish twist in the hand pose's frame
+        self._publish_twist(self._twist, pose_frame)
 
         # Propagate and find hit (in cloud frame)
         # Initialize the positions list that _propagate_and_find_hit will fill
         self._last_predicted_positions: list[tuple[float, float, float]] = []
-        hit = self._propagate_and_find_hit(
+        hit_result = self._propagate_and_find_hit(
             (px_cloud, py_cloud, pz_cloud, qx, qy, qz, qw),
             self._twist,
         )
@@ -1213,12 +1386,43 @@ class TwistPropagationNode(Node):
         # Always publish visualization (even when no hit)
         self._publish_predicted_path(positions)
         self._publish_collision_spheres(positions)
-        self._publish_trajectory_line(positions, hit_found=hit is not None)
+        self._publish_trajectory_line(positions, hit_found=hit_result is not None)
 
-        if hit is not None:
-            hit_x, hit_y, hit_z = hit
+        if hit_result is not None:
+            hit_x, hit_y, hit_z, time_to_hit = hit_result
+            # Publish hit time for the preshaping bridge, regardless of gate.
+            self._hit_time_pub.publish(Float64(data=time_to_hit))
+
+            # Time-to-hit gate: reject hits that occur too soon in the
+            # propagation horizon.  If the predicted collision is less than
+            # min_time_to_hit_s away, the downstream pipeline (segmentation
+            # + grasp planning) cannot complete in time, so triggering
+            # would waste computation and lock the state machine.
+            if (self._min_time_to_hit > 0.0
+                    and time_to_hit < self._min_time_to_hit):
+                self.get_logger().debug(
+                    f"Hit at ({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}) "
+                    f"rejected: time-to-hit {time_to_hit:.3f}s < "
+                    f"min {self._min_time_to_hit:.3f}s"
+                )
+                self._publish_status(
+                    reason="hit_too_close",
+                    hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
+                    time_to_hit_s=round(time_to_hit, 3),
+                    min_time_to_hit_s=self._min_time_to_hit,
+                    num_predicted_poses=len(positions),
+                )
+                # Fall through to the "no hit" visualization path below
+                hit_result = None
+            else:
+                # Valid hit — proceed with retarget check and segmentation
+                pass
+
+        if hit_result is not None:
+            hit_x, hit_y, hit_z, time_to_hit = hit_result
+            hit_point = (hit_x, hit_y, hit_z)
             publish_click, publish_reset = _should_retarget(
-                hit, self._current_segmentation_target, self._seg_retarget_distance
+                hit_point, self._current_segmentation_target, self._seg_retarget_distance
             )
 
             if not publish_click:
@@ -1248,7 +1452,7 @@ class TwistPropagationNode(Node):
                 # Publish click cluster (original hit + synthetic clicks)
                 rng = np.random.default_rng(self._click_random_seed)
                 synthetic = _sample_spherical_shell_clicks(
-                    hit, self._click_min_radius, self._click_radius, self._click_count, rng
+                    hit_point, self._click_min_radius, self._click_radius, self._click_count, rng
                 )
                 total_clicks = 1 + len(synthetic)
 
@@ -1279,13 +1483,14 @@ class TwistPropagationNode(Node):
                 )
 
                 # Update current target and transition
-                self._current_segmentation_target = hit
+                self._current_segmentation_target = hit_point
                 self._seg_cloud_stamp_at_trigger = self._seg_cloud_stamp
                 self._seg_trigger_time = time.time()
                 self._cycle_state = CycleState.WAITING_FOR_SEGMENTATION
 
                 self._publish_status(
                     hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
+                    time_to_hit_s=round(time_to_hit, 3),
                     num_predicted_poses=len(positions),
                     reset_before_click=publish_reset,
                     total_positive_clicks=total_clicks,
@@ -1294,14 +1499,72 @@ class TwistPropagationNode(Node):
                     click_min_radius_m=self._click_min_radius,
                 )
         else:
+            # No hit -- publish -1.0 sentinel to invalidate any stale hit time
+            self._hit_time_pub.publish(Float64(data=-1.0))
+
             # No hit -- publish status with twist info
-            vx, vy, vz, wx, wy, wz = self._twist
-            lin_mag = math.sqrt(vx ** 2 + vy ** 2 + vz ** 2)
             self._publish_status(
                 reason="no_hit",
                 twist_linear_mag=round(lin_mag, 4),
                 num_predicted_poses=len(positions),
             )
+
+    # ── Preshaping service call ────────────────────────────────────────────
+
+    def _schedule_preshaping_call(self):
+        """Call the preshaping service after a short delay.
+
+        The delay (``preshaping_call_delay_s``) gives the preshaping bridge
+        time to receive the segmented cloud via its own subscription before
+        the service call arrives.  Without this delay the bridge may still
+        hold the previous (empty/reset) cloud.
+        """
+        if self._preshaping_call_delay <= 0.0:
+            self._call_preshaping_service()
+            return
+
+        if self._preshaping_call_timer is not None:
+            self._preshaping_call_timer.cancel()
+        self._preshaping_call_timer = self.create_timer(
+            self._preshaping_call_delay, self._on_preshaping_delay_expired
+        )
+
+    def _on_preshaping_delay_expired(self):
+        """One-shot timer callback: call the preshaping service."""
+        if self._preshaping_call_timer is not None:
+            self._preshaping_call_timer.cancel()
+            self._preshaping_call_timer = None
+        self._call_preshaping_service()
+
+    def _call_preshaping_service(self):
+        """Call the preshaping service.  NOT called under self._lock."""
+        if not self._compute_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn("Preshaping service not available")
+            with self._lock:
+                self._cycle_state = CycleState.IDLE
+            return
+
+        future = self._compute_client.call_async(Trigger.Request())
+        future.add_done_callback(self._on_preshaping_response)
+
+    def _on_preshaping_response(self, future):
+        try:
+            response = future.result()
+            if response.success:
+                self.get_logger().info(
+                    f"Preshaping succeeded: {response.message[:100]}"
+                )
+            else:
+                self.get_logger().warn(
+                    f"Preshaping failed: {response.message[:100]}"
+                )
+        except Exception as exc:
+            self.get_logger().error(f"Preshaping service error: {exc}")
+
+        with self._lock:
+            self._cycle_state = CycleState.IDLE
+            self._seg_trigger_time = 0.0
+
 
 # ---------------------------------------------------------------------------
 # Entry point

@@ -1,0 +1,1015 @@
+prosthesis@KingBob:/prosthesis_ws$ make camera-test
+Starting >>> sensor_fusion_bringup
+Starting >>> prosthesis_launch
+Finished <<< sensor_fusion_bringup [0.64s]
+Finished <<< prosthesis_launch [2.10s]
+
+Summary: 2 packages finished [2.45s]
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-22-00-50-41-591540-KingBob-19347
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [19445]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [19446]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [19447]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [19448]
+[INFO] [pointcloud_fusion_node-5]: process started with pid [19449]
+[INFO] [odom_to_pose_relay-6]: process started with pid [19450]
+[INFO] [segmentation_ros2_node-7]: process started with pid [19451]
+[INFO] [twist_propagation_node-8]: process started with pid [19452]
+[INFO] [preshaping_service_bridge_node-9]: process started with pid [19453]
+[INFO] [grasp_proximity_controller_node.py-10]: process started with pid [19454]
+[INFO] [rviz2-11]: process started with pid [19455]
+[rviz2-11] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[preshaping_service_bridge_node-9] [INFO] [1779411041.843979037] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=5
+[preshaping_service_bridge_node-9] [INFO] [1779411041.845388152] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-11] [INFO] [1779411042.201021797] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-11] [INFO] [1779411042.201299910] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-11] [INFO] [1779411042.296294810] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-11] [INFO] [1779411042.407399004] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-11]
+[rviz2-11] [INFO] [1779411042.421849819] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-11]
+[rviz2-11] [INFO] [1779411042.450746963] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-11]
+[rviz2-11] [INFO] [1779411042.453285507] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-11]
+[rviz2-11] [INFO] [1779411042.746746968] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-11] [INFO] [1779411042.871013899] [rviz2]: Stereo is NOT SUPPORTED
+[grasp_proximity_controller_node.py-10] [INFO] [1779411042.917212502] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[pipeline_manager_node-1] [INFO] [1779411043.300574714] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tf_pipeline_diagnostics-4] [INFO] [1779411043.428571980] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[camera_mount_tf_publisher-3] [INFO] [1779411043.631731664] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1779411043.634181991] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[pointcloud_fusion_node-5] [INFO] [1779411043.706948954] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-5] [INFO] [1779411043.707902402] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-5] [INFO] [1779411043.830198078] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-5] [INFO] [1779411043.835112716] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779411043.965759976] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779411043.966685755] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[segmentation_ros2_node-7] [INFO] [1779411043.993434679] [segmentation_bridge]: Segmentation node ready. click_batch_debounce_s=0.02s
+[twist_propagation_node-8] [INFO] [1779411044.066113187] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779411044.069879493] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779411044.074947096] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779411044.076083438] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (2.0 Hz)
+[twist_propagation_node-8] [INFO] [1779411044.139162013] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=4 (r=0.03m, r_min=0.005m)
+[pointcloud_fusion_node-5] [INFO] [1779411053.834675865] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-5] [WARN] [1779411053.838508473] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: no cloud; cam2: no cloud
+[tf_pipeline_diagnostics-4] [WARN] [1779411055.416038672] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [WARN] [1779411056.569970640] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-5] [INFO] [1779411063.834657647] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:110, head_d435i_head_depth_optical_frame:109} last_publish_ago=20.0s
+[pointcloud_fusion_node-5] [WARN] [1779411063.835891959] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: fresh (0.05s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.01s); cam2 TF: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[tf_pipeline_diagnostics-4] [WARN] [1779411065.415694889] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [WARN] [1779411066.647656344] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779411070.862851846] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411070.864550860] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411074.250521926] [pointcloud_fusion]: Stats: published=6 (dual=0, cam1_only=25) dist_removed=0 bbox_removed=0 bbox_skipped=29 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:135, head_d435i_head_depth_optical_frame:103} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-4] [WARN] [1779411074.404677264] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):OK | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-5] [ERROR] [1779411075.029208992] [pointcloud_fusion]: Bbox removal success rate is 0% over 30s (0/37 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411075.973434738] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411076.018863500] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411076.781188683] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-5] [WARN] [1779411081.051993396] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411083.399198408] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411084.890399651] [pointcloud_fusion]: Stats: published=40 (dual=36, cam1_only=14) dist_removed=3192198 bbox_removed=0 bbox_skipped=88 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:8} last_publish_ago=0.7s
+[pointcloud_fusion_node-5] [WARN] [1779411086.068728123] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411088.913645538] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411089.866629466] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411077.078152 but the earliest data is at time 1779411077.170550, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411091.127114682] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411093.399795088] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411094.232428471] [pointcloud_fusion]: Stats: published=38 (dual=21, cam1_only=6) dist_removed=998771 bbox_removed=0 bbox_skipped=68 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:26, head_d435i_head_depth_optical_frame:26} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779411096.145105512] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411101.447314004] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411103.399155058] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411105.395220378] [pointcloud_fusion]: Stats: published=30 (dual=44, cam1_only=0) dist_removed=2066156 bbox_removed=0 bbox_skipped=75 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:14, head_d435i_head_depth_optical_frame:13} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779411106.576500171] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [ERROR] [1779411106.592488760] [pointcloud_fusion]: Bbox removal success rate is 0% over 31s (0/235 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411107.902607957] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411095.079378 but the earliest data is at time 1779411095.767509, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411108.130739293] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[twist_propagation_node-8] [INFO] [1779411111.176009792] [twist_propagation]: Activated
+[twist_propagation_node-8] [INFO] [1779411111.446738220] [twist_propagation]: Hit found at (0.281, -0.313, 0.040) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411111.449358391] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.281, -0.313, 0.040), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411111.450853294] [segmentation_bridge]: [+] positive click at (0.281, -0.313, 0.040) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411111.452028762] [segmentation_bridge]: [+] positive click at (0.283, -0.321, 0.028) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411111.453346323] [segmentation_bridge]: [+] positive click at (0.275, -0.310, 0.062) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411111.459325745] [segmentation_bridge]: [+] positive click at (0.293, -0.327, 0.051) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411111.460863400] [segmentation_bridge]: [+] positive click at (0.274, -0.335, 0.057) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411111.514734486] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411111.831691612] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[segmentation_ros2_node-7] [INFO] [1779411112.603683316] [segmentation_bridge]: Published segmented cloud: 25098/145635 points.
+[twist_propagation_node-8] [INFO] [1779411112.639823190] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411112.791520818] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.099,-0.453,0.807)
+[preshaping_service_bridge_node-9] [runtime_config] Loaded config from "/prosthesis_ws/config/grasp_preshaping.yaml"
+[preshaping_service_bridge_node-9] [INFO] [1779411113.088839835] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089247622] [preshaping_service]:   Pipeline Time: 295 ms
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089269768] [preshaping_service]:   SMC Iterations: 4
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089301035] [preshaping_service]:   Grasp Type: Pinch
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089317687] [preshaping_service]:   Combined Score: 0.2167
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089345762] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089360104] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089375766] [preshaping_service]:   Contact Count Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089384102] [preshaping_service]:   Contact Score: 0.1000
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089392680] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089402350] [preshaping_service]:   2nd Best Grasp: Cylindrical
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089409384] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0000)
+[preshaping_service_bridge_node-9] [INFO] [1779411113.089427410] [preshaping_service]: ===========================
+[twist_propagation_node-8] [INFO] [1779411113.097190706] [twist_propagation]: Preshaping succeeded: pinch grasp, closure=0.0000, combined=0.2167, alignment=0.0000, force_closure=0.0000, contact_count=
+[tf_pipeline_diagnostics-4] [INFO] [1779411113.402358191] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411114.073845596] [pointcloud_fusion]: Stats: published=31 (dual=17, cam1_only=1) dist_removed=1120561 bbox_removed=0 bbox_skipped=40 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:26, head_d435i_head_depth_optical_frame:28} last_publish_ago=0.2s
+[pointcloud_fusion_node-5] [WARN] [1779411116.847423385] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411121.859201052] [twist_propagation]: Hit found at (-0.138, 0.163, 0.222) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411121.860721172] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411121.861481679] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411121.864119429] [segmentation_bridge]: [+] positive click at (-0.138, 0.163, 0.222) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411121.864367307] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (-0.138, 0.163, 0.222), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411121.868128072] [segmentation_bridge]: [+] positive click at (-0.137, 0.154, 0.210) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411121.870475566] [segmentation_bridge]: [+] positive click at (-0.145, 0.166, 0.244) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411121.875825373] [segmentation_bridge]: [+] positive click at (-0.127, 0.149, 0.233) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411121.877522306] [segmentation_bridge]: [+] positive click at (-0.146, 0.141, 0.239) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411121.905596246] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411122.019215719] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411122.439083257] [twist_propagation]: Segmented cloud received, calling preshaping service
+[segmentation_ros2_node-7] [INFO] [1779411122.446526778] [segmentation_bridge]: Published segmented cloud: 7067/69677 points.
+[preshaping_service_bridge_node-9] [INFO] [1779411122.591342263] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(-0.087,-0.305,0.790)
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823134264] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823339245] [preshaping_service]:   Pipeline Time: 231 ms
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823354637] [preshaping_service]:   SMC Iterations: 4
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823361116] [preshaping_service]:   Grasp Type: Pinch
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823368515] [preshaping_service]:   Combined Score: 0.2167
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823383390] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823389755] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823397815] [preshaping_service]:   Contact Count Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823404496] [preshaping_service]:   Contact Score: 0.1000
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823410807] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823417677] [preshaping_service]:   2nd Best Grasp: Cylindrical
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823423406] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0000)
+[preshaping_service_bridge_node-9] [INFO] [1779411122.823431257] [preshaping_service]: ===========================
+[twist_propagation_node-8] [INFO] [1779411122.827487879] [twist_propagation]: Preshaping succeeded: pinch grasp, closure=0.0000, combined=0.2167, alignment=0.0000, force_closure=0.0000, contact_count=
+[twist_propagation_node-8] [INFO] [1779411123.357942869] [twist_propagation]: Hit found at (0.218, -0.277, 0.100) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411123.359525146] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411123.360037100] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411123.361875906] [segmentation_bridge]: [+] positive click at (0.218, -0.277, 0.100) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411123.362338635] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.218, -0.277, 0.100), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411123.365102420] [segmentation_bridge]: [+] positive click at (0.219, -0.286, 0.088) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411123.369206163] [segmentation_bridge]: [+] positive click at (0.211, -0.274, 0.122) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411123.378770147] [segmentation_bridge]: [+] positive click at (0.229, -0.291, 0.112) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411123.382061215] [segmentation_bridge]: [+] positive click at (0.210, -0.300, 0.117) (cloud frame)
+[tf_pipeline_diagnostics-4] [INFO] [1779411123.403099511] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[segmentation_ros2_node-7] [INFO] [1779411123.406125738] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411124.088395736] [segmentation_bridge]: Published segmented cloud: 859/70079 points.
+[twist_propagation_node-8] [INFO] [1779411124.139179957] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411124.290435400] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.026,-0.416,0.805)
+[twist_propagation_node-8] [WARN] [1779411124.309958702] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[pointcloud_fusion_node-5] [WARN] [1779411124.361702128] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [INFO] [1779411124.560633829] [pointcloud_fusion]: Stats: published=29 (dual=43, cam1_only=3) dist_removed=2896743 bbox_removed=0 bbox_skipped=90 bbox_cache_hits=0 last_publish_ago=1.4s
+[pointcloud_fusion_node-5] [WARN] [1779411124.760836738] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411111.576929 but the earliest data is at time 1779411113.302320, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[twist_propagation_node-8] [INFO] [1779411126.547366865] [twist_propagation]: Hit found at (0.281, -0.318, 0.168) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411126.549347884] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411126.552014608] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411126.553422462] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.281, -0.318, 0.168), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411126.555496072] [segmentation_bridge]: [+] positive click at (0.281, -0.318, 0.168) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411126.557540954] [segmentation_bridge]: [+] positive click at (0.282, -0.327, 0.155) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411126.559939646] [segmentation_bridge]: [+] positive click at (0.274, -0.316, 0.190) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411126.561551784] [segmentation_bridge]: [+] positive click at (0.292, -0.333, 0.179) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411126.567095594] [segmentation_bridge]: [+] positive click at (0.273, -0.341, 0.184) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411126.602687301] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411127.167151318] [segmentation_bridge]: Published segmented cloud: 823/69631 points.
+[twist_propagation_node-8] [INFO] [1779411127.242795105] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411127.395400841] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.077,-0.462,0.804)
+[twist_propagation_node-8] [WARN] [1779411127.416372680] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[pointcloud_fusion_node-5] [WARN] [1779411128.865797083] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411128.947610052] [twist_propagation]: Hit found at (0.204, -0.206, 0.187) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411128.949332569] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411128.952550763] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411128.955658801] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.204, -0.206, 0.187), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411128.955786136] [segmentation_bridge]: [+] positive click at (0.204, -0.206, 0.187) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411128.958950627] [segmentation_bridge]: [+] positive click at (0.206, -0.215, 0.174) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411128.961527083] [segmentation_bridge]: [+] positive click at (0.198, -0.203, 0.209) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411128.963910683] [segmentation_bridge]: [+] positive click at (0.216, -0.220, 0.198) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411128.966001445] [segmentation_bridge]: [+] positive click at (0.197, -0.229, 0.203) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411129.007007811] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411129.758454733] [segmentation_bridge]: Published segmented cloud: 2264/68261 points.
+[twist_propagation_node-8] [INFO] [1779411129.844894572] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411129.997208125] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(-0.050,-0.318,0.794)
+[twist_propagation_node-8] [WARN] [1779411130.014800250] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[twist_propagation_node-8] [INFO] [1779411130.050326211] [twist_propagation]: Hit found at (0.034, 0.169, 0.164) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411130.051461111] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411130.051618001] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411130.056467668] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.034, 0.169, 0.164), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411130.062781772] [segmentation_bridge]: [+] positive click at (0.034, 0.169, 0.164) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411130.065472601] [segmentation_bridge]: [+] positive click at (0.035, 0.160, 0.152) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411130.068071162] [segmentation_bridge]: [+] positive click at (0.027, 0.171, 0.186) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411130.070742913] [segmentation_bridge]: [+] positive click at (0.046, 0.154, 0.176) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411130.089725826] [segmentation_bridge]: [+] positive click at (0.026, 0.146, 0.181) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411130.132064569] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411130.635386591] [segmentation_bridge]: Published segmented cloud: 25363/73877 points.
+[twist_propagation_node-8] [INFO] [1779411130.704907086] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411130.860959720] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(-0.036,-0.331,0.787)
+[twist_propagation_node-8] [WARN] [1779411130.893908589] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[twist_propagation_node-8] [INFO] [1779411131.449462082] [twist_propagation]: Hit found at (0.198, -0.259, 0.136) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411131.452131409] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411131.452606022] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411131.456708577] [segmentation_bridge]: [+] positive click at (0.198, -0.259, 0.136) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411131.459397330] [segmentation_bridge]: [+] positive click at (0.200, -0.268, 0.124) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411131.457985648] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.198, -0.259, 0.136), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411131.469879772] [segmentation_bridge]: [+] positive click at (0.192, -0.257, 0.158) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411131.472190995] [segmentation_bridge]: [+] positive click at (0.210, -0.274, 0.148) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411131.474783895] [segmentation_bridge]: [+] positive click at (0.191, -0.282, 0.153) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411131.517152746] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411132.064861110] [segmentation_bridge]: Published segmented cloud: 11439/75410 points.
+[twist_propagation_node-8] [INFO] [1779411132.139864216] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411132.336327860] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.068,-0.453,0.811)
+[twist_propagation_node-8] [WARN] [1779411132.353140627] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[tf_pipeline_diagnostics-4] [INFO] [1779411133.399928389] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411133.977970168] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411134.509556265] [pointcloud_fusion]: Stats: published=44 (dual=27, cam1_only=5) dist_removed=1594839 bbox_removed=0 bbox_skipped=66 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:29, head_d435i_head_depth_optical_frame:29} last_publish_ago=0.1s
+[pointcloud_fusion_node-5] [ERROR] [1779411134.586587174] [pointcloud_fusion]: Bbox removal success rate is 0% over 29s (0/201 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411138.982448613] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411139.347719338] [twist_propagation]: Hit found at (0.120, -0.193, 0.177) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411139.349028192] [twist_propagation]: Published segmentation reset (new object)
+[twist_propagation_node-8] [INFO] [1779411139.352981101] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.120, -0.193, 0.177), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411139.355346324] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411139.360259657] [segmentation_bridge]: [+] positive click at (0.120, -0.193, 0.177) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411139.363254865] [segmentation_bridge]: [+] positive click at (0.122, -0.202, 0.165) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411139.367887159] [segmentation_bridge]: [+] positive click at (0.114, -0.190, 0.199) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411139.380689571] [segmentation_bridge]: [+] positive click at (0.132, -0.207, 0.189) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411139.395860156] [segmentation_bridge]: [+] positive click at (0.113, -0.216, 0.194) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411139.421784926] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411140.020994211] [segmentation_bridge]: Published segmented cloud: 985/69309 points.
+[twist_propagation_node-8] [INFO] [1779411140.043693020] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411140.204499713] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(-0.099,-0.260,0.783)
+[twist_propagation_node-8] [WARN] [1779411140.220881295] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[twist_propagation_node-8] [INFO] [1779411140.343897332] [twist_propagation]: Hit found at (0.049, 0.154, 0.143) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411140.345561542] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411140.348853355] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411140.352155373] [segmentation_bridge]: [+] positive click at (0.049, 0.154, 0.143) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411140.351735854] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.049, 0.154, 0.143), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411140.356945355] [segmentation_bridge]: [+] positive click at (0.050, 0.145, 0.130) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411140.364357773] [segmentation_bridge]: [+] positive click at (0.042, 0.156, 0.164) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411140.374121093] [segmentation_bridge]: [+] positive click at (0.060, 0.139, 0.154) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411140.376981661] [segmentation_bridge]: [+] positive click at (0.041, 0.131, 0.159) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411140.438117084] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411141.097799024] [segmentation_bridge]: Published segmented cloud: 20921/74559 points.
+[twist_propagation_node-8] [INFO] [1779411141.140717462] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411141.293188592] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(-0.027,-0.358,0.792)
+[twist_propagation_node-8] [WARN] [1779411141.645475863] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[twist_propagation_node-8] [INFO] [1779411141.750404658] [twist_propagation]: Hit found at (0.183, -0.258, 0.148) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411141.751265199] [twist_propagation]: Published segmentation reset (new object)
+[twist_propagation_node-8] [INFO] [1779411141.754115467] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.183, -0.258, 0.148), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411141.754911509] [segmentation_bridge]: [+] positive click at (0.183, -0.258, 0.148) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411141.758464944] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411141.762845565] [segmentation_bridge]: [+] positive click at (0.184, -0.267, 0.136) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411141.765291995] [segmentation_bridge]: [+] positive click at (0.176, -0.255, 0.170) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411141.768708349] [segmentation_bridge]: [+] positive click at (0.194, -0.272, 0.159) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411141.771852557] [segmentation_bridge]: [+] positive click at (0.175, -0.281, 0.165) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411141.800140396] [segmentation_bridge]: Running inference with 4 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411142.484904465] [segmentation_bridge]: Published segmented cloud: 978/74559 points.
+[twist_propagation_node-8] [INFO] [1779411142.543344746] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411142.708751420] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.063,-0.441,0.814)
+[twist_propagation_node-8] [WARN] [1779411142.758221512] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[tf_pipeline_diagnostics-4] [INFO] [1779411143.404711913] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[twist_propagation_node-8] [INFO] [1779411143.743855707] [twist_propagation]: Hit found at (0.216, -0.353, 0.103) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411143.745515303] [twist_propagation]: Published segmentation reset (new object)
+[twist_propagation_node-8] [INFO] [1779411143.749398157] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.216, -0.353, 0.103), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411143.749528522] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411143.752188435] [segmentation_bridge]: [+] positive click at (0.216, -0.353, 0.103) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411143.755376670] [segmentation_bridge]: [+] positive click at (0.218, -0.362, 0.091) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411143.758116640] [segmentation_bridge]: [+] positive click at (0.210, -0.350, 0.125) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411143.759501205] [segmentation_bridge]: [+] positive click at (0.228, -0.367, 0.114) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411143.760950953] [segmentation_bridge]: [+] positive click at (0.208, -0.376, 0.120) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411143.822270639] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411144.077855807] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[segmentation_ros2_node-7] [INFO] [1779411144.428092622] [segmentation_bridge]: Published segmented cloud: 803/75969 points.
+[twist_propagation_node-8] [INFO] [1779411144.441214900] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411144.662937035] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.081,-0.463,0.809)
+[twist_propagation_node-8] [WARN] [1779411144.696387403] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[pointcloud_fusion_node-5] [INFO] [1779411144.774163176] [pointcloud_fusion]: Stats: published=33 (dual=38, cam1_only=3) dist_removed=2980849 bbox_removed=0 bbox_skipped=83 bbox_cache_hits=0 last_publish_ago=0.7s
+[pointcloud_fusion_node-5] [WARN] [1779411145.760475893] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411146.758086703] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411133.577237 but the earliest data is at time 1779411134.907301, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411149.346643465] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411149.654091259] [twist_propagation]: Hit found at (0.041, -0.026, 0.161) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411149.655658799] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411149.657075950] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411149.660953659] [segmentation_bridge]: [+] positive click at (0.041, -0.026, 0.161) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411149.660988625] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.041, -0.026, 0.161), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411149.664522311] [segmentation_bridge]: [+] positive click at (0.042, -0.035, 0.149) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411149.668018990] [segmentation_bridge]: [+] positive click at (0.034, -0.023, 0.183) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411149.670986185] [segmentation_bridge]: [+] positive click at (0.052, -0.040, 0.172) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411149.674195778] [segmentation_bridge]: [+] positive click at (0.033, -0.049, 0.178) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411149.711345057] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [WARN] [1779411150.630901332] [segmentation_bridge]: Segmentation returned no foreground points.
+[tf_pipeline_diagnostics-4] [INFO] [1779411153.399410038] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411154.474883523] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411154.721026222] [pointcloud_fusion]: Stats: published=39 (dual=26, cam1_only=8) dist_removed=1798211 bbox_removed=0 bbox_skipped=70 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:18, head_d435i_head_depth_optical_frame:19} last_publish_ago=0.0s
+[twist_propagation_node-8] [WARN] [1779411154.738984591] [twist_propagation]: Segmentation timeout (5.1s), returning to IDLE
+[twist_propagation_node-8] [INFO] [1779411155.155781877] [twist_propagation]: Hit found at (0.222, -0.290, 0.179) in frame 'marker_map'
+[segmentation_ros2_node-7] [INFO] [1779411155.160664930] [segmentation_bridge]: [+] positive click at (0.222, -0.290, 0.179) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411155.163444861] [segmentation_bridge]: [+] positive click at (0.223, -0.299, 0.167) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411155.163921347] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.222, -0.290, 0.179), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411155.168465129] [segmentation_bridge]: [+] positive click at (0.215, -0.288, 0.201) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411155.171169664] [segmentation_bridge]: [+] positive click at (0.233, -0.305, 0.191) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411155.176928569] [segmentation_bridge]: [+] positive click at (0.214, -0.313, 0.196) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411155.203674076] [segmentation_bridge]: Running inference with 10 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411155.950950039] [segmentation_bridge]: Published segmented cloud: 596/84930 points.
+[twist_propagation_node-8] [INFO] [1779411156.038402971] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411156.247313293] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.086,-0.476,0.810)
+[twist_propagation_node-8] [WARN] [1779411156.309520079] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[pointcloud_fusion_node-5] [WARN] [1779411159.598253245] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411161.208789302] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411148.576861 but the earliest data is at time 1779411149.276527, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411161.949187488] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411163.400317076] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411164.538482226] [pointcloud_fusion]: Stats: published=38 (dual=31, cam1_only=3) dist_removed=2199627 bbox_removed=0 bbox_skipped=74 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:15, head_d435i_head_depth_optical_frame:20} last_publish_ago=0.9s
+[pointcloud_fusion_node-5] [WARN] [1779411164.602399210] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [ERROR] [1779411164.892898936] [pointcloud_fusion]: Bbox removal success rate is 0% over 30s (0/234 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411169.738287331] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411173.400732732] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411175.063399083] [pointcloud_fusion]: Stats: published=32 (dual=40, cam1_only=1) dist_removed=2779585 bbox_removed=0 bbox_skipped=69 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:16, head_d435i_head_depth_optical_frame:15} last_publish_ago=0.3s
+[pointcloud_fusion_node-5] [WARN] [1779411175.101743698] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411178.006652357] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411178.087147439] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411166.076777 but the earliest data is at time 1779411166.077343, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411180.225672260] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411183.403158084] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411183.946255090] [pointcloud_fusion]: Stats: published=35 (dual=20, cam1_only=4) dist_removed=699675 bbox_removed=0 bbox_skipped=54 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:25, head_d435i_head_depth_optical_frame:21} last_publish_ago=0.0s
+[twist_propagation_node-8] [INFO] [1779411185.087226845] [twist_propagation]: Hit found at (0.043, 0.092, 0.162) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411185.090190100] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411185.090582556] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411185.093491483] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.043, 0.092, 0.162), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411185.096158199] [segmentation_bridge]: [+] positive click at (0.043, 0.092, 0.162) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411185.098241699] [segmentation_bridge]: [+] positive click at (0.044, 0.083, 0.149) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411185.100056698] [segmentation_bridge]: [+] positive click at (0.036, 0.095, 0.184) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411185.103002994] [segmentation_bridge]: [+] positive click at (0.054, 0.078, 0.173) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411185.109675709] [segmentation_bridge]: [+] positive click at (0.035, 0.069, 0.179) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411185.148531928] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411185.674231855] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[segmentation_ros2_node-7] [INFO] [1779411186.071934458] [segmentation_bridge]: Published segmented cloud: 24179/154575 points.
+[twist_propagation_node-8] [INFO] [1779411186.139723064] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411186.291502538] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(-0.081,-0.280,0.774)
+[twist_propagation_node-8] [WARN] [1779411186.628506837] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[twist_propagation_node-8] [INFO] [1779411187.047605803] [twist_propagation]: Hit found at (0.184, -0.252, 0.141) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411187.048946167] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411187.050528485] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411187.057484014] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.184, -0.252, 0.141), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411187.059607513] [segmentation_bridge]: [+] positive click at (0.184, -0.252, 0.141) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411187.062751339] [segmentation_bridge]: [+] positive click at (0.186, -0.260, 0.128) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411187.068087193] [segmentation_bridge]: [+] positive click at (0.178, -0.249, 0.162) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411187.072617904] [segmentation_bridge]: [+] positive click at (0.196, -0.266, 0.152) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411187.075975200] [segmentation_bridge]: [+] positive click at (0.176, -0.274, 0.157) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411187.110406585] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411187.605652867] [segmentation_bridge]: Published segmented cloud: 795/70444 points.
+[twist_propagation_node-8] [INFO] [1779411187.638392790] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411187.791371721] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.039,-0.421,0.826)
+[twist_propagation_node-8] [WARN] [1779411187.821788263] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[pointcloud_fusion_node-5] [WARN] [1779411190.708069337] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411193.400012642] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411195.099399423] [pointcloud_fusion]: Stats: published=28 (dual=43, cam1_only=0) dist_removed=2922931 bbox_removed=0 bbox_skipped=74 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:13, head_d435i_head_depth_optical_frame:11} last_publish_ago=0.3s
+[pointcloud_fusion_node-5] [ERROR] [1779411195.344039497] [pointcloud_fusion]: Bbox removal success rate is 0% over 31s (0/214 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411195.856924903] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411196.693969901] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411184.577000 but the earliest data is at time 1779411184.873909, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[twist_propagation_node-8] [INFO] [1779411196.956091484] [twist_propagation]: Hit found at (-0.077, 0.196, 0.123) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411196.957805950] [twist_propagation]: Published segmentation reset (new object)
+[twist_propagation_node-8] [INFO] [1779411196.961270520] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (-0.077, 0.196, 0.123), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411196.961782283] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411196.964631799] [segmentation_bridge]: [+] positive click at (-0.077, 0.196, 0.123) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411196.973324343] [segmentation_bridge]: [+] positive click at (-0.076, 0.187, 0.111) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411196.978425367] [segmentation_bridge]: [+] positive click at (-0.084, 0.199, 0.145) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411196.983789910] [segmentation_bridge]: [+] positive click at (-0.065, 0.182, 0.134) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411196.988585343] [segmentation_bridge]: [+] positive click at (-0.085, 0.173, 0.140) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411197.039315538] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411197.769086666] [segmentation_bridge]: Published segmented cloud: 22275/82427 points.
+[twist_propagation_node-8] [INFO] [1779411197.840336031] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411197.991985591] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(-0.144,-0.294,0.775)
+[twist_propagation_node-8] [WARN] [1779411198.304541700] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[pointcloud_fusion_node-5] [WARN] [1779411198.363116981] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[twist_propagation_node-8] [INFO] [1779411198.551799011] [twist_propagation]: Hit found at (0.083, -0.199, 0.110) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411198.559832138] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411198.562087414] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411198.564320970] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.083, -0.199, 0.110), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411198.564785882] [segmentation_bridge]: [+] positive click at (0.083, -0.199, 0.110) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411198.570821819] [segmentation_bridge]: [+] positive click at (0.085, -0.208, 0.098) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411198.574168147] [segmentation_bridge]: [+] positive click at (0.077, -0.197, 0.132) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411198.581329789] [segmentation_bridge]: [+] positive click at (0.095, -0.214, 0.121) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411198.586616841] [segmentation_bridge]: [+] positive click at (0.076, -0.222, 0.127) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411198.614786312] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411199.191898227] [segmentation_bridge]: Published segmented cloud: 2046/83523 points.
+[twist_propagation_node-8] [INFO] [1779411199.241533287] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411199.393571064] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.009,-0.439,0.822)
+[twist_propagation_node-8] [WARN] [1779411199.405235089] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[pointcloud_fusion_node-5] [WARN] [1779411201.049065007] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411202.448043195] [twist_propagation]: Hit found at (0.143, -0.297, 0.183) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411202.449903707] [twist_propagation]: Published segmentation reset (new object)
+[twist_propagation_node-8] [INFO] [1779411202.452911492] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.143, -0.297, 0.183), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411202.454751448] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411202.457681785] [segmentation_bridge]: [+] positive click at (0.143, -0.297, 0.183) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411202.460189081] [segmentation_bridge]: [+] positive click at (0.144, -0.306, 0.170) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411202.463736869] [segmentation_bridge]: [+] positive click at (0.136, -0.295, 0.204) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411202.467552508] [segmentation_bridge]: [+] positive click at (0.155, -0.312, 0.194) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411202.474134855] [segmentation_bridge]: [+] positive click at (0.135, -0.320, 0.199) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411202.511133098] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411203.363091486] [segmentation_bridge]: Published segmented cloud: 4199/77439 points.
+[tf_pipeline_diagnostics-4] [INFO] [1779411203.401311663] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[twist_propagation_node-8] [INFO] [1779411203.438150545] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411203.591642216] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.011,-0.456,0.813)
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932616288] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932757970] [preshaping_service]:   Pipeline Time: 340 ms
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932771389] [preshaping_service]:   SMC Iterations: 4
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932778648] [preshaping_service]:   Grasp Type: Lateral
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932786738] [preshaping_service]:   Combined Score: 0.2167
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932803396] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932809852] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932820769] [preshaping_service]:   Contact Count Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932827722] [preshaping_service]:   Contact Score: 0.1000
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932834603] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932843519] [preshaping_service]:   2nd Best Grasp: Lateral
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932849319] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0000)
+[preshaping_service_bridge_node-9] [INFO] [1779411203.932857591] [preshaping_service]: ===========================
+[twist_propagation_node-8] [INFO] [1779411203.936295183] [twist_propagation]: Preshaping succeeded: lateral grasp, closure=0.0000, combined=0.2167, alignment=0.0000, force_closure=0.0000, contact_coun
+[pointcloud_fusion_node-5] [INFO] [1779411204.696473880] [pointcloud_fusion]: Stats: published=31 (dual=23, cam1_only=3) dist_removed=1660691 bbox_removed=0 bbox_skipped=57 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:27, head_d435i_head_depth_optical_frame:23} last_publish_ago=1.1s
+[pointcloud_fusion_node-5] [WARN] [1779411206.089806418] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411210.760917785] [twist_propagation]: Hit found at (0.324, -0.256, 0.028) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411210.761739726] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411210.763234125] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411210.765463564] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.324, -0.256, 0.028), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411210.767782589] [segmentation_bridge]: [+] positive click at (0.324, -0.256, 0.028) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411210.773513124] [segmentation_bridge]: [+] positive click at (0.325, -0.265, 0.015) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411210.777678936] [segmentation_bridge]: [+] positive click at (0.317, -0.253, 0.050) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411210.780168253] [segmentation_bridge]: [+] positive click at (0.335, -0.270, 0.039) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411210.785824838] [segmentation_bridge]: [+] positive click at (0.316, -0.279, 0.044) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411210.825294841] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411211.104304714] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[segmentation_ros2_node-7] [INFO] [1779411211.533997865] [segmentation_bridge]: Published segmented cloud: 18117/81595 points.
+[twist_propagation_node-8] [INFO] [1779411211.694617465] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411211.851538046] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.044,-0.382,0.809)
+[twist_propagation_node-8] [WARN] [1779411212.204357228] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[pointcloud_fusion_node-5] [WARN] [1779411212.528953769] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411200.577470 but the earliest data is at time 1779411201.178833, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[twist_propagation_node-8] [INFO] [1779411212.547900996] [twist_propagation]: Hit found at (0.183, 0.002, 0.037) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411212.549298108] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411212.554764439] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411212.555057716] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.183, 0.002, 0.037), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411212.557148426] [segmentation_bridge]: [+] positive click at (0.183, 0.002, 0.037) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411212.561245841] [segmentation_bridge]: [+] positive click at (0.184, -0.007, 0.024) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411212.566574003] [segmentation_bridge]: [+] positive click at (0.176, 0.005, 0.059) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411212.572029434] [segmentation_bridge]: [+] positive click at (0.194, -0.012, 0.048) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411212.574322847] [segmentation_bridge]: [+] positive click at (0.175, -0.020, 0.053) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411212.607189072] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411213.203630340] [segmentation_bridge]: Published segmented cloud: 17871/81188 points.
+[twist_propagation_node-8] [INFO] [1779411213.294523836] [twist_propagation]: Segmented cloud received, calling preshaping service
+[pointcloud_fusion_node-5] [WARN] [1779411213.300953434] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411213.400784499] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[preshaping_service_bridge_node-9] [INFO] [1779411213.445501036] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.018,-0.334,0.798)
+[twist_propagation_node-8] [WARN] [1779411213.824049486] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[twist_propagation_node-8] [INFO] [1779411214.145070548] [twist_propagation]: Hit found at (0.162, -0.298, 0.154) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411214.146372033] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411214.147665178] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411214.150082416] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.162, -0.298, 0.154), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411214.152378150] [segmentation_bridge]: [+] positive click at (0.162, -0.298, 0.154) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411214.155813705] [segmentation_bridge]: [+] positive click at (0.163, -0.307, 0.142) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411214.158734488] [segmentation_bridge]: [+] positive click at (0.155, -0.296, 0.176) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411214.161866139] [segmentation_bridge]: [+] positive click at (0.174, -0.312, 0.165) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411214.164944522] [segmentation_bridge]: [+] positive click at (0.154, -0.321, 0.171) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411214.224039940] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [INFO] [1779411214.782746954] [pointcloud_fusion]: Stats: published=31 (dual=43, cam1_only=1) dist_removed=3033178 bbox_removed=0 bbox_skipped=77 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:4, head_d435i_head_depth_optical_frame:5} last_publish_ago=0.0s
+[segmentation_ros2_node-7] [INFO] [1779411214.862183827] [segmentation_bridge]: Published segmented cloud: 12313/82468 points.
+[twist_propagation_node-8] [INFO] [1779411214.938169115] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411215.125015244] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.050,-0.418,0.818)
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442050054] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442169016] [preshaping_service]:   Pipeline Time: 315 ms
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442188986] [preshaping_service]:   SMC Iterations: 4
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442202174] [preshaping_service]:   Grasp Type: Pinch
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442215722] [preshaping_service]:   Combined Score: 0.2167
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442235104] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442248959] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442264257] [preshaping_service]:   Contact Count Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442277182] [preshaping_service]:   Contact Score: 0.1000
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442290227] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442302135] [preshaping_service]:   2nd Best Grasp: Pinch
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442313212] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0000)
+[preshaping_service_bridge_node-9] [INFO] [1779411215.442326651] [preshaping_service]: ===========================
+[twist_propagation_node-8] [INFO] [1779411215.456461229] [twist_propagation]: Preshaping succeeded: pinch grasp, closure=0.0000, combined=0.2167, alignment=0.0000, force_closure=0.0000, contact_count=
+[pointcloud_fusion_node-5] [WARN] [1779411216.216991431] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411218.843571206] [twist_propagation]: Hit found at (0.222, -0.097, 0.041) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411218.846471969] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411218.846951404] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411218.851432596] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.222, -0.097, 0.041), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411218.856098724] [segmentation_bridge]: [+] positive click at (0.222, -0.097, 0.041) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411218.859129638] [segmentation_bridge]: [+] positive click at (0.224, -0.106, 0.029) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411218.861282273] [segmentation_bridge]: [+] positive click at (0.216, -0.094, 0.063) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411218.863933082] [segmentation_bridge]: [+] positive click at (0.234, -0.111, 0.053) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411218.867393182] [segmentation_bridge]: [+] positive click at (0.214, -0.120, 0.058) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411218.953649855] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411219.579992974] [segmentation_bridge]: Published segmented cloud: 22189/65273 points.
+[twist_propagation_node-8] [INFO] [1779411219.793761794] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411219.947872539] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.010,-0.303,0.780)
+[twist_propagation_node-8] [WARN] [1779411219.972112970] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[twist_propagation_node-8] [INFO] [1779411220.348985617] [twist_propagation]: Hit found at (0.131, -0.066, 0.090) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411220.351287721] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411220.351909667] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411220.355523175] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.131, -0.066, 0.090), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411220.357446505] [segmentation_bridge]: [+] positive click at (0.131, -0.066, 0.090) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411220.360752923] [segmentation_bridge]: [+] positive click at (0.132, -0.075, 0.077) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411220.363895909] [segmentation_bridge]: [+] positive click at (0.124, -0.064, 0.111) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411220.366676031] [segmentation_bridge]: [+] positive click at (0.142, -0.081, 0.101) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411220.368781077] [segmentation_bridge]: [+] positive click at (0.123, -0.089, 0.106) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411220.391978599] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411221.214943606] [segmentation_bridge]: Published segmented cloud: 23110/147909 points.
+[twist_propagation_node-8] [INFO] [1779411221.243253414] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411221.398135356] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.064,-0.405,0.815)
+[twist_propagation_node-8] [WARN] [1779411221.415728803] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[pointcloud_fusion_node-5] [WARN] [1779411221.449408718] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411221.662414465] [twist_propagation]: Hit found at (0.202, -0.296, 0.159) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411221.663520693] [twist_propagation]: Published segmentation reset (new object)
+[twist_propagation_node-8] [INFO] [1779411221.666153756] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.202, -0.296, 0.159), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411221.669438921] [segmentation_bridge]: [+] positive click at (0.202, -0.296, 0.159) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411221.670654682] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411221.674239783] [segmentation_bridge]: [+] positive click at (0.204, -0.305, 0.147) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411221.678422427] [segmentation_bridge]: [+] positive click at (0.196, -0.293, 0.181) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411221.682357965] [segmentation_bridge]: [+] positive click at (0.214, -0.310, 0.171) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411221.685210540] [segmentation_bridge]: [+] positive click at (0.195, -0.319, 0.176) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411221.742742865] [segmentation_bridge]: Running inference with 4 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411222.446868129] [segmentation_bridge]: Published segmented cloud: 10882/150816 points.
+[twist_propagation_node-8] [INFO] [1779411222.539734711] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411222.691894903] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.065,-0.433,0.815)
+[twist_propagation_node-8] [WARN] [1779411223.015911085] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[tf_pipeline_diagnostics-4] [INFO] [1779411223.400961906] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411224.009446559] [pointcloud_fusion]: Stats: published=32 (dual=19, cam1_only=0) dist_removed=906664 bbox_removed=0 bbox_skipped=41 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:36, head_d435i_head_depth_optical_frame:35} last_publish_ago=0.6s
+[pointcloud_fusion_node-5] [ERROR] [1779411224.064920165] [pointcloud_fusion]: Bbox removal success rate is 0% over 29s (0/186 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411226.558131214] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411226.648167276] [twist_propagation]: Hit found at (0.393, -0.292, 0.032) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411226.650312526] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411226.654980845] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411226.655547261] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.393, -0.292, 0.032), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411226.663298780] [segmentation_bridge]: [+] positive click at (0.393, -0.292, 0.032) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411226.667368631] [segmentation_bridge]: [+] positive click at (0.395, -0.301, 0.020) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411226.675506865] [segmentation_bridge]: [+] positive click at (0.387, -0.289, 0.054) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411226.688045955] [segmentation_bridge]: [+] positive click at (0.405, -0.306, 0.043) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411226.696314245] [segmentation_bridge]: [+] positive click at (0.385, -0.314, 0.049) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411226.752813242] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411227.456978531] [segmentation_bridge]: Published segmented cloud: 16670/61411 points.
+[twist_propagation_node-8] [INFO] [1779411227.539180742] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411227.710480462] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.028,-0.342,0.791)
+[twist_propagation_node-8] [WARN] [1779411227.747825248] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[twist_propagation_node-8] [INFO] [1779411231.453548746] [twist_propagation]: Hit found at (0.443, -0.197, 0.042) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411231.455132673] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411231.459145602] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411231.459357899] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.443, -0.197, 0.042), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411231.462334428] [segmentation_bridge]: [+] positive click at (0.443, -0.197, 0.042) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411231.469571379] [segmentation_bridge]: [+] positive click at (0.444, -0.206, 0.029) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411231.478367265] [segmentation_bridge]: [+] positive click at (0.436, -0.195, 0.064) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411231.481647767] [segmentation_bridge]: [+] positive click at (0.454, -0.212, 0.053) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411231.484941669] [segmentation_bridge]: [+] positive click at (0.435, -0.220, 0.059) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411231.517239281] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411231.570845835] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[segmentation_ros2_node-7] [INFO] [1779411232.158538853] [segmentation_bridge]: Published segmented cloud: 18928/56521 points.
+[twist_propagation_node-8] [INFO] [1779411232.239881297] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411232.404304238] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.075,-0.333,0.808)
+[twist_propagation_node-8] [WARN] [1779411232.427889363] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[tf_pipeline_diagnostics-4] [INFO] [1779411233.401396666] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411233.538624720] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411221.090324 but the earliest data is at time 1779411221.681449, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411233.816256969] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[twist_propagation_node-8] [INFO] [1779411234.855115183] [twist_propagation]: Hit found at (0.201, -0.334, 0.139) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411234.856358872] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411234.858274652] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411234.859239128] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.201, -0.334, 0.139), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411234.870209096] [segmentation_bridge]: [+] positive click at (0.201, -0.334, 0.139) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411234.877105220] [segmentation_bridge]: [+] positive click at (0.203, -0.343, 0.127) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411234.885510952] [segmentation_bridge]: [+] positive click at (0.195, -0.331, 0.161) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411234.895766730] [segmentation_bridge]: [+] positive click at (0.213, -0.348, 0.151) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411234.899102324] [segmentation_bridge]: [+] positive click at (0.194, -0.357, 0.156) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411234.935649989] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411235.591438647] [segmentation_bridge]: Published segmented cloud: 17486/52482 points.
+[twist_propagation_node-8] [INFO] [1779411235.638378191] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411235.791098966] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.033,-0.374,0.792)
+[pointcloud_fusion_node-5] [INFO] [1779411235.818249671] [pointcloud_fusion]: Stats: published=36 (dual=37, cam1_only=3) dist_removed=3422059 bbox_removed=0 bbox_skipped=87 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:3, head_d435i_head_depth_optical_frame:6} last_publish_ago=0.1s
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070432452] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070581674] [preshaping_service]:   Pipeline Time: 278 ms
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070603247] [preshaping_service]:   SMC Iterations: 4
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070616424] [preshaping_service]:   Grasp Type: Lateral
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070628623] [preshaping_service]:   Combined Score: 0.2167
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070647301] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070660311] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070674069] [preshaping_service]:   Contact Count Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070685352] [preshaping_service]:   Contact Score: 0.1000
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070697613] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070708850] [preshaping_service]:   2nd Best Grasp: Lateral
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070719432] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0000)
+[preshaping_service_bridge_node-9] [INFO] [1779411236.070732288] [preshaping_service]: ===========================
+[twist_propagation_node-8] [INFO] [1779411236.146293985] [twist_propagation]: Preshaping succeeded: lateral grasp, closure=0.0000, combined=0.2167, alignment=0.0000, force_closure=0.0000, contact_coun
+[pointcloud_fusion_node-5] [WARN] [1779411236.646361020] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411236.747311980] [twist_propagation]: Hit found at (0.302, -0.271, 0.031) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411236.748032782] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411236.749120921] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411236.752223528] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.302, -0.271, 0.031), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411236.753311903] [segmentation_bridge]: [+] positive click at (0.302, -0.271, 0.031) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411236.756162623] [segmentation_bridge]: [+] positive click at (0.303, -0.280, 0.019) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411236.762535393] [segmentation_bridge]: [+] positive click at (0.295, -0.268, 0.053) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411236.768759267] [segmentation_bridge]: [+] positive click at (0.313, -0.285, 0.042) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411236.777517636] [segmentation_bridge]: [+] positive click at (0.294, -0.294, 0.048) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411236.828822331] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411237.405307432] [segmentation_bridge]: Published segmented cloud: 17179/54805 points.
+[twist_propagation_node-8] [INFO] [1779411237.582172554] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411237.793541035] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.035,-0.368,0.792)
+[twist_propagation_node-8] [WARN] [1779411238.023859997] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[twist_propagation_node-8] [INFO] [1779411239.648679929] [twist_propagation]: Hit found at (0.241, -0.292, 0.148) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411239.650047487] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411239.652412405] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411239.652871789] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.241, -0.292, 0.148), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411239.655872534] [segmentation_bridge]: [+] positive click at (0.241, -0.292, 0.148) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411239.660897853] [segmentation_bridge]: [+] positive click at (0.243, -0.301, 0.135) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411239.666765189] [segmentation_bridge]: [+] positive click at (0.235, -0.289, 0.170) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411239.673074217] [segmentation_bridge]: [+] positive click at (0.253, -0.306, 0.159) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411239.680025089] [segmentation_bridge]: [+] positive click at (0.234, -0.315, 0.164) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411239.738687463] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411240.419257617] [segmentation_bridge]: Published segmented cloud: 1119/61201 points.
+[twist_propagation_node-8] [INFO] [1779411240.439874134] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411240.591958096] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.025,-0.374,0.789)
+[twist_propagation_node-8] [WARN] [1779411240.611904840] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[pointcloud_fusion_node-5] [WARN] [1779411241.719154318] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411243.401764233] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411244.339118588] [pointcloud_fusion]: Stats: published=29 (dual=27, cam1_only=0) dist_removed=1338493 bbox_removed=0 bbox_skipped=48 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:18, head_d435i_head_depth_optical_frame:19} last_publish_ago=0.2s
+[twist_propagation_node-8] [INFO] [1779411245.746079098] [twist_propagation]: Hit found at (0.562, 0.023, 0.029) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411245.749471199] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411245.751934952] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411245.755825557] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.562, 0.023, 0.029), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411245.756596980] [segmentation_bridge]: [+] positive click at (0.562, 0.023, 0.029) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411245.761758238] [segmentation_bridge]: [+] positive click at (0.564, 0.014, 0.017) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411245.765403253] [segmentation_bridge]: [+] positive click at (0.556, 0.026, 0.051) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411245.772331433] [segmentation_bridge]: [+] positive click at (0.574, 0.009, 0.040) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411245.778093246] [segmentation_bridge]: [+] positive click at (0.555, 0.000, 0.046) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411245.825144435] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411246.504645653] [segmentation_bridge]: Published segmented cloud: 23476/59994 points.
+[twist_propagation_node-8] [INFO] [1779411246.539017268] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411246.692228759] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.091,-0.278,0.780)
+[twist_propagation_node-8] [WARN] [1779411247.046681630] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[pointcloud_fusion_node-5] [WARN] [1779411247.094912463] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411248.451326229] [twist_propagation]: Hit found at (0.243, -0.278, 0.140) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411248.453367830] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411248.457125470] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411248.460235650] [segmentation_bridge]: [+] positive click at (0.243, -0.278, 0.140) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411248.457252308] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.243, -0.278, 0.140), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411248.464152979] [segmentation_bridge]: [+] positive click at (0.244, -0.287, 0.128) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411248.474593592] [segmentation_bridge]: [+] positive click at (0.236, -0.275, 0.162) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411248.480310499] [segmentation_bridge]: [+] positive click at (0.255, -0.292, 0.152) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411248.485336142] [segmentation_bridge]: [+] positive click at (0.235, -0.301, 0.157) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411248.514298430] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [WARN] [1779411249.091702714] [segmentation_bridge]: Segmentation returned no foreground points.
+[pointcloud_fusion_node-5] [WARN] [1779411250.199318488] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411251.164029522] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411241.576606 but the earliest data is at time 1779411242.631857, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411252.128851314] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411253.399760741] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[twist_propagation_node-8] [WARN] [1779411253.475210002] [twist_propagation]: Segmentation timeout (5.0s), returning to IDLE
+[twist_propagation_node-8] [INFO] [1779411254.644986309] [twist_propagation]: Hit found at (0.320, -0.223, 0.073) in frame 'marker_map'
+[segmentation_ros2_node-7] [INFO] [1779411254.647020129] [segmentation_bridge]: [+] positive click at (0.320, -0.223, 0.073) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411254.647429857] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.320, -0.223, 0.073), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411254.649197699] [segmentation_bridge]: [+] positive click at (0.322, -0.232, 0.061) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411254.651619949] [segmentation_bridge]: [+] positive click at (0.314, -0.220, 0.095) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411254.658488289] [segmentation_bridge]: [+] positive click at (0.332, -0.237, 0.085) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411254.664711186] [segmentation_bridge]: [+] positive click at (0.312, -0.246, 0.090) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411254.704067922] [segmentation_bridge]: Running inference with 10 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411255.247591267] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[segmentation_ros2_node-7] [INFO] [1779411255.295961209] [segmentation_bridge]: Published segmented cloud: 17739/61076 points.
+[pointcloud_fusion_node-5] [INFO] [1779411255.326540432] [pointcloud_fusion]: Stats: published=34 (dual=27, cam1_only=13) dist_removed=1814570 bbox_removed=0 bbox_skipped=84 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:16, head_d435i_head_depth_optical_frame:12} last_publish_ago=0.1s
+[twist_propagation_node-8] [INFO] [1779411255.340883862] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411255.499377852] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.199,-0.283,0.803)
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735049525] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735170841] [preshaping_service]:   Pipeline Time: 234 ms
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735183936] [preshaping_service]:   SMC Iterations: 4
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735191453] [preshaping_service]:   Grasp Type: Lateral
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735198425] [preshaping_service]:   Combined Score: 0.2167
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735210844] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735219367] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735228413] [preshaping_service]:   Contact Count Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735235506] [preshaping_service]:   Contact Score: 0.1000
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735242866] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735251737] [preshaping_service]:   2nd Best Grasp: Cylindrical
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735258876] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0000)
+[preshaping_service_bridge_node-9] [INFO] [1779411255.735268520] [preshaping_service]: ===========================
+[twist_propagation_node-8] [INFO] [1779411255.738208361] [twist_propagation]: Preshaping succeeded: lateral grasp, closure=0.0000, combined=0.2167, alignment=0.0000, force_closure=0.0000, contact_coun
+[pointcloud_fusion_node-5] [ERROR] [1779411256.463387442] [pointcloud_fusion]: Bbox removal success rate is 0% over 31s (0/231 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[twist_propagation_node-8] [INFO] [1779411256.941318006] [twist_propagation]: Hit found at (0.483, -0.018, 0.044) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411256.942334065] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411256.944407013] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411256.945264696] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.483, -0.018, 0.044), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411256.950042905] [segmentation_bridge]: [+] positive click at (0.483, -0.018, 0.044) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411256.955414481] [segmentation_bridge]: [+] positive click at (0.484, -0.027, 0.032) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411256.962336024] [segmentation_bridge]: [+] positive click at (0.476, -0.015, 0.066) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411256.967747293] [segmentation_bridge]: [+] positive click at (0.494, -0.032, 0.055) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411256.975521474] [segmentation_bridge]: [+] positive click at (0.475, -0.041, 0.061) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411257.027911711] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411257.436734781] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[segmentation_ros2_node-7] [INFO] [1779411257.692918878] [segmentation_bridge]: Published segmented cloud: 20610/46867 points.
+[twist_propagation_node-8] [INFO] [1779411257.740861996] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411257.933885595] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.094,-0.391,0.821)
+[twist_propagation_node-8] [WARN] [1779411258.068753627] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[twist_propagation_node-8] [INFO] [1779411261.244633210] [twist_propagation]: Hit found at (0.341, -0.126, 0.031) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411261.245771909] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411261.248705239] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411261.252101572] [segmentation_bridge]: [+] positive click at (0.341, -0.126, 0.031) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411261.249765178] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.341, -0.126, 0.031), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411261.255506458] [segmentation_bridge]: [+] positive click at (0.343, -0.135, 0.019) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411261.258618427] [segmentation_bridge]: [+] positive click at (0.335, -0.123, 0.053) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411261.260750150] [segmentation_bridge]: [+] positive click at (0.353, -0.140, 0.043) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411261.263019194] [segmentation_bridge]: [+] positive click at (0.334, -0.149, 0.048) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411261.330074476] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411261.920008681] [segmentation_bridge]: Published segmented cloud: 16600/61551 points.
+[twist_propagation_node-8] [INFO] [1779411261.940715324] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411262.097588785] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.229,-0.460,0.811)
+[twist_propagation_node-8] [WARN] [1779411262.395136199] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[pointcloud_fusion_node-5] [WARN] [1779411262.828563720] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411263.398963898] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411264.694202608] [pointcloud_fusion]: Stats: published=33 (dual=30, cam1_only=2) dist_removed=1369007 bbox_removed=0 bbox_skipped=56 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:13, head_d435i_head_depth_optical_frame:12} last_publish_ago=0.4s
+[twist_propagation_node-8] [INFO] [1779411265.848860152] [twist_propagation]: Hit found at (0.630, 0.022, 0.142) in frame 'marker_map'
+[segmentation_ros2_node-7] [INFO] [1779411265.852050247] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411265.853932419] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411265.857510138] [segmentation_bridge]: [+] positive click at (0.630, 0.022, 0.142) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411265.857772072] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.630, 0.022, 0.142), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411265.864968315] [segmentation_bridge]: [+] positive click at (0.631, 0.013, 0.129) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411265.870512167] [segmentation_bridge]: [+] positive click at (0.623, 0.024, 0.164) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411265.874866916] [segmentation_bridge]: [+] positive click at (0.642, 0.007, 0.153) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411265.877943770] [segmentation_bridge]: [+] positive click at (0.622, -0.001, 0.159) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411265.928410450] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411266.538591301] [segmentation_bridge]: Published segmented cloud: 16686/72941 points.
+[twist_propagation_node-8] [INFO] [1779411266.538984027] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411266.690369830] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.215,-0.256,0.803)
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971250261] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971333825] [preshaping_service]:   Pipeline Time: 280 ms
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971346478] [preshaping_service]:   SMC Iterations: 4
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971353476] [preshaping_service]:   Grasp Type: Lateral
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971360751] [preshaping_service]:   Combined Score: 0.2167
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971374539] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971382290] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971391168] [preshaping_service]:   Contact Count Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971399366] [preshaping_service]:   Contact Score: 0.1000
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971407488] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971414693] [preshaping_service]:   2nd Best Grasp: Lateral
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971420682] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0000)
+[preshaping_service_bridge_node-9] [INFO] [1779411266.971429588] [preshaping_service]: ===========================
+[twist_propagation_node-8] [INFO] [1779411266.974676770] [twist_propagation]: Preshaping succeeded: lateral grasp, closure=0.0000, combined=0.2167, alignment=0.0000, force_closure=0.0000, contact_coun
+[twist_propagation_node-8] [INFO] [1779411267.744100906] [twist_propagation]: Hit found at (0.465, 0.141, 0.114) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411267.745112791] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411267.748836273] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411267.750989797] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.465, 0.141, 0.114), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411267.753144443] [segmentation_bridge]: [+] positive click at (0.465, 0.141, 0.114) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411267.756890491] [segmentation_bridge]: [+] positive click at (0.466, 0.132, 0.102) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411267.767132704] [segmentation_bridge]: [+] positive click at (0.458, 0.144, 0.136) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411267.771327953] [segmentation_bridge]: [+] positive click at (0.476, 0.127, 0.126) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411267.776984278] [segmentation_bridge]: [+] positive click at (0.457, 0.119, 0.131) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411267.810994244] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[pointcloud_fusion_node-5] [WARN] [1779411267.914134972] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[segmentation_ros2_node-7] [INFO] [1779411268.538795744] [segmentation_bridge]: Published segmented cloud: 3934/72199 points.
+[twist_propagation_node-8] [INFO] [1779411268.643188410] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411268.797819250] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.145,-0.444,0.814)
+[twist_propagation_node-8] [WARN] [1779411268.818824061] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[twist_propagation_node-8] [INFO] [1779411268.849230307] [twist_propagation]: Hit found at (0.382, 0.083, 0.032) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411268.850499145] [twist_propagation]: Published segmentation reset (new object)
+[twist_propagation_node-8] [INFO] [1779411268.854300076] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.382, 0.083, 0.032), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411268.856755211] [segmentation_bridge]: [+] positive click at (0.382, 0.083, 0.032) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411268.858348493] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411268.865222091] [segmentation_bridge]: [+] positive click at (0.383, 0.074, 0.020) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411268.872249944] [segmentation_bridge]: [+] positive click at (0.375, 0.085, 0.054) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411268.885699992] [segmentation_bridge]: [+] positive click at (0.393, 0.068, 0.044) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411268.889358283] [segmentation_bridge]: [+] positive click at (0.374, 0.060, 0.049) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411268.951109280] [segmentation_bridge]: Running inference with 4 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411269.515934723] [segmentation_bridge]: Published segmented cloud: 22968/73025 points.
+[twist_propagation_node-8] [INFO] [1779411269.593951968] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411269.748702317] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.171,-0.461,0.814)
+[twist_propagation_node-8] [WARN] [1779411270.096650344] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[pointcloud_fusion_node-5] [WARN] [1779411270.676001659] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411270.797132650] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411258.076965 but the earliest data is at time 1779411258.155347, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411272.978252995] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411273.399253311] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411273.855573173] [pointcloud_fusion]: Stats: published=41 (dual=14, cam1_only=15) dist_removed=1560209 bbox_removed=0 bbox_skipped=68 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:26, head_d435i_head_depth_optical_frame:28} last_publish_ago=0.3s
+[pointcloud_fusion_node-5] [WARN] [1779411277.991311641] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411283.002045415] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411283.400258121] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411284.457761768] [pointcloud_fusion]: Stats: published=37 (dual=42, cam1_only=6) dist_removed=2980091 bbox_removed=0 bbox_skipped=97 bbox_cache_hits=0 last_publish_ago=0.3s
+[pointcloud_fusion_node-5] [ERROR] [1779411285.008291237] [pointcloud_fusion]: Bbox removal success rate is 0% over 29s (0/221 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[twist_propagation_node-8] [INFO] [1779411285.352127382] [twist_propagation]: Hit found at (0.282, 0.002, 0.012) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411285.355309925] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411285.357541737] [segmentation_bridge]: Clicks reset.
+[segmentation_ros2_node-7] [INFO] [1779411285.369412462] [segmentation_bridge]: [+] positive click at (0.282, 0.002, 0.012) (cloud frame)
+[twist_propagation_node-8] [INFO] [1779411285.369164555] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.282, 0.002, 0.012), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411285.373595865] [segmentation_bridge]: [+] positive click at (0.284, -0.006, 0.000) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411285.379788456] [segmentation_bridge]: [+] positive click at (0.276, 0.005, 0.034) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411285.386883966] [segmentation_bridge]: [+] positive click at (0.294, -0.012, 0.024) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411285.394934020] [segmentation_bridge]: [+] positive click at (0.275, -0.020, 0.029) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411285.428739764] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411286.138475700] [segmentation_bridge]: Published segmented cloud: 19321/72125 points.
+[twist_propagation_node-8] [INFO] [1779411286.139593391] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411286.292565632] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.145,-0.667,0.821)
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668559858] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668752340] [preshaping_service]:   Pipeline Time: 374 ms
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668774699] [preshaping_service]:   SMC Iterations: 4
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668823608] [preshaping_service]:   Grasp Type: Lateral
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668868072] [preshaping_service]:   Combined Score: 0.2167
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668892436] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668903156] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668917014] [preshaping_service]:   Contact Count Score: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668925080] [preshaping_service]:   Contact Score: 0.1000
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668933968] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668941773] [preshaping_service]:   2nd Best Grasp: Pinch
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668947946] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0000)
+[preshaping_service_bridge_node-9] [INFO] [1779411286.668957907] [preshaping_service]: ===========================
+[twist_propagation_node-8] [INFO] [1779411286.678961417] [twist_propagation]: Preshaping succeeded: lateral grasp, closure=0.0000, combined=0.2167, alignment=0.0000, force_closure=0.0000, contact_coun
+[pointcloud_fusion_node-5] [WARN] [1779411286.941918834] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411273.078665 but the earliest data is at time 1779411274.431766, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411286.985545537] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411288.057781471] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411289.544545331] [twist_propagation]: Hit found at (0.241, -0.370, 0.120) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411289.545714512] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411289.552306891] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411289.555187759] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.241, -0.370, 0.120), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411289.559829819] [segmentation_bridge]: [+] positive click at (0.241, -0.370, 0.120) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411289.564087529] [segmentation_bridge]: [+] positive click at (0.242, -0.379, 0.107) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411289.568693844] [segmentation_bridge]: [+] positive click at (0.235, -0.368, 0.142) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411289.572515661] [segmentation_bridge]: [+] positive click at (0.253, -0.385, 0.131) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411289.577748151] [segmentation_bridge]: [+] positive click at (0.233, -0.393, 0.137) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411289.612379848] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411290.216452403] [segmentation_bridge]: Published segmented cloud: 1821/65719 points.
+[twist_propagation_node-8] [INFO] [1779411290.239487746] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411290.393833689] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.162,-0.639,0.824)
+[twist_propagation_node-8] [WARN] [1779411290.420339302] [twist_propagation]: Preshaping failed: No points in ROI, cannot score grasps
+[tf_pipeline_diagnostics-4] [INFO] [1779411293.399394790] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411293.446255612] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411294.452321622] [pointcloud_fusion]: Stats: published=35 (dual=17, cam1_only=5) dist_removed=677636 bbox_removed=0 bbox_skipped=50 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:40, head_d435i_head_depth_optical_frame:35} last_publish_ago=2.0s
+[pointcloud_fusion_node-5] [WARN] [1779411298.626463645] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411303.298533127] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411292.078331 but the earliest data is at time 1779411292.094285, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[tf_pipeline_diagnostics-4] [INFO] [1779411303.399166905] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411303.599179486] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411304.282495003] [pointcloud_fusion]: Stats: published=34 (dual=41, cam1_only=3) dist_removed=3567095 bbox_removed=0 bbox_skipped=79 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:5} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779411308.735503612] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411313.399493313] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411313.756915159] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411315.598451421] [pointcloud_fusion]: Stats: published=31 (dual=35, cam1_only=3) dist_removed=2828990 bbox_removed=0 bbox_skipped=80 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:19, head_d435i_head_depth_optical_frame:21} last_publish_ago=0.3s
+[pointcloud_fusion_node-5] [ERROR] [1779411316.075827108] [pointcloud_fusion]: Bbox removal success rate is 0% over 31s (0/231 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411318.766503170] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411321.894978864] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411321.943461948] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411310.577034 but the earliest data is at time 1779411310.921116, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[tf_pipeline_diagnostics-4] [INFO] [1779411323.401594955] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411324.034548316] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411324.553256757] [pointcloud_fusion]: Stats: published=37 (dual=28, cam1_only=6) dist_removed=2615707 bbox_removed=0 bbox_skipped=71 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:9, head_d435i_head_depth_optical_frame:5} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779411329.225785179] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411329.393278625] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411333.404405735] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411334.439285451] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411335.044146564] [pointcloud_fusion]: Stats: published=35 (dual=25, cam1_only=5) dist_removed=2126082 bbox_removed=0 bbox_skipped=60 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:27, head_d435i_head_depth_optical_frame:30} last_publish_ago=0.9s
+[pointcloud_fusion_node-5] [WARN] [1779411339.752647270] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411341.217123905] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411328.577095 but the earliest data is at time 1779411328.657737, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411341.264950247] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411343.407101202] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411344.772187451] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [INFO] [1779411345.365663340] [pointcloud_fusion]: Stats: published=37 (dual=31, cam1_only=0) dist_removed=2615682 bbox_removed=0 bbox_skipped=71 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:18, head_d435i_head_depth_optical_frame:23} last_publish_ago=0.7s
+[pointcloud_fusion_node-5] [ERROR] [1779411345.608181818] [pointcloud_fusion]: Bbox removal success rate is 0% over 30s (0/212 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411347.470478919] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411349.775552383] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411353.399702080] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411354.198902131] [pointcloud_fusion]: Stats: published=36 (dual=37, cam1_only=5) dist_removed=3926339 bbox_removed=0 bbox_skipped=75 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:12, head_d435i_head_depth_optical_frame:10} last_publish_ago=0.5s
+[pointcloud_fusion_node-5] [WARN] [1779411354.886608798] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411359.895384450] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411363.400983579] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411364.175652675] [pointcloud_fusion]: Stats: published=49 (dual=45, cam1_only=2) dist_removed=5736140 bbox_removed=0 bbox_skipped=94 bbox_cache_hits=0 last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779411364.948927814] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411365.244485380] [twist_propagation]: Hit found at (0.295, -0.254, 0.265) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411365.245867040] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411365.249744324] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411365.249731059] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.295, -0.254, 0.265), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411365.253898132] [segmentation_bridge]: [+] positive click at (0.295, -0.254, 0.265) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411365.269727245] [segmentation_bridge]: [+] positive click at (0.296, -0.263, 0.253) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411365.274140167] [segmentation_bridge]: [+] positive click at (0.288, -0.251, 0.287) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411365.281799199] [segmentation_bridge]: [+] positive click at (0.306, -0.268, 0.277) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411365.286352569] [segmentation_bridge]: [+] positive click at (0.287, -0.277, 0.282) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411365.349186984] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-7] [WARN] [1779411365.918307645] [segmentation_bridge]: Segmentation returned no foreground points.
+[pointcloud_fusion_node-5] [WARN] [1779411370.055322961] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [WARN] [1779411370.339467879] [twist_propagation]: Segmentation timeout (5.1s), returning to IDLE
+[tf_pipeline_diagnostics-4] [INFO] [1779411373.400479118] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411374.613789847] [pointcloud_fusion]: Stats: published=45 (dual=45, cam1_only=3) dist_removed=5302995 bbox_removed=0 bbox_skipped=97 bbox_cache_hits=0 last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [ERROR] [1779411374.965475961] [pointcloud_fusion]: Bbox removal success rate is 0% over 29s (0/279 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411375.271434231] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411376.426153300] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411363.576851 but the earliest data is at time 1779411364.677857, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411377.318121048] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411380.471000717] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411380.585827208] [twist_propagation]: Deactivated
+[tf_pipeline_diagnostics-4] [INFO] [1779411383.399446552] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411384.368560772] [pointcloud_fusion]: Stats: published=32 (dual=27, cam1_only=5) dist_removed=1092057 bbox_removed=0 bbox_skipped=65 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:7, head_d435i_head_depth_optical_frame:11} last_publish_ago=0.6s
+[pointcloud_fusion_node-5] [WARN] [1779411385.683248831] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411388.957120781] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411377.077098 but the earliest data is at time 1779411377.470968, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411390.833357396] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411392.225883699] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411393.401249348] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411394.736523507] [pointcloud_fusion]: Stats: published=28 (dual=25, cam1_only=5) dist_removed=1375905 bbox_removed=0 bbox_skipped=68 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:12, head_d435i_head_depth_optical_frame:21} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779411395.847072401] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411398.950939173] [twist_propagation]: Activated
+[pointcloud_fusion_node-5] [WARN] [1779411401.114067637] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411402.447899777] [twist_propagation]: Hit found at (0.185, -0.136, 0.077) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411402.453433812] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.185, -0.136, 0.077), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411402.453543444] [segmentation_bridge]: [+] positive click at (0.185, -0.136, 0.077) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411402.457258687] [segmentation_bridge]: [+] positive click at (0.186, -0.145, 0.064) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411402.460824253] [segmentation_bridge]: [+] positive click at (0.178, -0.133, 0.099) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411402.472565659] [segmentation_bridge]: [+] positive click at (0.196, -0.150, 0.088) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411402.481168570] [segmentation_bridge]: [+] positive click at (0.177, -0.159, 0.094) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411402.523966170] [segmentation_bridge]: Running inference with 10 positive, 0 negative clicks
+[segmentation_ros2_node-7] [INFO] [1779411403.263158985] [segmentation_bridge]: Published segmented cloud: 3847/76151 points.
+[twist_propagation_node-8] [INFO] [1779411403.338441390] [twist_propagation]: Segmented cloud received, calling preshaping service
+[tf_pipeline_diagnostics-4] [INFO] [1779411403.402608409] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[preshaping_service_bridge_node-9] [INFO] [1779411403.490036087] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.211,-0.370,0.812)
+[twist_propagation_node-8] [WARN] [1779411403.757040427] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[pointcloud_fusion_node-5] [INFO] [1779411404.665976852] [pointcloud_fusion]: Stats: published=29 (dual=36, cam1_only=2) dist_removed=1867855 bbox_removed=0 bbox_skipped=61 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:26, head_d435i_head_depth_optical_frame:25} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [ERROR] [1779411404.780010243] [pointcloud_fusion]: Bbox removal success rate is 0% over 30s (0/203 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411406.396289835] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411409.047687046] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411397.076942 but the earliest data is at time 1779411397.189402, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411409.244804828] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411411.670104603] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411413.403374468] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411414.167069120] [pointcloud_fusion]: Stats: published=35 (dual=18, cam1_only=5) dist_removed=707624 bbox_removed=0 bbox_skipped=58 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:27, head_d435i_head_depth_optical_frame:28} last_publish_ago=0.1s
+[pointcloud_fusion_node-5] [WARN] [1779411415.321442216] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411416.800605108] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411421.842039499] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[twist_propagation_node-8] [INFO] [1779411423.043930457] [twist_propagation]: Hit found at (0.180, -0.345, 0.090) in frame 'marker_map'
+[twist_propagation_node-8] [INFO] [1779411423.045123008] [twist_propagation]: Published segmentation reset (new object)
+[segmentation_ros2_node-7] [INFO] [1779411423.046587485] [segmentation_bridge]: Clicks reset.
+[twist_propagation_node-8] [INFO] [1779411423.048340041] [twist_propagation]: Published click cluster: 5 clicks (1 original + 4 synthetic) around hit (0.180, -0.345, 0.090), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-7] [INFO] [1779411423.052241318] [segmentation_bridge]: [+] positive click at (0.180, -0.345, 0.090) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411423.060913774] [segmentation_bridge]: [+] positive click at (0.181, -0.354, 0.078) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411423.065668695] [segmentation_bridge]: [+] positive click at (0.173, -0.342, 0.112) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411423.070710869] [segmentation_bridge]: [+] positive click at (0.192, -0.359, 0.102) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411423.075086155] [segmentation_bridge]: [+] positive click at (0.172, -0.368, 0.107) (cloud frame)
+[segmentation_ros2_node-7] [INFO] [1779411423.127122226] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[tf_pipeline_diagnostics-4] [INFO] [1779411423.404387227] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[segmentation_ros2_node-7] [INFO] [1779411423.854500586] [segmentation_bridge]: Published segmented cloud: 13/65212 points.
+[twist_propagation_node-8] [INFO] [1779411423.946173352] [twist_propagation]: Segmented cloud received, calling preshaping service
+[preshaping_service_bridge_node-9] [INFO] [1779411424.098071191] [preshaping_service]: Planner called with 2 camera(s): target_frame=marker_map cam0=(0.150,-0.574,0.824)
+[twist_propagation_node-8] [WARN] [1779411424.382145467] [twist_propagation]: Preshaping failed: No object in reach for any grasp type (20000 particles x 5 iterations, best contact_score=0.0)
+[pointcloud_fusion_node-5] [INFO] [1779411425.421580034] [pointcloud_fusion]: Stats: published=37 (dual=45, cam1_only=5) dist_removed=3584443 bbox_removed=0 bbox_skipped=89 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:14, head_d435i_head_depth_optical_frame:14} last_publish_ago=0.4s
+[pointcloud_fusion_node-5] [WARN] [1779411426.612899846] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411415.077731 but the earliest data is at time 1779411415.230677, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-5] [WARN] [1779411426.973499631] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411427.270449855] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [WARN] [1779411431.981833321] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[tf_pipeline_diagnostics-4] [INFO] [1779411433.400157083] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1779411434.200443995] [pointcloud_fusion]: Stats: published=35 (dual=22, cam1_only=10) dist_removed=1663134 bbox_removed=0 bbox_skipped=69 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:30, head_d435i_head_depth_optical_frame:27} last_publish_ago=1.6s
+[pointcloud_fusion_node-5] [ERROR] [1779411434.446615947] [pointcloud_fusion]: Bbox removal success rate is 0% over 30s (0/220 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-5] [WARN] [1779411437.114566203] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411442.338531778] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411443.209109165] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779411430.576848 but the earliest data is at time 1779411430.628493, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[tf_pipeline_diagnostics-4] [INFO] [1779411443.403825660] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [WARN] [1779411443.711010079] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-5] [INFO] [1779411445.606217251] [pointcloud_fusion]: Stats: published=31 (dual=40, cam1_only=2) dist_removed=1567841 bbox_removed=0 bbox_skipped=74 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:3} last_publish_ago=0.0s
+[pointcloud_fusion_node-5] [WARN] [1779411447.445883261] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-5] [WARN] [1779411449.132655548] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[rviz2-11] [INFO] [1779411452.242993695] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[preshaping_service_bridge_node-9] [INFO] [1779411452.243012711] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[pointcloud_fusion_node-5] Exception in thread Thread-2222 (_process_clouds):
+[pointcloud_fusion_node-5] Traceback (most recent call last):
+[pointcloud_fusion_node-5]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[camera_mount_tf_publisher-3] Traceback (most recent call last):
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-3]     main()
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-3]     rclpy.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-3]     _shutdown(context=context)
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-3]     context.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-3]     self.__context.shutdown()
+[camera_mount_tf_publisher-3] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[tf_pipeline_diagnostics-4] Traceback (most recent call last):
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-4]     main()
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 147, in main
+[tf_pipeline_diagnostics-4]     rclpy.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[tf_pipeline_diagnostics-4]     _shutdown(context=context)
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[tf_pipeline_diagnostics-4]     context.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[tf_pipeline_diagnostics-4]     self.__context.shutdown()
+[tf_pipeline_diagnostics-4] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[segmentation_ros2_node-7] Traceback (most recent call last):
+[segmentation_ros2_node-7]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-7]     sys.exit(load_entry_point('segmentation-bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-7]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 292, in main
+[segmentation_ros2_node-7]     rclpy.spin(node)
+[segmentation_ros2_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[segmentation_ros2_node-7]     executor.spin_once()
+[segmentation_ros2_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[segmentation_ros2_node-7]     self._spin_once_impl(timeout_sec)
+[segmentation_ros2_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[segmentation_ros2_node-7]     handler, entity, node = self.wait_for_ready_callbacks(
+[segmentation_ros2_node-7]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[segmentation_ros2_node-7]     return next(self._cb_iter)
+[segmentation_ros2_node-7]            ^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 812, in _wait_for_ready_callbacks
+[segmentation_ros2_node-7]     if tmr.handle.pointer in timers_ready:
+[segmentation_ros2_node-7]        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-7] KeyboardInterrupt
+[INFO] [preshaping_service_bridge_node-9]: process has finished cleanly [pid 19453]
+[pointcloud_fusion_node-5] [WARN] [1779411453.431995866] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[ERROR] [camera_mount_tf_publisher-3]: process has died [pid 19447, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[INFO] [openvins_realsense_tf_bridge_node-2]: process has finished cleanly [pid 19446]
+[INFO] [odom_to_pose_relay-6]: process has finished cleanly [pid 19450]
+[ERROR] [tf_pipeline_diagnostics-4]: process has died [pid 19448, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[INFO] [grasp_proximity_controller_node.py-10]: process has finished cleanly [pid 19454]
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 19445]
+[ERROR] [segmentation_ros2_node-7]: process has died [pid 19451, exit code -2, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_2d0ulk5a -r /segmentation/input_cloud:=/fused_pointcloud'].
+[INFO] [twist_propagation_node-8]: process has finished cleanly [pid 19452]
+[INFO] [pointcloud_fusion_node-5]: process has finished cleanly [pid 19449]
+[ERROR] [rviz2-11]: process[rviz2-11] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'

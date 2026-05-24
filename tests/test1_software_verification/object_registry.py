@@ -19,6 +19,33 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PARAMETRIC_DIR = os.path.join(SCRIPT_DIR, "objects", "parametric")
 YCB_DIR = os.path.join(SCRIPT_DIR, "objects", "ycb")
 
+# Convexity classification for each object.
+# Convex objects have no self-occlusion from any single viewpoint.
+# Non-convex objects have concavities, handles, or overhangs that create
+# self-occlusion — these are where the multi-view advantage is strongest.
+CONVEXITY = {
+    # Convex parametric objects
+    "cylinder_upright": "convex",
+    "cylinder_tilted": "convex",
+    "ellipsoid": "convex",
+    "tapered_bottle": "convex",
+    "small_cube": "convex",
+    # Non-convex parametric objects
+    "l_block": "non-convex",
+    "notched_box": "non-convex",
+    "cross_shape": "non-convex",
+    "thin_plate": "non-convex",
+    # YCB objects (non-convex geometry)
+    "banana": "non-convex",
+    "mug": "non-convex",
+    "power_drill": "non-convex",
+}
+
+
+def get_convexity(name: str) -> str:
+    """Return 'convex' or 'non-convex' for the given object."""
+    return CONVEXITY.get(name, "unknown")
+
 
 def _discover_objects() -> dict[str, str]:
     """Scan directories for .npz object files.

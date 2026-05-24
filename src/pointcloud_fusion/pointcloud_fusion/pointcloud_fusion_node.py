@@ -7,7 +7,7 @@ Pipeline:
   2. Transform both to world frame via TF2
   3. Concatenate into a single cloud
   4. Distance filter — remove points >max_distance from arm_frame origin
-  5. Hand/arm bbox removal — AABB crop in arm_frame
+  5. Hand/arm bbox removal — AABB crop per pruning box (from camera_mounts.yaml)
   6. Voxel downsampling — numpy-based grid filter
   7. Publish on /fused_pointcloud
 
@@ -23,9 +23,11 @@ Publish:
 """
 
 import threading
+from pathlib import Path
 
 import numpy as np
 import rclpy
+import yaml
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import PointCloud2, PointField
@@ -126,7 +128,7 @@ def _voxel_downsample(xyz: np.ndarray, rgb_packed: np.ndarray, voxel_size: float
     """Voxel grid downsampling. Returns (xyz_down, rgb_down) with one centroid per voxel.
 
     xyz:         (N, 3) float32
-    rgb_packed:  (N,) uint32
+    rgb_packed:  (N,) uint32  — 0x00RRGGBB encoding
     voxel_size:  side length of each voxel cube in metres
     """
     if voxel_size <= 0.0 or len(xyz) == 0:
@@ -140,38 +142,43 @@ def _voxel_downsample(xyz: np.ndarray, rgb_packed: np.ndarray, voxel_size: float
 
     n_voxels = len(unique_idx)
     summed_xyz = np.zeros((n_voxels, 3), dtype=np.float64)
-    summed_rgb = np.zeros(n_voxels, dtype=np.uint64)
     counts = np.zeros(n_voxels, dtype=np.int32)
 
     np.add.at(summed_xyz, inverse, xyz.astype(np.float64))
-    np.add.at(summed_rgb, inverse, rgb_packed.astype(np.uint64))
     np.add.at(counts, inverse, 1)
 
     xyz_out = (summed_xyz / counts[:, None]).astype(np.float32)
-    rgb_out = (summed_rgb / counts.astype(np.uint64)).astype(np.uint32)
+
+    # Per-channel RGB averaging to avoid carry propagation between channels
+    # when averaging packed 0x00RRGGBB integers.
+    r_ch = ((rgb_packed >> 16) & 0xFF).astype(np.uint64)
+    g_ch = ((rgb_packed >> 8) & 0xFF).astype(np.uint64)
+    b_ch = (rgb_packed & 0xFF).astype(np.uint64)
+
+    summed_r = np.zeros(n_voxels, dtype=np.uint64)
+    summed_g = np.zeros(n_voxels, dtype=np.uint64)
+    summed_b = np.zeros(n_voxels, dtype=np.uint64)
+
+    np.add.at(summed_r, inverse, r_ch)
+    np.add.at(summed_g, inverse, g_ch)
+    np.add.at(summed_b, inverse, b_ch)
+
+    counts_u64 = counts.astype(np.uint64)
+    avg_r = (summed_r / counts_u64).astype(np.uint32)
+    avg_g = (summed_g / counts_u64).astype(np.uint32)
+    avg_b = (summed_b / counts_u64).astype(np.uint32)
+
+    rgb_out = (avg_r << 16) | (avg_g << 8) | avg_b
     return xyz_out, rgb_out
 
 
-def _transform_points_to_frame(xyz: np.ndarray, tf_buffer, target_frame: str,
-                                source_frame: str, stamp) -> np.ndarray | None:
-    """Transform an (N,3) xyz array from source_frame to target_frame using TF2.
-
-    Returns transformed (N,3) float32 or None if TF lookup fails.
-    """
-    try:
-        t = tf_buffer.lookup_transform(target_frame, source_frame, stamp)
-    except Exception:
-        return None
-
-    tx = t.transform.translation.x
-    ty = t.transform.translation.y
-    tz = t.transform.translation.z
+def _extract_rotation_translation(t) -> tuple[np.ndarray, np.ndarray]:
+    """Extract rotation matrix (3,3) and translation vector (3,) from a TF2 transform."""
     qx = t.transform.rotation.x
     qy = t.transform.rotation.y
     qz = t.transform.rotation.z
     qw = t.transform.rotation.w
 
-    # Quaternion to rotation matrix
     r00 = 1 - 2*(qy*qy + qz*qz)
     r01 = 2*(qx*qy - qz*qw)
     r02 = 2*(qx*qz + qy*qw)
@@ -185,8 +192,26 @@ def _transform_points_to_frame(xyz: np.ndarray, tf_buffer, target_frame: str,
     R = np.array([[r00, r01, r02],
                    [r10, r11, r12],
                    [r20, r21, r22]], dtype=np.float64)
-    t_vec = np.array([tx, ty, tz], dtype=np.float64)
+    t_vec = np.array([
+        t.transform.translation.x,
+        t.transform.translation.y,
+        t.transform.translation.z,
+    ], dtype=np.float64)
+    return R, t_vec
 
+
+def _transform_points_to_frame(xyz: np.ndarray, tf_buffer, target_frame: str,
+                                source_frame: str, stamp) -> np.ndarray | None:
+    """Transform an (N,3) xyz array from source_frame to target_frame using TF2.
+
+    Returns transformed (N,3) float32 or None if TF lookup fails.
+    """
+    try:
+        t = tf_buffer.lookup_transform(target_frame, source_frame, stamp)
+    except Exception:
+        return None
+
+    R, t_vec = _extract_rotation_translation(t)
     transformed = (xyz.astype(np.float64) @ R.T) + t_vec
     return transformed.astype(np.float32)
 
@@ -218,6 +243,10 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("require_both_cameras", False)
         self.declare_parameter("fallback_merge_rate_hz", 15.0)
         self.declare_parameter("cloud_max_age_s", 0.5)
+        self.declare_parameter("mounts_config_path", "")
+        self.declare_parameter("active_mount", "8_cm_cam_mount")
+        self.declare_parameter("bbox_fallback_mode", "cache")  # skip | cache | conservative
+        self.declare_parameter("bbox_cache_max_age_s", 2.0)
 
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
@@ -236,6 +265,25 @@ class PointCloudFusionNode(Node):
         self._require_both = self.get_parameter("require_both_cameras").value
         fallback_rate = max(float(self.get_parameter("fallback_merge_rate_hz").value), 1.0)
         self._cloud_max_age = float(self.get_parameter("cloud_max_age_s").value)
+        self._bbox_fallback_mode = self.get_parameter("bbox_fallback_mode").value
+        self._bbox_cache_max_age = float(
+            self.get_parameter("bbox_cache_max_age_s").value)
+
+        # ── Load pruning boxes from camera_mounts.yaml or fall back to params ─
+        mounts_config = self.get_parameter("mounts_config_path").value
+        if mounts_config:
+            self._pruning_boxes = self._load_pruning_boxes(
+                mounts_config, self.get_parameter("active_mount").value)
+            for i, (frame, bmin, bmax) in enumerate(self._pruning_boxes):
+                self.get_logger().info(
+                    f"Pruning box {i}: frame={frame}, "
+                    f"min={bmin.tolist()}, max={bmax.tolist()}")
+        else:
+            self._pruning_boxes = [
+                (self._arm_frame, self._bbox_min, self._bbox_max)]
+            self.get_logger().info(
+                f"Pruning box 0 (fallback): frame={self._arm_frame}, "
+                f"min={self._bbox_min.tolist()}, max={self._bbox_max.tolist()}")
 
         # ── TF2 ───────────────────────────────────────────────────────────
         self._tf_buffer = tf2_ros.Buffer()
@@ -293,14 +341,29 @@ class PointCloudFusionNode(Node):
         self._stats_lock = threading.Lock()
         self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
                        "distance_removed": 0, "bbox_removed": 0,
+                       "bbox_skipped": 0, "bbox_cache_hits": 0,
                        "tf_fail": {}}
         self._last_publish_time = self.get_clock().now()
         self.create_timer(10.0, self._log_stats)
 
+        # ── Bbox transform cache ───────────────────────────────────────────
+        # Caches the most recent successful transform for each pruning box
+        # frame as (R, t_vec, timestamp_ns). Used when fresh TF lookup fails
+        # and bbox_fallback_mode == "cache".
+        self._bbox_transform_cache: dict[str, tuple] = {}  # frame -> (R, t_vec, cache_time_ns)
+
+        # ── Bbox health tracking ───────────────────────────────────────────
+        self._bbox_attempts = 0
+        self._bbox_successes = 0
+        self._bbox_health_window_start = self.get_clock().now()
+        self.create_timer(30.0, self._check_bbox_health)
+
         self.get_logger().info(
             f"Pointcloud fusion: {cam1_topic} + {cam2_topic} -> {output_topic} "
             f"(target_frame={self._target_frame}, arm_frame={self._arm_frame}, "
-            f"max_dist={self._max_distance}m, voxel={self._voxel_size}m)"
+            f"max_dist={self._max_distance}m, voxel={self._voxel_size}m, "
+            f"pruning_boxes={len(self._pruning_boxes)}, "
+            f"bbox_fallback={self._bbox_fallback_mode})"
         )
 
     # ── Synced callback (message_filters) ────────────────────────────────
@@ -438,24 +501,51 @@ class PointCloudFusionNode(Node):
         if len(xyz_all) == 0:
             return
 
-        # ── Step 4: Hand/arm bbox removal ─────────────────────────────
+        # ── Step 4: Hand/arm bbox removal (multiple pruning boxes) ─────
         if self._enable_hand_removal:
-            xyz_arm = _transform_points_to_frame(
-                xyz_all, self._tf_buffer, self._arm_frame,
-                self._target_frame, rclpy.time.Time(),
-            )
-            if xyz_arm is not None:
-                keep = _bbox_filter(xyz_arm, self._bbox_min, self._bbox_max)
-                removed = len(xyz_all) - np.sum(keep)
-                xyz_all = xyz_all[keep]
-                rgb_all = rgb_all[keep]
-                with self._stats_lock:
-                    self._stats["bbox_removed"] += int(removed)
-            else:
-                self.get_logger().warn(
-                    f"Cannot transform to {self._arm_frame} for bbox removal — skipping",
-                    throttle_duration_sec=5.0,
-                )
+            # Use a recent-but-not-zero timestamp for bbox TF lookups.
+            # rclpy.time.Time() (= zero) means "latest", but can cause
+            # extrapolation-into-the-past errors when the TF buffer only has
+            # data starting slightly after the requested time.  A 100ms offset
+            # gives the buffer a safe margin while still being recent enough.
+            lookup_stamp = (self.get_clock().now()
+                            - rclpy.duration.Duration(seconds=0.1))
+
+            for frame, bbox_min, bbox_max in self._pruning_boxes:
+                self._bbox_attempts += 1
+
+                # Try instant (non-blocking) TF lookup; falls back to cache
+                transform_result = self._lookup_bbox_transform(
+                    frame, lookup_stamp, xyz_all)
+
+                if transform_result is not None:
+                    R, t_vec, xyz_box = transform_result
+                    # Cache the successful transform
+                    cache_time = self.get_clock().now().nanoseconds
+                    self._bbox_transform_cache[frame] = (R, t_vec, cache_time)
+                    self._bbox_successes += 1
+
+                    keep = _bbox_filter(xyz_box, bbox_min, bbox_max)
+                    removed = len(xyz_all) - np.sum(keep)
+                    xyz_all = xyz_all[keep]
+                    rgb_all = rgb_all[keep]
+                    with self._stats_lock:
+                        self._stats["bbox_removed"] += int(removed)
+                    # Throttled success logging — only visible when bbox removal
+                    # is actually filtering hand/arm points.
+                    if removed > 0 and self._bbox_successes % 50 == 1:
+                        self.get_logger().info(
+                            f"Bbox removal via fresh TF removed {removed} points "
+                            f"from {frame}",
+                            throttle_duration_sec=10.0)
+                else:
+                    # Fresh lookup failed — apply fallback strategy
+                    handled = self._bbox_fallback(
+                        frame, bbox_min, bbox_max,
+                        xyz_all, rgb_all, lookup_stamp)
+                    if handled is not None:
+                        xyz_all, rgb_all = handled[0], handled[1]
+                    # else: bbox_skipped already counted in _bbox_fallback
 
         if len(xyz_all) == 0:
             return
@@ -484,6 +574,116 @@ class PointCloudFusionNode(Node):
             self._stats["published"] += 1
         self._last_publish_time = self.get_clock().now()
 
+    def _lookup_bbox_transform(self, frame: str, stamp, xyz_all: np.ndarray):
+        """Try to look up the transform for a bbox pruning box.
+
+        Returns (R, t_vec, xyz_box) on success, or None if lookup fails.
+        Uses a zero timeout (instant, non-blocking) to avoid adding latency
+        to the fusion pipeline.  The cache fallback in _bbox_fallback handles
+        the case where the transform is not yet in the buffer.
+        """
+        try:
+            t = self._tf_buffer.lookup_transform(
+                frame, self._target_frame, stamp,
+                timeout=rclpy.duration.Duration(seconds=0),
+            )
+        except Exception:
+            return None
+
+        R, t_vec = _extract_rotation_translation(t)
+        xyz_box = (xyz_all.astype(np.float64) @ R.T) + t_vec
+        return R, t_vec, xyz_box.astype(np.float32)
+
+    def _bbox_fallback(self, frame: str, bbox_min, bbox_max,
+                       xyz_all, rgb_all, lookup_stamp):
+        """Handle bbox removal when fresh TF lookup fails.
+
+        Returns (xyz_all, rgb_all) if fallback was applied, or None if
+        the pruning box was skipped entirely.
+        """
+        if self._bbox_fallback_mode == "cache":
+            cached = self._bbox_transform_cache.get(frame)
+            if cached is not None:
+                R, t_vec, cache_time_ns = cached
+                age_s = (self.get_clock().now().nanoseconds - cache_time_ns) / 1e9
+                if age_s <= self._bbox_cache_max_age:
+                    # Apply cached transform
+                    xyz_box = (xyz_all.astype(np.float64) @ R.T) + t_vec
+                    xyz_box = xyz_box.astype(np.float32)
+                    keep = _bbox_filter(xyz_box, bbox_min, bbox_max)
+                    removed = len(xyz_all) - np.sum(keep)
+                    xyz_all = xyz_all[keep]
+                    rgb_all = rgb_all[keep]
+                    with self._stats_lock:
+                        self._stats["bbox_removed"] += int(removed)
+                        self._stats["bbox_cache_hits"] += 1
+                    # Also count cache hits as functional successes
+                    self._bbox_successes += 1
+                    if removed > 0:
+                        if self._bbox_successes % 50 == 1:
+                            self.get_logger().info(
+                                f"Bbox removal via cache removed {removed} points "
+                                f"from {frame} (cache age={age_s:.2f}s)",
+                                throttle_duration_sec=10.0)
+                    self.get_logger().warn(
+                        f"Using cached transform for {frame} "
+                        f"(age={age_s:.2f}s) — fresh lookup failed",
+                        throttle_duration_sec=5.0)
+                    return xyz_all, rgb_all
+                else:
+                    with self._stats_lock:
+                        self._stats["bbox_skipped"] += 1
+                    self.get_logger().warn(
+                        f"Cannot transform to {frame} for bbox removal — "
+                        f"cached transform too old ({age_s:.1f}s > "
+                        f"{self._bbox_cache_max_age}s), skipping",
+                        throttle_duration_sec=5.0)
+                    return None
+            # No cache available
+            with self._stats_lock:
+                self._stats["bbox_skipped"] += 1
+            self.get_logger().warn(
+                f"Cannot transform to {frame} for bbox removal — "
+                f"no cached transform available, skipping",
+                throttle_duration_sec=5.0)
+            return None
+
+        elif self._bbox_fallback_mode == "conservative":
+            # Don't publish if bbox removal can't run — safest option.
+            # Return empty arrays to signal the caller to abort.
+            self.get_logger().warn(
+                f"Cannot transform to {frame} for bbox removal — "
+                f"conservative mode: dropping fused cloud",
+                throttle_duration_sec=5.0)
+            return np.zeros((0, 3), dtype=np.float32), rgb_all[:0]
+
+        else:  # "skip" mode (original behavior)
+            with self._stats_lock:
+                self._stats["bbox_skipped"] += 1
+            self.get_logger().warn(
+                f"Cannot transform to {frame} for bbox removal — skipping",
+                throttle_duration_sec=5.0)
+            return None
+
+    def _check_bbox_health(self):
+        """Log an ERROR if bbox removal success rate is too low over a 30s window."""
+        now = self.get_clock().now()
+        elapsed = (now - self._bbox_health_window_start).nanoseconds / 1e9
+        if self._bbox_attempts > 0 and elapsed >= 25.0:
+            success_rate = self._bbox_successes / self._bbox_attempts
+            if success_rate < 0.9:
+                self.get_logger().error(
+                    f"Bbox removal success rate is {success_rate:.0%} over "
+                    f"{elapsed:.0f}s ({self._bbox_successes}/"
+                    f"{self._bbox_attempts} attempts). "
+                    f"Fused cloud quality is degraded — hand/arm may not be "
+                    f"filtered. Check TF tree connectivity for pruning box frames."
+                )
+            # Reset window
+            self._bbox_attempts = 0
+            self._bbox_successes = 0
+            self._bbox_health_window_start = now
+
     # ── TF helpers ────────────────────────────────────────────────────────
 
     def _get_frame_origin_in_target(self, frame: str) -> np.ndarray | None:
@@ -502,38 +702,90 @@ class PointCloudFusionNode(Node):
     # ── BBox visualization ────────────────────────────────────────────────
 
     def _publish_bbox_marker(self):
-        """Publish the hand removal bbox as a semi-transparent cube in arm_frame."""
+        """Publish a semi-transparent cube per pruning box for RViz visualization."""
         if self._bbox_marker_pub.get_subscription_count() == 0:
             return
 
-        marker = Marker()
-        marker.header.frame_id = self._arm_frame
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "hand_removal_bbox"
-        marker.id = 0
-        marker.type = Marker.CUBE
-        marker.action = Marker.ADD
+        colors = [
+            (1.0, 0.3, 0.3, 0.3),  # red for box 0
+            (1.0, 0.6, 0.0, 0.3),  # orange for box 1
+        ]
+        for i, (frame, bbox_min, bbox_max) in enumerate(self._pruning_boxes):
+            marker = Marker()
+            marker.header.frame_id = frame
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.ns = f"pruning_box_{i}"
+            marker.id = i
+            marker.type = Marker.CUBE
+            marker.action = Marker.ADD
 
-        # Center and scale from bbox_min/max
-        center = (self._bbox_min + self._bbox_max) / 2.0
-        scale = self._bbox_max - self._bbox_min
-        marker.pose.position.x = float(center[0])
-        marker.pose.position.y = float(center[1])
-        marker.pose.position.z = float(center[2])
-        marker.pose.orientation.w = 1.0
-        marker.scale.x = float(scale[0])
-        marker.scale.y = float(scale[1])
-        marker.scale.z = float(scale[2])
+            center = (bbox_min + bbox_max) / 2.0
+            scale = bbox_max - bbox_min
+            marker.pose.position.x = float(center[0])
+            marker.pose.position.y = float(center[1])
+            marker.pose.position.z = float(center[2])
+            marker.pose.orientation.w = 1.0
+            marker.scale.x = float(scale[0])
+            marker.scale.y = float(scale[1])
+            marker.scale.z = float(scale[2])
 
-        # Semi-transparent red
-        marker.color.r = 1.0
-        marker.color.g = 0.3
-        marker.color.b = 0.3
-        marker.color.a = 0.3
+            r, g, b, a = colors[i % len(colors)]
+            marker.color.r = r
+            marker.color.g = g
+            marker.color.b = b
+            marker.color.a = a
 
-        marker.lifetime.sec = 5  # Expire if node dies
+            marker.lifetime.sec = 5  # Expire if node dies
 
-        self._bbox_marker_pub.publish(marker)
+            self._bbox_marker_pub.publish(marker)
+
+    # ── Pruning box loading from camera_mounts.yaml ──────────────────
+
+    @staticmethod
+    def _load_pruning_boxes(config_path: str, mount_name: str) -> list:
+        """Load pruning boxes from camera_mounts.yaml.
+
+        Returns a list of (frame_id, bbox_min, bbox_max) tuples.
+        """
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+
+        boxes = []
+
+        # Box 1: bounding_box in palm_frame
+        bb = data["bounding_box"]
+        corner = bb["palm_to_corner"]["translation"]
+        opp_offset = bb["corner_to_opposite"]["translation"]
+        c = np.array([corner["x"], corner["y"], corner["z"]], dtype=np.float32)
+        o = c + np.array([opp_offset["x"], opp_offset["y"], opp_offset["z"]],
+                         dtype=np.float32)
+        boxes.append((
+            "palm_frame",
+            np.minimum(c, o),
+            np.maximum(c, o),
+        ))
+
+        # Box 2: cam_bounding_box in screw frame (if present)
+        cam_key = f"cam_bounding_box_{mount_name.split('_')[0]}cm"
+        # Try exact key first, then fall back to 8cm
+        cam_bb = data.get("cam_bounding_box_8cm")
+        if cam_bb is None:
+            cam_bb = data.get(cam_key)
+        if cam_bb is not None:
+            c1_dict = cam_bb["screw_to_bbcam1"]["translation"]
+            c2_dict = cam_bb["screw_to_bbcam2"]["translation"]
+            c1 = np.array([c1_dict["x"], c1_dict["y"], c1_dict["z"]],
+                          dtype=np.float32)
+            c2 = np.array([c2_dict["x"], c2_dict["y"], c2_dict["z"]],
+                          dtype=np.float32)
+            screw_frame = f"d435i_arm_bottom_screw_frame_{mount_name}"
+            boxes.append((
+                screw_frame,
+                np.minimum(c1, c2),
+                np.maximum(c1, c2),
+            ))
+
+        return boxes
 
     # ── Stats logging ─────────────────────────────────────────────────────
 
@@ -553,6 +805,8 @@ class PointCloudFusionNode(Node):
             f"(dual={stats_snapshot['dual']}, cam1_only={stats_snapshot['cam1_only']}) "
             f"dist_removed={stats_snapshot['distance_removed']} "
             f"bbox_removed={stats_snapshot['bbox_removed']}"
+            f" bbox_skipped={stats_snapshot['bbox_skipped']}"
+            f" bbox_cache_hits={stats_snapshot['bbox_cache_hits']}"
             f"{tf_fail_str}"
             f" last_publish_ago={since_last:.1f}s"
         )
@@ -600,6 +854,7 @@ class PointCloudFusionNode(Node):
         with self._stats_lock:
             self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
                            "distance_removed": 0, "bbox_removed": 0,
+                           "bbox_skipped": 0, "bbox_cache_hits": 0,
                            "tf_fail": {}}
 
 

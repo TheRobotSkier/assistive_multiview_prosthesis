@@ -18,6 +18,7 @@
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "tf2_ros/buffer.h"
 #include "tf2_ros/transform_listener.h"
@@ -85,6 +86,8 @@ public:
       declare_parameter<std::string>("hand_twist_topic", "/hand_twist");
     const std::string cloud_topic =
       declare_parameter<std::string>("cloud_topic", "/segmentation/object_cloud");
+    const std::string hit_time_topic =
+      declare_parameter<std::string>("hit_time_topic", "/grasp_preshaping/hit_time");
     const std::string thumb_cmd_topic =
       declare_parameter<std::string>("thumb_cmd_topic", "/thumb_pos_ff_controller/commands");
     const std::string index_cmd_topic =
@@ -128,6 +131,14 @@ public:
         has_cloud_ = true;
       });
 
+    hit_time_sub_ = create_subscription<std_msgs::msg::Float64>(
+      hit_time_topic, 10,
+      [this](const std_msgs::msg::Float64::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(input_mutex_);
+        latest_hit_time_ = msg->data;
+        has_hit_time_ = true;
+      });
+
     thumb_cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
       thumb_cmd_topic, 10);
     index_cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
@@ -148,6 +159,9 @@ public:
 
     grasp_type_pub_ = create_publisher<std_msgs::msg::Int32>(
       grasp_type_topic, rclcpp::QoS(10).transient_local());
+
+    pipeline_timing_pub_ = create_publisher<std_msgs::msg::String>(
+      "/grasp_preshaping/pipeline_timing", 10);
 
     initialize_rust_backend();
 
@@ -261,6 +275,19 @@ private:
         return true;
       }
 
+      // Reject empty / reset clouds early with a clear message instead of
+      // letting a null data pointer reach the Rust FFI layer.
+      if (latest_cloud_.width * latest_cloud_.height == 0) {
+        response->success = false;
+        response->message = "Point cloud is empty (0 points) — segmentation may still be in progress";
+        return true;
+      }
+      if (latest_cloud_.data.empty()) {
+        response->success = false;
+        response->message = "Point cloud data buffer is empty — segmentation may still be in progress";
+        return true;
+      }
+
       pose = latest_pose_;
       twist = latest_twist_;
       cloud = latest_cloud_;
@@ -356,6 +383,11 @@ private:
       n_cameras = 1;
     }
     request.n_cameras = n_cameras;
+    // Hit time from twist propagation (negative = no hit time available).
+    {
+      std::lock_guard<std::mutex> lock(input_mutex_);
+      request.hit_time_s = has_hit_time_ ? latest_hit_time_ : -1.0;
+    }
 
     RCLCPP_INFO(
       get_logger(),
@@ -489,6 +521,15 @@ private:
       grasp_type_pub_->publish(grasp_type_msg);
     }
 
+    // Pipeline timing info (for latency benchmarking).
+    {
+      std_msgs::msg::String timing_msg;
+      timing_msg.data =
+        "pipeline_time_ms=" + std::to_string(ffi_response.pipeline_time_ms) +
+        ",smc_iterations=" + std::to_string(ffi_response.smc_iterations_used);
+      pipeline_timing_pub_->publish(timing_msg);
+    }
+
     response->success = true;
     response->message = message.empty() ? "Preshaping completed" : message;
     response->message +=
@@ -500,6 +541,8 @@ private:
       ", full=[" + std::to_string(full_thumb) + ","
                   + std::to_string(full_index) + ","
                   + std::to_string(full_mrl) + "]"
+      ", pipeline_time_ms=" + std::to_string(ffi_response.pipeline_time_ms) +
+      ", smc_iterations=" + std::to_string(ffi_response.smc_iterations_used) +
       ")";
     return true;
   }
@@ -511,6 +554,8 @@ private:
   bool has_pose_;
   bool has_twist_;
   bool has_cloud_;
+  bool has_hit_time_ = false;
+  double latest_hit_time_ = -1.0;
 
   void * rust_lib_handle_;
   GraspComputeFn rust_compute_fn_;
@@ -528,6 +573,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr hand_pose_sub_;
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr hand_twist_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr hit_time_sub_;
 
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr thumb_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr index_cmd_pub_;
@@ -536,6 +582,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr target_hand_pose_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr target_finger_closures_pub_;
   rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr grasp_type_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pipeline_timing_pub_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr service_;
 };
 

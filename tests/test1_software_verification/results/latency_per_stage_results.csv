@@ -1,0 +1,16 @@
+object,repetition,path,status,pipeline_manager_ms,twist_propagation_ms,segmentation_ms,pm_cloud_handling_ms,preshaping_ms,total_ms,rust_compute_ms,ros_service_overhead_ms,grasp_type,n_cloud_points,seg_simulated,n_events
+cylinder_upright,0,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,104
+cylinder_upright,1,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76
+cylinder_upright,2,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,77
+cylinder_upright,3,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76
+cylinder_upright,4,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76
+ellipsoid,0,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,105
+ellipsoid,1,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76
+ellipsoid,2,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76
+ellipsoid,3,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,77
+ellipsoid,4,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76
+small_cube,0,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,104
+small_cube,1,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76
+small_cube,2,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76
+small_cube,3,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,77
+small_cube,4,timeout,timeout,nan,nan,nan,nan,nan,nan,nan,nan,-1,30000,False,76

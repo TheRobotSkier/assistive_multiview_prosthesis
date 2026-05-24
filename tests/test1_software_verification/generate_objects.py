@@ -22,7 +22,10 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PARAMETRIC_DIR = os.path.join(SCRIPT_DIR, "objects", "parametric")
 YCB_DIR = os.path.join(SCRIPT_DIR, "objects", "ycb")
 
-N_POINTS = 10000  # target number of surface points per object
+N_POINTS = 30000  # target number of surface points per object
+# Matches typical segmented object cloud size from the live D435i pipeline
+# (dual-camera fused at 5mm voxel, then segmented). This ensures latency
+# measurements are representative of real-world conditions.
 
 
 def _save_object(path: str, name: str, points: np.ndarray,
@@ -302,6 +305,156 @@ def gen_thin_plate():
     )
 
 
+def gen_mug_with_handle():
+    """Mug with handle: cylinder body + C-shaped handle on the side.
+    Non-convex — handle interior is occluded from most viewpoints.
+    """
+    rng = np.random.default_rng(42)
+    body_r, body_h = 0.035, 0.09
+    handle_r = 0.008  # handle cross-section radius
+    handle_center_r = 0.055  # distance from mug axis to handle center
+    handle_z_range = (0.02, 0.07)
+
+    # Body surface points (cylinder)
+    body_pts = []
+    n_body = int(N_POINTS * 0.65)
+    for _ in range(n_body * 3):
+        z = rng.uniform(0, body_h)
+        theta = rng.uniform(0, 2 * np.pi)
+        body_pts.append([body_r * np.cos(theta), body_r * np.sin(theta), z])
+    body_pts = np.array(body_pts, dtype=np.float32)
+    # Surface mask: keep points near the cylinder surface
+    r_pts = np.sqrt(body_pts[:, 0]**2 + body_pts[:, 1]**2)
+    surface_mask = np.abs(r_pts - body_r) < 0.002
+    body_pts = body_pts[surface_mask][:n_body]
+
+    # Handle: torus segment (C-shape)
+    handle_pts = []
+    n_handle = N_POINTS - len(body_pts)
+    for _ in range(n_handle * 3):
+        # Parametric torus: angle around the handle loop + angle around cross-section
+        phi = rng.uniform(-np.pi * 0.7, np.pi * 0.7)  # partial torus (C-shape)
+        theta = rng.uniform(0, 2 * np.pi)
+        z_frac = rng.uniform(0, 1)
+        z = handle_z_range[0] + z_frac * (handle_z_range[1] - handle_z_range[0])
+
+        # Handle center in the +Y direction from mug axis
+        cx = handle_r * np.cos(phi)
+        cy = handle_center_r + handle_r * np.sin(phi)
+        handle_pts.append([cx, cy, z])
+    handle_pts = np.array(handle_pts, dtype=np.float32)
+    handle_pts = _sample_surface(handle_pts, n_handle)
+
+    points = np.vstack([body_pts, handle_pts]).astype(np.float32)
+    points = _sample_surface(points, N_POINTS)
+
+    _save_object(
+        os.path.join(PARAMETRIC_DIR, "mug_with_handle.npz"),
+        "mug_with_handle", points, "cylindrical",
+        {"body_radius_m": body_r, "body_height_m": body_h,
+         "handle_center_r_m": handle_center_r, "handle_r_m": handle_r},
+    )
+
+
+def gen_notched_box():
+    """Box with a rectangular notch cut from one edge.
+    Non-convex — the notch creates self-occlusion from oblique angles.
+    """
+    rng = np.random.default_rng(42)
+    # Main box: 8x6x4 cm
+    hx, hy, hz = 0.04, 0.03, 0.02
+    # Notch: 3x6x2 cm cut from the +X side
+    notch_hx, notch_hz = 0.015, 0.01
+
+    dense = rng.uniform(
+        np.array([-hx, -hy, -hz]),
+        np.array([hx, hy, hz]),
+        (N_POINTS * 5, 3),
+    )
+
+    # Surface mask: on any face of the outer box
+    abs_d = np.abs(dense)
+    dist_to_face = np.array([hx, hy, hz]) - abs_d
+    on_outer_face = np.any(dist_to_face < 0.0015, axis=1)
+
+    # Notch mask: points inside the notch region
+    in_notch = (
+        (dense[:, 0] > (hx - notch_hx)) &
+        (np.abs(dense[:, 1]) < hy) &
+        (dense[:, 2] < (-hz + notch_hz))
+    )
+
+    # Keep surface points that are NOT inside the notch
+    mask = on_outer_face & ~in_notch
+
+    # Add notch interior surfaces
+    notch_pts = rng.uniform(
+        np.array([hx - notch_hx, -hy, -hz]),
+        np.array([hx, hy, -hz + notch_hz]),
+        (N_POINTS * 2, 3),
+    )
+    abs_n = np.abs(notch_pts)
+    # Notch surfaces: on any face of the notch cavity
+    notch_face_dist = np.array([
+        notch_pts[:, 0] - (hx - notch_hx),  # left face
+        hx - notch_pts[:, 0],  # right face (shared with outer)
+        hy - abs_n[:, 1],  # front/back
+        notch_pts[:, 2] - (-hz),  # bottom
+        (-hz + notch_hz) - notch_pts[:, 2],  # top
+    ]).T
+    on_notch_face = np.any(notch_face_dist < 0.0015, axis=1)
+    notch_pts = notch_pts[on_notch_face]
+
+    points = np.vstack([dense[mask], notch_pts]).astype(np.float32)
+    points = _sample_surface(points, N_POINTS)
+
+    _save_object(
+        os.path.join(PARAMETRIC_DIR, "notched_box.npz"),
+        "notched_box", points, "pinch",
+        {"box_m": [0.08, 0.06, 0.04], "notch_m": [0.03, 0.06, 0.02]},
+    )
+
+
+def gen_cross_shape():
+    """Cross/plus shape: two perpendicular rectangular bars.
+    Non-convex — the junction creates self-occlusion from many angles.
+    """
+    rng = np.random.default_rng(42)
+    # Bar 1: 10x3x3 cm along X
+    # Bar 2: 3x10x3 cm along Y
+    bar_len = 0.05  # half-length
+    bar_thick = 0.015  # half-thickness
+
+    # Generate surface points for bar 1
+    dense1 = rng.uniform(
+        np.array([-bar_len, -bar_thick, -bar_thick]),
+        np.array([bar_len, bar_thick, bar_thick]),
+        (N_POINTS * 3, 3),
+    )
+    abs_d1 = np.abs(dense1)
+    face_dist1 = np.array([bar_len, bar_thick, bar_thick]) - abs_d1
+    surf_mask1 = np.any(face_dist1 < 0.002, axis=1)
+
+    # Generate surface points for bar 2
+    dense2 = rng.uniform(
+        np.array([-bar_thick, -bar_len, -bar_thick]),
+        np.array([bar_thick, bar_len, bar_thick]),
+        (N_POINTS * 3, 3),
+    )
+    abs_d2 = np.abs(dense2)
+    face_dist2 = np.array([bar_thick, bar_len, bar_thick]) - abs_d2
+    surf_mask2 = np.any(face_dist2 < 0.002, axis=1)
+
+    points = np.vstack([dense1[surf_mask1], dense2[surf_mask2]]).astype(np.float32)
+    points = _sample_surface(points, N_POINTS)
+
+    _save_object(
+        os.path.join(PARAMETRIC_DIR, "cross_shape.npz"),
+        "cross_shape", points, "cylindrical",
+        {"bar_length_m": 0.10, "bar_thickness_m": 0.03},
+    )
+
+
 # ---------------------------------------------------------------------------
 # YCB mesh processing
 # ---------------------------------------------------------------------------
@@ -538,21 +691,21 @@ PARAMETRIC_GENERATORS = [
     gen_l_block,
     gen_small_cube,
     gen_thin_plate,
+    # Non-convex objects for multi-view advantage evaluation
+    # mug_with_handle removed — redundant with YCB mug
+
+    gen_notched_box,
+    gen_cross_shape,
 ]
 
-FALLBACK_GENERATORS = [
-    gen_banana_fallback,
-    gen_mug_fallback,
-    gen_drill_fallback,
-]
+# Fallback generators are removed. YCB meshes are used when available.
+FALLBACK_GENERATORS = []
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate test object point clouds")
     parser.add_argument("--ycb", action="store_true", help="Process YCB meshes")
-    parser.add_argument("--fallbacks", action="store_true",
-                        help="Generate parametric fallbacks for YCB objects")
-    parser.add_argument("--all", action="store_true", help="Generate everything")
+    parser.add_argument("--all", action="store_true", help="Generate parametric + YCB objects")
     args = parser.parse_args()
 
     os.makedirs(PARAMETRIC_DIR, exist_ok=True)
@@ -566,14 +719,7 @@ def main():
         print("\nProcessing YCB meshes...")
         gen_ycb_objects()
 
-    if args.fallbacks or args.all:
-        print("\nGenerating YCB fallbacks...")
-        for gen in FALLBACK_GENERATORS:
-            gen()
-
-    print("\nDone. Object files in:", PARAMETRIC_DIR)
-    if args.ycb or args.all:
-        print("YCB files in:", YCB_DIR)
+    print("\nDone.")
 
 
 if __name__ == "__main__":

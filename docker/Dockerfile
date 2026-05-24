@@ -14,6 +14,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # ── System dependencies ──────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
+        chrony \
+        gosu \
         libserial-dev \
         python3-pip \
         python3-scipy \
@@ -92,8 +94,14 @@ RUN echo 'if [ ! -f /prosthesis_ws/install/setup.bash ] && [ -d /prosthesis_ws/s
 USER root
 RUN sed -i 's/use_daemon = not getattr(args, '\''no_daemon'\'', False)/use_daemon = False  # patched: daemon hangs in rootless podman/' \
     /opt/ros/jazzy/lib/python3.12/site-packages/ros2cli/node/strategy.py
-USER prosthesis
 
+# ── Entrypoint: fix volume ownership then drop privileges ─────────────────
+# Must be root to COPY + chmod, and container runs as root so entrypoint
+# can chown named volumes before dropping to prosthesis via gosu.
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/bin/bash"]
 
 # ── Production stage: copies source for test service ────────────────────────

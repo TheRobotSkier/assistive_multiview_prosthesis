@@ -32,7 +32,7 @@ __pycache__/
 
 # llm stuff
 .kilo/
-plans/
+#plans/
 .forge/
 .mcp.json
 
@@ -62,6 +62,9 @@ backup/
 
 # Force logs
 tests/test2_hw_force_controller/results/
+
+# Rosbags
+rosbags/
 
 # Worktrees
 .worktrees/

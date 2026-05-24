@@ -87,6 +87,7 @@ pub fn score_cylindrical(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
+    sq_params: Option<&crate::superquadric::SuperquadricParams>,
 ) -> GraspScoreResult {
     let spec = cylindrical_spec();
     let max_closure = lut.get_max_closure(spec.max_closure_index);
@@ -97,6 +98,7 @@ pub fn score_cylindrical(
         collision_tol,
         &spec,
         max_closure,
+        sq_params,
     )
 }
 
@@ -105,10 +107,11 @@ pub fn score_pinch(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
+    sq_params: Option<&crate::superquadric::SuperquadricParams>,
 ) -> GraspScoreResult {
     let spec = pinch_spec();
     let max_closure = lut.get_max_closure(spec.max_closure_index);
-    score_grasp(lut, tsdf, base_transform, collision_tol, &spec, max_closure)
+    score_grasp(lut, tsdf, base_transform, collision_tol, &spec, max_closure, sq_params)
 }
 
 pub fn score_lateral(
@@ -116,10 +119,11 @@ pub fn score_lateral(
     tsdf: &Tsdf,
     base_transform: &Matrix4<f64>,
     collision_tol: f32,
+    sq_params: Option<&crate::superquadric::SuperquadricParams>,
 ) -> GraspScoreResult {
     let spec = lateral_spec();
     let max_closure = lut.get_max_closure(spec.max_closure_index);
-    score_grasp(lut, tsdf, base_transform, collision_tol, &spec, max_closure)
+    score_grasp(lut, tsdf, base_transform, collision_tol, &spec, max_closure, sq_params)
 }
 
 fn cylindrical_spec() -> GraspSpec {
@@ -292,24 +296,52 @@ fn score_grasp(
     collision_tol: f32,
     spec: &GraspSpec,
     max_closure: f64,
+    sq_params: Option<&crate::superquadric::SuperquadricParams>,
 ) -> GraspScoreResult {
+    // Early termination: if SQ puts the hand center >25 cm from the surface,
+    // no finger can reach it (max ~13 cm FK extension from palm).
+    // Skip the expensive FK sweep entirely.
+    if let Some(sq) = sq_params {
+        let hand_center = Vector3::new(
+            base_transform[(0, 3)] as f32,
+            base_transform[(1, 3)] as f32,
+            base_transform[(2, 3)] as f32,
+        );
+        let sq_dist = sq.taubin_distance(hand_center);
+        if sq_dist > 0.25 {
+            // Score decaying with distance; max 0.04 at surface, 0 beyond ~30 cm.
+            let sq_score = 0.04 * (1.0 - (sq_dist / 0.30).min(1.0));
+            return GraspScoreResult {
+                closure_amount: 0.0,
+                alignment_score: 0.0,
+                force_closure_score: 0.0,
+                contact_count_score: 0.0,
+                contact_score: sq_score.max(0.0) as f64,
+                active_contact_count: 0,
+                found_collision: false,
+            };
+        }
+    }
+
     match sweep_for_collision(lut, tsdf, base_transform, &spec.sweep_points, collision_tol, max_closure) {
         // Tier 4: No collision — hand swept fully closed and hit nothing.
-        // With wider truncation band, we can provide a proximity score based on how
-        // close the hand is to the surface, giving the optimizer directional information.
+        // Use TSDF proximity within the truncation band, and superquadric
+        // taubin_distance as a global fallback beyond the TSDF band.
         None => {
-            // Compute proximity score using a sparse key-point check at mid-closure.
-            // Instead of evaluating all ~25 sweep points, we check only the palm center
-            // and key finger tips. This gives the SMC optimizer coarse directional
-            // information at much lower cost.
             let mid_closure = 0.5;
-            let min_dist = sparse_proximity_distance(lut, tsdf, base_transform, mid_closure);
-            let proximity_score = if min_dist < f32::MAX {
+            let min_dist = sparse_proximity_distance(lut, tsdf, base_transform, mid_closure, sq_params);
+            let proximity_score = if min_dist.tsdf_dist < f32::MAX {
+                // TSDF-based proximity (high accuracy, limited range).
                 // Convert distance to a score in [0.0, 0.05].
-                // Distance 0 → score 0.05, distance at truncation → score 0.0.
                 let trunc_dist = config::TRUNCATION_CELLS() as f32 * config::TSDF_RESOLUTION_M();
-                let normalized = (min_dist / trunc_dist).clamp(0.0, 1.0);
+                let normalized = (min_dist.tsdf_dist / trunc_dist).clamp(0.0, 1.0);
                 0.05 * (1.0 - normalized)
+            } else if let Some(sq_dist) = min_dist.sq_dist {
+                // Superquadric-based proximity (approximate, global range).
+                // Score in [0.0, 0.04] — slightly below TSDF max to preserve hierarchy.
+                // Normalize: 0m → 0.04, decays to 0 over ~0.30m.
+                let sq_score = 0.04 * (1.0 - (sq_dist / 0.30).min(1.0));
+                sq_score.max(0.0)
             } else {
                 0.0
             };
@@ -325,15 +357,42 @@ fn score_grasp(
             }
         },
         // Tier 3: Start-position collision — palm or open-hand fingers already
-        // inside the object. The hand is "in" the object. Back up!
-        Some(0) => GraspScoreResult {
-            closure_amount: 0.0,
-            alignment_score: 0.0,
-            force_closure_score: 0.0,
-            contact_count_score: 0.0,
-            contact_score: 0.1,
-            active_contact_count: 0,
-            found_collision: false,
+        // inside the object. Use superquadric depth to create a gradient that
+        // rewards being near the surface and penalises deep penetration.
+        Some(0) => {
+            let contact_score = if let Some(sq) = sq_params {
+                // Compute palm center position in world frame.
+                let palm = pos_at_sample(lut, Contact::PalmDistRadi, 0, base_transform);
+                let sq_dist = sq.taubin_distance(Vector3::new(palm.x, palm.y, palm.z));
+                if sq_dist < 0.0 {
+                    // Inside the superquadric: sq_dist is negative, magnitude = depth.
+                    // Score: 0.04 (deep inside) to 0.09 (barely inside surface).
+                    // Always below Tier 4 TSDF max (0.05) for deep penetration,
+                    // but can exceed it when barely inside (encouraging surface approach).
+                    let depth = sq_dist.abs();
+                    let max_depth = 0.10; // 10cm: beyond this, score is clamped to minimum
+                    let normalized_depth = (depth / max_depth).min(1.0);
+                    0.09 * (1.0 - normalized_depth) + 0.01
+                } else {
+                    // Outside but still triggered Tier 3 via TSDF — this can happen
+                    // when the palm is in the TSDF band but outside the SQ.
+                    // Use a flat moderate score.
+                    0.05
+                }
+            } else {
+                // No superquadric: flat score, slightly below Tier 4 TSDF max.
+                0.04
+            };
+
+            GraspScoreResult {
+                closure_amount: 0.0,
+                alignment_score: 0.0,
+                force_closure_score: 0.0,
+                contact_count_score: 0.0,
+                contact_score: contact_score as f64,
+                active_contact_count: 0,
+                found_collision: false,
+            }
         },
         Some(coll_sample) => {
             let lo_ctrl = lut.get_control(coll_sample - 1);
@@ -531,34 +590,60 @@ fn collides_at_control(
     false
 }
 
+/// Result of sparse proximity distance evaluation.
+struct ProximityResult {
+    /// Minimum TSDF distance across key points (f32::MAX if all outside band).
+    tsdf_dist: f32,
+    /// Minimum superquadric taubin_distance across key points (None if no SQ).
+    sq_dist: Option<f32>,
+}
+
 /// Sparse proximity check for Tier 4 (no collision) grasps.
 /// Evaluates only 3 key points — palm center, index tip, and thumb tip —
-/// at mid-closure. This gives the SMC optimizer coarse directional information
-/// at ~8× lower cost than checking all sweep points.
+/// at mid-closure. Returns both TSDF and superquadric distances so the
+/// caller can use the best available signal.
 fn sparse_proximity_distance(
     lut: &FingerLUT,
     tsdf: &Tsdf,
     base: &Matrix4<f64>,
     control: f64,
-) -> f32 {
-    let mut min_dist = f32::MAX;
-
-    // Palm center (locked, doesn't move with closure)
+    sq_params: Option<&crate::superquadric::SuperquadricParams>,
+) -> ProximityResult {
+    // Key points to evaluate
     let palm = pos_at_sample(lut, Contact::PalmDistRadi, 0, base);
-    let d = tsdf.get_distance(palm.x, palm.y, palm.z);
-    if d < min_dist { min_dist = d; }
-
-    // Index tip at mid-closure (coupled, moves with closure)
     let index_tip = pos_at_control(lut, Contact::IndexTip, control, base);
-    let d = tsdf.get_distance(index_tip.x, index_tip.y, index_tip.z);
-    if d < min_dist { min_dist = d; }
-
-    // Thumb tip at mid-closure (coupled, moves with closure)
     let thumb_tip = pos_at_control(lut, Contact::ThumbAbdTip, control, base);
-    let d = tsdf.get_distance(thumb_tip.x, thumb_tip.y, thumb_tip.z);
-    if d < min_dist { min_dist = d; }
+    let key_points = [palm, index_tip, thumb_tip];
 
-    min_dist
+    let mut min_tsdf = f32::MAX;
+    let mut min_sq: Option<f32> = None;
+
+    for pt in &key_points {
+        let p = Vector3::new(pt.x, pt.y, pt.z);
+
+        // TSDF distance
+        let d_tsdf = tsdf.get_distance(pt.x, pt.y, pt.z);
+        if d_tsdf < min_tsdf { min_tsdf = d_tsdf; }
+
+        // Superquadric distance (only if TSDF is outside band)
+        if d_tsdf >= f32::MAX {
+            if let Some(sq) = sq_params {
+                let d_sq = sq.taubin_distance(p);
+                // Only consider positive (outside) distances for proximity
+                if d_sq > 0.0 {
+                    min_sq = Some(match min_sq {
+                        Some(prev) => prev.min(d_sq),
+                        None => d_sq,
+                    });
+                }
+            }
+        }
+    }
+
+    ProximityResult {
+        tsdf_dist: min_tsdf,
+        sq_dist: min_sq,
+    }
 }
 
 fn find_active_contacts(

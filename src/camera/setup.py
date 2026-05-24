@@ -20,6 +20,7 @@ setup(
             "cam2_hand_tracker_node = camera.cam2_hand_tracker_node:main",
             "odom_to_pose_relay = camera.odom_to_pose_relay:main",
             "openvins_realsense_tf_bridge_node = camera.openvins_realsense_tf_bridge_node:main",
+            "openvins_odom_tf_relay = camera.openvins_odom_tf_relay:main",
         ],
     },
     data_files=[

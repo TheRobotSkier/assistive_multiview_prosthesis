@@ -39,6 +39,7 @@ Inside Docker:
 import argparse
 import csv
 import os
+import re
 import sys
 import threading
 import time
@@ -294,19 +295,33 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
                                 "status": "ok" if response.success else "service_failed",
                             }
 
-                            # Parse grasp type from response message
-                            if response.success and "grasp_type=" in response.message:
+                            # Parse structured fields from response message
+                            msg = response.message
+                            if response.success and "grasp_type=" in msg:
                                 try:
-                                    gt_part = response.message.split("grasp_type=")[1]
+                                    gt_part = msg.split("grasp_type=")[1]
                                     gt_str = gt_part.split(",")[0].split(")")[0]
                                     row["grasp_type"] = int(gt_str)
                                 except (ValueError, IndexError):
                                     pass
 
+                            # Parse pipeline_time_ms (Rust algorithmic latency)
+                            ptm = re.search(r"pipeline_time_ms=(\d+)", msg)
+                            if ptm:
+                                row["pipeline_time_ms"] = int(ptm.group(1))
+                                row["ros_overhead_ms"] = round(
+                                    latency_ms - int(ptm.group(1)), 2)
+
+                            # Parse smc_iterations
+                            si = re.search(r"smc_iterations=(\d+)", msg)
+                            if si:
+                                row["smc_iterations"] = int(si.group(1))
+
                             rows.append(row)
+                            ptm_str = f", rust={ptm.group(1)}ms" if ptm else ""
                             if rep == 0:
-                                print(f"    Service rep 0: {latency_ms:.1f} ms, "
-                                      f"success={response.success}")
+                                print(f"    Service rep 0: {latency_ms:.1f} ms"
+                                      f"{ptm_str}, success={response.success}")
                         except Exception as e:
                             rows.append({
                                 "object": obj_name,
@@ -364,6 +379,7 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
     if rows:
         fieldnames = [
             "object", "repetition", "method", "total_latency_ms",
+            "pipeline_time_ms", "ros_overhead_ms", "smc_iterations",
             "grasp_type", "n_cloud_points", "status",
         ]
         with open(out_path, "w", newline="") as f:

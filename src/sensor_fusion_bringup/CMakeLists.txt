@@ -13,4 +13,10 @@ install(
   DESTINATION share/${PROJECT_NAME}/config
 )
 
+install(
+  DIRECTORY scripts/
+  DESTINATION share/${PROJECT_NAME}/scripts
+  USE_SOURCE_PERMISSIONS
+)
+
 ament_package()

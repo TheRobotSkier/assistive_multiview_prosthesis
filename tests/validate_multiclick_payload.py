@@ -19,7 +19,6 @@ import math
 
 # Add source paths
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'twist_propagation', 'twist_propagation'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'segmentation', 'segmentation_bridge'))
 
 import numpy as np
 
