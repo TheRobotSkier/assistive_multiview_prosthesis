@@ -1,0 +1,31 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_marker_pose_phase2.launch.py
+  s_9d8c134e956688::t_2ab7b6bf739c77 3,25,37-41,43,49,57-84
+docker_ws/multi_cam_localization/sensor_fusion_bringup/CMakeLists.txt
+  s_9d8c134e956688::t_a06b5b89a2e884 12-13,27-37,39
+docker_ws/multi_cam_localization/sensor_fusion_bringup/package.xml
+  s_9d8c134e956688::t_1e95356b82ea60 20
+  s_9d8c134e956688::t_e5a3289f991963 19
+docker_ws/multi_cam_localization/sensor_fusion_bringup/src/aruco_marker_pose_node.cpp
+  s_9d8c134e956688::t_3082ce495179da 663-674,677,679-685
+  s_9d8c134e956688::t_c2dc66ca95b063 1-242,244-662,675-676,678,686-718,720-759
+  s_9d8c134e956688::t_6c5d0172bcb0eb 719
+  s_9d8c134e956688::t_41f059999ec043 243
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_marker_pose_phase2.launch.py
+  s_9d8c134e956688::t_7593b58ae5ddd8 3,25,37-41,43,49,57-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "daa19d8d9ce9359c6203379b0fae91d78a77b07c",
+  "prompts": {},
+  "sessions": {
+    "s_9d8c134e956688": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a59962eaffe8ftE5fD4Dh3euJ",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
