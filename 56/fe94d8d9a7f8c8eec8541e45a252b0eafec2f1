@@ -1,0 +1,27 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/CMakeLists.txt
+  s_ebfeaf38393738::t_088241654c7eb3 59
+docker_ws/src/open_vins/ov_msckf/cmake/ROS2.cmake
+  s_ebfeaf38393738::t_45b9cff448bbb4 127-132
+docker_ws/src/open_vins/ov_msckf/src/test_marker_pose_updater.cpp
+  s_ebfeaf38393738::t_353d9d9dabb4ff 1-237
+docker_ws/multi_cam_localization/sensor_fusion_bringup/test/test_openvins_profiles.py
+  s_ebfeaf38393738::t_dace859ad48811 1-197
+docker_ws/src/open_vins/ov_msckf/src/update/UpdaterMarkerPose.h
+  s_ebfeaf38393738::t_c6980f3fdc5bac 107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "56fe94d8d9a7f8c8eec8541e45a252b0eafec2f1",
+  "prompts": {},
+  "sessions": {
+    "s_ebfeaf38393738": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5a30257ffe4ACl3JKI7Ff1Te",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
