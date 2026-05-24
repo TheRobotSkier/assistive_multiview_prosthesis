@@ -21,7 +21,7 @@ from pathlib import Path
 
 import numpy as np
 from emg_bridge.board_reader import BoardReader
-from emg_bridge.classifier import PredictionSmoother, predict
+from emg_bridge.classifier import PredictionSmoother
 from emg_bridge.config import (
     CONFIDENCE_THRESHOLD,
     GESTURE_NAMES,
@@ -30,11 +30,12 @@ from emg_bridge.config import (
     WINDOW_LEN,
     WINDOW_STEP,
 )
+from emg_bridge.control_filters import ProportionalLimiter
 from emg_bridge.experiment_config import ExperimentConfig, load_config
-from emg_bridge.features import compute_features
+from emg_bridge.gesture_stabilizer import GestureStabilizer
 from emg_bridge.preprocessing import OnlineFilter, RingBuffer
+from emg_bridge.sklearn_backends import SklearnEmgBackend, SklearnImuBackend
 
-from emg_bridge import classifier as clf_mod
 from emg_bridge import proportional as prop_mod
 
 # ── Optional ROS 2 bridge ──────────────────────────────────────────────────────
@@ -196,11 +197,6 @@ def main() -> None:
             )
         )
         sys.exit(1)
-    try:
-        pipe = clf_mod.load(args.model_dir)
-    except Exception as e:
-        print(_red(f"Failed to load classifier from {args.model_dir}: {e}"))
-        sys.exit(1)
 
     calibration = prop_mod.load(args.model_dir)
     if calibration is None:
@@ -209,7 +205,6 @@ def main() -> None:
         )
 
     gesture_names = GESTURE_NAMES
-    print(_green("Models loaded.\n"))
 
     # ── Load experiment config ─────────────────────────────────────────────────
     experiment = ExperimentConfig()  # defaults (all experiments off)
@@ -220,6 +215,30 @@ def main() -> None:
             print(_yellow(f"Experiment config not found: {args.config} — using defaults."))
         except ValueError as exc:
             print(_yellow(f"Invalid experiment config: {exc} — using defaults."))
+
+    # ── Select gesture backend ─────────────────────────────────────────────────
+    if experiment.classifier_backend == "sklearn":
+        backend = SklearnEmgBackend(experiment)
+    elif experiment.classifier_backend == "sklearn_imu":
+        backend = SklearnImuBackend(experiment)
+    elif experiment.classifier_backend == "naviflame":
+        try:
+            from emg_bridge.naviflame_backend import NaviFlameBackend
+            backend = NaviFlameBackend(experiment)
+        except ImportError as exc:
+            print(_red(f"NaviFlame backend unavailable: {exc}"))
+            print(_yellow("Falling back to sklearn EMG-only backend."))
+            backend = SklearnEmgBackend(experiment)
+    else:
+        print(_yellow(f"Unknown backend '{experiment.classifier_backend}' — using sklearn."))
+        backend = SklearnEmgBackend(experiment)
+
+    backend.start(args.model_dir, threshold=args.threshold)
+
+    # ── Create stabilizer and limiter from config ──────────────────────────────
+    stabilizer = GestureStabilizer(experiment.gesture_stability)
+    limiter = ProportionalLimiter(experiment.proportional_slew)
+
     if experiment.classifier_backend != "sklearn":
         label_lut: dict[str, str] = {"sklearn_imu": "sklearn + IMU", "naviflame": "NaviFlame"}
         backend_display = label_lut.get(experiment.classifier_backend, experiment.classifier_backend)
@@ -247,12 +266,22 @@ def main() -> None:
     # ── Inference loop ────────────────────────────────────────────────────────
     filt = OnlineFilter(N_CHANNELS)
     ring = RingBuffer(WINDOW_LEN, N_CHANNELS)
-    smoother = PredictionSmoother(args.smooth)
+    use_old_smoother = not experiment.gesture_stability.enabled
+    smoother = PredictionSmoother(args.smooth) if use_old_smoother else None
+
+    # Check if backend needs IMU data
+    needs_imu = experiment.classifier_backend == "sklearn_imu" or (
+        experiment.classifier_backend == "naviflame" and experiment.naviflame.enabled
+    )
 
     # Boot the ring buffer: wait until we have at least one full window
     print(_cyan("Filling buffer …"))
     while not ring.is_full():
-        chunk = reader.read(WINDOW_STEP)
+        if needs_imu:
+            frame = reader.read_frame(WINDOW_STEP)
+            chunk = frame["emg"]
+        else:
+            chunk = reader.read(WINDOW_STEP)
         filtered = filt.process(chunk)
         ring.push(filtered)
     print(_green("Ready.\n"))
@@ -267,25 +296,45 @@ def main() -> None:
     try:
         while True:
             # Read next step of samples
-            chunk = reader.read(WINDOW_STEP)
+            now = time.monotonic()
+            dt = now - last_time
+            last_time = now
+
+            if needs_imu:
+                frame = reader.read_frame(WINDOW_STEP)
+                chunk = frame["emg"]
+                gyro = frame.get("gyro") if frame.get("gyro") is not None else None
+                accel = frame.get("accel") if frame.get("accel") is not None else None
+            else:
+                chunk = reader.read(WINDOW_STEP)
+                gyro = None
+                accel = None
+
             filtered = filt.process(chunk)
             ring.push(filtered)
 
             if not ring.is_full():
                 continue
 
-            # Extract features
+            # Extract features and classify
             window = ring.get_window().T  # (N_channels, WINDOW_LEN)
-            features = compute_features(window)
+            label, confidence, probs, _debug = backend.predict(window, gyro, accel)
 
-            # Classify
-            label, confidence, probs = predict(pipe, features, threshold=args.threshold)
-            smoothed_label = smoother.update(label)
+            # Stabilize gesture (or use old smoother)
+            if use_old_smoother:
+                smoothed_label = smoother.update(label)  # type: ignore[union-attr]
+            else:
+                result = stabilizer.update(label, confidence, probs, dt)
+                smoothed_label = result["label"]
 
             # Proportional control
-            prop_val = prop_mod.compute_proportional(
+            raw_prop = prop_mod.compute_proportional(
                 window, smoothed_label, calibration
             )
+            if experiment.proportional_slew.enabled:
+                prop_val = limiter.step(raw_prop, dt, smoothed_label)
+            else:
+                prop_val = raw_prop
 
             mode_name = "moving"
 
@@ -299,9 +348,7 @@ def main() -> None:
                     mode_name = _ros_state.mode
 
             # FPS estimate
-            now = time.monotonic()
-            fps_history.append(1.0 / max(now - last_time, 1e-6))
-            last_time = now
+            fps_history.append(1.0 / max(dt, 1e-6))
             fps = float(np.mean(fps_history))
 
             frame_count += 1
