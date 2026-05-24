@@ -1,0 +1,29 @@
+src/emg_bridge/test_emg_adapter.py
+  s_0e42536529f77c::t_57b5d1692d1a20 65,67-69
+  s_0e42536529f77c::t_cb47f5e74d97e6 98,100-106
+  s_0e42536529f77c::t_b00614f05b749e 1-64,66,70-83,86-97,99,107-150,152-202,204-206,210-267
+  s_0e42536529f77c::t_ed90d0afa8ec34 84-85
+  s_0e42536529f77c::t_d11c4159604fb4 151
+  s_0e42536529f77c::t_ac3aee138d42ab 203,207-209
+src/emg_bridge/emg_grasp_adapter.py
+  s_0e42536529f77c::t_7111f0a69a7fa1 1-241,244-249,251-252
+  s_0e42536529f77c::t_671ad623af6e1c 242-243,250
+config/emg_live.yaml
+  s_0e42536529f77c::t_2d2a50694268d5 6-26
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "4090051a52118c07410e5cd9f65938c33736325a",
+  "prompts": {},
+  "sessions": {
+    "s_0e42536529f77c": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3ddcee3ffe6rOBSRXOW776J9",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
