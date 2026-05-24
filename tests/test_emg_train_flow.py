@@ -64,3 +64,21 @@ def test_makefile_waits_for_enter_before_auto_launch() -> None:
     assert "read -r dummy" in target_body
     assert "$(MAKE) up-grasp-test" in target_body
     assert "--profile grasp_test up -d grasp_test" in makefile_text
+
+
+def test_makefile_has_emg_only_train_target() -> None:
+    makefile_text = (REPO_ROOT / "Makefile").read_text()
+    target_start = makefile_text.index("up-emg-test-train:")
+    target_end = makefile_text.index("print-force:", target_start)
+    target_body = makefile_text[target_start:target_end]
+
+    assert "EMG_POST_TRAIN_MODE=classifier" in target_body
+    assert "$(DOCKER_CMD) run --rm -it --name emg_test_train" in target_body
+    assert "$(MAKE) up-grasp-test" not in target_body
+
+
+def test_emg_train_script_can_continue_into_classifier_mode() -> None:
+    script_text = (REPO_ROOT / "scripts" / "emg_train_and_test.sh").read_text()
+
+    assert 'EMG_POST_TRAIN_MODE="${EMG_POST_TRAIN_MODE:-grasp-test}"' in script_text
+    assert 'ros2 run emg_bridge run_classifier \\' in script_text

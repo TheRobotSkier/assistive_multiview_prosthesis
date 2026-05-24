@@ -15,6 +15,7 @@
 # Tuning knobs (set as env vars or via make variables):
 #   EMG_REPS      Number of recording repetitions per gesture  (default: 3)
 #   EMG_DURATION  Recording duration per rep in seconds        (default: 5)
+#   EMG_POST_TRAIN_MODE  grasp-test | classifier                (default: grasp-test)
 #
 # Example (more reps, longer recordings):
 #   make up-grasp-test-train EMG_REPS=5 EMG_DURATION=7
@@ -28,6 +29,7 @@ MODEL_DIR=/prosthesis_ws/models
 # Tunable defaults — overridden by env vars injected from the Makefile
 EMG_REPS="${EMG_REPS:-3}"
 EMG_DURATION="${EMG_DURATION:-5}"
+EMG_POST_TRAIN_MODE="${EMG_POST_TRAIN_MODE:-grasp-test}"
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -113,14 +115,25 @@ ros2 run emg_bridge train \
 
 ok "Classifier and proportional calibration saved to ${MODEL_DIR}."
 
-# ── Phase 3: live EMG grasp test ──────────────────────────────────────────────
+# ── Phase 3: post-training live inference ─────────────────────────────────────
+if [ "$EMG_POST_TRAIN_MODE" = "classifier" ]; then
+    banner \
+        "Phase 3 — Live EMG Classifier" \
+        "Starting terminal-only inference without hand or wrist control."
+
+    ok "Training complete. Models saved to ${MODEL_DIR}"
+    info "Launching live classifier output in the terminal..."
+    ros2 run emg_bridge run_classifier \
+        --model-dir "$MODEL_DIR"
+    exit 0
+fi
+
 banner \
     "Phase 3 — Live EMG Grasp Test" \
     "Waiting for ENTER before host launches it."
 
 # The train script (phases 1 & 2) and the live grasp test (phase 3) run in
-# different container lifecycles.  We exit here so the Makefile can hand off
-# to `make up-grasp-test`, which uses the exact same compose service that is
-# known to work.
+# different container lifecycles. We exit here so the Makefile can hand off
+# to `make up-grasp-test`, which uses the exact same runtime path.
 ok "Training complete. Models saved to ${MODEL_DIR}"
 info "Return to the host terminal, review the prompt, and press ENTER to launch the live grasp test."
