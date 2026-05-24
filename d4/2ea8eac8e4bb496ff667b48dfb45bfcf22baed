@@ -1,0 +1,26 @@
+src/prosthesis_launch/launch/emg_grasp_test.launch.py
+  s_106a05ded949ca::t_cb8bffe689cb35 108
+  s_106a05ded949ca::t_464fe1f1cba0b5 69
+  s_106a05ded949ca::t_3933d25cd83521 45-49,55
+Makefile
+  s_106a05ded949ca::t_f6f2f4aa3872b5 57
+  s_106a05ded949ca::t_151dd44a4681ca 507-554
+scripts/emg_grasp_test.sh
+  s_106a05ded949ca::t_5e9db01f076cf7 1-208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "d42ea8eac8e4bb496ff667b48dfb45bfcf22baed",
+  "prompts": {},
+  "sessions": {
+    "s_106a05ded949ca": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3bd874effeS5u4sx31fBXUyF",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
