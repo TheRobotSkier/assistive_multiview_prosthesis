@@ -6,18 +6,78 @@
 #include <vector>
 
 #include <pcl/common/transforms.h>
+#include <pcl/conversions.h>
 #include <pcl/features/fpfh.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/filters/voxel_grid.h>
+#include <pcl/PCLPointCloud2.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/ia_ransac.h>
 #include <pcl/search/kdtree.h>
-#include <pcl_conversions/pcl_conversions.h>
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/string.hpp>
+
+namespace {
+
+void rosToPCL(const sensor_msgs::msg::PointCloud2 &ros_msg, pcl::PCLPointCloud2 &pcl_msg) {
+  pcl_msg.header.seq = ros_msg.header.stamp.sec;
+  pcl_msg.header.stamp = static_cast<uint64_t>(ros_msg.header.stamp.sec) * 1000000ULL +
+                         static_cast<uint64_t>(ros_msg.header.stamp.nanosec) / 1000ULL;
+  pcl_msg.header.frame_id = ros_msg.header.frame_id;
+  pcl_msg.height = ros_msg.height;
+  pcl_msg.width = ros_msg.width;
+  pcl_msg.fields.resize(ros_msg.fields.size());
+  for (std::size_t i = 0; i < ros_msg.fields.size(); ++i) {
+    pcl_msg.fields[i].name = ros_msg.fields[i].name;
+    pcl_msg.fields[i].offset = ros_msg.fields[i].offset;
+    pcl_msg.fields[i].datatype = ros_msg.fields[i].datatype;
+    pcl_msg.fields[i].count = ros_msg.fields[i].count;
+  }
+  pcl_msg.is_bigendian = ros_msg.is_bigendian;
+  pcl_msg.point_step = ros_msg.point_step;
+  pcl_msg.row_step = ros_msg.row_step;
+  pcl_msg.is_dense = static_cast<bool>(ros_msg.is_dense);
+  pcl_msg.data = ros_msg.data;
+}
+
+void pclToROS(const pcl::PCLPointCloud2 &pcl_msg, sensor_msgs::msg::PointCloud2 &ros_msg) {
+  ros_msg.header.stamp.sec = static_cast<int32_t>(pcl_msg.header.stamp / 1000000ULL);
+  ros_msg.header.stamp.nanosec = static_cast<uint32_t>((pcl_msg.header.stamp % 1000000ULL) * 1000ULL);
+  ros_msg.header.frame_id = pcl_msg.header.frame_id;
+  ros_msg.height = pcl_msg.height;
+  ros_msg.width = pcl_msg.width;
+  ros_msg.fields.resize(pcl_msg.fields.size());
+  for (std::size_t i = 0; i < pcl_msg.fields.size(); ++i) {
+    ros_msg.fields[i].name = pcl_msg.fields[i].name;
+    ros_msg.fields[i].offset = pcl_msg.fields[i].offset;
+    ros_msg.fields[i].datatype = pcl_msg.fields[i].datatype;
+    ros_msg.fields[i].count = pcl_msg.fields[i].count;
+  }
+  ros_msg.is_bigendian = pcl_msg.is_bigendian;
+  ros_msg.point_step = pcl_msg.point_step;
+  ros_msg.row_step = pcl_msg.row_step;
+  ros_msg.is_dense = pcl_msg.is_dense;
+  ros_msg.data = pcl_msg.data;
+}
+
+template<typename PointT>
+void fromROSMsg(const sensor_msgs::msg::PointCloud2 &ros_msg, pcl::PointCloud<PointT> &cloud) {
+  pcl::PCLPointCloud2 pcl_msg;
+  rosToPCL(ros_msg, pcl_msg);
+  pcl::fromPCLPointCloud2(pcl_msg, cloud);
+}
+
+template<typename PointT>
+void toROSMsg(const pcl::PointCloud<PointT> &cloud, sensor_msgs::msg::PointCloud2 &ros_msg) {
+  pcl::PCLPointCloud2 pcl_msg;
+  pcl::toPCLPointCloud2(cloud, pcl_msg);
+  pclToROS(pcl_msg, ros_msg);
+}
+
+} // namespace
 
 class RansacPointCloudFusionNode : public rclcpp::Node {
 public:
@@ -88,8 +148,8 @@ private:
     // Convert to PCL
     pcl::PointCloud<pcl::PointXYZ>::Ptr head_cloud(new pcl::PointCloud<pcl::PointXYZ>());
     pcl::PointCloud<pcl::PointXYZ>::Ptr arm_cloud(new pcl::PointCloud<pcl::PointXYZ>());
-    pcl::fromROSMsg(latest_head_, *head_cloud);
-    pcl::fromROSMsg(latest_arm_, *arm_cloud);
+    fromROSMsg(latest_head_, *head_cloud);
+    fromROSMsg(latest_arm_, *arm_cloud);
 
     if (head_cloud->empty() || arm_cloud->empty()) {
       return;
@@ -248,9 +308,9 @@ private:
 
       // Preserve color from head cloud if available (use nearest-neighbor)
       // For now just use XYZ
-      pcl::toROSMsg(*dedup, output);
+      toROSMsg(*dedup, output);
     } else {
-      pcl::toROSMsg(merged, output);
+      toROSMsg(merged, output);
     }
 
     output.header.stamp = get_clock()->now();
