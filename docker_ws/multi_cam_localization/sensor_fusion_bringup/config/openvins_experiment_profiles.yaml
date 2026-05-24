@@ -90,9 +90,14 @@ profiles:
       marker_chi2_gate: 22.46
 
   zupt:
+    # ZUPT may reduce drift during stationary intervals but can over-constrain
+    # or freeze behavior during motion. For bench tests only.
     description: >
-      Placeholder for zero-velocity update experiments.
-      No overrides yet — add keys here when the ZUPT bead lands.
+      Zero-velocity updates enabled with conservative thresholds
+      (max_velocity=0.05 m/s, noise_multiplier=10.0).
+      Uses separate estimator config files to keep baseline unchanged.
+    head_config: "head_d435i_336222071386/estimator_config_zupt.yaml"
+    arm_config: "arm_d435i_310622071850/estimator_config_zupt.yaml"
 
   imu_frame_variant:
     description: >
