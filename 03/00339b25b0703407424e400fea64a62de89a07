@@ -1,0 +1,25 @@
+scripts/run_ransac_fusion.sh
+  s_14430be63187a9::t_f4a3b99ca09339 1-125
+docker_ws/docker-deployment/ransac_fusion/docker-compose.yml
+  s_14430be63187a9::t_b6db7988305d2c 1-2,6,13,16,19,22,40-42,44-47,49-51,54-56,58,71
+  s_14430be63187a9::t_a9b0e38e2952bd 3-5,7-12,14-15,17-18,20-21,23-39,43,48,52-53,57,59-70
+docker_ws/docker-deployment/ransac_fusion/Dockerfile
+  s_14430be63187a9::t_c38dd6c63f109c 1-2,6-9,15-22,24-25,27,29-31,33,35-38,40
+  s_14430be63187a9::t_9971126e85fd5e 3-5,10-14,23,26,28,32,34,39,41-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "0300339b25b0703407424e400fea64a62de89a07",
+  "prompts": {},
+  "sessions": {
+    "s_14430be63187a9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5c0128cffe1r7WEnoiYrSuMC",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
