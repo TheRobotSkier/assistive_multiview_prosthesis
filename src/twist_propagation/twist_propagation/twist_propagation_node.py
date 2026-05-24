@@ -713,6 +713,15 @@ class TwistPropagationNode(Node):
         self._hit_time_pub = self.create_publisher(
             Float64, "/grasp_preshaping/hit_time", 10)
 
+        # Contact-state override for grasp preshaping: published immediately
+        # when a hit is detected so the preshaping bridge can use the
+        # predicted contact position (instead of the live hand pose) as
+        # the planner input.  Zero twist => stationary assumption.
+        self._contact_pose_pub = self.create_publisher(
+            PoseStamped, "/grasp_preshaping/contact_pose", 10)
+        self._contact_twist_pub = self.create_publisher(
+            TwistStamped, "/grasp_preshaping/contact_twist", 10)
+
         # ── Service servers ────────────────────────────────────────────────
         self.create_service(
             Trigger,
@@ -1282,6 +1291,50 @@ class TwistPropagationNode(Node):
         ma.markers.append(m)
         self._hit_marker_pub.publish(ma)
 
+    def _publish_contact_state(
+        self, hit_x: float, hit_y: float, hit_z: float
+    ):
+        """Publish the predicted contact pose and zero twist for preshaping.
+
+        Called immediately when a valid hit is detected, *before* the click
+        cluster is published.  The preshaping bridge caches these values and
+        uses them instead of the live hand pose when the Trigger service is
+        called (after segmentation completes).
+
+        The position is the predicted contact point; the orientation is taken
+        from the most recent hand tracking pose.  The twist is all-zeros,
+        enforcing the stationary-at-contact assumption.
+        """
+        now = self.get_clock().now().to_msg()
+
+        # Orientation from the latest hand pose (fallback to identity).
+        qx, qy, qz, qw = 0.0, 0.0, 0.0, 1.0
+        if self._pose_buf:
+            _, _, _, _, qx, qy, qz, qw, _ = self._pose_buf[-1]
+
+        contact_pose = PoseStamped()
+        contact_pose.header.stamp = now
+        contact_pose.header.frame_id = self._cloud_frame
+        contact_pose.pose.position.x = hit_x
+        contact_pose.pose.position.y = hit_y
+        contact_pose.pose.position.z = hit_z
+        contact_pose.pose.orientation.x = qx
+        contact_pose.pose.orientation.y = qy
+        contact_pose.pose.orientation.z = qz
+        contact_pose.pose.orientation.w = qw
+        self._contact_pose_pub.publish(contact_pose)
+
+        contact_twist = TwistStamped()
+        contact_twist.header.stamp = now
+        contact_twist.header.frame_id = self._cloud_frame
+        # All velocities zero — stationary at contact.
+        self._contact_twist_pub.publish(contact_twist)
+
+        self.get_logger().info(
+            f"Published contact state: pos=({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f})"
+            f" orient=({qx:.3f}, {qy:.3f}, {qz:.3f}, {qw:.3f}) zero_twist"
+        )
+
     def _publish_trajectory_line(
         self, positions: list[tuple[float, float, float]], hit_found: bool
     ):
@@ -1642,6 +1695,11 @@ class TwistPropagationNode(Node):
 
                 # Publish hit marker
                 self._publish_hit_marker(hit_x, hit_y, hit_z)
+
+                # Publish contact-state override for the preshaping bridge.
+                # Must come BEFORE the click cluster so the bridge caches
+                # the contact pose before segmentation even starts.
+                self._publish_contact_state(hit_x, hit_y, hit_z)
 
                 # Publish click cluster (original hit + synthetic clicks)
                 rng = np.random.default_rng(self._click_random_seed)

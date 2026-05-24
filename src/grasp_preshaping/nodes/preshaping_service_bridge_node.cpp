@@ -137,6 +137,31 @@ public:
         has_hit_time_ = true;
       });
 
+    // Contact-state override from twist propagation node.
+    // Provides the predicted contact position + zero twist so the
+    // planner starts from the object instead of the live hand pose.
+    const std::string contact_pose_topic =
+      declare_parameter<std::string>("contact_pose_topic", "/grasp_preshaping/contact_pose");
+    const std::string contact_twist_topic =
+      declare_parameter<std::string>("contact_twist_topic", "/grasp_preshaping/contact_twist");
+
+    contact_pose_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
+      contact_pose_topic, 10,
+      [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(input_mutex_);
+        latest_contact_pose_ = *msg;
+        has_contact_pose_ = true;
+        contact_pose_received_time_ = this->now();
+      });
+
+    contact_twist_sub_ = create_subscription<geometry_msgs::msg::TwistStamped>(
+      contact_twist_topic, 10,
+      [this](const geometry_msgs::msg::TwistStamped::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(input_mutex_);
+        latest_contact_twist_ = *msg;
+        has_contact_twist_ = true;
+      });
+
     thumb_cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
       thumb_cmd_topic, 10);
     index_cmd_pub_ = create_publisher<std_msgs::msg::Float64MultiArray>(
@@ -255,6 +280,7 @@ private:
     geometry_msgs::msg::PoseStamped pose;
     geometry_msgs::msg::TwistStamped twist;
     sensor_msgs::msg::PointCloud2 cloud;
+    bool used_contact_override = false;
     {
       std::lock_guard<std::mutex> lock(input_mutex_);
       if (!has_pose_) {
@@ -289,6 +315,24 @@ private:
       pose = latest_pose_;
       twist = latest_twist_;
       cloud = latest_cloud_;
+
+      // Prefer contact-state override when available and fresh (<2 s old).
+      // Published by twist propagation immediately at hit detection.
+      used_contact_override =
+        has_contact_pose_ && has_contact_twist_ &&
+        (this->now() - contact_pose_received_time_) < rclcpp::Duration(2, 0);
+      if (used_contact_override) {
+        pose = latest_contact_pose_;
+        twist = latest_contact_twist_;
+      }
+    }
+
+    if (used_contact_override) {
+      RCLCPP_INFO(
+        get_logger(),
+        "Planner called with contact override: target=(%.3f,%.3f,%.3f)"
+        " zero_twist=true",
+        pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
     }
 
     GraspComputeRequestFFI request{};
@@ -553,6 +597,16 @@ private:
   bool has_hit_time_ = false;
   double latest_hit_time_ = -1.0;
 
+  // Contact-state override from twist propagation node.
+  // When a hit is detected, twist propagation publishes the predicted
+  // contact position + zero twist on dedicated topics.  The bridge
+  // prefers these over the live hand pose when they are fresh.
+  bool has_contact_pose_ = false;
+  geometry_msgs::msg::PoseStamped latest_contact_pose_;
+  bool has_contact_twist_ = false;
+  geometry_msgs::msg::TwistStamped latest_contact_twist_;
+  rclcpp::Time contact_pose_received_time_{0, 0, RCL_ROS_TIME};
+
   void * rust_lib_handle_;
   GraspComputeFn rust_compute_fn_;
   GraspApiVersionFn rust_api_version_fn_;
@@ -569,6 +623,10 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr hand_twist_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr cloud_sub_;
   rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr hit_time_sub_;
+
+  // Contact-state override subscriptions (from twist propagation).
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr contact_pose_sub_;
+  rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr contact_twist_sub_;
 
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr thumb_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr index_cmd_pub_;

@@ -35,6 +35,10 @@ from interactive_adaptation.interactive_adaptation import InteractiveSegmentatio
 WEIGHTS_PATH = os.environ.get("WEIGHTS_PATH", "/weights/weights_exp14_14.pth")
 PORT = int(os.environ.get("INFERENCE_SERVER_PORT", "5678"))
 
+# Safety limit: reject clouds larger than this to prevent CUDA OOM on small GPUs.
+# RTX 3050 (4 GB) struggles above ~50k points with MinkowskiEngine.
+MAX_POINTS = int(os.environ.get("INFERENCE_MAX_POINTS", "50000"))
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"[inference_server] Detected device: {device}", flush=True)
 
@@ -52,12 +56,24 @@ except Exception as e:
 
 _cuda_version = torch.version.cuda if torch.version.cuda else None
 
+def _gpu_memory_info() -> dict:
+    """Return GPU memory stats if CUDA is available, else empty dict."""
+    if not torch.cuda.is_available():
+        return {}
+    return {
+        "gpu_memory_allocated_mb": round(torch.cuda.memory_allocated() / 1e6, 1),
+        "gpu_memory_reserved_mb": round(torch.cuda.memory_reserved() / 1e6, 1),
+        "gpu_memory_total_mb": round(torch.cuda.get_device_properties(0).total_mem / 1e6, 1),
+    }
+
+
 diagnostics = {
     "device": str(device),
     "torch_cuda_available": torch.cuda.is_available(),
     "torch_cuda_version": _cuda_version,
     "minkowski_engine_version": me_version,
     "minkowski_engine_cuda": me_cuda_available,
+    **_gpu_memory_info(),
 }
 
 print(f"[inference_server] Diagnostics: {json.dumps(diagnostics)}", flush=True)
@@ -100,7 +116,9 @@ def health():
     return jsonify({
         "status": "ok" if _model_ready else "model_not_loaded",
         "model_ready": _model_ready,
+        "max_points": MAX_POINTS,
         **diagnostics,
+        **_gpu_memory_info(),
     })
 
 
@@ -111,8 +129,21 @@ def segment():
     xyz = _decode(data["xyz"], np.float32).reshape(-1, 3)   # (N, 3)
     n = xyz.shape[0]
 
+    if n > MAX_POINTS:
+        print(f"[inference_server] Cloud too large ({n} points > {MAX_POINTS}) "
+              f"— truncating to {MAX_POINTS}", flush=True)
+        indices = np.random.choice(n, MAX_POINTS, replace=False)
+        indices.sort()  # preserve spatial locality
+        xyz = xyz[indices]
+        n = MAX_POINTS
+        truncated = True
+    else:
+        indices = None
+        truncated = False
+
     if data.get("rgb"):
-        rgb = _decode(data["rgb"], np.float32).reshape(-1, 3)
+        rgb_full = _decode(data["rgb"], np.float32).reshape(-1, 3)
+        rgb = rgb_full[indices] if truncated else rgb_full
     else:
         rgb = np.zeros((n, 3), dtype=np.float32)
 
@@ -155,7 +186,16 @@ def segment():
     pred[neg_mask > 0.5] = 0
 
     mask = pred.numpy().astype(np.int32).tolist()
-    return jsonify({"mask": mask})
+
+    # If cloud was truncated, expand mask back to original size
+    # (non-sampled points default to background=0)
+    if truncated and indices is not None:
+        full_mask = [0] * len(data["xyz"])  # original size
+        for i, idx in enumerate(indices):
+            full_mask[idx] = mask[i]
+        mask = full_mask
+
+    return jsonify({"mask": mask, "truncated": truncated})
 
 
 if __name__ == "__main__":
