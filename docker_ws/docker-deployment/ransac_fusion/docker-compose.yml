@@ -1,0 +1,71 @@
+# RANSAC point cloud fusion — drop-in container
+#
+# Subscribes to the two existing marker_map point clouds (already transformed
+# by pointcloud_to_frame_node instances) and publishes a single fused +
+# deduplicated cloud.  Uses PCL FPFH + SAC-IA for RANSAC alignment.
+#
+# No image build required — uses the existing prosthesis:latest image
+# and mounts the overlay read-only.
+#
+# ── Usage (on Jetson) ─────────────────────────────────────────────────────────
+#
+#   # Start
+#   docker compose -f docker-deployment/ransac_fusion/docker-compose.yml up -d
+#
+#   # Logs
+#   docker compose -f docker-deployment/ransac_fusion/docker-compose.yml logs -f
+#
+#   # Stop
+#   docker compose -f docker-deployment/ransac_fusion/docker-compose.yml down
+#
+# ── Customisation ─────────────────────────────────────────────────────────────
+#
+#   All params are environment variables (see environment: below).
+#   Override on the command line or in a .env file:
+#
+#     RANSAC_HEAD_TOPIC=/head/d435i_head/points_marker_map \
+#     RANSAC_ARM_TOPIC=/arm/d435i_arm/points_marker_map \
+#     RANSAC_OUTPUT_TOPIC=/pointcloud_fused_ransac \
+#     RANSAC_MIN_CORRESPONDENCES=12 \
+#     docker compose -f docker-deployment/ransac_fusion/docker-compose.yml up -d
+#
+# ── Integration ───────────────────────────────────────────────────────────────
+#
+#   This container uses host networking so it automatically discovers ROS2
+#   topics published by other containers on the same machine.
+#
+#   To disable the old separate point cloud outputs and use only the
+#   fused output, remove (or set condition=false on) the
+#   pointcloud_to_frame_node entries in the head/arm launch files.
+
+services:
+  ransac_fusion:
+    image: prosthesis:latest
+    container_name: ransac_fusion
+    network_mode: host
+    ipc: host
+    runtime: nvidia
+    restart: unless-stopped
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      RMW_IMPLEMENTATION: rmw_cyclonedds_cpp
+    volumes:
+      - ${OVERLAY_DIR:-/home/robotlab/openvins_overlay/install_overlay}:/overlay:ro
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        source /overlay/setup.bash 2>/dev/null || true &&
+        exec ransac_pointcloud_fusion_node --ros-args
+          -p head_cloud_topic:=${RANSAC_HEAD_TOPIC:-/head/d435i_head/points_marker_map}
+          -p arm_cloud_topic:=${RANSAC_ARM_TOPIC:-/arm/d435i_arm/points_marker_map}
+          -p output_topic:=${RANSAC_OUTPUT_TOPIC:-/pointcloud_fused_ransac}
+          -p ransac_min_correspondences:=${RANSAC_MIN_CORRESPONDENCES:-8}
+          -p max_rate_hz:=${RANSAC_MAX_RATE_HZ:-10.0}
+          -p downsample_leaf_m:=${RANSAC_DOWNSAMPLE_LEAF_M:-0.02}
+          -p fuse_voxel_leaf_m:=${RANSAC_FUSE_VOXEL_LEAF_M:-0.01}
+          -p normal_radius_m:=${RANSAC_NORMAL_RADIUS_M:-0.05}
+          -p feature_radius_m:=${RANSAC_FEATURE_RADIUS_M:-0.10}
+          -p max_cloud_age_s:=${RANSAC_MAX_CLOUD_AGE_S:-1.0}
+          -p ransac_max_iterations:=${RANSAC_MAX_ITERATIONS:-2000}
+          -p ransac_max_correspondence_dist_m:=${RANSAC_MAX_CORR_DIST_M:-0.05}
+      "
