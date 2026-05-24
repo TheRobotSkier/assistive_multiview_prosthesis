@@ -324,8 +324,7 @@ def main() -> None:
             if use_old_smoother:
                 smoothed_label = smoother.update(label)  # type: ignore[union-attr]
             else:
-                result = stabilizer.update(label, confidence, probs, dt)
-                smoothed_label = result["label"]
+                smoothed_label, _debug_info = stabilizer.update(label, confidence, probs, dt)
 
             # Proportional control
             raw_prop = prop_mod.compute_proportional(

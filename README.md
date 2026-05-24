@@ -261,7 +261,7 @@ Edit `config/prosthesis_config.yaml` — topic names, thresholds, and state mach
 
 ## EMG Gesture Pipeline
 
-The MindRove EMG classifier supports 5 gestures: REST, POWER, PINCH, OPEN, POINT.
+The MindRove EMG classifier supports 5 gestures: REST, POWER, OPEN, FLEXION, EXTENSION.
 
 ```bash
 # Inside the container — record training data
@@ -288,8 +288,8 @@ The pipeline manager supports live reloading of EMG thresholds and gesture mappi
 |-------|------|---------|-------------|
 | `confidence_threshold` | float | 0.55 | Minimum confidence to trigger a grasp gesture from IDLE |
 | `release_confidence_threshold` | float | 0.25 | Minimum confidence to trigger release (more permissive than grasp for safety) |
-| `grasp_gestures` | list[int] | [1, 2, 4] | Which gesture labels count as "grasp" (POWER=1, PINCH=2, POINT=4) |
-| `release_gesture` | int | 3 | Which gesture label triggers release (OPEN=3) |
+| `grasp_gestures` | list[int] | [1] | Which gesture labels count as "grasp" (POWER=1) |
+| `release_gesture` | int | 2 | Which gesture label triggers release (OPEN=2) |
 
 **Safe edit expectations:**
 - Values are validated on reload. Invalid edits (wrong type, out of range [0, 1] for thresholds) are ignored with an ERROR log — previous values are preserved.
@@ -314,6 +314,107 @@ nano config/emg_live.yaml
 # change release_confidence_threshold from 0.25 to 0.15
 # save — pipeline_manager picks it up automatically
 ```
+
+### EMG Experiment Modes
+
+Four experimental features are independently toggleable via `config/emg_experiment_config.yaml`:
+
+| Feature | Config Key | Description |
+|---------|-----------|-------------|
+| IMU-augmented sklearn | `classifier_backend: sklearn_imu` | Adds gyro/accel features to EMG feature vector |
+| NaviFlame deep model | `classifier_backend: naviflame` | Uses official NaviFlame transformer model for gesture, EMG RMS for proportional |
+| Proportional slew limiting | `proportional_slew.enabled: true` | Rate-limits /emg/proportional for smooth hand control |
+| Sticky gesture selection | `gesture_stability.enabled: true` | Confidence hysteresis to prevent transient misclassifications |
+
+All features default to **off** — existing behaviour is preserved when running without `--config`.
+
+#### Config snippets
+
+**1. EMG-only baseline (default — no config needed)**
+
+```bash
+ros2 run emg_bridge run_classifier --model-dir /app/models
+# or in launch file:
+ros2 launch prosthesis_launch pipeline.launch.py
+```
+
+**2. IMU-enhanced sklearn mode**
+
+`config/emg_experiment_config.yaml`:
+```yaml
+classifier_backend: sklearn_imu
+imu_features:
+  enabled: true
+  gyro: true
+  accel: false
+```
+
+Then train with IMU data and run:
+```bash
+ros2 run emg_bridge train --classifier-backend sklearn_imu
+ros2 run emg_bridge run_classifier --config config/emg_experiment_config.yaml
+# With launch file:
+ros2 launch prosthesis_launch pipeline.launch.py emg_config:=config/emg_experiment_config.yaml
+```
+
+**3. NaviFlame gesture backend**
+
+```yaml
+classifier_backend: naviflame
+naviflame:
+  enabled: true
+```
+
+**Important:** NaviFlame requires `tensorflow==2.12.0` and Python <3.11. The ROS Jazzy container uses Python 3.12, so NaviFlame cannot run inside the base ROS container. Either:
+- Run NaviFlame in a **separate podman container** with Python 3.10:
+  ```bash
+  podman build -f docker/Dockerfile.naviflame -t naviflame .
+  podman run --rm --network host naviflame
+  ```
+- Or run `run_classifier` on the **host** Python in a virtualenv with Python 3.10 + tensorflow.
+
+**4. Proportional slew limiter enabled**
+
+```yaml
+proportional_slew:
+  enabled: true
+  max_velocity_per_s: 2.5       # cap rate of change
+  max_accel_per_s2: 10.0        # smooth acceleration
+  max_fall_velocity_per_s: 10.0 # allow fast release
+  reset_on_rest: true
+```
+
+**5. Sticky gesture selection enabled**
+
+```yaml
+gesture_stability:
+  enabled: true
+  min_confidence_to_switch: 0.7
+  min_frames: 5
+  min_hold_s: 0.2
+  release_behavior: allow_rest_immediately  # open/rest always immediate
+  fallback_behavior: hold_previous
+```
+
+#### Launch with experiment config
+
+```bash
+# Direct script:
+python scripts/run_classifier.py --config config/emg_experiment_config.yaml
+
+# ROS 2 run:
+ros2 run emg_bridge run_classifier --ros-args -p config:=config/emg_experiment_config.yaml
+
+# Pipeline launch:
+ros2 launch prosthesis_launch pipeline.launch.py emg_config:=config/emg_experiment_config.yaml
+
+# Grasp test launch:
+ros2 launch prosthesis_launch emg_grasp_test.launch.py emg:=true emg_config:=config/emg_experiment_config.yaml
+```
+
+#### Rollback to baseline
+
+Remove or rename the experiment config file, or set all `enabled` flags to `false`:
 
 ## Twist Propagation
 
