@@ -95,7 +95,8 @@ docker run -d --name ransac_fusion \
     bash -c "
         source /opt/ros/humble/setup.bash && \
         source /overlay/setup.bash 2>/dev/null || true && \
-        exec ransac_pointcloud_fusion_node --ros-args \
+        export LD_LIBRARY_PATH=/overlay/ov_core/lib:/overlay/ov_init/lib:/overlay/ov_msckf/lib:\$LD_LIBRARY_PATH && \
+        exec /overlay/sensor_fusion_bringup/lib/sensor_fusion_bringup/ransac_pointcloud_fusion_node --ros-args \
             -p head_cloud_topic:=$HEAD_TOPIC \
             -p arm_cloud_topic:=$ARM_TOPIC \
             -p output_topic:=$OUTPUT_TOPIC \
