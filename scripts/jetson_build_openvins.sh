@@ -249,6 +249,7 @@ echo ''
 echo 'Ov_msckf build complete!'
 echo '.so: /ws/install_overlay/ov_msckf/lib/libov_msckf_lib.so'
 echo 'Step 4 complete.'
+"
 
 # ── Verify ───────────────────────────────────────────────────────────────────
 echo ""
