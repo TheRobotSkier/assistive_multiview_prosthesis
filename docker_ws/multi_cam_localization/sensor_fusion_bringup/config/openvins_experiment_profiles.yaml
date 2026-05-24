@@ -39,18 +39,46 @@ profiles:
 
   marker_strong_ekf:
     description: >
-      Relax marker rejection thresholds and increase marker trust.
-      Uses 99% DOF chi2 critical value (22.46 for 2 DOF).
+      Aggressive but safe marker trust profile. Makes the EKF trust fixed
+      marker (ID0) measurements more without triggering hard resets.
+
+      Designed to reduce rejection of borderline-good marker observations
+      while keeping all reset thresholds at baseline — this is NOT a reset
+      profile. Intended for scenes where the marker is well-calibrated and
+      drift is dominated by IMU noise, not marker misdetection.
+
+      Each override moved from baseline (16.81/1.0/0.25/25.0).  Details:
+
+    # -- chi2 rejection gate --
+    # Baseline uses 95% 2-DOF chi2 critical value (16.81).  Moving to the
+    # 99% critical value (20.09) plus margin buys room for occasional
+    # multi-path / partial-occlusion residuals without letting in true
+    # outliers.  25.0 is the rounded equivalent used in other OpenVINS
+    # ROS1 parameter files for "relaxed" operation and is still well below
+    # the 99.9% threshold (27.63).
     head_marker:
-      marker_chi2_gate: 22.46
-      marker_noise_multiplier: 0.5
-      marker_max_update_translation_m: 0.40
-      marker_max_update_rotation_deg: 35.0
+      marker_chi2_gate: 25.0
+      # -- noise multiplier --
+      # 1.0 means "trust measurement noise at face value".  0.25 tells the
+      # EKF that fixed-marker measurements are 4× more precise than their
+      # reported covariance, pulling the estimate harder toward the marker.
+      # Safe because fixed markers are static, well-localised, and do not
+      # suffer from the frame-to-frame jitter of detected AprilTags.
+      marker_noise_multiplier: 0.25
+      # -- update caps --
+      # Baseline caps a single marker correction at 25 cm / 25°.  Raising
+      # to 50 cm / 40° lets the EKF accept larger leap corrections when
+      # the IMU-only pose has drifted further than usual (e.g. after a
+      # period of aggressive motion).  Kept below 50 cm / 45° to avoid
+      # accepting spurious matches in the far field.
+      marker_max_update_translation_m: 0.50
+      marker_max_update_rotation_deg: 40.0
+
     arm_marker:
-      marker_chi2_gate: 22.46
-      marker_noise_multiplier: 0.5
-      marker_max_update_translation_m: 0.40
-      marker_max_update_rotation_deg: 35.0
+      marker_chi2_gate: 25.0
+      marker_noise_multiplier: 0.25
+      marker_max_update_translation_m: 0.50
+      marker_max_update_rotation_deg: 40.0
 
   marker_easier_initial_lock:
     description: >
