@@ -109,7 +109,7 @@ public:
    * \brief Function for restoring Mia Hand normal operation after an emergency
    *        stop, issued through #emergency_stop() function.
    */
-  void play();
+  bool play();
 
   /**
    * \brief Function for starting a Mia Hand motor positions re-calibration.
@@ -411,4 +411,3 @@ private:
 }  // namespace
 
 #endif  // MIA_HAND_DRIVER_CPP_DRIVER_HPP
-

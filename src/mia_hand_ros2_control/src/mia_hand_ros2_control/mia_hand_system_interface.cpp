@@ -10,6 +10,23 @@ namespace mia_hand_ros2_control
 {
 MiaHandSystemInterface::MiaHandSystemInterface()
 {
+  for (std::size_t data_it = 0; data_it < 3; ++data_it)
+  {
+    b_jnt_pos_cmd_defined_[data_it] = false;
+    b_jnt_pos_state_defined_[data_it] = false;
+    b_jnt_vel_cmd_defined_[data_it] = false;
+    b_jnt_vel_state_defined_[data_it] = false;
+    b_jnt_eff_state_defined_[data_it] = false;
+
+    jnt_pos_cmd_[data_it] = 0.0;
+    jnt_pos_state_[data_it] = 0.0;
+    last_jnt_pos_cmd_[data_it] = std::numeric_limits<double>::quiet_NaN();
+    jnt_vel_cmd_[data_it] = 0.0;
+    jnt_vel_state_[data_it] = 0.0;
+    last_jnt_vel_cmd_[data_it] = std::numeric_limits<double>::quiet_NaN();
+    jnt_eff_state_[data_it] = 0.0;
+    last_jnt_cmd_modes_[data_it] = CommandMode::kNone;
+  }
 }
 
 hardware_interface::CallbackReturn MiaHandSystemInterface::on_init(
@@ -82,9 +99,13 @@ hardware_interface::CallbackReturn MiaHandSystemInterface::on_configure(
   {
     jnt_pos_state_[data_it] = 0.0;
     jnt_vel_state_[data_it] = 0.0;
+    jnt_eff_state_[data_it] = 0.0;
 
     jnt_pos_cmd_[data_it] = 0.0;
     jnt_vel_cmd_[data_it] = 0.0;
+    last_jnt_pos_cmd_[data_it] = std::numeric_limits<double>::quiet_NaN();
+    last_jnt_vel_cmd_[data_it] = std::numeric_limits<double>::quiet_NaN();
+    last_jnt_cmd_modes_[data_it] = CommandMode::kNone;
   }
 
   rviz2_joints_[0].pos = 0.0;
@@ -113,6 +134,17 @@ hardware_interface::CallbackReturn MiaHandSystemInterface::on_configure(
 
   if (hardware_interface::CallbackReturn::ERROR != result)
   {
+    if (mia_hand_->play())
+    {
+      RCLCPP_INFO(*logger_, "Mia Hand normal operation restored.");
+    }
+    else
+    {
+      RCLCPP_WARN(*logger_,
+        "Failed to restore Mia Hand normal operation before connection check: %s",
+        mia_hand_->get_error_msg());
+    }
+
     if (mia_hand_->is_connected())
     {
       RCLCPP_INFO(*logger_, "Mia Hand connected.");
@@ -185,6 +217,13 @@ MiaHandSystemInterface::export_state_interfaces()
       jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
         jnt_names_[data_it], hardware_interface::HW_IF_VELOCITY,
         &jnt_vel_state_[data_it]));
+    }
+
+    if (b_jnt_eff_state_defined_[data_it])
+    {
+      jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
+        jnt_names_[data_it], hardware_interface::HW_IF_EFFORT,
+        &jnt_eff_state_[data_it]));
     }
 
     if (!rviz2_joints_[data_it].name.empty())
@@ -338,6 +377,26 @@ hardware_interface::return_type MiaHandSystemInterface::read(
     // result = hardware_interface::return_type::ERROR;
   }
 
+  int32_t thumb_nfor = 0;
+  int32_t index_nfor = 0;
+  int32_t mrl_nfor = 0;
+  int32_t thumb_tfor = 0;
+  int32_t index_tfor = 0;
+  int32_t mrl_tfor = 0;
+  if (mia_hand_->get_finger_forces(
+        thumb_nfor, index_nfor, mrl_nfor,
+        thumb_tfor, index_tfor, mrl_tfor))
+  {
+    jnt_eff_state_[0] = static_cast<double>(thumb_nfor);
+    jnt_eff_state_[1] = static_cast<double>(index_nfor);
+    jnt_eff_state_[2] = static_cast<double>(mrl_nfor);
+  }
+  else
+  {
+    RCLCPP_ERROR(*logger_,
+      "Failed to read finger force data: %s", mia_hand_->get_error_msg());
+  }
+
   return result;
 }
 
@@ -350,6 +409,12 @@ hardware_interface::return_type MiaHandSystemInterface::write(
   {
     if (CommandMode::kPosition == jnt_cmd_modes_[jnt_it])
     {
+      if ((last_jnt_cmd_modes_[jnt_it] == CommandMode::kPosition) &&
+          (last_jnt_pos_cmd_[jnt_it] == jnt_pos_cmd_[jnt_it]))
+      {
+        continue;
+      }
+
       if(!mia_hand_->set_joint_trajectory(
           jnt_it, jnt_pos_cmd_[jnt_it], 50))
       {
@@ -360,9 +425,20 @@ hardware_interface::return_type MiaHandSystemInterface::write(
         /* TODO: uncomment after fixing driver timeouts issue. */
         // result = hardware_interface::return_type::ERROR;
       }
+      else
+      {
+        last_jnt_pos_cmd_[jnt_it] = jnt_pos_cmd_[jnt_it];
+        last_jnt_cmd_modes_[jnt_it] = CommandMode::kPosition;
+      }
     }
     else if (CommandMode::kVelocity == jnt_cmd_modes_[jnt_it])
     {
+      if ((last_jnt_cmd_modes_[jnt_it] == CommandMode::kVelocity) &&
+          (last_jnt_vel_cmd_[jnt_it] == jnt_vel_cmd_[jnt_it]))
+      {
+        continue;
+      }
+
       if(!mia_hand_->set_joint_speed(
           jnt_it, jnt_vel_cmd_[jnt_it], 80))
       {
@@ -373,9 +449,15 @@ hardware_interface::return_type MiaHandSystemInterface::write(
         /* TODO: uncomment after fixing driver timeouts issue. */
         // result = hardware_interface::return_type::ERROR;
       }
+      else
+      {
+        last_jnt_vel_cmd_[jnt_it] = jnt_vel_cmd_[jnt_it];
+        last_jnt_cmd_modes_[jnt_it] = CommandMode::kVelocity;
+      }
     }
     else
     {
+      last_jnt_cmd_modes_[jnt_it] = CommandMode::kNone;
     }
   }
 
@@ -430,6 +512,11 @@ bool MiaHandSystemInterface::read_joints_info(
         if (has_state_interface(*role_match_it, hardware_interface::HW_IF_VELOCITY))
         {
           b_jnt_vel_state_defined_[jnt_roles_it] = true;
+        }
+
+        if (has_state_interface(*role_match_it, hardware_interface::HW_IF_EFFORT))
+        {
+          b_jnt_eff_state_defined_[jnt_roles_it] = true;
         }
       }
       else  // Joint role not found

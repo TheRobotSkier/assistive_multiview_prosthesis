@@ -555,9 +555,15 @@ void RosDriver::play_srv_fun(
 {
   (void)req;  // Explicitly ignoring empty request, to suppress compiler warning.
 
-  mia_hand_->play();
-  rsp->success = true;
-  rsp->message = "Mia Hand normal operation restored.";
+  rsp->success = mia_hand_->play();
+  if (rsp->success)
+  {
+    rsp->message = "Mia Hand normal operation restored.";
+  }
+  else
+  {
+    rsp->message = mia_hand_->get_error_msg();
+  }
 
   return;
 }

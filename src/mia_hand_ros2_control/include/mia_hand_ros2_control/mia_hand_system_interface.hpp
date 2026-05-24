@@ -168,21 +168,25 @@ private:
 
   double jnt_pos_cmd_[3];    //!< Joint position commands.
   double jnt_pos_state_[3];  //!< Joint position states.
+  double last_jnt_pos_cmd_[3];  //!< Last position commands sent to hardware.
 
   bool b_jnt_vel_cmd_defined_[3];    //!< Joint velocity commands defined or not.
   bool b_jnt_vel_state_defined_[3];  //!< Joint velocity states defined or not.
 
   double jnt_vel_cmd_[3];    //!< Joint velocity commands.
   double jnt_vel_state_[3];  //!< Joint velocity states.
+  double last_jnt_vel_cmd_[3];  //!< Last velocity commands sent to hardware.
+
+  bool b_jnt_eff_state_defined_[3];  //!< Joint effort states defined or not.
+  double jnt_eff_state_[3];          //!< Joint effort states.
 
   std::array<CommandMode, 3> jnt_cmd_modes_;  //!< Current joint command modes.
+  std::array<CommandMode, 3> last_jnt_cmd_modes_;  //!< Last modes sent to hardware.
 
   std::array<Rviz2JointInfo, 3> rviz2_joints_;  //!< Rviz2 joints info.
 };
 }  // namespace
 
 #endif  // MIA_HAND_ROS2_CONTROL_MIA_HAND_SYSTEM_INTERFACE_HPP
-
-
 
 

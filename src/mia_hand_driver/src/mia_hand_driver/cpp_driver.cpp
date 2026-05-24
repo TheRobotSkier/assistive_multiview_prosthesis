@@ -108,11 +108,15 @@ bool CppDriver::emergency_stop()
   return emergency_stop_on_;
 }
 
-void CppDriver::play()
+bool CppDriver::play()
 {
-  emergency_stop_on_ = false;
+  const bool success = send_command("@AR.............*\r");
+  if (success)
+  {
+    emergency_stop_on_ = false;
+  }
 
-  return;
+  return success;
 }
 
 bool CppDriver::calibrate_motor_positions()
@@ -176,7 +180,7 @@ bool CppDriver::get_motor_positions(
      */
     try 
     {
-      serial_port_.Read(rx_msg_, 31, 20);
+      serial_port_.Read(rx_msg_, 31, 200);
     }
     catch (std::exception& err)
     {
@@ -238,7 +242,7 @@ bool CppDriver::get_motor_speeds(
      */
     try 
     {
-      serial_port_.Read(rx_msg_, 31, 20);
+      serial_port_.Read(rx_msg_, 31, 200);
     }
     catch (std::exception& err)
     {
@@ -297,7 +301,7 @@ bool CppDriver::get_motor_currents(
      */
     try 
     {
-      serial_port_.Read(rx_msg_, 31, 20);
+      serial_port_.Read(rx_msg_, 31, 200);
     }
     catch (std::exception& err)
     {
@@ -359,7 +363,7 @@ bool CppDriver::get_joint_positions(
      */
     try 
     {
-      serial_port_.Read(rx_msg_, 15, 20);
+      serial_port_.Read(rx_msg_, 15, 200);
     }
     catch (std::exception& err)
     {
@@ -421,7 +425,7 @@ bool CppDriver::get_joint_speeds(
      */
     try 
     {
-      serial_port_.Read(rx_msg_, 12, 20);
+      serial_port_.Read(rx_msg_, 12, 200);
     }
     catch (std::exception& err)
     {
@@ -481,7 +485,7 @@ bool CppDriver::get_finger_forces(
      */
     try 
     {
-      serial_port_.Read(rx_msg_, 76, 20);
+      serial_port_.Read(rx_msg_, 76, 200);
     }
     catch (std::exception& err)
     {
@@ -1034,7 +1038,7 @@ bool CppDriver::get_grasp_refs(
      */
     try 
     {
-      serial_port_.Read(rx_msg_, 29, 20);
+      serial_port_.Read(rx_msg_, 29, 200);
     }
     catch (std::exception& err)
     {
@@ -1319,7 +1323,7 @@ bool CppDriver::send_command(const std::string& cmd)
      */
     try
     {
-      serial_port_.Read(rx_msg_, 17, 20);
+      serial_port_.Read(rx_msg_, 17, 200);
     }
     catch (std::exception& err)
     {

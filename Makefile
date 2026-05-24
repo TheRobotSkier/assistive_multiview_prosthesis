@@ -465,7 +465,7 @@ rviz-imu-test-kill:
 # ── Grasp Test ──────────────────────────────────────────────────────────────
 up-grasp-test:
 	$(COMPOSE) rm -f grasp_test 2>/dev/null || true
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up grasp_test -d
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up grasp_test
 
 down-grasp-test:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test down
@@ -493,17 +493,28 @@ test-static-grasp:
 	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
 	@test -f scripts/static_grasp_test.sh || { echo "Missing scripts/static_grasp_test.sh"; exit 1; }
 	@test -f config/static_grasp_test.yaml || { echo "Missing config/static_grasp_test.yaml"; exit 1; }
+	@mkdir -p build install log
 	-podman rm -f mia-static-grasp 2>/dev/null
 	podman run --rm -it --name mia-static-grasp \
 		--network host \
+		--userns keep-id \
 		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
 		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
 		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
 		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
-		-e MIA_PORT=/dev/ttyUSB0 \
+		-v $(CURDIR)/build:/prosthesis_ws/build:rw \
+		-v $(CURDIR)/install:/prosthesis_ws/install:rw \
+		-v $(CURDIR)/log:/prosthesis_ws/log:rw \
+		-e MIA_PORT=$${MIA_PORT:-/dev/ttyUSB0} \
 		-e GRASP_TEST_CONFIG=/prosthesis_ws/config/static_grasp_test.yaml \
+		-e GRASP_TEST_START_CONTROLLER=$${GRASP_TEST_START_CONTROLLER:-true} \
+		-e GRASP_TEST_USE_MOCK_HARDWARE=$${GRASP_TEST_USE_MOCK_HARDWARE:-false} \
+		-e GRASP_TEST_MAX_CLOSING_DURATION_S=$${GRASP_TEST_MAX_CLOSING_DURATION_S:-20} \
+		-e GRASP_TEST_FORCE_THRESHOLD=$${GRASP_TEST_FORCE_THRESHOLD:-} \
+		-e GRASP_TEST_FORCE_HOLD_TARGET=$${GRASP_TEST_FORCE_HOLD_TARGET:-} \
+		-e GRASP_TEST_FORCE_HOLD_DURATION_S=$${GRASP_TEST_FORCE_HOLD_DURATION_S:-} \
 		prosthesis:latest \
-		python3 /prosthesis_ws/scripts/static_grasp_test.sh
+		bash -lc 'set -e; source /opt/ros/jazzy/setup.bash; if [ -f /prosthesis_ws/install/setup.bash ]; then source /prosthesis_ws/install/setup.bash; echo "Updating MIA hand packages for static grasp test..."; colcon build --packages-up-to mia_hand_ros2_control --cmake-args -DCMAKE_BUILD_TYPE=Release; else echo "Building MIA hand packages for static grasp test..."; colcon build --packages-up-to mia_hand_ros2_control --cmake-args -DCMAKE_BUILD_TYPE=Release; fi; source /prosthesis_ws/install/setup.bash; python3 /prosthesis_ws/scripts/static_grasp_test.sh'
 
 emg-grasp-test: ## EMG-driven grasp test: collect → train → launch (set MOCK_HARDWARE=true for CI)
 	@echo "=== EMG-Driven Grasp Test ==="

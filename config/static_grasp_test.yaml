@@ -20,14 +20,31 @@ step_interval_s: 0.2
 stop_positions:
   j_thumb_fle: 1.5
   j_index_fle: 1.5
-  j_mrl_fle:   1.5
+  j_mrl_fle: 1.5
 
 # Force threshold (raw ADC units) — if ANY finger exceeds this, contact = stop ALL fingers
 # Idle forces on our hardware: thumb~215, index~208, mrl~260
 force_thresholds:
   j_thumb_fle: 300
   j_index_fle: 300
-  j_mrl_fle:   300
+  j_mrl_fle: 300
+
+# ---- Force Hold ----
+# After first contact, keep velocity control active and regulate around these
+# target forces. The 10s hold stands in for an OPEN EMG release in this test.
+force_hold:
+  duration_s: 10.0
+  target_forces:
+    j_thumb_fle: 300
+    j_index_fle: 300
+    j_mrl_fle: 300
+  deadzone: 20
+  min_overshoot: 20
+  max_overshoot: 150
+  max_velocity: 0.08
 
 # Time to wait after resetting to relaxed position (seconds)
 relaxed_wait_s: 2
+
+# Safety timeout for closing if neither force nor position thresholds are reached
+max_closing_duration_s: 20

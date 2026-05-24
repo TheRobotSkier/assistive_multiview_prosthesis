@@ -205,7 +205,7 @@ def launch_fun(context, *args, **kwargs):
 
     mia_safety_node = Node(
         package = 'mia_hand_ros2_control',
-        executable = 'mia_safety_node',
+        executable = 'mia_safety_node.py',
         name = 'mia_safety',
         parameters = [{'serial_port': serial_port}],
         output = 'screen',
