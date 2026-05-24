@@ -18,6 +18,7 @@
 #   calib_extrinsics            high-noise profile for extrinsic estimation
 #   zupt                        placeholder for zero-velocity updates
 #   imu_frame_variant           placeholder for IMU frame remapping
+#   native_aruco_landmarks      ArUco corner landmarks as SLAM features
 #   all_changes                 combine all non-contradictory overrides
 #
 # Each profile can contain (all keys optional):
@@ -151,6 +152,17 @@ profiles:
       R_IMUtoACC/R_IMUtoGYRO are therefore correct. No separate
       *_imu_optical_frame variant needed — the *_imu data IS already optical.
       See mvp-cox.8 bead notes for full investigation trace.
+
+  native_aruco_landmarks:
+    description: >
+      Enable native OpenVINS ArUco corner-landmark tracking (use_aruco: true)
+      for both head and arm. ArUco corners become persistent SLAM landmarks.
+      This does NOT estimate rigid marker poses and does NOT create a shared
+      cross-camera marker graph. Use in isolation to measure whether native
+      ArUco landmarks improve or degrade VIO drift.
+      See mvp-cox.14.1 investigation for details.
+    head_config: "head_d435i_336222071386/estimator_config_aruco_landmarks.yaml"
+    arm_config: "arm_d435i_310622071850/estimator_config_aruco_landmarks.yaml"
 
   all_changes:
     description: >
