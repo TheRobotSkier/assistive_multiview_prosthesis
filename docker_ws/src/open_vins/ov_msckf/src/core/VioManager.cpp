@@ -203,59 +203,96 @@ void VioManager::feed_measurement_imu(const ov_core::ImuData &message) {
   }
 }
 
-void VioManager::feed_measurement_marker(const MarkerPoseMeasurement &message) {
+MarkerPoseUpdateResult VioManager::feed_measurement_marker(const MarkerPoseMeasurement &message) {
+
+  MarkerPoseUpdateResult result;
+  result.marker_map_initialized = is_marker_global_initialized;
 
   if (updaterMarkerPose == nullptr || !params.marker_pose_options.enabled) {
-    return;
+    result.reason = "disabled";
+    return result;
   }
   if (!is_initialized_vio || state->_timestamp < 0.0) {
+    result.reason = "not_initialized";
     PRINT_DEBUG(YELLOW "[MARKER]: dropping marker %d before VIO initialization\n" RESET, message.marker_id);
-    return;
+    return result;
   }
   if (!updaterMarkerPose->is_fixed_marker_id(message.marker_id)) {
+    result.reason = "non_fixed_marker_id";
     PRINT_DEBUG(YELLOW "[MARKER]: rejecting non-fixed marker id %d\n" RESET, message.marker_id);
-    return;
+    return result;
   }
   if (last_marker_timestamp >= 0.0 && message.timestamp <= last_marker_timestamp + 1e-9) {
+    result.reason = "stale_or_duplicate";
     PRINT_DEBUG(YELLOW "[MARKER]: rejecting stale/duplicate marker %.6f <= %.6f\n" RESET, message.timestamp, last_marker_timestamp);
-    return;
+    return result;
   }
 
   const double dt = message.timestamp - state->_timestamp;
   if (std::abs(dt) > params.marker_pose_options.time_tolerance_s) {
+    result.reason = "time_tolerance_exceeded";
     PRINT_DEBUG(YELLOW "[MARKER]: rejecting marker timestamp %.6f, state %.6f, dt %.3f s\n" RESET, message.timestamp, state->_timestamp,
                 dt);
-    return;
+    return result;
   }
 
   last_marker_timestamp = message.timestamp;
   record_marker_measurement(message);
 
   MarkerPoseUpdateResult innovation = updaterMarkerPose->innovation(state, message);
+  result.chi2 = innovation.chi2;
+  result.translation_norm_m = innovation.translation_norm_m;
+  result.rotation_deg = innovation.rotation_deg;
+
   if (should_marker_reset(message, innovation)) {
+    result.reset_requested = true;
+    result.reset_reason = innovation.reason;
     Eigen::Vector3d velocity = Eigen::Vector3d::Zero();
     Eigen::Matrix3d velocity_covariance = Eigen::Matrix3d::Identity();
     if (!marker_velocity_fit(velocity, velocity_covariance)) {
+      result.reset_skipped_velocity_fit = true;
+      result.reason = "reset_skipped_velocity_fit_unreliable";
       PRINT_WARNING(YELLOW "[MARKER]: reset requested for marker %d but velocity fit is not reliable yet (%s)\n" RESET, message.marker_id,
                     innovation.reason.c_str());
-      return;
+      return result;
+    }
+    result.velocity_fit_passed = true;
+    result.velocity_fit_speed_mps = velocity.norm();
+    if (!recent_marker_measurements.empty()) {
+      result.velocity_fit_sample_count = (int)recent_marker_measurements.size();
+      result.velocity_fit_sample_span_s = recent_marker_measurements.back().timestamp - recent_marker_measurements.front().timestamp;
     }
     if (reset_to_marker_map(message, velocity, velocity_covariance,
                             is_marker_global_initialized ? innovation.reason : "first_marker_map_lock")) {
+      result.reset_performed = true;
+      result.state_updated = true;
+      result.accepted = true;
+      result.reason = is_marker_global_initialized ? "reset_applied" : "first_marker_map_lock";
+      result.marker_map_initialized = true;
       last_fixed_marker_update_timestamp = message.timestamp;
-      return;
+      return result;
     }
+    result.reason = "reset_failed";
+    return result;
   }
 
   if (!is_marker_global_initialized) {
+    result.reason = "marker_map_not_locked";
     PRINT_DEBUG(YELLOW "[MARKER]: waiting for explicit marker_map lock before EKF marker updates\n" RESET);
-    return;
+    return result;
   }
 
   MarkerPoseUpdateResult update_result = updaterMarkerPose->try_update(state, message);
+  result.accepted = update_result.accepted;
+  result.reason = update_result.reason;
+  result.chi2 = update_result.chi2;
+  result.translation_norm_m = update_result.translation_norm_m;
+  result.rotation_deg = update_result.rotation_deg;
   if (update_result.accepted) {
+    result.state_updated = true;
     last_fixed_marker_update_timestamp = message.timestamp;
   }
+  return result;
 }
 
 DynamicArmPoseUpdateResult VioManager::feed_measurement_dynamic_arm_pose(const DynamicArmPoseMeasurement &message) {

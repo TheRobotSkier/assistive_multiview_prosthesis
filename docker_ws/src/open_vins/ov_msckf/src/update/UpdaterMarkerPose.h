@@ -18,6 +18,7 @@ class State;
 struct MarkerPoseUpdaterOptions {
   bool enabled = false;
   std::string topic = "/head/marker_pose/observation";
+  std::string status_topic = "/ov_msckf/marker_update/status";
   std::string global_frame_id = "marker_map";
   std::string target_frame = "imu";
   std::vector<int> fixed_marker_ids = {0};
@@ -65,10 +66,20 @@ struct MarkerPoseMeasurement {
 
 struct MarkerPoseUpdateResult {
   bool accepted = false;
+  bool state_updated = false;
   std::string reason = "not_run";
   double chi2 = -1.0;
   double translation_norm_m = 0.0;
   double rotation_deg = 0.0;
+  bool reset_requested = false;
+  bool reset_performed = false;
+  bool reset_skipped_velocity_fit = false;
+  std::string reset_reason;
+  bool velocity_fit_passed = false;
+  int velocity_fit_sample_count = 0;
+  double velocity_fit_sample_span_s = 0.0;
+  double velocity_fit_speed_mps = 0.0;
+  bool marker_map_initialized = false;
 };
 
 class UpdaterMarkerPose {

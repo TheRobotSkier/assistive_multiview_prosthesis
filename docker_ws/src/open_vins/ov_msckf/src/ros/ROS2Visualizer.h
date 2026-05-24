@@ -181,6 +181,10 @@ protected:
   void publish_dynamic_arm_status(const DynamicArmPoseMeasurement &measurement, const DynamicArmPoseUpdateResult &result,
                                   const std::string &queue_reason = "");
 
+  /// Publish marker update status
+  void publish_marker_status(const MarkerPoseMeasurement &measurement, const MarkerPoseUpdateResult &result,
+                             const std::string &queue_reason = "");
+
   /// Global node handler
   std::shared_ptr<rclcpp::Node> _node;
 
@@ -201,6 +205,7 @@ protected:
   rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr pub_loop_intrinsics;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_marker_map_locked;
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_dynamic_arm_status;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_marker_status;
   std::shared_ptr<tf2_ros::TransformBroadcaster> mTfBr;
 
   // Our subscribers and camera synchronizers

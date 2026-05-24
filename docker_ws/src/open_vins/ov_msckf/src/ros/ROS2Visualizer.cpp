@@ -151,6 +151,11 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
         node->create_publisher<std_msgs::msg::String>(_app->get_params().dynamic_arm_pose_options.status_topic, 10);
     PRINT_DEBUG("Publishing: %s\n", pub_dynamic_arm_status->get_topic_name());
   }
+  if (_app->get_params().marker_pose_options.enabled) {
+    pub_marker_status =
+        node->create_publisher<std_msgs::msg::String>(_app->get_params().marker_pose_options.status_topic, 10);
+    PRINT_DEBUG("Publishing: %s\n", pub_marker_status->get_topic_name());
+  }
 
   // option to enable publishing of global to IMU transformation
   if (node->has_parameter("publish_global_to_imu_tf")) {
@@ -254,6 +259,7 @@ ROS2Visualizer::~ROS2Visualizer() {
   pub_loop_point.reset();
   pub_loop_intrinsics.reset();
   pub_dynamic_arm_status.reset();
+  pub_marker_status.reset();
   mTfBr.reset();
   sub_imu.reset();
   sub_marker_pose.reset();
@@ -830,6 +836,9 @@ void ROS2Visualizer::process_marker_queue() {
   if (!_app->initialized()) {
     const double newest_to_keep = _node->now().seconds() - 2.0;
     while (!marker_queue.empty() && marker_queue.front().timestamp < newest_to_keep) {
+      MarkerPoseUpdateResult result;
+      result.reason = "not_initialized_queue_drop";
+      publish_marker_status(marker_queue.front(), result, "not_initialized_queue_drop");
       marker_queue.pop_front();
     }
     return;
@@ -841,6 +850,9 @@ void ROS2Visualizer::process_marker_queue() {
     const MarkerPoseMeasurement measurement = marker_queue.front();
     if (measurement.timestamp < state_timestamp - tolerance) {
       PRINT_DEBUG(YELLOW "[MARKER]: visualizer dropping stale marker %.6f for state %.6f\n" RESET, measurement.timestamp, state_timestamp);
+      MarkerPoseUpdateResult result;
+      result.reason = "visualizer_stale";
+      publish_marker_status(measurement, result, "visualizer_stale");
       marker_queue.pop_front();
       continue;
     }
@@ -848,7 +860,8 @@ void ROS2Visualizer::process_marker_queue() {
       break;
     }
     marker_queue.pop_front();
-    _app->feed_measurement_marker(measurement);
+    MarkerPoseUpdateResult result = _app->feed_measurement_marker(measurement);
+    publish_marker_status(measurement, result);
   }
 }
 
@@ -958,6 +971,74 @@ void ROS2Visualizer::publish_dynamic_arm_status(const DynamicArmPoseMeasurement 
   std_msgs::msg::String msg;
   msg.data = ss.str();
   pub_dynamic_arm_status->publish(msg);
+}
+
+void ROS2Visualizer::publish_marker_status(const MarkerPoseMeasurement &measurement,
+                                           const MarkerPoseUpdateResult &result,
+                                           const std::string &queue_reason) {
+  if (pub_marker_status == nullptr) {
+    return;
+  }
+  const double state_timestamp = (_app->get_state() != nullptr) ? _app->get_state()->_timestamp : -1.0;
+  const double dt = (state_timestamp >= 0.0) ? measurement.timestamp - state_timestamp : 0.0;
+  const double fixed_dt =
+      (_app->last_fixed_marker_update_time() >= 0.0) ? measurement.timestamp - _app->last_fixed_marker_update_time() : -1.0;
+
+  std::ostringstream ss;
+  ss << std::fixed << std::setprecision(6);
+  ss << "{";
+  ss << "\"event_type\":\"marker_pose_update\"";
+  ss << ",\"stamp\":" << measurement.timestamp;
+  ss << ",\"state_timestamp\":" << state_timestamp;
+  ss << ",\"dt\":" << dt;
+  ss << ",\"accepted\":" << (result.accepted ? "true" : "false");
+  ss << ",\"state_updated\":" << (result.state_updated ? "true" : "false");
+  ss << ",\"reason\":\"" << json_escape(queue_reason.empty() ? result.reason : queue_reason) << "\"";
+  ss << ",\"marker_id\":" << measurement.marker_id;
+  ss << ",\"frame_id\":\"" << json_escape(measurement.frame_id) << "\"";
+  ss << ",\"marker_frame\":\"" << json_escape(measurement.marker_frame) << "\"";
+  ss << ",\"target_frame\":\"" << json_escape(measurement.target_frame) << "\"";
+  ss << ",\"stable\":" << (measurement.stable ? "true" : "false");
+  ss << ",\"stable_frames\":" << measurement.stable_frames;
+  ss << ",\"hard_gate_passed\":" << (measurement.hard_gate_passed ? "true" : "false");
+  ss << ",\"hard_gate_status\":\"" << json_escape(measurement.hard_gate_status) << "\"";
+  ss << ",\"chi2\":" << result.chi2;
+  ss << ",\"innovation_translation_m\":" << result.translation_norm_m;
+  ss << ",\"innovation_rotation_deg\":" << result.rotation_deg;
+  ss << ",\"noise_multiplier\":" << _app->get_params().marker_pose_options.noise_multiplier;
+  ss << ",\"chi2_gate\":" << _app->get_params().marker_pose_options.chi2_gate;
+  ss << ",\"max_update_translation_m\":" << _app->get_params().marker_pose_options.max_update_translation_m;
+  ss << ",\"max_update_rotation_deg\":" << _app->get_params().marker_pose_options.max_update_rotation_deg;
+  ss << ",\"reset_requested\":" << (result.reset_requested ? "true" : "false");
+  ss << ",\"reset_reason\":\"" << json_escape(result.reset_reason) << "\"";
+  ss << ",\"reset_performed\":" << (result.reset_performed ? "true" : "false");
+  ss << ",\"reset_skipped_velocity_fit\":" << (result.reset_skipped_velocity_fit ? "true" : "false");
+  ss << ",\"velocity_fit_passed\":" << (result.velocity_fit_passed ? "true" : "false");
+  ss << ",\"velocity_fit_sample_count\":" << result.velocity_fit_sample_count;
+  ss << ",\"velocity_fit_sample_span_s\":" << result.velocity_fit_sample_span_s;
+  ss << ",\"velocity_fit_speed_mps\":" << result.velocity_fit_speed_mps;
+  ss << ",\"marker_map_initialized\":" << (result.marker_map_initialized ? "true" : "false");
+  ss << ",\"last_fixed_marker_update_dt_s\":" << fixed_dt;
+  ss << ",\"reprojection_error_px\":" << measurement.reprojection_error_px;
+  ss << ",\"distance_m\":" << measurement.distance_m;
+  ss << ",\"view_angle_deg\":" << measurement.view_angle_deg;
+  ss << ",\"area_px2\":" << measurement.area_px2;
+  ss << ",\"side_mean_px\":" << measurement.side_mean_px;
+  ss << ",\"side_min_px\":" << measurement.side_min_px;
+  ss << ",\"geometry_score\":" << measurement.geometry_score;
+  ss << ",\"covariance_sigma_px\":" << measurement.covariance_sigma_px;
+  ss << ",\"stability_factor\":" << measurement.stability_factor;
+  ss << ",\"std_roll_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 0);
+  ss << ",\"std_pitch_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 1);
+  ss << ",\"std_yaw_deg\":" << 180.0 / M_PI * covariance_std(measurement.covariance, 2);
+  ss << ",\"std_x_m\":" << covariance_std(measurement.covariance, 3);
+  ss << ",\"std_y_m\":" << covariance_std(measurement.covariance, 4);
+  ss << ",\"std_z_m\":" << covariance_std(measurement.covariance, 5);
+  ss << "}";
+
+  std_msgs::msg::String msg;
+  msg.data = ss.str();
+  pub_marker_status->publish(msg);
 }
 
 void ROS2Visualizer::publish_state() {

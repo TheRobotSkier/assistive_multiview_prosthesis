@@ -45,6 +45,7 @@ def _create_openvins_node(context, *args, **kwargs):
         "publish_calibration_tf": True,
         "use_marker_pose_updates": True,
         "marker_pose_topic": "/head/marker_pose/observation",
+        "marker_status_topic": "/ov_msckf/marker_update/status",
         "marker_global_frame_id": "marker_map",
         "marker_target_frame": "head_imu",
         "marker_fixed_ids": "0",
@@ -194,6 +195,7 @@ def generate_launch_description():
             {"max_tf_age_s": ParameterValue(LaunchConfiguration("pointcloud_max_tf_age_s"), value_type=float)},
         ],
     )
+
 
     return LaunchDescription([
         DeclareLaunchArgument("verbosity", default_value="INFO"),
