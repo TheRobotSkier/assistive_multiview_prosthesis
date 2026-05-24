@@ -1,0 +1,23 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins_experiment_profiles.yaml
+  s_50110caea318f4::t_f8b516885fdbb3 83-88
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins/arm_d435i_310622071850/estimator_config_calib_extrinsics.yaml
+  s_50110caea318f4::t_a4e6e892e32d18 1-115
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins/head_d435i_336222071386/estimator_config_calib_extrinsics.yaml
+  s_50110caea318f4::t_cc5277704543e5 1-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "078f8ff6b4c03cb48a6b46165f2bfdb8e269285f",
+  "prompts": {},
+  "sessions": {
+    "s_50110caea318f4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5af0008ffe4qqtUN4aOp7Sr6",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
