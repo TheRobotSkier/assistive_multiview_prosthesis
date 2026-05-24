@@ -1,0 +1,49 @@
+# ── EMG Experiment Container (Python 3.10) ───────────────────────────────────
+# Used for NaviFlame backend which requires tensorflow==2.12.0 / Python <3.11.
+# The ROS Jazzy container uses Python 3.12 so NaviFlame cannot run inside it.
+#
+# Build:
+#   make build-emg-experiments
+#
+# Run (NaviFlame mode):
+#   make emg-naviflame
+
+FROM python:3.10-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libusb-1.0-0 libudev1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /prosthesis_ws
+
+# ── NaviFlame dependencies ────────────────────────────────────────────────────
+COPY NaviFlame/requirements.txt /tmp/naviflame_reqs.txt
+RUN pip install --no-cache-dir -r /tmp/naviflame_reqs.txt
+
+# Additional deps used by our adapter
+RUN pip install --no-cache-dir pyyaml
+
+# ── Install emg_bridge (our Python path needs it) ─────────────────────────────
+# Just copy what's needed — no ROS, no mindrove import unless hardware is present.
+# The emg_bridge modules used: experiment_config.py, naviflame_backend.py,
+# sklearn_backends.py, features.py, classifier.py, config.py
+COPY src/emg_bridge/ /prosthesis_ws/src/emg_bridge/
+
+# ── NaviFlame models ──────────────────────────────────────────────────────────
+COPY NaviFlame/ /prosthesis_ws/NaviFlame/
+
+# ── Config ────────────────────────────────────────────────────────────────────
+COPY config/ /prosthesis_ws/config/
+
+# Use host-network container user (UID matches host via podman --userns=keep-id).
+# Install packages as the user that will run the container.
+ARG USER_UID=1000
+ARG USER_GID=1000
+RUN groupadd --gid ${USER_GID} prosthesis || true && \
+    useradd --uid ${USER_UID} --gid ${USER_GID} -m prosthesis
+
+USER prosthesis
+ENV PYTHONPATH="/prosthesis_ws/src/emg_bridge"
+ENV HOME=/home/prosthesis
+
+ENTRYPOINT ["python3", "/prosthesis_ws/src/emg_bridge/scripts/run_classifier.py"]

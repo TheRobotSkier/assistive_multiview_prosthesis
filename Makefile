@@ -54,7 +54,7 @@ COMPOSE_SEGMENTATION_CPU := -f docker-compose.yml
 COMPOSE_SEGMENTATION_CUDA := -f docker-compose.yml -f docker-compose.segmentation.cuda.yml
 COMPOSE_SEGMENTATION_CUDA_PODMAN := -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test up-grasp-test-train up-emg-test-train test-static-grasp print-force
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test up-grasp-test-train up-emg-test-train test-static-grasp print-force build-emg-experiments emg-default emg-sklearn-imu emg-slew emg-sticky emg-naviflame emg-pipeline emg-validate
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -574,22 +574,40 @@ up-emg-test-train:
 
 # ── EMG Experiment Mode Launch Targets ───────────────────────────────────────
 # Each target launches run_classifier with a pre-made experiment config.
-# Config templates are in config/emg_experiment_config.yaml — copy and edit.
 #
 # Default mode (no experiments — standard sklearn EMG-only):
-#   make emg-run
+#   make emg-default
 #
-# Quick experiment modes:
+# Quick experiment modes (all run in base prosthesis container except NaviFlame):
 #   make emg-sklearn-imu    # EMG + IMU features with sklearn
 #   make emg-slew           # Proportional slew limiting
 #   make emg-sticky         # Sticky gesture hysteresis
-#   make emg-naviflame      # NaviFlame backend (needs separate container!)
+#   make emg-naviflame      # NaviFlame backend (separate container, see below)
 #
 # Full pipeline with experiment config:
 #   make emg-pipeline MODE=naviflame
 
-EMG_CONFIG ?= config/emg_experiment_config.yaml
+EMG_CONFIG_DIR = config
+EMG_MODELS_DIR = models
 
+# ── NaviFlame container (Python 3.10 + TF 2.12, separate from ROS) ───────────
+build-emg-experiments:
+	podman build -f docker/Dockerfile.emg-experiments -t emg-experiments .
+
+emg-naviflame: build-emg-experiments
+	@echo "=== NaviFlame Backend ==="
+	@test -f $(CURDIR)/$(EMG_CONFIG_DIR)/emg_experiment_config.yaml || \
+		{ echo "Error: $(EMG_CONFIG_DIR)/emg_experiment_config.yaml not found."; exit 1; }
+	podman run --rm -it \
+		--network host \
+		--userns=keep-id \
+		-v $(CURDIR)/$(EMG_CONFIG_DIR):/prosthesis_ws/config:ro \
+		-v $(CURDIR)/$(EMG_MODELS_DIR):/prosthesis_ws/models:ro \
+		emg-experiments \
+		--model-dir /prosthesis_ws/models \
+		--config /prosthesis_ws/config/emg_experiment_config.yaml
+
+# ── Baseline mode (runs in ROS container) ────────────────────────────────────
 emg-default:
 	@echo "=== EMG Classifier (default sklearn) ==="
 	$(DOCKER_CMD) run --rm -it --name emg-default \
@@ -605,9 +623,9 @@ emg-default:
 		prosthesis:latest \
 		python3 /prosthesis_ws/src/emg_bridge/scripts/run_classifier.py --model-dir /prosthesis_ws/models
 
+# ── Experiment modes (all run in ROS container, toggled via --config) ────────
 emg-sklearn-imu:
 	@echo "=== EMG Classifier (sklearn + IMU) ==="
-	@test -f $(EMG_CONFIG) || { echo "Error: $(EMG_CONFIG) not found. Run: cp config/emg_experiment_config.yaml $(EMG_CONFIG)"; exit 1; }
 	$(DOCKER_CMD) run --rm -it --name emg-sklearn-imu \
 		--network host --privileged --ipc host --userns=keep-id \
 		-e DISPLAY=$${DISPLAY:-:0} \
@@ -625,7 +643,6 @@ emg-sklearn-imu:
 
 emg-slew:
 	@echo "=== EMG Classifier (proportional slew limiting) ==="
-	@test -f $(EMG_CONFIG) || { echo "Error: $(EMG_CONFIG) not found."; exit 1; }
 	$(DOCKER_CMD) run --rm -it --name emg-slew \
 		--network host --privileged --ipc host --userns=keep-id \
 		-e DISPLAY=$${DISPLAY:-:0} \
@@ -643,7 +660,6 @@ emg-slew:
 
 emg-sticky:
 	@echo "=== EMG Classifier (sticky gesture selection) ==="
-	@test -f $(EMG_CONFIG) || { echo "Error: $(EMG_CONFIG) not found."; exit 1; }
 	$(DOCKER_CMD) run --rm -it --name emg-sticky \
 		--network host --privileged --ipc host --userns=keep-id \
 		-e DISPLAY=$${DISPLAY:-:0} \
@@ -658,14 +674,6 @@ emg-sticky:
 		python3 /prosthesis_ws/src/emg_bridge/scripts/run_classifier.py \
 			--model-dir /prosthesis_ws/models \
 			--config /prosthesis_ws/config/emg_experiment_config_sticky.yaml
-
-# NaviFlame runs in its own container (Python 3.10 + TF 2.12, not ROS)
-emg-naviflame:
-	@echo "=== NaviFlame Backend ==="
-	@echo "NaviFlame requires Python 3.10 + TensorFlow 2.12 — not compatible with ROS Jazzy container."
-	@echo "Run in a separate podman container:"
-	@echo "  pip install tensorflow==2.12.0 scikit-learn && pip install -r NaviFlame/requirements.txt"
-	@echo "  python scripts/run_classifier.py --config config/emg_experiment_config_naviflame.yaml"
 
 # Full pipeline launch with experiment config override
 # Usage: make emg-pipeline MODE=naviflame
