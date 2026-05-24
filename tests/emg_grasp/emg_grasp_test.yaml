@@ -29,12 +29,50 @@ emg_release_gesture: 3
 emg_grasp_confidence_threshold: 0.7
 gesture_hold_timeout_s: 1.0
 
-# ---- Wrist Control (optional) ----
-wrist_control_enabled: false
+# ---- Wrist Control (bounded velocity) ----
+wrist_control:
+  # Master enable/disable for EMG wrist control
+  enabled: false
+
+  # Gesture IDs for wrist motion (FLEXION=5, EXTENSION=6)
+  flexion_gesture: 5
+  extension_gesture: 6
+
+  # Minimum confidence for wrist motion activation
+  confidence_threshold: 0.55
+
+  # Positive speed (deg/s) for extension direction, informative — actual motion
+  # is governed by step_size_deg and command_rate_hz.
+  positive_speed_deg_s: 30.0
+  negative_speed_deg_s: -30.0
+
+  # Position increment per control tick (deg)
+  step_size_deg: 1.5
+  # Control loop rate (Hz)
+  command_rate_hz: 20.0
+
+  # Wrist angle limits (deg)
+  min_position_deg: -90.0
+  max_position_deg: 90.0
+
+  # Max age of wrist state before motion is halted (seconds)
+  stale_state_timeout_s: 0.5
+
+  # Immediately stop if pipeline state changes while wrist is moving
+  stop_on_mode_change: true
+
+  # Pipeline states that allow wrist motion (by ID)
+  # 0=IDLE, 6=RELEASING
+  wrist_permissive_states: [0, 6]
+
+  # How missing wrist hardware is handled:
+  #   false → disable wrist control with a warning (default)
+  #   true  → raise RuntimeError to fail launch/preflight
+  fail_preflight_on_missing_wrist: false
+
+  # Acceleration passed to the wrist driver position command (deg/s²)
+  wrist_accel_deg_s2: 180.0
+
+# Topic overrides for wrist control
+wrist_state_topic: "/wrist/state"
 wrist_cmd_topic: "/wrist/set_position"
-wrist_gesture_map:
-  0: 0.0
-  1: 0.0
-  2: 15.0
-  3: -15.0
-  4: 0.0
