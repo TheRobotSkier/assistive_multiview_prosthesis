@@ -1,0 +1,31 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/dynamic_id2_arm_update_live.launch.py
+  s_10359bcb3d4ec9::t_8409440b245903 284-309
+  s_10359bcb3d4ec9::t_4bfe2e7e084a7d 413
+  s_10359bcb3d4ec9::t_0d20a7044d46b7 354-358
+  s_10359bcb3d4ec9::t_370b66f62b85cb 78
+docker_ws/multi_cam_localization/sensor_fusion_bringup/scripts/marker_graph_odom_relay.py
+  s_10359bcb3d4ec9::t_cde093483c5c6e 1-392
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/dynamic_id2_arm_update.yaml
+  s_10359bcb3d4ec9::t_bd3dddbc3f5895 20
+  s_10359bcb3d4ec9::t_71d0c8d8a05aea 96-109
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins_experiment_profiles.yaml
+  s_10359bcb3d4ec9::t_d24041867c0e03 97,99,101-106
+docker_ws/multi_cam_localization/sensor_fusion_bringup/CMakeLists.txt
+  s_10359bcb3d4ec9::t_3e37b168e27339 67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "d2daa257259323cc13b833fae7b36a009b849de4",
+  "prompts": {},
+  "sessions": {
+    "s_10359bcb3d4ec9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a58591beffeUvAKpcIxU4hObc",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
