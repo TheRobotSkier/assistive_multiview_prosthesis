@@ -31,6 +31,7 @@ Use camera_body_pose for an intuitive visualization-only body frame.
 from __future__ import annotations
 
 import ast
+import time
 from collections import Counter, deque
 from dataclasses import dataclass
 import json
@@ -730,6 +731,9 @@ class ArucoMarkerPoseNode(Node):
         self.max_position_norm_m = float(vio_cfg.get("max_position_norm_m", 5.0))
         self.max_linear_velocity_mps = float(vio_cfg.get("max_linear_velocity_mps", 2.0))
         self.max_pose_covariance_trace = float(vio_cfg.get("max_pose_covariance_trace", 10.0))
+        self.startup_grace_period_s = float(vio_cfg.get("startup_grace_period_s", 10.0))
+        self._first_marker_detection_wall_sec: Optional[float] = None
+        self._startup_grace_active = False
 
         self.default_pose_cov_diag = np.array(
             [
@@ -833,6 +837,13 @@ class ArucoMarkerPoseNode(Node):
         self.last_odom_wall_time_sec: Optional[float] = None
         self.last_marker_detection_stamp_sec: Optional[float] = None
 
+        self._diagnostic_timer = self.create_timer(5.0, self._diagnostic_cb)
+        self._diag_markers_detected: int = 0
+        self._diag_corrections_accepted: int = 0
+        self._diag_corrections_rejected: int = 0
+        self._diag_rejection_reasons: Counter = Counter()
+        self._diag_last_log_sec: float = 0.0
+
         self.T_map_global: Optional[np.ndarray] = None
         self.P_correction_diag = self.default_pose_cov_diag.copy()
         self.last_correction_time_sec: Optional[float] = None
@@ -914,6 +925,16 @@ class ArucoMarkerPoseNode(Node):
         if ids is None or len(ids) == 0:
             self.publish_marker_state(False, -1)
             return
+
+        if self._first_marker_detection_wall_sec is None:
+            self._first_marker_detection_wall_sec = self.now_sec()
+            self._startup_grace_active = True
+            self.get_logger().info(
+                f"First marker detection — startup grace period active for {self.startup_grace_period_s:.1f}s "
+                f"(relaxed VIO health checks)"
+            )
+
+        self._diag_markers_detected += len(ids)
 
         marker_ids = [int(marker_id_arr[0]) for marker_id_arr in ids]
         id_counts = Counter(marker_ids)
@@ -1542,8 +1563,24 @@ class ArucoMarkerPoseNode(Node):
 
         position = T_global_imu[:3, 3]
         if valid and float(np.linalg.norm(position)) > self.max_position_norm_m:
-            valid = False
-            reason = "position_outside_workspace"
+            if self._startup_grace_active:
+                grace_elapsed = self.now_sec() - (self._first_marker_detection_wall_sec or 0.0)
+                if grace_elapsed < self.startup_grace_period_s:
+                    self.get_logger().debug(
+                        f"VIO position norm {float(np.linalg.norm(position)):.1f}m exceeds "
+                        f"{self.max_position_norm_m:.1f}m but within startup grace period "
+                        f"({grace_elapsed:.1f}/{self.startup_grace_period_s:.1f}s)"
+                    )
+                else:
+                    self._startup_grace_active = False
+                    self.get_logger().info(
+                        f"Startup grace period ended — enforcing full VIO health checks"
+                    )
+                    valid = False
+                    reason = "position_outside_workspace"
+            else:
+                valid = False
+                reason = "position_outside_workspace"
 
         linear = msg.twist.twist.linear
         speed = math.sqrt(linear.x * linear.x + linear.y * linear.y + linear.z * linear.z)
@@ -1576,6 +1613,8 @@ class ArucoMarkerPoseNode(Node):
 
     def try_apply_marker_correction(self, measurement: MarkerMeasurement, force_manual: bool) -> tuple[bool, str]:
         if not self.reanchor_enabled:
+            self._diag_corrections_rejected += 1
+            self._diag_rejection_reasons["correction_disabled"] += 1
             self.publish_reanchor_event_from_measurement(
                 measurement,
                 correction_accepted=False,
@@ -1586,6 +1625,8 @@ class ArucoMarkerPoseNode(Node):
 
         matched_odom, odom_dt = self.find_nearest_odom(measurement.stamp_sec)
         if matched_odom is None:
+            self._diag_corrections_rejected += 1
+            self._diag_rejection_reasons["odom_match_timeout"] += 1
             self.publish_reanchor_event_from_measurement(
                 measurement,
                 correction_accepted=False,
@@ -1597,6 +1638,8 @@ class ArucoMarkerPoseNode(Node):
 
         if not measurement.stable:
             mode = "not_initialized" if self.T_map_global is None else "rejected"
+            self._diag_corrections_rejected += 1
+            self._diag_rejection_reasons["marker_not_stable"] += 1
             self.publish_reanchor_event_from_measurement(
                 measurement,
                 correction_accepted=False,
@@ -1611,6 +1654,7 @@ class ArucoMarkerPoseNode(Node):
         P_ov_diag = pose_covariance_diag(matched_odom, self.default_pose_cov_diag)
 
         if self.T_map_global is None:
+            self._diag_corrections_accepted += 1
             self.hard_set_correction(T_meas_map_global, measurement.covariance_diag, P_ov_diag, measurement.stamp_sec)
             self.publish_reanchor_event_from_measurement(
                 measurement,
@@ -1626,6 +1670,7 @@ class ArucoMarkerPoseNode(Node):
         rot_deg = math.degrees(float(np.linalg.norm(innovation[3:])))
 
         if force_manual:
+            self._diag_corrections_accepted += 1
             self.hard_set_correction(T_meas_map_global, measurement.covariance_diag, P_ov_diag, measurement.stamp_sec)
             self.mark_large_reanchor_if_needed(trans_norm, rot_deg, measurement.stamp_sec)
             self.publish_reanchor_event_from_measurement(
@@ -1641,6 +1686,8 @@ class ArucoMarkerPoseNode(Node):
 
         if not self.vio_valid:
             if self.last_hard_reanchor_time_sec is not None and measurement.stamp_sec - self.last_hard_reanchor_time_sec < self.reanchor_cooldown_s:
+                self._diag_corrections_rejected += 1
+                self._diag_rejection_reasons["reanchor_cooldown_active"] += 1
                 self.publish_reanchor_event_from_measurement(
                     measurement,
                     correction_accepted=False,
@@ -1651,6 +1698,7 @@ class ArucoMarkerPoseNode(Node):
                     correction_rotation_deg=rot_deg,
                 )
                 return False, "reanchor_cooldown_active"
+            self._diag_corrections_accepted += 1
             self.hard_set_correction(T_meas_map_global, measurement.covariance_diag, P_ov_diag, measurement.stamp_sec)
             self.mark_large_reanchor_if_needed(trans_norm, rot_deg, measurement.stamp_sec, force=True)
             self.publish_reanchor_event_from_measurement(
@@ -1665,6 +1713,8 @@ class ArucoMarkerPoseNode(Node):
             return True, "accepted"
 
         if not self.enable_periodic_marker_correction:
+            self._diag_corrections_rejected += 1
+            self._diag_rejection_reasons["periodic_correction_disabled"] += 1
             self.publish_reanchor_event_from_measurement(
                 measurement,
                 correction_accepted=False,
@@ -1677,6 +1727,8 @@ class ArucoMarkerPoseNode(Node):
             return False, "periodic_correction_disabled"
 
         if self.last_correction_time_sec is not None and measurement.stamp_sec - self.last_correction_time_sec < self.periodic_correction_interval_s:
+            self._diag_corrections_rejected += 1
+            self._diag_rejection_reasons["periodic_interval_wait"] += 1
             self.publish_reanchor_event_from_measurement(
                 measurement,
                 correction_accepted=False,
@@ -1689,6 +1741,8 @@ class ArucoMarkerPoseNode(Node):
             return False, "periodic_interval_wait"
 
         if trans_norm > self.max_periodic_translation_correction_m or rot_deg > self.max_periodic_rotation_correction_deg:
+            self._diag_corrections_rejected += 1
+            self._diag_rejection_reasons["valid_vio_correction_jump_too_large"] += 1
             self.hold_vio_invalid(measurement.stamp_sec, "marker_innovation_jump")
             self.update_vio_valid(matched_odom, force_invalid=True)
             self.publish_reanchor_event_from_measurement(
@@ -1704,6 +1758,8 @@ class ArucoMarkerPoseNode(Node):
 
         chi2 = self.innovation_chi2(innovation, measurement.covariance_diag, P_ov_diag)
         if chi2 > self.correction_chi2_gate:
+            self._diag_corrections_rejected += 1
+            self._diag_rejection_reasons["innovation_chi2_rejected"] += 1
             self.hold_vio_invalid(measurement.stamp_sec, "marker_innovation_chi2")
             self.update_vio_valid(matched_odom, force_invalid=True)
             self.publish_reanchor_event_from_measurement(
@@ -1718,6 +1774,7 @@ class ArucoMarkerPoseNode(Node):
             )
             return False, "innovation_chi2_rejected"
 
+        self._diag_corrections_accepted += 1
         self.soft_update_correction(T_meas_map_global, measurement.covariance_diag, P_ov_diag, measurement.stamp_sec)
         self.publish_reanchor_event_from_measurement(
             measurement,
@@ -1999,6 +2056,51 @@ class ArucoMarkerPoseNode(Node):
         tf.transform.rotation.z = float(qz)
         tf.transform.rotation.w = float(qw)
         self.tf_broadcaster.sendTransform(tf)
+
+    def _diagnostic_cb(self) -> None:
+        now = self.now_sec()
+        if self._diag_last_log_sec > 0 and now - self._diag_last_log_sec < 4.0:
+            return
+
+        uptime = now - self._diag_last_log_sec if self._diag_last_log_sec > 0 else 0.0
+        self._diag_last_log_sec = now
+
+        odom_status = "receiving"
+        if self.last_odom_wall_time_sec is None:
+            odom_status = "never_received"
+        elif now - self.last_odom_wall_time_sec > 2.0:
+            odom_status = f"stale_{now - self.last_odom_wall_time_sec:.1f}s"
+
+        position_norm = 0.0
+        if self.last_odom_msg is not None:
+            T = odom_to_T(self.last_odom_msg)
+            position_norm = float(np.linalg.norm(T[:3, 3]))
+
+        grace_str = ""
+        if self._startup_grace_active and self._first_marker_detection_wall_sec is not None:
+            grace_elapsed = now - self._first_marker_detection_wall_sec
+            grace_str = f", grace={grace_elapsed:.1f}/{self.startup_grace_period_s:.1f}s"
+
+        correction_locked = self.T_map_global is not None
+
+        reasons_str = ""
+        if self._diag_rejection_reasons:
+            top = self._diag_rejection_reasons.most_common(5)
+            reasons_str = " | rejections: " + ", ".join(f"{r}={c}" for r, c in top)
+
+        self.get_logger().info(
+            f"[DIAG] markers_detected={self._diag_markers_detected} "
+            f"corrections={self._diag_corrections_accepted}/{self._diag_corrections_accepted + self._diag_corrections_rejected} "
+            f"vio={'valid' if self.vio_valid else 'INVALID'} "
+            f"pos_norm={position_norm:.2f}m "
+            f"odom={odom_status} "
+            f"locked={correction_locked}{grace_str}{reasons_str}"
+        )
+
+        self._diag_markers_detected = 0
+        self._diag_corrections_accepted = 0
+        self._diag_corrections_rejected = 0
+        self._diag_rejection_reasons.clear()
 
     def qos_watchdog_cb(self) -> None:
         if self.last_odom_wall_time_sec is None:
