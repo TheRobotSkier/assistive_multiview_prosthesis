@@ -1,0 +1,155 @@
+tests/test1_software_verification/generate_objects.py
+  s_3f0940a5664f8c::t_93c6865344384a 25-28,308-457,694-695,697-698,701-703,708,722
+src/grasp_preshaping/src/c_api.rs
+  s_3f0940a5664f8c::t_93c6865344384a 78-80,153,218,238,376-391,393-394,401,453,470,649-650,653-657
+tests/test1_software_verification/occlusion.py
+  s_3f0940a5664f8c::t_93c6865344384a 1,3-6,9-12,18-86,172-174,176-180,188,212-221,232,251-256,308-351
+config/chrony-host.conf
+  s_3f0940a5664f8c::t_93c6865344384a 1-38
+src/pointcloud_fusion/test/test_pointcloud_fusion.py
+  s_3f0940a5664f8c::t_93c6865344384a 1-232
+tests/test1_software_verification/hand_approaches.py
+  s_3f0940a5664f8c::t_93c6865344384a 4-7,17-59,64-65,68-69,72-73,76-77,80-81,84-85,88-99,104-105,108-109,112-113,129
+src/prosthesis_launch/launch/twist_propagation_test.launch.py
+  s_3f0940a5664f8c::t_93c6865344384a 17-21,101,120-121,127,133,143,160
+tests/test1_software_verification/plot_results.py
+  s_3f0940a5664f8c::t_93c6865344384a 34-48,50,53-61,63,91-96,98-99,102,105,141-142,145-146,148-149,154,156,161,201,215-218,226,228-229,247-248,253-254,256-257,262-263,265,297-298,319,323,340-341,343-344,348,350,356,359,368-369,388-389,401-402,406,408,454-455,460,462,474-1145,1212,1214,1224-1225,1230,1232,1239,1313-1317,1328,1350-1878,1899,1906,1916-1924,1926-1927,1930-1937
+src/grasp_preshaping/src/planner.rs
+  s_3f0940a5664f8c::t_93c6865344384a 90,101,110,114,122,126,299,301-325,328-329,332-334,337,339-344,360-395,593-600,603-604,610-612,616-641,643-646
+tests/test1_software_verification/run_latency_stages.py
+  s_3f0940a5664f8c::t_93c6865344384a 1-541
+docs/camera_mounts.md
+  s_3f0940a5664f8c::t_93c6865344384a 23,130
+tests/test1_software_verification/run.py
+  s_3f0940a5664f8c::t_93c6865344384a 51-53,120,130,147,165,178,385-388,391,403-406,408,433,468-471,482-511,559,584,586-587,609-611,614,622-623,631-734,751-752,757-762,808-811,854,859,862,865-866
+src/segmentation/docker/entrypoint.inference.sh
+  s_3f0940a5664f8c::t_93c6865344384a 12-18,21
+docker/docker-compose.segmentation.cuda.yml
+  s_3f0940a5664f8c::t_93c6865344384a 10
+config/chrony-jetson.conf
+  s_3f0940a5664f8c::t_93c6865344384a 1-35
+src/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py
+  s_3f0940a5664f8c::t_93c6865344384a 1-151
+tests/test1_software_verification/figures/test1_results_table.tex
+  s_3f0940a5664f8c::t_93c6865344384a 8-19,33-44,46
+src/prosthesis_launch/launch/digital_twin.launch.py
+  s_3f0940a5664f8c::t_93c6865344384a 8-20,178-179,185,191,222,250,272,282,298,317,328,339,349,379,395
+tests/test1_software_verification/run_tier_b.py
+  s_3f0940a5664f8c::t_93c6865344384a 42,298-300,302,308-319,321,323-324,382
+src/segmentation/nodes/inference_server.py
+  s_3f0940a5664f8c::t_93c6865344384a 66-78,101-102,121-123,149
+tests/test1_software_verification/ffi_bridge.py
+  s_3f0940a5664f8c::t_93c6865344384a 122-130,167-186
+src/grasp_preshaping/src/runtime_config.rs
+  s_3f0940a5664f8c::t_93c6865344384a 11,41-44,111-114,170-171,245-257,299,301-316
+src/prosthesis_launch/launch/mock.launch.py
+  s_3f0940a5664f8c::t_93c6865344384a 20,23-24,27-31,47-50,121-137,141,144
+src/camera/camera/openvins_odom_tf_relay.py
+  s_3f0940a5664f8c::t_93c6865344384a 1-231
+tests/test1_software_verification/object_registry.py
+  s_3f0940a5664f8c::t_93c6865344384a 22-48
+tests/test1_software_verification/results/_sweep_config_100000.yaml
+  s_3f0940a5664f8c::t_93c6865344384a 1-41
+src/grasp_preshaping/src/predictor.rs
+  s_3f0940a5664f8c::t_93c6865344384a 155-196,203,205-206,209,278,280-281,284,618,621,698,749,772-829
+Makefile.workspace
+  s_3f0940a5664f8c::t_93c6865344384a 23-24,29,69,89-91,293-299
+camera-test-log-v3.txt
+  s_3f0940a5664f8c::t_93c6865344384a 1-681
+src/grasp_preshaping/include/grasp_preshaping/ffi_types.hpp
+  s_3f0940a5664f8c::t_93c6865344384a 67-69
+tests/test1_software_verification/results/baseline_results.csv
+  s_3f0940a5664f8c::t_93c6865344384a 1-13
+rviz/camera_mounts.rviz
+  s_3f0940a5664f8c::t_93c6865344384a 44-52
+src/sensor_fusion_bringup/config/camera_mounts.yaml
+  s_3f0940a5664f8c::t_93c6865344384a 23-24,29-31,34-98,101-165
+report/generate_figures.py
+  s_3f0940a5664f8c::t_93c6865344384a 1-490
+docker/entrypoint.sh
+  s_3f0940a5664f8c::t_93c6865344384a 1-18
+src/grasp_preshaping/src/config.rs
+  s_3f0940a5664f8c::t_93c6865344384a 27-30
+tests/test1_software_verification/results/latency_per_stage_results.csv
+  s_3f0940a5664f8c::t_93c6865344384a 1-16
+tests/test1_software_verification/results/baseline_all_scores.csv
+  s_3f0940a5664f8c::t_93c6865344384a 1-241
+camera-test-log-v1.txt
+  s_3f0940a5664f8c::t_93c6865344384a 1-111
+camera-test-log-v6.txt
+  s_3f0940a5664f8c::t_93c6865344384a 1-1513
+tests/test1_software_verification/run_score_sweep.py
+  s_3f0940a5664f8c::t_93c6865344384a 1-178
+report/grasp_section.txt
+  s_3f0940a5664f8c::t_93c6865344384a 1-146
+docker/Dockerfile
+  s_3f0940a5664f8c::t_93c6865344384a 17-18,98-104
+rviz/prosthesis.rviz
+  s_3f0940a5664f8c::t_93c6865344384a 7,9-10,45,68-74,76,78,80-83,106,114,188,208,221,241,316,319,327,402
+tests/test1_software_verification/results/latency_results.csv
+  s_3f0940a5664f8c::t_93c6865344384a 2-1201
+.gitignore
+  s_3f0940a5664f8c::t_93c6865344384a 35,66-67
+camera-test-log-v2.txt
+  s_3f0940a5664f8c::t_93c6865344384a 1-454
+src/sensor_fusion_bringup/scripts/publish_camera_mounts.py
+  s_3f0940a5664f8c::t_93c6865344384a 7-20,29,42,158,160-163,166-167,182-219,224-226,229-232,234-242,244,247-254,256-257,260-264,267,269-270,275-302,319-357,368-379,400-403,418-419,421-422,424-425
+.dockerignore
+  s_3f0940a5664f8c::t_93c6865344384a 18-20
+tests/test1_software_verification/analyze_latency_results.py
+  s_3f0940a5664f8c::t_93c6865344384a 1-101
+tests/test1_software_verification/view_geometry.py
+  s_3f0940a5664f8c::t_93c6865344384a 4-5,7-21,28,31-44,46,48,52-53,56-87,89-91,168-225
+.zshrc
+  s_3f0940a5664f8c::t_93c6865344384a 1-125
+src/sensor_fusion_bringup/CMakeLists.txt
+  s_3f0940a5664f8c::t_93c6865344384a 16-21
+tests/test1_software_verification/results/intent_precision_delta.csv
+  s_3f0940a5664f8c::t_93c6865344384a 1-13
+test-noter.md
+  s_3f0940a5664f8c::t_93c6865344384a 1-21
+tests/test1_software_verification/results/occlusion_results.csv
+  s_3f0940a5664f8c::t_93c6865344384a 1-2401
+docker/docker-compose.yml
+  s_3f0940a5664f8c::t_93c6865344384a 53-54,87,91,93-98,117,121,123-128,203
+tests/test1_software_verification/results/latency_per_stage_summary.csv
+  s_3f0940a5664f8c::t_93c6865344384a 1-3
+camera-test-log-v5.txt
+  s_3f0940a5664f8c::t_93c6865344384a 1-236
+src/camera/camera/openvins_realsense_tf_bridge_node.py
+  s_3f0940a5664f8c::t_93c6865344384a 23-27,236,250,257,259-268,365-366,368,373,388,390,393-401,409-433
+docs/segmentation-backends.md
+  s_3f0940a5664f8c::t_93c6865344384a 54-55,154-156,165-166,168,170,199-200
+docker/docker-compose.segmentation.podman-gpu.yml
+  s_3f0940a5664f8c::t_93c6865344384a 10
+src/grasp_preshaping/nodes/preshaping_service_bridge_node.cpp
+  s_3f0940a5664f8c::t_93c6865344384a 21,89-90,134-141,163-165,278-290,386-390,524-532,544-545,557-558,576,585
+src/camera/setup.py
+  s_3f0940a5664f8c::t_93c6865344384a 23
+tests/test1_software_verification/results/score_sweep_results.csv
+  s_3f0940a5664f8c::t_93c6865344384a 1-2521
+tests/test1_software_verification/results/intent_precision_summary.csv
+  s_3f0940a5664f8c::t_93c6865344384a 1-25
+src/pointcloud_fusion/pointcloud_fusion/pointcloud_fusion_node.py
+  s_3f0940a5664f8c::t_93c6865344384a 10,26,30,131,152-156,158-160,162-169,171-176,195-201,203-214,246-249,268-286,344,349-360,364-366,504,506-548,577-686,705,709-788,808-809,857
+docker/Dockerfile.segmentation
+  s_3f0940a5664f8c::t_93c6865344384a 2,6,10,17-19,27-29,41-50,52-56,58-59,67-68,82-90,114-118,133
+camera-test-log-v4.txt
+  s_3f0940a5664f8c::t_93c6865344384a 1-1015
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "028039a934d7ab8d67cc6635dfe39400b08ed2c4",
+  "prompts": {},
+  "sessions": {
+    "s_3f0940a5664f8c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e59b5-eb66-78e1-b3c5-64cf9c839f93",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
