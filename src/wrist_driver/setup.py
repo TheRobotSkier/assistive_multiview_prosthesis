@@ -27,6 +27,7 @@ setup(
         'console_scripts': [
             'wrist_driver_node = wrist_driver.wrist_driver_node:main',
             'wrist_driver_sim_node = wrist_driver.wrist_driver_sim_node:main',
+            'emg_wrist_controller = wrist_driver.emg_wrist_controller:main',
         ],
     },
 )
