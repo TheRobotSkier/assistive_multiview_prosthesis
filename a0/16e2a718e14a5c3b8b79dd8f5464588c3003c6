@@ -1,0 +1,30 @@
+src/mia_hand_ros2_control/config/emg_force_controller.yaml
+  s_eef0ab97fb4297::t_54cbf3336fa2fe 1-78
+src/mia_hand_ros2_control/CMakeLists.txt
+  s_eef0ab97fb4297::t_a899ba71172e1b 66,70-74
+src/mia_hand_ros2_control/mia_hand_ros2_control/emg_force_controller.py
+  s_eef0ab97fb4297::t_5d534e5859d14f 80-81
+  s_eef0ab97fb4297::t_35eb500428228d 1-79,82-656
+src/mia_hand_ros2_control/mia_hand_ros2_control/__init__.py
+  s_eef0ab97fb4297::t_061ca569a41b71 1-16
+src/mia_hand_ros2_control/test_force_controller.py
+  s_eef0ab97fb4297::t_45dddf1e185b4a 1-313
+src/mia_hand_ros2_control/mia_hand_ros2_control/force_hold_controller.py
+  s_eef0ab97fb4297::t_7170f4e25a59a0 1-260
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "a016e2a718e14a5c3b8b79dd8f5464588c3003c6",
+  "prompts": {},
+  "sessions": {
+    "s_eef0ab97fb4297": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3cb7a77ffeC6Zgo8sRBGJ3G5",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
