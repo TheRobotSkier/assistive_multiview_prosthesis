@@ -1,0 +1,32 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/dynamic_id2_arm_update_live.launch.py
+  s_6e79525d65ab12::t_e7bab0b450b46e 189
+  s_6e79525d65ab12::t_80724da8c36bbb 132
+  s_6e79525d65ab12::t_4d0a6a6147ee8e 71-73
+  s_6e79525d65ab12::t_80ecd192e18a75 350-358
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/arm_d435i_openvins_phase2.launch.py
+  s_6e79525d65ab12::t_37e5db27f51e8c 1-2,4,11,14-154,372-381,385
+  s_6e79525d65ab12::t_7f7a47b05e5f7a 6
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/openvins_profile.py
+  s_6e79525d65ab12::t_5c924d77f0fa28 1-44
+docker_ws/multi_cam_localization/sensor_fusion_bringup/launch/head_d435i_openvins_phase2.launch.py
+  s_6e79525d65ab12::t_9a8eebf66778e5 1-2,4,11,14-78,250-259,263
+  s_6e79525d65ab12::t_06ad42612bc1fd 6
+docker_ws/multi_cam_localization/sensor_fusion_bringup/config/openvins_experiment_profiles.yaml
+  s_6e79525d65ab12::t_1a3ed3d3d16ec7 1-127
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "4e5c82ab9a608e12cebceeedb4f67a07a3d91af8",
+  "prompts": {},
+  "sessions": {
+    "s_6e79525d65ab12": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5b95d8affe4TVttbbspUK9F2",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
