@@ -36,6 +36,7 @@ struct MarkerPoseUpdaterOptions {
   double reset_min_velocity_std_mps = 0.05;
   double reset_bias_gyro_std = 0.02;
   double reset_bias_accel_std = 0.20;
+  std::string marker_reset_bias_policy = "preserve";
 };
 
 struct MarkerPoseMeasurement {
@@ -80,6 +81,11 @@ struct MarkerPoseUpdateResult {
   double velocity_fit_sample_span_s = 0.0;
   double velocity_fit_speed_mps = 0.0;
   bool marker_map_initialized = false;
+  double bias_gyro_norm_before = 0.0;
+  double bias_accel_norm_before = 0.0;
+  double bias_gyro_norm_after = 0.0;
+  double bias_accel_norm_after = 0.0;
+  std::string active_bias_policy;
 };
 
 class UpdaterMarkerPose {

@@ -262,6 +262,10 @@ MarkerPoseUpdateResult VioManager::feed_measurement_marker(const MarkerPoseMeasu
       result.velocity_fit_sample_count = (int)recent_marker_measurements.size();
       result.velocity_fit_sample_span_s = recent_marker_measurements.back().timestamp - recent_marker_measurements.front().timestamp;
     }
+    result.bias_gyro_norm_before = state->_imu->bias_g().norm();
+    result.bias_accel_norm_before = state->_imu->bias_a().norm();
+    result.active_bias_policy = params.marker_pose_options.marker_reset_bias_policy;
+
     if (reset_to_marker_map(message, velocity, velocity_covariance,
                             is_marker_global_initialized ? innovation.reason : "first_marker_map_lock")) {
       result.reset_performed = true;
@@ -269,6 +273,8 @@ MarkerPoseUpdateResult VioManager::feed_measurement_marker(const MarkerPoseMeasu
       result.accepted = true;
       result.reason = is_marker_global_initialized ? "reset_applied" : "first_marker_map_lock";
       result.marker_map_initialized = true;
+      result.bias_gyro_norm_after = state->_imu->bias_g().norm();
+      result.bias_accel_norm_after = state->_imu->bias_a().norm();
       last_fixed_marker_update_timestamp = message.timestamp;
       return result;
     }
@@ -693,20 +699,40 @@ bool VioManager::reset_to_marker_map(const MarkerPoseMeasurement &measurement, c
   }
 
   Eigen::MatrixXd reset_cov = StateHelper::get_marginal_covariance(state, reset_order);
+
+  // Capture original bias covariance before zeroing (for inflate_only policy)
+  Eigen::Matrix3d original_bias_g_cov = reset_cov.block<3, 3>(9, 9);
+  Eigen::Matrix3d original_bias_a_cov = reset_cov.block<3, 3>(12, 12);
+
   reset_cov.block(0, 0, state->_imu->size(), reset_cov.cols()).setZero();
   reset_cov.block(0, 0, reset_cov.rows(), state->_imu->size()).setZero();
   reset_cov.block<3, 3>(0, 0) = measurement.covariance.block<3, 3>(0, 0);
   reset_cov.block<3, 3>(3, 3) = measurement.covariance.block<3, 3>(3, 3);
   reset_cov.block<3, 3>(6, 6) = velocity_covariance;
-  reset_cov.block<3, 3>(9, 9) = std::pow(params.marker_pose_options.reset_bias_gyro_std, 2) * Eigen::Matrix3d::Identity();
-  reset_cov.block<3, 3>(12, 12) = std::pow(params.marker_pose_options.reset_bias_accel_std, 2) * Eigen::Matrix3d::Identity();
+
+  // Bias covariance: config-based default or inflated from original
+  if (params.marker_pose_options.marker_reset_bias_policy == "inflate_only") {
+    constexpr double kInflateMultiplier = 4.0;
+    Eigen::Matrix3d cov_g = original_bias_g_cov.allFinite() ? original_bias_g_cov : Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d cov_a = original_bias_a_cov.allFinite() ? original_bias_a_cov : Eigen::Matrix3d::Identity();
+    reset_cov.block<3, 3>(9, 9) = kInflateMultiplier * cov_g;
+    reset_cov.block<3, 3>(12, 12) = kInflateMultiplier * cov_a;
+  } else {
+    reset_cov.block<3, 3>(9, 9) = std::pow(params.marker_pose_options.reset_bias_gyro_std, 2) * Eigen::Matrix3d::Identity();
+    reset_cov.block<3, 3>(12, 12) = std::pow(params.marker_pose_options.reset_bias_accel_std, 2) * Eigen::Matrix3d::Identity();
+  }
+
+  // Bias value handling based on policy
+  const std::string &policy = params.marker_pose_options.marker_reset_bias_policy;
+  bool is_first_lock = !is_marker_global_initialized;
+  bool zero_bias = (policy == "zero") || (policy == "zero_on_initial_lock" && is_first_lock);
 
   Eigen::Matrix<double, 16, 1> imu_value = state->_imu->value();
   imu_value.block<4, 1>(0, 0) = rot_2_quat(measurement.R_GtoI);
   imu_value.block<3, 1>(4, 0) = measurement.p_IinG;
   imu_value.block<3, 1>(7, 0) = velocity;
-  imu_value.block<3, 1>(10, 0) = state->_imu->bias_g();
-  imu_value.block<3, 1>(13, 0) = state->_imu->bias_a();
+  imu_value.block<3, 1>(10, 0) = zero_bias ? Eigen::Vector3d::Zero() : state->_imu->bias_g();
+  imu_value.block<3, 1>(13, 0) = zero_bias ? Eigen::Vector3d::Zero() : state->_imu->bias_a();
   state->_imu->set_value(imu_value);
   state->_imu->set_fej(imu_value);
 
@@ -718,8 +744,8 @@ bool VioManager::reset_to_marker_map(const MarkerPoseMeasurement &measurement, c
   is_marker_global_initialized = true;
   propagator->invalidate_cache();
 
-  PRINT_WARNING(CYAN "[MARKER]: reset OpenVINS global gauge to marker_map using marker %d (%s), v=[%.3f %.3f %.3f] m/s\n" RESET,
-                measurement.marker_id, reason.c_str(), velocity(0), velocity(1), velocity(2));
+  PRINT_WARNING(CYAN "[MARKER]: reset OpenVINS global gauge to marker_map using marker %d (%s, %s bias), v=[%.3f %.3f %.3f] m/s\n" RESET,
+                measurement.marker_id, reason.c_str(), policy.c_str(), velocity(0), velocity(1), velocity(2));
   return true;
 }
 

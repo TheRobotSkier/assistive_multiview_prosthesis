@@ -1018,6 +1018,11 @@ void ROS2Visualizer::publish_marker_status(const MarkerPoseMeasurement &measurem
   ss << ",\"velocity_fit_sample_span_s\":" << result.velocity_fit_sample_span_s;
   ss << ",\"velocity_fit_speed_mps\":" << result.velocity_fit_speed_mps;
   ss << ",\"marker_map_initialized\":" << (result.marker_map_initialized ? "true" : "false");
+  ss << ",\"bias_gyro_norm_before\":" << result.bias_gyro_norm_before;
+  ss << ",\"bias_accel_norm_before\":" << result.bias_accel_norm_before;
+  ss << ",\"bias_gyro_norm_after\":" << result.bias_gyro_norm_after;
+  ss << ",\"bias_accel_norm_after\":" << result.bias_accel_norm_after;
+  ss << ",\"active_bias_policy\":\"" << json_escape(result.active_bias_policy) << "\"";
   ss << ",\"last_fixed_marker_update_dt_s\":" << fixed_dt;
   ss << ",\"reprojection_error_px\":" << measurement.reprojection_error_px;
   ss << ",\"distance_m\":" << measurement.distance_m;
