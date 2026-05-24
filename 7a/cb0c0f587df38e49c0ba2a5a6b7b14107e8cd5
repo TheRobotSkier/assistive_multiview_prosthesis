@@ -1,0 +1,28 @@
+src/emg_bridge/emg_bridge/naviflame_backend.py
+  s_7cacb24b465d2b::t_5fabb0da2a76e2 1-21,23-437
+  s_7cacb24b465d2b::t_8b5514bb03831a 22
+tests/test_naviflame_backend.py
+  s_7cacb24b465d2b::t_1958335e2859b4 160-162
+  s_7cacb24b465d2b::t_ab530cec9209e1 223-227,231,235-236,252-253
+  s_7cacb24b465d2b::t_fdbcd1eb5d0118 1-159,163-168,170,172,180-182,184-193,195-197,199-222,230,232-234,240-244,246-251,254-364
+  s_7cacb24b465d2b::t_ac6c22d4e433e6 169,171,173-179,183
+  s_7cacb24b465d2b::t_3f7ed7990f2f7b 228-229
+  s_7cacb24b465d2b::t_fc1cd252e8c53b 237-239,245
+  s_7cacb24b465d2b::t_f0cf25e196620d 194,198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "7acb0c0f587df38e49c0ba2a5a6b7b14107e8cd5",
+  "prompts": {},
+  "sessions": {
+    "s_7cacb24b465d2b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a537426effer7M7kCzM9RPWcH",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
