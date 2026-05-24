@@ -1,0 +1,28 @@
+tests/emg_grasp/emg_grasp_test.yaml
+  s_5c068a319a8693::t_1cd2a86ff831b0 32-77
+src/wrist_driver/wrist_driver/emg_wrist_controller.py
+  s_5c068a319a8693::t_d9048f37a6c78d 294-295,300-306
+  s_5c068a319a8693::t_2ba645c28b249f 440-445
+  s_5c068a319a8693::t_1e69f7feeaa078 1-293,296-299,307-439,446-495
+src/wrist_driver/setup.py
+  s_5c068a319a8693::t_f5f6fb796320fe 30
+src/wrist_driver/test_wrist_controller.py
+  s_5c068a319a8693::t_73dfb44e224533 104
+  s_5c068a319a8693::t_480f6f2c35492c 1-103,105-576
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "63f43cc77efc9692e2869c115d87c488aac88860",
+  "prompts": {},
+  "sessions": {
+    "s_5c068a319a8693": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3cb4f91ffeN917Amb8QguaGu",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
