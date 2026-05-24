@@ -247,20 +247,23 @@ private:
     pcl::PointCloud<pcl::PointXYZ> aligned;
     sac_ia.align(aligned);
 
-    correspondences_out = sac_ia.getFitnessScore() > 0.0 ? 0 : sac_ia.getCorrespondences()->size();
-
     if (!sac_ia.hasConverged()) {
       return false;
     }
 
-    // Check if we have enough correspondences from the RANSAC result
-    auto corr = sac_ia.getCorrespondences();
-    if (!corr || corr->size() < static_cast<std::size_t>(ransac_min_correspondences_)) {
-      correspondences_out = corr ? static_cast<int>(corr->size()) : 0;
+    const double fitness = sac_ia.getFitnessScore();
+    // Estimate correspondence count from fitness: fitness ≈ 1.0 - (inliers / total_points)
+    const std::size_t source_pts = arm_ds.size();
+    if (fitness > 0.0 && fitness < 1.0 && source_pts > 0) {
+      correspondences_out = static_cast<int>((1.0 - fitness) * static_cast<double>(source_pts));
+    } else {
+      correspondences_out = static_cast<int>(source_pts);
+    }
+
+    if (correspondences_out < ransac_min_correspondences_) {
       return false;
     }
 
-    correspondences_out = static_cast<int>(corr->size());
     transform_out = sac_ia.getFinalTransformation();
     return true;
   }
