@@ -23,7 +23,7 @@ common:
   pointcloud_max_range_m: 2.0
   enable_gyro: true
   enable_accel: true
-  unite_imu_method: 2
+  unite_imu_method: 1
   hold_back_imu_for_frames: true
   depth_profile: "640x480x15"
   color_profile: "640x480x30"

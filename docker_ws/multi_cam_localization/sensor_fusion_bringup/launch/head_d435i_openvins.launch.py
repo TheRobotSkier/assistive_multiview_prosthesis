@@ -38,7 +38,7 @@ def generate_launch_description():
             "rgb_camera.color_profile": "640x480x30",
             "enable_gyro": "true",
             "enable_accel": "true",
-            "unite_imu_method": "2",
+            "unite_imu_method": "1",
             "gyro_fps": "200",
             "accel_fps": "200",
 

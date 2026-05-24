@@ -1,20 +1,20 @@
 %YAML:1.0 # need to specify the file type at the top!
 
-verbosity: "INFO" # ALL, DEBUG, INFO, WARNING, ERROR, SILENT
+verbosity: "ALL" # ALL, DEBUG, INFO, WARNING, ERROR, SILENT
 
 use_fej: true # if first-estimate Jacobians should be used (enable for good consistency)
 integration: "rk4" # discrete, rk4, analytical (if rk4 or analytical used then analytical covariance propagation is used)
 use_stereo: false # mono RGB D435i head camera
 max_cameras: 1 # one RGB camera
 
-# calib_cam_extrinsics: false # use offline Kalibr camera-IMU calibration for initial bringup
-calib_cam_extrinsics: true
-# calib_cam_intrinsics: false # use offline Kalibr intrinsics for initial bringup
-calib_cam_intrinsics: true
-# calib_cam_timeoffset: false # use offline Kalibr time offset for initial bringup
-calib_cam_timeoffset: true
-calib_imu_intrinsics: false # if imu intrinsics should be calibrated (rotation and skew-scale matrix)
-calib_imu_g_sensitivity: false # if gyroscope gravity sensitivity (Tg) should be calibrated
+calib_cam_extrinsics: false # use offline Kalibr camera-IMU calibration for initial bringup
+# calib_cam_extrinsics: true
+calib_cam_intrinsics: false # use offline Kalibr intrinsics for initial bringup
+# calib_cam_intrinsics: true
+calib_cam_timeoffset: false # use offline Kalibr time offset for initial bringup
+# calib_cam_timeoffset: true
+calib_imu_intrinsics: true # if imu intrinsics should be calibrated (rotation and skew-scale matrix)
+calib_imu_g_sensitivity: true # if gyroscope gravity sensitivity (Tg) should be calibrated
 
 max_clones: 8 # Jetson-safe dual-camera sliding window
 max_slam: 25 # Jetson-safe SLAM feature budget
@@ -46,8 +46,8 @@ init_imu_thresh: 1.5
 init_max_disparity: 10.0 # original rs_d455 visual disparity threshold
 init_max_features: 50 # how many features to track during initialization (saves on computation)
 
-init_dyn_use: false # if dynamic initialization should be used
-init_dyn_mle_opt_calib: false # if we should optimize calibration during intialization (not recommended)
+init_dyn_use: true # if dynamic initialization should be used
+init_dyn_mle_opt_calib: true # if we should optimize calibration during intialization (not recommended)
 init_dyn_mle_max_iter: 50 # how many iterations the MLE refinement should use (zero to skip the MLE)
 init_dyn_mle_max_time: 0.05 # how many seconds the MLE should be completed in
 init_dyn_mle_max_threads: 6 # how many threads the MLE should use
