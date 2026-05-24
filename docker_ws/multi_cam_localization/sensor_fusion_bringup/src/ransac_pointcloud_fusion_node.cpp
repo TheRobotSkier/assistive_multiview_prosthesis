@@ -253,7 +253,7 @@ private:
 
     const double fitness = sac_ia.getFitnessScore();
     // Estimate correspondence count from fitness: fitness ≈ 1.0 - (inliers / total_points)
-    const std::size_t source_pts = arm_ds.size();
+    const std::size_t source_pts = arm.size();
     if (fitness > 0.0 && fitness < 1.0 && source_pts > 0) {
       correspondences_out = static_cast<int>((1.0 - fitness) * static_cast<double>(source_pts));
     } else {
