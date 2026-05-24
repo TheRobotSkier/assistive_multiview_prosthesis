@@ -102,9 +102,9 @@ public:
 
   bool is_fixed_marker_id(int marker_id) const;
 
-private:
   bool valid_measurement(const MarkerPoseMeasurement &measurement, std::string &reason) const;
 
+private:
   MarkerPoseUpdaterOptions _options;
 };
 

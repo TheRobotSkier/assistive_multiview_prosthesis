@@ -124,6 +124,12 @@ target_link_libraries(test_dynamic_arm_pose_updater ov_msckf_lib ${thirdparty_li
 add_test(NAME test_dynamic_arm_pose_updater COMMAND test_dynamic_arm_pose_updater)
 install(TARGETS test_dynamic_arm_pose_updater DESTINATION lib/${PROJECT_NAME})
 
+add_executable(test_marker_pose_updater src/test_marker_pose_updater.cpp)
+ament_target_dependencies(test_marker_pose_updater ${ament_libraries})
+target_link_libraries(test_marker_pose_updater ov_msckf_lib ${thirdparty_libraries})
+add_test(NAME test_marker_pose_updater COMMAND test_marker_pose_updater)
+install(TARGETS test_marker_pose_updater DESTINATION lib/${PROJECT_NAME})
+
 # Install launch and config directories
 install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)
 install(DIRECTORY ../config/ DESTINATION share/${PROJECT_NAME}/config/)

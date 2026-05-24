@@ -56,6 +56,7 @@ install(
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(test_aruco_marker_pose_math test/test_aruco_marker_pose_math.py)
+  ament_add_pytest_test(test_openvins_profiles test/test_openvins_profiles.py)
 endif()
 
 ament_package()
