@@ -105,12 +105,15 @@ profiles:
     description: >
       Aggressive IMU gyro / accel bias reset standard deviations
       on marker lock, allowing the EKF to adjust biases faster.
+      Zeroes biases on initial lock to avoid bad seed bias values.
     head_marker:
       marker_reset_bias_gyro_std: 0.05
       marker_reset_bias_accel_std: 0.50
+      marker_reset_bias_policy: "zero_on_initial_lock"
     arm_marker:
       marker_reset_bias_gyro_std: 0.05
       marker_reset_bias_accel_std: 0.50
+      marker_reset_bias_policy: "zero_on_initial_lock"
 
   calib_extrinsics:
     description: >
@@ -166,6 +169,7 @@ profiles:
       marker_reset_bias_accel_std: 0.50
       marker_initial_lock_allow_zero_velocity: true
       marker_initial_lock_velocity_cov_std: 0.5
+      marker_reset_bias_policy: "zero_on_initial_lock"
     arm_marker:
       marker_chi2_gate: 22.46
       marker_noise_multiplier: 0.5
@@ -179,3 +183,4 @@ profiles:
       marker_reset_bias_accel_std: 0.50
       marker_initial_lock_allow_zero_velocity: true
       marker_initial_lock_velocity_cov_std: 0.5
+      marker_reset_bias_policy: "zero_on_initial_lock"

@@ -38,6 +38,7 @@ struct MarkerPoseUpdaterOptions {
   double reset_bias_accel_std = 0.20;
   bool marker_initial_lock_allow_zero_velocity = false;
   double marker_initial_lock_velocity_cov_std = 0.5;
+  std::string marker_reset_bias_policy = "preserve";
 };
 
 struct MarkerPoseMeasurement {
@@ -84,6 +85,11 @@ struct MarkerPoseUpdateResult {
   bool marker_map_initialized = false;
   bool is_first_lock_attempt = false;
   bool initial_lock_zero_velocity_fallback = false;
+  double bias_gyro_norm_before = 0.0;
+  double bias_accel_norm_before = 0.0;
+  double bias_gyro_norm_after = 0.0;
+  double bias_accel_norm_after = 0.0;
+  std::string active_bias_policy;
 };
 
 class UpdaterMarkerPose {

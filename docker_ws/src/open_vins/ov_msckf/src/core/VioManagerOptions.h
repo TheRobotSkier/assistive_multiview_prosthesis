@@ -164,6 +164,7 @@ struct VioManagerOptions {
       parser->parse_config("marker_reset_bias_accel_std", marker_pose_options.reset_bias_accel_std, false);
       parser->parse_config("marker_initial_lock_allow_zero_velocity", marker_pose_options.marker_initial_lock_allow_zero_velocity, false);
       parser->parse_config("marker_initial_lock_velocity_cov_std", marker_pose_options.marker_initial_lock_velocity_cov_std, false);
+      parser->parse_config("marker_reset_bias_policy", marker_pose_options.marker_reset_bias_policy, false);
 
       parser->parse_config("use_dynamic_arm_pose_updates", dynamic_arm_pose_options.enabled, false);
       parser->parse_config("dynamic_arm_measurement_only", dynamic_arm_pose_options.measurement_only, false);
@@ -233,6 +234,7 @@ struct VioManagerOptions {
     PRINT_DEBUG("  - marker initial lock zero-vel fallback: %d (cov std %.3f)\n",
                 (int)marker_pose_options.marker_initial_lock_allow_zero_velocity,
                 marker_pose_options.marker_initial_lock_velocity_cov_std);
+    PRINT_DEBUG("  - marker reset bias policy: %s\n", marker_pose_options.marker_reset_bias_policy.c_str());
     PRINT_DEBUG("  - dynamic arm pose updates?: %d\n", (int)dynamic_arm_pose_options.enabled);
     PRINT_DEBUG("  - dynamic arm measurement-only?: %d\n", (int)dynamic_arm_pose_options.measurement_only);
     PRINT_DEBUG("  - dynamic arm topic: %s\n", dynamic_arm_pose_options.topic.c_str());
