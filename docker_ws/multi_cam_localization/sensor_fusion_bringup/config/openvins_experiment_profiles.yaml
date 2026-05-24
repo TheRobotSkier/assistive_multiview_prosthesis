@@ -154,8 +154,28 @@ profiles:
 
   all_changes:
     description: >
-      Merge all non-contradictory overrides from the other profiles
-      into a single experiment. Useful for quick A/B testing.
+      Merge all non-contradictory, safe-to-combine overrides from the
+      other profiles into a single experiment. Useful for quick A/B
+      testing of the maximum marker-trust configuration.
+      
+      INCLUDED (parameter merges from individual profiles):
+        - marker_strong_ekf: relaxed chi2 gate (22.46), noise_multiplier
+          (0.5), increased update caps (0.40m/35deg)
+        - marker_easier_initial_lock: lower reset thresholds
+          (3 samples, 0.30s window, 0.80m/30deg), zero-velocity fallback
+        - reset_bias_policy: aggressive bias stds + zero_on_initial_lock
+      
+      INTENTIONALLY EXCLUDED:
+        - calib_extrinsics: enabling online camera extrinsics calibration
+          alongside aggressive marker params risks estimator instability.
+          Use calib_extrinsics profile independently for controlled tests.
+        - zupt: ZUPT can over-constrain or freeze behavior during motion.
+          Config-level change requires dedicated estimator_config_zupt.yaml;
+          use zupt profile independently.
+        - imu_frame_variant: investigation concluded no frame convention
+          mismatch exists; no active overrides needed.
+      
+      All individual profiles remain runnable alongside all_changes.
     head_marker:
       marker_chi2_gate: 22.46
       marker_noise_multiplier: 0.5
