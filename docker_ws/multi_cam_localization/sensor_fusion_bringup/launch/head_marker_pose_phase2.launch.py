@@ -42,7 +42,7 @@ def generate_launch_description():
             parameters=[
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
                 {"config_file": LaunchConfiguration("config_file")},
-                {"correction_enabled_override": "false"},
+                {"correction_enabled_override": "true"},
                 {"marker_detection_rate_hz": ParameterValue(LaunchConfiguration("marker_detection_rate_hz"), value_type=float)},
             ],
         ),
