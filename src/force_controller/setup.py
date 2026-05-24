@@ -21,6 +21,7 @@ setup(
     entry_points={
         "console_scripts": [
             "force_controller_node = force_controller.force_controller_node:main",
+            "force_bridge_node = force_controller.force_bridge_node:main",
         ],
     },
 )

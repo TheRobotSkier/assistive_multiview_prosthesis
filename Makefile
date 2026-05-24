@@ -510,3 +510,70 @@ rviz-imu-test-kill:
 	-podman kill rviz-imu-test 2>/dev/null
 	-podman rm rviz-imu-test 2>/dev/null
 	@echo "IMU test RViz stopped."
+
+# ── EMG + Mia Hand force-aware grasp ───────────────────────────────────
+# Launches the full force-aware EMG grasp pipeline inside the prosthesis
+# container: ros2_control, force bridge, force controller, wrist driver,
+# EMG classifier, and the EMG-driven grasp node.
+#
+# Make targets:
+#   emg-mia       — EMG-only model (models/) with force controller
+#   emg-mia-imu   — EMG+IMU model (models_imu/) with force controller
+#
+# Model directories:
+#   models/       — EMG-only sklearn
+#   models_imu/   — EMG+IMU sklearn
+
+EMG_MODELS_EMG := $(CURDIR)/models
+EMG_MODELS_IMU := $(CURDIR)/models_imu
+
+emg-mia:
+	@echo "=== EMG Force-Aware Grasp (Mia Hand) ==="
+	-podman rm -f emg-force-grasp 2>/dev/null || true
+	podman run --rm -it --name emg-force-grasp \
+		--network host \
+		--privileged \
+		--ipc host \
+		--userns=keep-id \
+		--device /dev/ttyUSB0:/dev/ttyUSB0 \
+		--device /dev/ttyUSB1:/dev/ttyUSB1 \
+		-e DISPLAY=$${DISPLAY:-:0} \
+		-e MODEL_DIR=/prosthesis_ws/models \
+		-e CONFIG_PATH=/prosthesis_ws/tests/emg_grasp/emg_grasp_test_force.yaml \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(CURDIR)/src:/prosthesis_ws/src:rw \
+		-v $(CURDIR)/config:/prosthesis_ws/config:rw \
+		-v $(CURDIR)/tests:/prosthesis_ws/tests:rw \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:rw \
+		-v $(EMG_MODELS_EMG):/prosthesis_ws/models:rw \
+		-v prosthesis-build:/prosthesis_ws/build \
+		-v prosthesis-install:/prosthesis_ws/install \
+		prosthesis:latest \
+		bash /prosthesis_ws/scripts/emg_force_grasp_entrypoint.sh
+
+emg-mia-imu:
+	@echo "=== EMG+IMU Force-Aware Grasp (Mia Hand) ==="
+	@test -f $(EMG_MODELS_IMU)/classifier.pkl || \
+		{ echo "Error: No IMU model found. Run: make emg-sklearn-imu-train (from emg-grasp-modes worktree)"; exit 1; }
+	-podman rm -f emg-force-grasp-imu 2>/dev/null || true
+	podman run --rm -it --name emg-force-grasp-imu \
+		--network host \
+		--privileged \
+		--ipc host \
+		--userns=keep-id \
+		--device /dev/ttyUSB0:/dev/ttyUSB0 \
+		--device /dev/ttyUSB1:/dev/ttyUSB1 \
+		-e DISPLAY=$${DISPLAY:-:0} \
+		-e MODEL_DIR=/prosthesis_ws/models \
+		-e CONFIG_PATH=/prosthesis_ws/tests/emg_grasp/emg_grasp_test_force.yaml \
+		-e EMG_CONFIG=/prosthesis_ws/config/emg_experiment_config_sklearn_imu.yaml \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(CURDIR)/src:/prosthesis_ws/src:rw \
+		-v $(CURDIR)/config:/prosthesis_ws/config:rw \
+		-v $(CURDIR)/tests:/prosthesis_ws/tests:rw \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:rw \
+		-v $(EMG_MODELS_IMU):/prosthesis_ws/models:rw \
+		-v prosthesis-build:/prosthesis_ws/build \
+		-v prosthesis-install:/prosthesis_ws/install \
+		prosthesis:latest \
+		bash /prosthesis_ws/scripts/emg_force_grasp_entrypoint.sh

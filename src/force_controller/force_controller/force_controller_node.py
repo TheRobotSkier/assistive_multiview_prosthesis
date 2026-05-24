@@ -281,10 +281,10 @@ class ForceControllerNode(Node):
             f"{STATE_NAMES.get(new_state, '?')}"
         )
 
-        # Activate on entering GRASPING
-        if new_state == STATE_GRASPING and old_state in (
-            STATE_APPROACHING,
-            STATE_PLANNING,
+        # Activate on entering GRASPING from any non-active state
+        if new_state == STATE_GRASPING and old_state not in (
+            STATE_GRASPING,
+            STATE_HOLDING,
         ):
             self._activate_controller()
 

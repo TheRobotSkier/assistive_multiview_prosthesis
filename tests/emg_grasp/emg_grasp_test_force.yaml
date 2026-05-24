@@ -1,0 +1,129 @@
+# EMG-Driven Force-Aware Grasp Test Configuration
+#
+# Extends the standard emg_grasp_test.yaml with force controller integration.
+# The force_controller_node regulates fingertip normal forces via PI control
+# on per-finger position controllers during GRASPING and HOLDING states.
+#
+# Gesture IDs:
+#   REST=0, POWER=1, OPEN=2, FLEXION=3, EXTENSION=4
+
+# ---- Force Controller Integration ----
+use_force_controller: true
+per_finger_position_controllers:
+  - "thumb_pos_ff_controller"
+  - "index_pos_ff_controller"
+  - "mrl_pos_ff_controller"
+
+# ---- Legacy Static-Grasp Contract Parameters ----
+closing_velocity_start: 0.3
+closing_velocity_end: 0.1
+decay_steps: 5
+
+# ---- Runtime Loop Timing ----
+step_interval_s: 0.1
+relaxed_wait_s: 2
+
+# ---- Finger Velocity Control ----
+grasp_close_velocity: 0.1
+grasp_open_velocity: -0.1
+hold_position_kp: 1.2
+hold_velocity_limit: 0.08
+hold_position_deadband: 0.01
+
+stop_positions:
+  j_thumb_fle: 1.5
+  j_index_fle: 1.5
+  j_mrl_fle: 1.5
+
+force_thresholds:
+  j_thumb_fle: 300
+  j_index_fle: 300
+  j_mrl_fle: 300
+
+# ---- EMG Topic Names ----
+emg_gesture_topic: "/emg/gesture_label"
+emg_confidence_topic: "/emg/confidence"
+emg_proportional_topic: "/emg/proportional"
+
+# ---- Hand Controller Switching ----
+controller_switch_enabled: true
+controller_switch_timeout_s: 10.0
+position_controller: "group_pos_ff_controller"
+velocity_controller: "group_vel_ff_controller"
+emergency_stop_on_shutdown: true
+emergency_stop_service: "/mia_hand/emergency_stop"
+
+# ---- Wrist Control ----
+wrist_control_enabled: true
+wrist_cmd_topic: "/wrist/set_position"
+wrist_accel_deg_s2: 180.0
+
+modes:
+  moving:
+    wrist_pos:
+      gesture_id: 3 # FLEXION
+      confidence_threshold: 0.7
+      hold_time_s: 0.0
+      velocity: 2.5 # deg/s
+
+    wrist_neg:
+      gesture_id: 4 # EXTENSION
+      confidence_threshold: 0.7
+      hold_time_s: 0.0
+      velocity: -2.5 # deg/s
+
+    grasp_activate:
+      gesture_id: 1 # POWER
+      confidence_threshold: 0.6
+      hold_time_s: 0.0
+      velocity: null
+
+  grasping:
+    grasp_close:
+      gesture_id: 1 # POWER
+      confidence_threshold: 0.6
+      hold_time_s: 0.0
+      velocity: 0.1 # rad/s (ignored when force controller active)
+
+    grasp_open:
+      gesture_id: 4 # EXTENSION
+      confidence_threshold: 0.7
+      hold_time_s: 0.0
+      velocity: -0.1 # rad/s (triggers release when force controller active)
+
+    switch_to_holding:
+      gesture_id: 3 # FLEXION
+      confidence_threshold: 0.7
+      hold_time_s: 0.0
+      velocity: null
+
+    grasp_release:
+      gesture_id: 2 # OPEN
+      confidence_threshold: 0.7
+      hold_time_s: 1.2
+      velocity: null
+
+  holding:
+    switch_to_grasping:
+      gesture_id: 1 # POWER
+      confidence_threshold: 0.6
+      hold_time_s: 0.0
+      velocity: null
+
+    wrist_pos:
+      gesture_id: 3 # FLEXION
+      confidence_threshold: 0.7
+      hold_time_s: 0.0
+      velocity: 2.5 # deg/s
+
+    wrist_neg:
+      gesture_id: 4 # EXTENSION
+      confidence_threshold: 0.7
+      hold_time_s: 0.0
+      velocity: -2.5 # deg/s
+
+    grasp_release:
+      gesture_id: 2 # OPEN
+      confidence_threshold: 0.7
+      hold_time_s: 1.2
+      velocity: null
