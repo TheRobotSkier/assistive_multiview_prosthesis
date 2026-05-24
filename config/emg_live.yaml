@@ -3,3 +3,24 @@ confidence_threshold: 0.55
 release_confidence_threshold: 0.25
 grasp_gestures: [1, 2, 4]  # POWER, PINCH, POINT
 release_gesture: 3          # OPEN
+
+# ── EMG grasp adapter configuration ────────────────────────────────────────────
+emg_adapter:
+  # Gesture aliases: map legacy/raw classifier names → canonical grasp names.
+  # The adapter exposes only OPEN, POWER, FLEXION, EXTENSION to the state machine.
+  aliases:
+    PINCH: FLEXION
+    POINT: EXTENSION
+
+  # General confidence threshold for any valid non-neutral gesture.
+  confidence_threshold: 0.55
+
+  # Stale-data timeout (seconds).  If no new EMG message arrives within this
+  # window the adapter returns a neutral signal.
+  stale_timeout_s: 0.5
+
+  # OPEN safety gate.  OPEN is the "release / open hand" command; we require a
+  # strong proportional signal and a sustained hold so that spurious classifier
+  # flickers cannot accidentally open the hand during grasp.
+  open_min_control: 0.7
+  open_min_hold_s: 0.5
