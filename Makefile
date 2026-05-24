@@ -54,7 +54,7 @@ COMPOSE_SEGMENTATION_CPU := -f docker-compose.yml
 COMPOSE_SEGMENTATION_CUDA := -f docker-compose.yml -f docker-compose.segmentation.cuda.yml
 COMPOSE_SEGMENTATION_CUDA_PODMAN := -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp print-force
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test up-grasp-test-train test-static-grasp print-force
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -464,14 +464,76 @@ rviz-imu-test-kill:
 
 # ── Grasp Test ──────────────────────────────────────────────────────────────
 up-grasp-test:
-	$(COMPOSE) rm -f grasp_test 2>/dev/null || true
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up grasp_test -d
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test rm -f grasp_test 2>/dev/null || true
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up -d grasp_test
+	@echo ""
+	@echo "grasp_test container started. Python packages will rebuild then the EMG grasp test launches."
+	@echo "Follow progress: make logs-grasp-test"
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test logs -f grasp_test
 
 down-grasp-test:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test down
 
 logs-grasp-test:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test logs -f
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test logs -f grasp_test
+
+# ── Train + grasp test (interactive: collect → train → launch) ────────────────
+# Runs in the foreground so the collect_data ENTER prompts reach your terminal.
+# The container is removed automatically on Ctrl-C.
+#
+# Recording knobs (override on the command line):
+#   EMG_REPS     — repetitions per gesture      (default: 3)
+#   EMG_DURATION — recording duration per rep s (default: 5)
+#
+# Example:
+#   make up-grasp-test-train EMG_REPS=5 EMG_DURATION=7
+
+EMG_REPS     ?= 3
+EMG_DURATION ?= 5
+
+up-grasp-test-train:
+	@mkdir -p $(CURDIR)/data $(CURDIR)/models
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo "  EMG Train + Test"
+	@echo "═══════════════════════════════════════════════════════════"
+	@echo ""
+	@echo "Phase 1–2: collect data + train model (interactive)"
+	@echo "Phase 3:   live EMG grasp test (press ENTER after training to launch)"
+	@echo ""
+	$(DOCKER_CMD) run --rm -it --name grasp_test_train \
+		--network host \
+		--privileged \
+		--ipc host \
+		--userns=keep-id \
+		-e DISPLAY=$${DISPLAY:-:0} \
+		-e RMW_IMPLEMENTATION=rmw_fastrtps_cpp \
+		-e ROS_DOMAIN_ID=0 \
+		-e EMG_REPS=$(EMG_REPS) \
+		-e EMG_DURATION=$(EMG_DURATION) \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		-v $(CURDIR)/src:/prosthesis_ws/src:rw \
+		-v $(CURDIR)/config:/prosthesis_ws/config:rw \
+		-v $(CURDIR)/rviz:/prosthesis_ws/rviz:rw \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:rw \
+		-v $(CURDIR)/tests:/prosthesis_ws/tests:rw \
+		-v $(CURDIR)/models:/prosthesis_ws/models:rw \
+		-v $(CURDIR)/data:/prosthesis_ws/data:rw \
+		-v $(CURDIR)/Makefile.workspace:/prosthesis_ws/Makefile:ro \
+		-v prosthesis-build:/prosthesis_ws/build \
+		-v prosthesis-install:/prosthesis_ws/install \
+		-v prosthesis-log:/prosthesis_ws/log \
+		$$(test -e /dev/ttyUSB0 && echo '--device /dev/ttyUSB0:/dev/ttyUSB0' || true) \
+		$$(test -e /dev/ttyUSB1 && echo '--device /dev/ttyUSB1:/dev/ttyUSB1' || true) \
+		prosthesis:latest \
+		/bin/bash /prosthesis_ws/scripts/emg_train_and_test.sh
+	@echo ""
+	@printf "Press ENTER to launch the live EMG grasp test... "
+	@read -r dummy
+	@echo ""
+	@echo "Launching live EMG grasp test..."
+	@echo ""
+	$(MAKE) up-grasp-test
 
 print-force:
 	@echo "=== MIA Hand Force Monitor ==="

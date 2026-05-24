@@ -3,13 +3,14 @@
 Interactive EMG data collection / calibration script.
 
 Connects to the MindRove WiFi armband and guides the user through recording
-each gesture one by one. Raw (unfiltered) EMG data and labels are saved to a
+each gesture. The first recording waits for ENTER, then later gestures
+auto-advance after a short countdown. Raw (unfiltered) EMG data and labels are saved to a
 timestamped .npz file for later offline training.
 
 Usage (inside the Docker container):
     python scripts/collect_data.py
     python scripts/collect_data.py --reps 5 --duration 6 --output-dir /data
-    python scripts/collect_data.py --gesture-names REST POWER PINCH OPEN POINT
+    python scripts/collect_data.py --gesture-names REST POWER OPEN FLEXION EXTENSION
 """
 
 from __future__ import annotations
@@ -33,17 +34,29 @@ from emg_bridge.config import (
     WARMUP_DURATION_S,
     WINDOW_STEP,
 )
-
+from collect_data_flow import prepare_for_recording
 
 # ── ANSI helpers ──────────────────────────────────────────────────────────────
 
-def _green(s: str) -> str:  return f"\033[92m{s}\033[0m"
-def _yellow(s: str) -> str: return f"\033[93m{s}\033[0m"
-def _bold(s: str) -> str:   return f"\033[1m{s}\033[0m"
-def _cyan(s: str) -> str:   return f"\033[96m{s}\033[0m"
+
+def _green(s: str) -> str:
+    return f"\033[92m{s}\033[0m"
+
+
+def _yellow(s: str) -> str:
+    return f"\033[93m{s}\033[0m"
+
+
+def _bold(s: str) -> str:
+    return f"\033[1m{s}\033[0m"
+
+
+def _cyan(s: str) -> str:
+    return f"\033[96m{s}\033[0m"
 
 
 # ── Progress bar ──────────────────────────────────────────────────────────────
+
 
 def _progress(elapsed: float, total: float, width: int = 30) -> str:
     frac = min(elapsed / total, 1.0)
@@ -55,45 +68,93 @@ def _progress(elapsed: float, total: float, width: int = 30) -> str:
 
 # ── Core recording ────────────────────────────────────────────────────────────
 
+
 def record_gesture(
     reader: BoardReader,
     duration_s: float,
     sampling_rate: int,
 ) -> np.ndarray:
-    """Record `duration_s` seconds of raw EMG.
+    """Record roughly `duration_s` seconds of raw EMG.
+
+    Older logic waited for the board ring buffer count to reach the expected
+    sample count before stopping. On some MindRove/BoardShim setups that count
+    can lag or behave unexpectedly, which makes recording appear to run forever
+    even though data is still streaming.
+
+    The robust approach is:
+      1. record for the requested wall-clock duration,
+      2. allow a short grace period for trailing samples to land,
+      3. read up to the expected number of samples from the buffer.
 
     Returns ndarray of shape (n_samples, N_CHANNELS).
     """
-    n_needed = int(duration_s * sampling_rate)
+    n_expected = int(duration_s * sampling_rate)
     reader.flush()  # discard any buffered samples before recording
 
-    # Live countdown / progress display
+    # Live countdown / progress display based on wall-clock time.
     t_start = time.monotonic()
     print()
     while True:
         elapsed = time.monotonic() - t_start
         print(f"\r  {_progress(elapsed, duration_s)}", end="", flush=True)
-        if reader.available() >= n_needed:
+        if elapsed >= duration_s:
             break
         time.sleep(0.05)
 
-    data = reader.read(n_needed)
+    # Give the board a brief moment to flush the last samples into its buffer.
+    grace_deadline = time.monotonic() + 1.0
+    while reader.available() < n_expected and time.monotonic() < grace_deadline:
+        time.sleep(0.01)
+
+    n_available = reader.available()
+    if n_available <= 0:
+        raise RuntimeError(
+            "No EMG samples were received during the recording window. "
+            "Check the armband connection and stream status."
+        )
+
+    n_to_read = min(n_available, n_expected)
+    if n_to_read < n_expected:
+        print(
+            f"\n  {_yellow('Warning:')} captured {n_to_read}/{n_expected} samples "
+            f"({n_to_read / sampling_rate:.2f}/{duration_s:.2f} s). Proceeding with available data.",
+            flush=True,
+        )
+
+    data = reader.read(n_to_read)
     print(f"\r  {_progress(duration_s, duration_s)}  ✓", flush=True)
     return data  # (n_samples, N_CHANNELS)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="MindRove EMG data collector")
-    parser.add_argument("--reps", type=int, default=DEFAULT_REPS,
-                        help=f"Repetitions per gesture (default: {DEFAULT_REPS})")
-    parser.add_argument("--duration", type=float, default=DEFAULT_RECORD_DURATION_S,
-                        help=f"Recording duration per rep in seconds (default: {DEFAULT_RECORD_DURATION_S})")
-    parser.add_argument("--output-dir", type=Path, default=Path("/app/data"),
-                        help="Directory to save .npz files (default: /app/data)")
-    parser.add_argument("--gesture-names", nargs="+", default=GESTURE_NAMES,
-                        help="Gesture names (space-separated, must start with REST)")
+    parser.add_argument(
+        "--reps",
+        type=int,
+        default=DEFAULT_REPS,
+        help=f"Repetitions per gesture (default: {DEFAULT_REPS})",
+    )
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=DEFAULT_RECORD_DURATION_S,
+        help=f"Recording duration per rep in seconds (default: {DEFAULT_RECORD_DURATION_S})",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("/app/data"),
+        help="Directory to save .npz files (default: /app/data)",
+    )
+    parser.add_argument(
+        "--gesture-names",
+        nargs="+",
+        default=GESTURE_NAMES,
+        help="Gesture names (space-separated, must start with REST)",
+    )
     args = parser.parse_args()
 
     gesture_names: list[str] = args.gesture_names
@@ -105,7 +166,9 @@ def main() -> None:
     print(_bold("=" * 58))
     print(_bold("    MindRove EMG Data Collector"))
     print(_bold("=" * 58))
-    print(f"  Gestures   : {', '.join(f'{i}={g}' for i, g in enumerate(gesture_names))}")
+    print(
+        f"  Gestures   : {', '.join(f'{i}={g}' for i, g in enumerate(gesture_names))}"
+    )
     print(f"  Repetitions: {args.reps}")
     print(f"  Duration   : {args.duration} s per rep per gesture")
     print(f"  Output dir : {output_dir}")
@@ -121,7 +184,9 @@ def main() -> None:
         sys.exit(1)
 
     sampling_rate = reader.sampling_rate
-    print(_green(f"Connected!  sampling_rate={sampling_rate} Hz  channels={N_CHANNELS}"))
+    print(
+        _green(f"Connected!  sampling_rate={sampling_rate} Hz  channels={N_CHANNELS}")
+    )
 
     # ── Warm-up ───────────────────────────────────────────────────────────────
     print(f"\n{_yellow('Warming up …')} ({WARMUP_DURATION_S:.0f} s)")
@@ -134,13 +199,15 @@ def main() -> None:
     print(_green("Board ready.\n"))
 
     # ── Recording loop ────────────────────────────────────────────────────────
-    all_emg: list[np.ndarray] = []   # list of (n_samples, N_CHANNELS)
+    all_emg: list[np.ndarray] = []  # list of (n_samples, N_CHANNELS)
     all_labels: list[np.ndarray] = []
-    segment_ends: list[int] = []   # cumulative end index of each gesture recording
+    segment_ends: list[int] = []  # cumulative end index of each gesture recording
 
     try:
         for rep in range(1, args.reps + 1):
-            print(_bold(f"── Repetition {rep}/{args.reps} ──────────────────────────────"))
+            print(
+                _bold(f"── Repetition {rep}/{args.reps} ──────────────────────────────")
+            )
             for g_id, g_name in enumerate(gesture_names):
                 print(f"\n  [{g_id + 1}/{n_gestures}] {_bold(g_name)}")
 
@@ -149,7 +216,17 @@ def main() -> None:
                 else:
                     print(f"  Perform the {_bold(g_name)} gesture and hold it.")
 
-                input(_yellow("  Press ENTER to start recording …"))
+                prepare_for_recording(
+                    gesture_name=g_name,
+                    is_first_recording=(rep == 1 and g_id == 0),
+                    auto_advance_delay_s=3,
+                    input_func=input,
+                    sleep_func=time.sleep,
+                    print_func=print,
+                    colorize_warning=_yellow,
+                    colorize_info=_cyan,
+                    colorize_bold=_bold,
+                )
                 print(_cyan(f"  Recording {args.duration} s …"))
 
                 chunk = record_gesture(reader, args.duration, sampling_rate)
@@ -176,8 +253,8 @@ def main() -> None:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = output_dir / f"session_{timestamp}.npz"
 
-    emg_arr = np.concatenate(all_emg, axis=0)       # (total_samples, N_CHANNELS)
-    label_arr = np.concatenate(all_labels, axis=0)   # (total_samples,)
+    emg_arr = np.concatenate(all_emg, axis=0)  # (total_samples, N_CHANNELS)
+    label_arr = np.concatenate(all_labels, axis=0)  # (total_samples,)
 
     np.savez_compressed(
         out_path,
@@ -191,7 +268,9 @@ def main() -> None:
     print()
     print(_bold("=" * 58))
     print(_green(f"  Saved {emg_arr.shape[0]} samples → {out_path}"))
-    class_counts = {gesture_names[i]: int(np.sum(label_arr == i)) for i in range(n_gestures)}
+    class_counts = {
+        gesture_names[i]: int(np.sum(label_arr == i)) for i in range(n_gestures)
+    }
     for name, count in class_counts.items():
         print(f"    {name:>8}: {count} samples  ({count / sampling_rate:.1f} s)")
     print(_bold("=" * 58))
