@@ -1,0 +1,193 @@
+prosthesis@KingBob:/prosthesis_ws$ make camera-test
+Starting >>> sensor_fusion_bringup
+Starting >>> prosthesis_launch
+Finished <<< sensor_fusion_bringup [0.66s]
+Finished <<< prosthesis_launch [2.10s]
+
+Summary: 2 packages finished [2.41s]
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-24-19-41-59-098533-KingBob-7235
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [7333]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [7334]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [7335]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [7336]
+[INFO] [pointcloud_fusion_node-5]: process started with pid [7337]
+[INFO] [odom_to_pose_relay-6]: process started with pid [7338]
+[INFO] [openvins_odom_tf_relay-7]: process started with pid [7339]
+[INFO] [segmentation_ros2_node-8]: process started with pid [7340]
+[INFO] [twist_propagation_node-9]: process started with pid [7341]
+[INFO] [preshaping_service_bridge_node-10]: process started with pid [7342]
+[INFO] [grasp_proximity_controller_node.py-11]: process started with pid [7343]
+[INFO] [rviz2-12]: process started with pid [7344]
+[preshaping_service_bridge_node-10] [INFO] [1779651719.664833966] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-10] [INFO] [1779651719.669501771] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-12] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[grasp_proximity_controller_node.py-11] [INFO] [1779651720.373332091] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[pipeline_manager_node-1] [INFO] [1779651720.521964942] [pipeline_manager]: Pipeline manager started — state: IDLE
+[rviz2-12] [INFO] [1779651720.714742365] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-12] [INFO] [1779651720.714895558] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-12] [INFO] [1779651720.805195540] [rviz2]: Stereo is NOT SUPPORTED
+[tf_pipeline_diagnostics-4] [INFO] [1779651720.834879713] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[rviz2-12] [INFO] [1779651720.951435159] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779651720.953905749] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779651720.978428422] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-12]
+[rviz2-12] [INFO] [1779651720.979027109] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-12]
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779651721.142472838] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779651721.143546047] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[rviz2-12] [INFO] [1779651721.168631017] [rviz2]: Stereo is NOT SUPPORTED
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779651721.246202624] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779651721.247836441] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1779651721.248336148] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[rviz2-12] [INFO] [1779651721.276969579] [rviz2]: Stereo is NOT SUPPORTED
+[pointcloud_fusion_node-5] [INFO] [1779651721.346463858] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-5] [INFO] [1779651721.347947008] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-5] [INFO] [1779651721.382774651] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-5] Traceback (most recent call last):
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/pointcloud_fusion/pointcloud_fusion_node", line 33, in <module>
+[pointcloud_fusion_node-5]     sys.exit(load_entry_point('pointcloud-fusion==0.1.0', 'console_scripts', 'pointcloud_fusion_node')())
+[pointcloud_fusion_node-5]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 1002, in main
+[pointcloud_fusion_node-5]     node = PointCloudFusionNode()
+[pointcloud_fusion_node-5]            ^^^^^^^^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 375, in __init__
+[pointcloud_fusion_node-5]     self._check_tf_ready()
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 770, in _check_tf_ready
+[pointcloud_fusion_node-5]     if self._node_start_time is not None:
+[pointcloud_fusion_node-5]        ^^^^^^^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5] AttributeError: 'PointCloudFusionNode' object has no attribute '_node_start_time'
+[camera_mount_tf_publisher-3] [INFO] [1779651721.461639692] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1779651721.464539736] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[segmentation_ros2_node-8] [INFO] [1779651721.648220298] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.05m
+[twist_propagation_node-9] [INFO] [1779651721.651977080] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-9] [INFO] [1779651721.700332581] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-9] [INFO] [1779651721.702689417] [twist_propagation]: External twist source: /hand_twist (max_age=0.5s)
+[ERROR] [pointcloud_fusion_node-5]: process has died [pid 7337, exit code 1, cmd '/prosthesis_ws/install/pointcloud_fusion/lib/pointcloud_fusion/pointcloud_fusion_node --ros-args -r __node:=pointcloud_fusion --params-file /tmp/launch_params_x7svhv9_'].
+[openvins_odom_tf_relay-7] [WARN] [1779651730.793394834] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[tf_pipeline_diagnostics-4] [WARN] [1779651732.831288658] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1779651740.129824567] [openvins_odom_tf_relay]: head: OpenVINS initialized (covariance), publishing TF marker_map -> head_imu (p=(-0.040, 0.002, 0.010), cov_trace=6.19e-05, pos_norm=0.041m, elapsed=19.4s, actual_imu_frame='head_imu')
+[openvins_odom_tf_relay-7] [WARN] [1779651740.747353647] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: OK (101 msgs), arm: WAITING (0 msgs)
+[tf_pipeline_diagnostics-4] [WARN] [1779651741.845343136] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):OK | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1779651750.743836304] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: OK (1641 msgs), arm: WAITING (0 msgs)
+[tf_pipeline_diagnostics-4] [WARN] [1779651751.827552530] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):OK | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1779651758.660030619] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.058, 0.004, 0.231), cov_trace=1.28e-04, pos_norm=0.239m, elapsed=37.9s, actual_imu_frame='arm_imu')
+[tf_pipeline_diagnostics-4] [INFO] [1779651760.823936916] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[tf_pipeline_diagnostics-4] [INFO] [1779651770.824013919] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[twist_propagation_node-9] [INFO] [1779651779.677746936] [twist_propagation]: Activated
+[tf_pipeline_diagnostics-4] [INFO] [1779651780.827009197] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[tf_pipeline_diagnostics-4] [INFO] [1779651790.828441844] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[tf_pipeline_diagnostics-4] [INFO] [1779651800.823899167] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[tf_pipeline_diagnostics-4] [INFO] [1779651810.830100788] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[preshaping_service_bridge_node-10] [INFO] [1779651816.032288731] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[rviz2-12] [INFO] [1779651816.033346842] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[segmentation_ros2_node-8] Traceback (most recent call last):
+[segmentation_ros2_node-8]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-8]     sys.exit(load_entry_point('segmentation-bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 359, in main
+[segmentation_ros2_node-8]     rclpy.spin(node)
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[segmentation_ros2_node-8]     executor.spin_once()
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[segmentation_ros2_node-8]     self._spin_once_impl(timeout_sec)
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[segmentation_ros2_node-8]     handler, entity, node = self.wait_for_ready_callbacks(
+[segmentation_ros2_node-8]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[segmentation_ros2_node-8]     return next(self._cb_iter)
+[segmentation_ros2_node-8]            ^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 778, in _wait_for_ready_callbacks
+[segmentation_ros2_node-8]     waitable.add_to_wait_set(wait_set)
+[segmentation_ros2_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/event_handler.py", line 125, in add_to_wait_set
+[segmentation_ros2_node-8]     self._event_index = wait_set.add_event(self.__event)
+[segmentation_ros2_node-8]                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-8] KeyboardInterrupt
+[INFO] [preshaping_service_bridge_node-10]: process has finished cleanly [pid 7342]
+[twist_propagation_node-9] Traceback (most recent call last):
+[twist_propagation_node-9]   File "/prosthesis_ws/install/twist_propagation/lib/twist_propagation/twist_propagation_node", line 33, in <module>
+[twist_propagation_node-9]     sys.exit(load_entry_point('twist-propagation==0.2.0', 'console_scripts', 'twist_propagation_node')())
+[twist_propagation_node-9]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-9]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1766, in main
+[twist_propagation_node-9]     rclpy.spin(node)
+[twist_propagation_node-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[twist_propagation_node-9]     executor.spin_once()
+[twist_propagation_node-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[twist_propagation_node-9]     self._spin_once_impl(timeout_sec)
+[twist_propagation_node-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[twist_propagation_node-9]     raise handler.exception()
+[twist_propagation_node-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[twist_propagation_node-9]     result = coro.send(None)
+[twist_propagation_node-9]              ^^^^^^^^^^^^^^^
+[twist_propagation_node-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 584, in handler
+[twist_propagation_node-9]     call_coroutine = take_from_wait_list(entity)
+[twist_propagation_node-9]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 470, in _take_subscription
+[twist_propagation_node-9]     msg_info = sub.handle.take_message(sub.msg_type, sub.raw)
+[twist_propagation_node-9]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-9] RuntimeError: Unable to convert call argument '0' to Python object (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)
+[camera_mount_tf_publisher-3] Traceback (most recent call last):
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-3]     main()
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-3]     rclpy.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-3]     _shutdown(context=context)
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-3]     context.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-3]     self.__context.shutdown()
+[camera_mount_tf_publisher-3] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[tf_pipeline_diagnostics-4] Traceback (most recent call last):
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-4]     main()
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 147, in main
+[tf_pipeline_diagnostics-4]     rclpy.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[tf_pipeline_diagnostics-4]     _shutdown(context=context)
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[tf_pipeline_diagnostics-4]     context.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[tf_pipeline_diagnostics-4]     self.__context.shutdown()
+[tf_pipeline_diagnostics-4] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[INFO] [grasp_proximity_controller_node.py-11]: process has finished cleanly [pid 7343]
+[INFO] [odom_to_pose_relay-6]: process has finished cleanly [pid 7338]
+[openvins_odom_tf_relay-7] Traceback (most recent call last):
+[openvins_odom_tf_relay-7]   File "/prosthesis_ws/install/camera/lib/camera/openvins_odom_tf_relay", line 33, in <module>
+[openvins_odom_tf_relay-7]     sys.exit(load_entry_point('camera==0.1.0', 'console_scripts', 'openvins_odom_tf_relay')())
+[openvins_odom_tf_relay-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/openvins_odom_tf_relay.py", line 693, in main
+[openvins_odom_tf_relay-7]     rclpy.spin(node)
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[openvins_odom_tf_relay-7]     executor.spin_once()
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[openvins_odom_tf_relay-7]     self._spin_once_impl(timeout_sec)
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[openvins_odom_tf_relay-7]     raise handler.exception()
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[openvins_odom_tf_relay-7]     result = coro.send(None)
+[openvins_odom_tf_relay-7]              ^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 584, in handler
+[openvins_odom_tf_relay-7]     call_coroutine = take_from_wait_list(entity)
+[openvins_odom_tf_relay-7]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 470, in _take_subscription
+[openvins_odom_tf_relay-7]     msg_info = sub.handle.take_message(sub.msg_type, sub.raw)
+[openvins_odom_tf_relay-7]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7] RuntimeError: Unable to convert call argument '0' to Python object (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)
+[INFO] [openvins_realsense_tf_bridge_node-2]: process has finished cleanly [pid 7334]
+[ERROR] [camera_mount_tf_publisher-3]: process has died [pid 7335, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[ERROR] [tf_pipeline_diagnostics-4]: process has died [pid 7336, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 7333]
+[ERROR] [twist_propagation_node-9]: process has died [pid 7341, exit code 1, cmd '/prosthesis_ws/install/twist_propagation/lib/twist_propagation/twist_propagation_node --ros-args -r __node:=twist_propagation --params-file /tmp/launch_params_1p8ys8y7'].
+[ERROR] [segmentation_ros2_node-8]: process has died [pid 7340, exit code -2, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_8pu2wa_2 -r /segmentation/input_cloud:=/fused_pointcloud'].
+[ERROR] [openvins_odom_tf_relay-7]: process has died [pid 7339, exit code 1, cmd '/prosthesis_ws/install/camera/lib/camera/openvins_odom_tf_relay --ros-args --log-level warn --ros-args -r __node:=openvins_odom_tf_relay --params-file /tmp/launch_params_jnlzizl1'].
+[ERROR] [rviz2-12]: process[rviz2-12] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [rviz2-12]: sending signal 'SIGTERM' to process[rviz2-12]
+[ERROR] [rviz2-12]: process[rviz2-12] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'
+[INFO] [rviz2-12]: sending signal 'SIGKILL' to process[rviz2-12]
+[ERROR] [rviz2-12]: process has died [pid 7344, exit code -9, cmd '/opt/ros/jazzy/lib/rviz2/rviz2 -d /prosthesis_ws/rviz/prosthesis.rviz --ros-args -r __node:=rviz2'].
+
+prosthesis@KingBob:/prosthesis_ws$

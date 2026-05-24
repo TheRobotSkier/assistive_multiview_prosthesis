@@ -461,7 +461,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "roi_radius",
-                default_value="0.3",
+                default_value="0.1",
                 description="ROI crop radius (m) for pre-inference point cloud filtering. "
                             "Set <=0 to disable.",
             ),

@@ -116,7 +116,7 @@ class SegmentationNode(Node):
         self.declare_parameter("cubeedge", 0.05)
         self.declare_parameter("inference_url", "http://127.0.0.1:5678")
         self.declare_parameter("click_batch_debounce_s", 0.02)
-        self.declare_parameter("roi_radius_m", 0.05)
+        self.declare_parameter("roi_radius_m", 0.1)
 
         self._lock = threading.Lock()
         self._cloud_xyz: np.ndarray | None = None

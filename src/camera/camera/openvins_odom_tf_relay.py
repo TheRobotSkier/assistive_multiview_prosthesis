@@ -50,6 +50,15 @@ from tf2_ros import Buffer, TransformBroadcaster, StaticTransformBroadcaster, Tr
 # A trace > 0 means the EKF has produced at least one update.
 _MIN_COV_TRACE = 1e-12
 
+# If the init guard hasn't passed after this many seconds, force-publish
+# anyway.  This prevents the relay from being permanently blocked if
+# OpenVINS never publishes non-zero covariance.
+_INIT_GUARD_FALLBACK_TIMEOUT_S = 30.0
+
+# Minimum position norm (meters) to consider the pose non-trivial.
+# Identity pose is near origin; a converged VIO will have moved.
+_MIN_POSE_NORM_M = 0.001
+
 # Maximum translation magnitude (m) for the imu->cam0 extrinsic.
 # If self-calibration produces a translation larger than this, it is
 # rejected and the hardcoded fallback is kept.
@@ -216,6 +225,12 @@ class OpenVINSOdomTFRelay(Node):
         self._head_count = 0
         self._arm_count = 0
 
+        # -- Startup timestamp for fallback timeout --------------------------
+        self._startup_time = self.get_clock().now()
+
+        # -- Periodic status timer (visible at warn level) --------------------
+        self._status_timer = self.create_timer(10.0, self._status_tick)
+
         # -- Per-camera initialization tracking --------------------------------
         self._head_initialized = False
         self._arm_initialized = False
@@ -297,6 +312,10 @@ class OpenVINSOdomTFRelay(Node):
         Skips messages from uninitialized OpenVINS (zero covariance or
         non-finite pose).  This prevents garbage TFs from flooding the
         system during the first 40-80 seconds while VIO converges.
+
+        After ``_INIT_GUARD_FALLBACK_TIMEOUT_S`` seconds, the guard is
+        bypassed and messages are published regardless of covariance, to
+        prevent the relay from being permanently blocked.
         """
         x, y, z = _extract_translation_from_odom(msg)
         qx, qy, qz, qw = _extract_quaternion_from_odom(msg)
@@ -310,21 +329,38 @@ class OpenVINSOdomTFRelay(Node):
             # Check 1: all pose values must be finite.
             if not all(math.isfinite(v) for v in [x, y, z, qx, qy, qz, qw]):
                 return
+
             # Check 2: covariance trace must be > 0 (EKF has updated).
             cov = msg.pose.covariance
             cov_trace = sum(c * c for c in cov)
-            if cov_trace < _MIN_COV_TRACE:
-                return
+            pos_norm = math.sqrt(x * x + y * y + z * z)
+
+            # Check 3: fallback timeout — if we've waited long enough,
+            # accept the message if the pose is non-trivial (not identity).
+            elapsed = (self.get_clock().now() - self._startup_time).nanoseconds / 1e9
+            fallback_triggered = (
+                elapsed >= _INIT_GUARD_FALLBACK_TIMEOUT_S
+                and pos_norm > _MIN_POSE_NORM_M
+            )
+
+            if cov_trace < _MIN_COV_TRACE and not fallback_triggered:
+                return  # still waiting for convergence
+
             # First valid message — mark initialized and log.
             setattr(self, init_attr, True)
             # Capture the actual IMU frame name from the odom message.
             actual_imu = msg.child_frame_id
             setattr(self, actual_imu_attr, actual_imu)
-            self.get_logger().info(
-                f"{name}: OpenVINS initialized, publishing TF "
+            reason = "covariance" if cov_trace >= _MIN_COV_TRACE else "fallback-timeout"
+            # Use warn level so this is visible even when the relay
+            # is launched with --log-level warn.
+            self.get_logger().warn(
+                f"{name}: OpenVINS initialized ({reason}), publishing TF "
                 f"{parent} -> {child} "
                 f"(p=({x:.3f}, {y:.3f}, {z:.3f}), "
                 f"cov_trace={cov_trace:.2e}, "
+                f"pos_norm={pos_norm:.3f}m, "
+                f"elapsed={elapsed:.1f}s, "
                 f"actual_imu_frame={actual_imu!r})"
             )
 
@@ -355,6 +391,23 @@ class OpenVINSOdomTFRelay(Node):
                 f"{parent} -> {child} "
                 f"t=({x:.3f}, {y:.3f}, {z:.3f})"
             )
+
+    # ── Periodic status (visible at warn level) ───────────────────────────
+
+    def _status_tick(self):
+        """Log a one-line status every 10 seconds, visible at warn level."""
+        elapsed = (self.get_clock().now() - self._startup_time).nanoseconds / 1e9
+        head_status = "OK" if self._head_initialized else "WAITING"
+        arm_status = "OK" if self._arm_initialized else "WAITING"
+        if self._head_initialized and self._arm_initialized:
+            # Both initialized — stop the status timer.
+            self.destroy_timer(self._status_timer)
+            return
+        self.get_logger().warn(
+            f"[RELAY-STATUS] {elapsed:.0f}s elapsed — "
+            f"head: {head_status} ({self._head_count} msgs), "
+            f"arm: {arm_status} ({self._arm_count} msgs)"
+        )
 
     # ── Self-calibration ──────────────────────────────────────────────────
 
