@@ -1,0 +1,21 @@
+docs/emg_grasp/README.md
+  s_4efccc4bd39efc::t_4f5e4f76e89302 1-451
+docs/emg_grasp/TROUBLESHOOTING.md
+  s_4efccc4bd39efc::t_f199f593a02b39 1-313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "2d0049462eca8bcfe96fb6b9bfd349f9545946a1",
+  "prompts": {},
+  "sessions": {
+    "s_4efccc4bd39efc": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3cb1af0ffew4OORlaCIlGduN",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
