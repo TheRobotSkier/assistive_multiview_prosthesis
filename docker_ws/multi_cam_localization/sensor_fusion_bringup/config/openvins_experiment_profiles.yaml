@@ -96,8 +96,15 @@ profiles:
 
   imu_frame_variant:
     description: >
-      Placeholder for IMU frame remapping experiments.
-      No overrides yet — add keys here when the IMU frame bead lands.
+      RESOLVED (mvp-cox.8): Investigated and found NO frame convention mismatch.
+      The D435i librealsense SDK internally multiplies raw IMU samples by the
+      depth-to-IMU extrinsic matrix, publishing data already in depth-sensor
+      optical convention (x-right, y-down, z-forward). OpenVINS
+      ROS2Visualizer::callback_inertial copies wm/am vectors directly without
+      frame_id filtering. Kalibr near-identity T_cam_imu and identity
+      R_IMUtoACC/R_IMUtoGYRO are therefore correct. No separate
+      *_imu_optical_frame variant needed — the *_imu data IS already optical.
+      See mvp-cox.8 bead notes for full investigation trace.
 
   all_changes:
     description: >
