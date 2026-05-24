@@ -1,0 +1,36 @@
+tests/emg_grasp/test_hardware_checklist.py
+  s_45228ebeab9f73::t_e1c6894fa8a0f3 1-541
+tests/emg_grasp/test_mock_integration.py
+  s_45228ebeab9f73::t_97fcb9d5fd783c 593
+  s_45228ebeab9f73::t_0c19376ead42aa 563
+  s_45228ebeab9f73::t_746b13c54199a6 1-536,541-562,564-577,579-592,594-606,608-621,623-646,648-659,661-672,674-723,725-1040,1044-1187,1189-1214,1216-1220,1222-1226,1228-1232,1234-1238,1240-1251
+  s_45228ebeab9f73::t_4e11ec4a60ce98 578
+  s_45228ebeab9f73::t_5f54a831a6f48f 647
+  s_45228ebeab9f73::t_d6af680126a325 673
+  s_45228ebeab9f73::t_b1ed00e63f2e58 660
+  s_45228ebeab9f73::t_0f2a0a0a07315a 724
+  s_45228ebeab9f73::t_b8a08e204b9fc8 537-540
+  s_45228ebeab9f73::t_948248c0e4f55a 622
+  s_45228ebeab9f73::t_a54ad6d0008be4 1188
+  s_45228ebeab9f73::t_4bba82509ca8d1 1215,1221,1227,1233,1239
+  s_45228ebeab9f73::t_cae955062cbea4 607
+  s_45228ebeab9f73::t_653effa5971d24 1041-1043
+scripts/run_emg_grasp_tests.sh
+  s_45228ebeab9f73::t_8e81d07ff1410f 1-223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "9cf86572a8c11dcf2e0d2f7579e3b2759e469dd2",
+  "prompts": {},
+  "sessions": {
+    "s_45228ebeab9f73": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3bd55e8ffer9AL0in2eElXA9",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
