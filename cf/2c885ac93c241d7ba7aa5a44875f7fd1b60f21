@@ -1,0 +1,32 @@
+src/emg_bridge/setup.py
+  s_88f9e12163e7f4::t_b400a951efda71 25
+src/emg_bridge/emg_bridge/emg_grasp_state_machine.py
+  s_88f9e12163e7f4::t_f51d46b847e092 107
+  s_88f9e12163e7f4::t_752972985dc58a 130
+  s_88f9e12163e7f4::t_2a6d250a906649 191
+  s_88f9e12163e7f4::t_86fae5994c4c1d 202-206,209-217,231
+  s_88f9e12163e7f4::t_55f2b3ad9835ad 207-208,218-220
+  s_88f9e12163e7f4::t_cbfaee1a47bb47 1-106,108-129,131-190,192-201,222-230,232-349
+  s_88f9e12163e7f4::t_52ba8c474d9e01 221
+src/emg_bridge/test_state_machine.py
+  s_88f9e12163e7f4::t_2507df73bce9d5 58
+  s_88f9e12163e7f4::t_cb12e39d9e1fcc 1-57,59-465
+src/emg_bridge/emg_bridge/emg_grasp_controller.py
+  s_88f9e12163e7f4::t_ada8e69820cda1 1-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "cf2c885ac93c241d7ba7aa5a44875f7fd1b60f21",
+  "prompts": {},
+  "sessions": {
+    "s_88f9e12163e7f4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3dd8067ffezIKRBKaK2jJlq0",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
