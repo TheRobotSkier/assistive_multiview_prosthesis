@@ -1,0 +1,19 @@
+Makefile
+  s_6a053cf002c2c5::t_afddfeb5572939 575-709
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "c965eca2fe70adacc62fb181a32c8e0e7c6e1ccb",
+  "prompts": {},
+  "sessions": {
+    "s_6a053cf002c2c5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a542d867ffem2rAk0lzel3omH",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
