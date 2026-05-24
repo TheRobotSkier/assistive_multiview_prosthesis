@@ -8,9 +8,10 @@ needs, bypassing unreliable DDS ``/tf`` delivery from the Jetson.
 
 The odometry messages arrive at ~200 Hz on separate topics (one per camera).
 Each message carries ``T(marker_map -> imu)`` in its pose field.  We extract
-that pose and publish it as a local TF transform stamped with the **odom
-message timestamp** so that TF timestamps share the same time domain as the
-point clouds arriving from the Jetson.
+that pose and publish it as a local TF transform stamped with the **host
+clock** so that TF timestamps share the same time domain as the other
+host-side TF publishers (bridge, camera mounts).  This ensures the
+multi-edge TF chain composes correctly for bbox removal lookups.
 
 Parameters
 ----------
@@ -364,13 +365,15 @@ class OpenVINSOdomTFRelay(Node):
                 f"actual_imu_frame={actual_imu!r})"
             )
 
-        # Use the odom message's timestamp so TF stamps share the same
-        # time domain as the point clouds from the Jetson.  The fusion
-        # node re-stamps the output cloud with the host clock, so
-        # downstream consumers are unaffected.
+        # Stamp with the host clock so all edges in the TF chain
+        # (relay, bridge, camera mounts) share the same time domain.
+        # Using the Jetson odom timestamp created a ~10s clock gap that
+        # prevented TF2 from composing the multi-edge chain for bbox
+        # removal lookups ("extrapolation into the past" errors).
+        host_stamp = self.get_clock().now().to_msg()
         tf_msg = _make_transform(
             parent, child, x, y, z, qx, qy, qz, qw,
-            msg.header.stamp,
+            host_stamp,
         )
         self._tf_broadcaster.sendTransform(tf_msg)
 
