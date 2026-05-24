@@ -9,6 +9,8 @@ find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(sensor_fusion_msgs REQUIRED)
 
 add_executable(pointcloud_to_frame_node src/pointcloud_to_frame_node.cpp)
 ament_target_dependencies(
@@ -22,8 +24,19 @@ ament_target_dependencies(
   tf2_sensor_msgs
 )
 
+add_executable(aruco_marker_pose_cpp_node src/aruco_marker_pose_node.cpp)
+ament_target_dependencies(
+  aruco_marker_pose_cpp_node
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+  sensor_fusion_msgs
+  OpenCV
+)
+
 install(
-  TARGETS pointcloud_to_frame_node
+  TARGETS pointcloud_to_frame_node aruco_marker_pose_cpp_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

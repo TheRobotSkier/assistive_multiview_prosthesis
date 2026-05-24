@@ -16,6 +16,8 @@
   <build_depend>tf2</build_depend>
   <build_depend>tf2_ros</build_depend>
   <build_depend>tf2_sensor_msgs</build_depend>
+  <build_depend>libopencv-dev</build_depend>
+  <build_depend>sensor_fusion_msgs</build_depend>
 
   <build_export_depend>geometry_msgs</build_export_depend>
   <build_export_depend>rclcpp</build_export_depend>
