@@ -221,14 +221,6 @@ def main() -> None:
         backend = SklearnEmgBackend(experiment)
     elif experiment.classifier_backend == "sklearn_imu":
         backend = SklearnImuBackend(experiment)
-    elif experiment.classifier_backend == "naviflame":
-        try:
-            from emg_bridge.naviflame_backend import NaviFlameBackend
-            backend = NaviFlameBackend(experiment)
-        except ImportError as exc:
-            print(_red(f"NaviFlame backend unavailable: {exc}"))
-            print(_yellow("Falling back to sklearn EMG-only backend."))
-            backend = SklearnEmgBackend(experiment)
     else:
         print(_yellow(f"Unknown backend '{experiment.classifier_backend}' — using sklearn."))
         backend = SklearnEmgBackend(experiment)

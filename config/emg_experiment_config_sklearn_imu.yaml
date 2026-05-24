@@ -1,0 +1,7 @@
+# EMG + IMU sklearn mode — uses models_imu/ directory
+classifier_backend: sklearn_imu
+imu_features:
+  enabled: true
+  gyro: true
+  accel: false
+  movement_gate: 0.0

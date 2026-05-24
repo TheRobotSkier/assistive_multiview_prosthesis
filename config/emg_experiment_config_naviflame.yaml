@@ -1,0 +1,5 @@
+# NaviFlame — standalone Python 3.10 container, not the ROS container
+# See: make emg-naviflame and make emg-naviflame-train
+classifier_backend: naviflame
+naviflame:
+  enabled: true

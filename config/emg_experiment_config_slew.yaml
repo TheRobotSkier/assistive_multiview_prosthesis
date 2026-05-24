@@ -1,0 +1,9 @@
+# Proportional slew limiting — uses models/ directory
+classifier_backend: sklearn
+proportional_slew:
+  enabled: true
+  max_velocity_per_s: 2.5
+  max_accel_per_s2: 10.0
+  max_fall_velocity_per_s: 10.0
+  reset_on_rest: true
+  initial_value: 0.0

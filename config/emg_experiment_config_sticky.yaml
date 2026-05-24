@@ -1,0 +1,10 @@
+# Sticky gesture hysteresis — uses models/ directory
+classifier_backend: sklearn
+gesture_stability:
+  enabled: true
+  min_confidence_to_switch: 0.7
+  min_margin_to_switch: 0.0
+  min_frames: 5
+  min_hold_s: 0.2
+  release_behavior: allow_rest_immediately
+  fallback_behavior: hold_previous
