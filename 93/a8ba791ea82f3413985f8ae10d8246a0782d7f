@@ -1,0 +1,22 @@
+docker_ws/multi_cam_localization/sensor_fusion_bringup/src/ransac_pointcloud_fusion_node.cpp
+  s_14430be63187a9::t_36cc138c366fce 311,313
+  s_14430be63187a9::t_4d99a253554002 9,13
+  s_14430be63187a9::t_e1a5e720c21379 23-81
+  s_14430be63187a9::t_21e61bd539be64 151-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "93a8ba791ea82f3413985f8ae10d8246a0782d7f",
+  "prompts": {},
+  "sessions": {
+    "s_14430be63187a9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5c0128cffe1r7WEnoiYrSuMC",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
