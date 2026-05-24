@@ -1,0 +1,22 @@
+docker/Dockerfile.emg-experiments
+  s_6a053cf002c2c5::t_c0a5a10422531e 1-49
+Makefile
+  s_6a053cf002c2c5::t_8613cf1c975cae 57
+  s_6a053cf002c2c5::t_ce1c191f2f1dcb 579,581,585,590-591,593-610,626
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "b6a99d7f2f94618ba3f4bd9e51e30395b30bfacd",
+  "prompts": {},
+  "sessions": {
+    "s_6a053cf002c2c5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a542d867ffem2rAk0lzel3omH",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
