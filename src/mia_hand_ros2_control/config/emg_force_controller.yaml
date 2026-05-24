@@ -1,0 +1,78 @@
+# EMG-Driven Velocity-Based Force-Hold Controller Configuration
+#
+# This config powers the EmgForceController node in mia_hand_ros2_control.
+
+# ── Velocity Profile ──────────────────────────────────────────────────────────
+closing_velocity_start: 0.3
+closing_velocity_end: 0.1
+decay_steps: 5
+step_interval_s: 0.2
+
+# ── Stop Conditions ───────────────────────────────────────────────────────────
+stop_positions:
+  j_thumb_fle: 1.5
+  j_index_fle: 1.5
+  j_mrl_fle:   1.5
+
+force_thresholds:
+  j_thumb_fle: 300
+  j_index_fle: 300
+  j_mrl_fle:   300
+
+# ── Target Force Ranges (raw ADC, per finger) ─────────────────────────────────
+target_force_min:
+  j_thumb_fle: 100
+  j_index_fle: 100
+  j_mrl_fle:   100
+
+target_force_max:
+  j_thumb_fle: 500
+  j_index_fle: 500
+  j_mrl_fle:   500
+
+# ── Force-Hold Tuning ─────────────────────────────────────────────────────────
+# Deadzone: no velocity adjustment when |target - effort| <= deadzone
+force_deadzone:
+  j_thumb_fle: 15
+  j_index_fle: 15
+  j_mrl_fle:   15
+
+# Max overshoot: clamp per-finger error to this before computing adjustment
+max_overshoot:
+  j_thumb_fle: 100
+  j_index_fle: 100
+  j_mrl_fle:   100
+
+# Max adjustment velocity (rad/s) — limit on velocity commanded during hold
+max_adjustment_velocity: 0.05
+
+# Adjustment gain: rad/s per raw ADC force unit (P-gain for hold loop)
+adjustment_gain: 0.0005
+
+# Static hold velocity (rad/s) — applied when all fingers are within deadzone
+# Tiny positive value maintains gentle contact pressure; set to 0.0 for true zero
+static_hold_velocity: 0.02
+
+# ── Safety ────────────────────────────────────────────────────────────────────
+# Time without /joint_states before data is considered stale
+stale_data_timeout_s: 0.5
+
+# Emergency force limits per finger — trigger immediate back-off
+max_force_emergency:
+  j_thumb_fle: 800
+  j_index_fle: 800
+  j_mrl_fle:   800
+
+# Back-off velocity during emergency release (negative = open direction)
+emergency_backoff_velocity: -0.1
+
+# ── EMG Parameters ────────────────────────────────────────────────────────────
+emg_gesture_topic: "/emg/gesture_label"
+emg_confidence_topic: "/emg/confidence"
+emg_proportional_topic: "/emg/proportional"
+
+# Gesture IDs: REST=0, POWER=1, PINCH=2, OPEN=3, POINT=4
+emg_grasp_trigger_gesture: 1
+emg_release_gesture: 3
+emg_grasp_confidence_threshold: 0.7
+gesture_hold_timeout_s: 1.0

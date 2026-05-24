@@ -63,7 +63,15 @@ install(DIRECTORY
 # Installing Python scripts.
 install(PROGRAMS
   mia_hand_ros2_control/mia_safety_node.py
+  mia_hand_ros2_control/emg_force_controller.py
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# Installing Python modules.
+install(FILES
+  mia_hand_ros2_control/__init__.py
+  mia_hand_ros2_control/force_hold_controller.py
+  DESTINATION lib/${PROJECT_NAME}/mia_hand_ros2_control
 )
 
 if(BUILD_TESTING)
