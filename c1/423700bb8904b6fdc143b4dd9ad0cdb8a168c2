@@ -1,0 +1,42 @@
+scripts/emg_force_grasp_entrypoint.sh
+  s_6a053cf002c2c5::t_7f90c0fe79b464 1-57
+src/prosthesis_launch/launch/emg_force_grasp.launch.py
+  s_6a053cf002c2c5::t_8cf159e9b84978 1-280
+src/force_controller/force_controller/force_bridge_node.py
+  s_6a053cf002c2c5::t_0c5146b8200fd3 1-132
+src/force_controller/force_controller/force_controller_node.py
+  s_6a053cf002c2c5::t_2790d028c77c25 284-287
+Makefile
+  s_6a053cf002c2c5::t_a32009ad8e53c9 513-579
+tests/emg_grasp/emg_grasp_test_force.yaml
+  s_6a053cf002c2c5::t_28e93bbfec6cb7 1-129
+src/force_controller/setup.py
+  s_6a053cf002c2c5::t_77c3237788a293 24
+tests/emg_grasp/emg_grasp_node.py
+  s_6a053cf002c2c5::t_265543079d118f 572,576-591
+  s_6a053cf002c2c5::t_1972f5c2cae6db 426-468
+  s_6a053cf002c2c5::t_f357e009b3759c 197-205
+  s_6a053cf002c2c5::t_8da443f97d4e4c 106-112
+  s_6a053cf002c2c5::t_41a9567ce0e561 218-221
+  s_6a053cf002c2c5::t_e7ff10f55a99e3 617-636
+  s_6a053cf002c2c5::t_6b04fad3c2a938 651-658
+  s_6a053cf002c2c5::t_958427cc61207e 599-607
+  s_6a053cf002c2c5::t_f1d7e90887a8cb 690-695,697-710,717-723,725-726,728-735,737-740
+  s_6a053cf002c2c5::t_da048631e57933 1-105,113-196,206-217,222-425,469-571,573-575,592-598,608-616,637-650,659-689,696,711-716,724,727,736,741-758
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "c1423700bb8904b6fdc143b4dd9ad0cdb8a168c2",
+  "prompts": {},
+  "sessions": {
+    "s_6a053cf002c2c5": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a542d867ffem2rAk0lzel3omH",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
