@@ -42,11 +42,17 @@ def generate_launch_description():
         default_value="/prosthesis_ws/tests/emg_grasp/emg_grasp_test.yaml",
         description="Path to EMG grasp test YAML config",
     )
+    use_mock_hardware_arg = DeclareLaunchArgument(
+        "use_mock_hardware",
+        default_value="false",
+        description="Use mock Mia hand hardware (no physical device needed)",
+    )
 
     emg = LaunchConfiguration("emg")
     mock_emg = LaunchConfiguration("mock_emg")
     serial_port = LaunchConfiguration("serial_port")
     config_path = LaunchConfiguration("config_path")
+    use_mock_hardware = LaunchConfiguration("use_mock_hardware")
 
     # Mia Hand system interface — spawns all individual pos+vel controllers
     mia_hand_launch = IncludeLaunchDescription(
@@ -60,7 +66,7 @@ def generate_launch_description():
         launch_arguments={
             "serial_port": serial_port,
             "controller": "",
-            "use_mock_hardware": "false",
+            "use_mock_hardware": use_mock_hardware,
             "rviz2_gui": "false",
         }.items(),
     )
@@ -99,6 +105,7 @@ def generate_launch_description():
         mock_emg_arg,
         serial_port_arg,
         config_path_arg,
+        use_mock_hardware_arg,
         mia_hand_launch,
         emg_grasp_node,
         mock_emg_node,
