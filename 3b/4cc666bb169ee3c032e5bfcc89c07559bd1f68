@@ -1,0 +1,19 @@
+docs/emg_grasp/INTERFACE_MAP.md
+  s_cfc982990da167::t_47dff82848207f 1-508
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "3b4cc666bb169ee3c032e5bfcc89c07559bd1f68",
+  "prompts": {},
+  "sessions": {
+    "s_cfc982990da167": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3de5e53ffetgOlmRendXxYSM",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
