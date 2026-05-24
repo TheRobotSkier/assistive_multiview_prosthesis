@@ -1,0 +1,19 @@
+scripts/emg_train_and_test.sh
+  s_22b3a9066ec4a6::t_acf28b42f7f7a8 18,32,118-130,136-137
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "89efebe6e5b40bc57da062f82b02c347f598537e",
+  "prompts": {},
+  "sessions": {
+    "s_22b3a9066ec4a6": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a6df4cc9ffeF08bwkl6r0ziZF",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
