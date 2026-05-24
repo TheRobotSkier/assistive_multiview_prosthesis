@@ -1,0 +1,22 @@
+src/emg_bridge/emg_bridge/control_filters.py
+  s_3fa84d0afaf810::t_8e7d4323ee8538 1-108
+tests/test_control_filters.py
+  s_3fa84d0afaf810::t_52781b3d72ffd8 346
+  s_3fa84d0afaf810::t_52bd013dcbb6aa 1-345,347-360
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "0969e07705ee942025f6b8e8274c1884950429f4",
+  "prompts": {},
+  "sessions": {
+    "s_3fa84d0afaf810": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a536f9a9ffeMwYQ1rZAsbIHgQ",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
