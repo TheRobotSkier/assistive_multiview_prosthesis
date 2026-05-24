@@ -76,6 +76,7 @@ def _setup(context, *args, **kwargs):
     start_rviz = _as_bool(_arg_or_config(context, "start_rviz", launch_cfg.get("start_rviz", False)))
     start_marker_graph = _as_bool(_arg_or_config(context, "start_marker_graph", launch_cfg.get("start_marker_graph", True)))
     start_marker_graph_odom_relay = _as_bool(_arg_or_config(context, "start_marker_graph_odom_relay", launch_cfg.get("start_marker_graph_odom_relay", True)))
+    start_ransac_fusion = _as_bool(_arg_or_config(context, "start_ransac_fusion", launch_cfg.get("start_ransac_fusion", False)))
     record_bag = _as_bool(_arg_or_config(context, "record_bag", launch_cfg.get("record_bag", False)))
     enable_pointclouds = _as_bool(_arg_or_config(context, "enable_pointclouds", pointcloud_cfg.get("enable", False)))
     enable_marker_map_pointclouds = _as_bool(
@@ -307,6 +308,33 @@ def _setup(context, *args, **kwargs):
             )
         )
 
+    ransac_fusion_cfg = config.get("ransac_pointcloud_fusion", {})
+    if start_ransac_fusion:
+        actions.append(
+            Node(
+                package="sensor_fusion_bringup",
+                executable="ransac_pointcloud_fusion_node",
+                name="ransac_pointcloud_fusion",
+                output="screen",
+                parameters=[
+                    {"use_sim_time": use_sim_time},
+                    {"head_cloud_topic": str(ransac_fusion_cfg.get("head_cloud_topic", "/head/d435i_head/points_marker_map"))},
+                    {"arm_cloud_topic": str(ransac_fusion_cfg.get("arm_cloud_topic", "/arm/d435i_arm/points_marker_map"))},
+                    {"output_topic": str(ransac_fusion_cfg.get("output_topic", "/pointcloud_fused_ransac"))},
+                    {"ransac_min_correspondences": int(ransac_fusion_cfg.get("ransac_min_correspondences", 8))},
+                    {"ransac_max_iterations": int(ransac_fusion_cfg.get("ransac_max_iterations", 2000))},
+                    {"ransac_max_correspondence_dist_m": float(ransac_fusion_cfg.get("ransac_max_correspondence_dist_m", 0.05))},
+                    {"downsample_leaf_m": float(ransac_fusion_cfg.get("downsample_leaf_m", 0.02))},
+                    {"fuse_voxel_leaf_m": float(ransac_fusion_cfg.get("fuse_voxel_leaf_m", 0.01))},
+                    {"max_cloud_age_s": float(ransac_fusion_cfg.get("max_cloud_age_s", 1.0))},
+                    {"max_rate_hz": float(ransac_fusion_cfg.get("max_rate_hz", 10.0))},
+                    {"enable_ransac_fusion": bool(ransac_fusion_cfg.get("enable_ransac_fusion", True))},
+                    {"normal_radius_m": float(ransac_fusion_cfg.get("normal_radius_m", 0.05))},
+                    {"feature_radius_m": float(ransac_fusion_cfg.get("feature_radius_m", 0.10))},
+                ],
+            )
+        )
+
     if start_preview:
         actions.append(
             IncludeLaunchDescription(
@@ -356,6 +384,8 @@ def _setup(context, *args, **kwargs):
             "/marker_graph_estimator/head_to_arm",
             "/marker_graph_estimator/status",
             "/marker_graph_estimator/edges",
+            "/pointcloud_fused_ransac",
+            "/pointcloud_fused_ransac/status",
         ]
         if record_pointclouds:
             topics.extend(
@@ -411,6 +441,7 @@ def generate_launch_description():
             DeclareLaunchArgument("verbosity", default_value=""),
             DeclareLaunchArgument("hold_back_imu_for_frames", default_value=""),
             DeclareLaunchArgument("start_marker_graph_odom_relay", default_value=""),
+            DeclareLaunchArgument("start_ransac_fusion", default_value=""),
             DeclareLaunchArgument(
                 "openvins_experiment_profile",
                 default_value="",

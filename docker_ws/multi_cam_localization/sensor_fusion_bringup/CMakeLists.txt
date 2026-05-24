@@ -11,6 +11,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(sensor_fusion_msgs REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common features filters registration search)
 
 add_executable(pointcloud_to_frame_node src/pointcloud_to_frame_node.cpp)
 ament_target_dependencies(
@@ -35,8 +36,23 @@ ament_target_dependencies(
   OpenCV
 )
 
+add_executable(ransac_pointcloud_fusion_node src/ransac_pointcloud_fusion_node.cpp)
+ament_target_dependencies(
+  ransac_pointcloud_fusion_node
+  geometry_msgs
+  rclcpp
+  sensor_msgs
+  std_msgs
+)
+target_include_directories(ransac_pointcloud_fusion_node PRIVATE ${PCL_INCLUDE_DIRS})
+target_link_libraries(ransac_pointcloud_fusion_node
+  ${PCL_LIBRARIES}
+  ${pcl_libraries}
+)
+target_compile_definitions(ransac_pointcloud_fusion_node PRIVATE ${PCL_DEFINITIONS})
+
 install(
-  TARGETS pointcloud_to_frame_node aruco_marker_pose_cpp_node
+  TARGETS pointcloud_to_frame_node aruco_marker_pose_cpp_node ransac_pointcloud_fusion_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

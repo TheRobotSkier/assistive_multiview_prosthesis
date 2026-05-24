@@ -209,3 +209,26 @@ profiles:
       marker_initial_lock_allow_zero_velocity: true
       marker_initial_lock_velocity_cov_std: 0.5
       marker_reset_bias_policy: "zero_on_initial_lock"
+
+  ransac_pointcloud_fusion:
+    description: >
+      Enable RANSAC-based point cloud fusion. After each camera's point cloud
+      is independently transformed into the marker_map frame, a new node
+      subscribes to both /head/d435i_head/points_marker_map and
+      /arm/d435i_arm/points_marker_map, runs PCL FPFH feature extraction
+      + SAC-IA (RANSAC) alignment with a minimum of 8 correspondences, and
+      publishes a properly fused + deduplicated point cloud on
+      /pointcloud_fused_ransac.
+
+      If fewer than 8 feature correspondences are found, the clouds are
+      concatenated without a correction transform (still voxel-deduplicated).
+
+      This profile does NOT alter OpenVINS parameters. It only controls the
+      post-OpenVINS point cloud processing pipeline. Requires
+      start_ransac_fusion:=true and enable_marker_map_pointclouds:=true on
+      the master launch.
+    marker_detector:
+      ransac_fusion_enable: true
+      ransac_min_correspondences: 8
+      ransac_fuse_voxel_leaf_m: 0.01
+      ransac_downsample_leaf_m: 0.02
