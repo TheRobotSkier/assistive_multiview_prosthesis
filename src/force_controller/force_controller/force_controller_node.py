@@ -1,63 +1,39 @@
 #!/usr/bin/env python3
-"""Force Controller Node for Mia Hand — position-based PI force regulation.
+"""Velocity-Based Force Controller Node for Mia Hand.
 
-Handoff Protocol (Proximity Controller -> Force Controller):
-    When the pipeline transitions from APPROACHING to GRASPING:
-      1. The proximity controller has already sent full closure positions to
-         the ``*_pos_ff_controller/commands`` topics.
-      2. This node wakes up, activates force streaming via the Mia Hand driver
-         service, and reads the current joint positions from ``/joint_states``.
-      3. It uses those positions as its baseline and begins making incremental
-         adjustments based on force sensor feedback.
-      4. No explicit handshake is needed — the proximity controller stops
-         publishing during GRASPING/HOLDING (pipeline state gate), so only
-         this node commands the joints during those states.
+Uses the same velocity-ramp closing + deadzone force-hold pattern as
+``scripts/emg_force_grasp_bridge.py``, but is fully drop-in compatible with
+the production pipeline manager.
 
-Subscriptions:
-    data_streams/fingers/forces/data  (mia_hand_msgs/ForceData)
-        Real force sensor data: 6 int32 fields (3 normal + 3 tangential).
-    /pipeline/state  (std_msgs/Int32)
-        Pipeline state machine state.
-    /joint_states  (sensor_msgs/JointState)
-        Current joint positions for incremental adjustments.
+Pipeline integration:
+    - Subscribes to /pipeline/state, activates on GRASPING, deactivates on
+      leaving GRASPING/HOLDING/VOLITIONAL, resets on RELEASING.
+    - Publishes ForceControllerStatus on /force_controller/status for the
+      pipeline manager's state transitions.
+    - Accepts manual force-target adjustments via /force_controller/manual_adjust
+      for volitional control.
 
-Service clients:
-    data_streams/fingers/forces/switch  (std_srvs/SetBool)
-        Activate/deactivate force streaming on the Mia Hand driver.
+Control flow:
+    1. On GRASPING entry: switch from position controllers to
+       ``group_vel_ff_controller``, start decaying velocity ramp (close).
+    2. Contact detected (force >= threshold or position >= stop limit)
+       → FORCE_HOLD phase: deadzone-based proportional velocity hold per finger.
+    3. Stable force detected → force_stable flag → pipeline transitions to
+       HOLDING → VOLITIONAL.
+    4. On RELEASING: switch to ``group_pos_ff_controller``, publish open
+       positions, reset internal state.
+    5. On shutdown: safe stop + open hand.
 
-Publishers:
-    /thumb_pos_ff_controller/commands  (std_msgs/Float64MultiArray)
-    /index_pos_ff_controller/commands  (std_msgs/Float64MultiArray)
-    /mrl_pos_ff_controller/commands    (std_msgs/Float64MultiArray)
-    /force_controller/status           (mia_hand_msgs/ForceControllerStatus)
-
-Parameters:
-    target_force_min       (double) — Min target normal force in raw sensor units
-    target_force_max       (double) — Max target normal force in raw sensor units
-    kp                     (double) — Proportional gain (rad / raw force unit)
-    ki                     (double) — Integral gain
-    update_rate_hz         (double) — Control loop frequency
-    max_position_step      (double) — Max position change per tick (rad)
-    integral_limit         (double) — Anti-windup: max integral accumulator
-    stability_window       (double) — Seconds within tolerance before stable
-    stability_tolerance    (double) — Raw force units tolerance for stability
-    slip_threshold         (double) — Tangential force rate-of-change threshold
-    max_force_emergency    (double) — Emergency release threshold (raw units)
-    stale_data_timeout_s   (double) — Seconds without force data before warning
-    emergency_backoff_factor (double) — Multiplier for max_step on emergency release
-    force_filter_window    (int)    — Moving-average window for force readings
-    force_data_topic       (str)    — Force sensor data topic
-    force_stream_switch_service (str) — Service to activate/deactivate force streaming
-    pipeline_state_topic   (str)    — Pipeline state topic
-    joint_states_topic     (str)    — Joint states topic
-    thumb_cmd_topic        (str)    — Thumb position command topic
-    index_cmd_topic        (str)    — Index position command topic
-    mrl_cmd_topic          (str)    — MRL position command topic
-    force_status_topic     (str)    — Force controller status publish topic
+Controller switching uses ``ros2 service call`` on the controller_manager
+services (same as the EMG bridge), ensuring runtime compatibility with the
+ros2_control stack.
 """
 
 from __future__ import annotations
 
+import math
+import re
+import subprocess
 import time
 from collections import deque
 from typing import Optional
@@ -72,7 +48,6 @@ from std_msgs.msg import Float64, Float64MultiArray, Int32
 from std_srvs.srv import SetBool
 
 
-# Pipeline states (must match pipeline_manager)
 STATE_IDLE = 0
 STATE_TWISTING = 1
 STATE_SEGMENTING = 2
@@ -95,42 +70,202 @@ STATE_NAMES = {
     STATE_RELEASING: "RELEASING",
 }
 
-# Joint names tracked from /joint_states
-JOINT_NAMES = ["j_thumb_fle", "j_index_fle", "j_mrl_fle"]
+FINGER_JOINTS = ["j_thumb_fle", "j_index_fle", "j_mrl_fle"]
+FINGER_COUNT = 3
+
+POSITION_CONTROLLERS = [
+    "group_pos_ff_controller",
+    "thumb_pos_ff_controller",
+    "index_pos_ff_controller",
+    "mrl_pos_ff_controller",
+]
+VELOCITY_CONTROLLERS = [
+    "group_vel_ff_controller",
+    "thumb_vel_ff_controller",
+    "index_vel_ff_controller",
+    "mrl_vel_ff_controller",
+]
+
+
+def _ros(*args: str, timeout: float = 10.0, check: bool = True) -> str:
+    cmd = ["ros2"] + list(args)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if check and result.returncode != 0:
+        raise RuntimeError(
+            f"{' '.join(cmd)} failed: {result.stderr.strip() or result.stdout.strip()}"
+        )
+    return result.stdout
+
+
+def _wait_for_controller_manager(timeout_s: float = 20.0) -> bool:
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        result = subprocess.run(
+            ["ros2", "service", "list"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if "/controller_manager/list_controllers" in result.stdout:
+            return True
+        time.sleep(0.25)
+    return False
+
+
+def _controller_states() -> dict[str, str]:
+    out = _ros(
+        "service",
+        "call",
+        "/controller_manager/list_controllers",
+        "controller_manager_msgs/srv/ListControllers",
+        "{}",
+        timeout=5,
+        check=False,
+    )
+    return {name: state for name, state in re.findall(r"name='([^']+)'.*?state='([^']+)'", out)}
+
+
+def _ensure_controller_loaded(ctrl: str) -> None:
+    states = _controller_states()
+    if ctrl in states:
+        return
+    req = f"{{name: '{ctrl}'}}"
+    out = _ros(
+        "service",
+        "call",
+        "/controller_manager/load_controller",
+        "controller_manager_msgs/srv/LoadController",
+        req,
+        timeout=10,
+        check=False,
+    )
+    if "ok=True" not in out:
+        raise RuntimeError(f"Failed to load {ctrl}: {out.strip()}")
+    out = _ros(
+        "service",
+        "call",
+        "/controller_manager/configure_controller",
+        "controller_manager_msgs/srv/ConfigureController",
+        req,
+        timeout=10,
+        check=False,
+    )
+    if "ok=True" not in out:
+        raise RuntimeError(f"Failed to configure {ctrl}: {out.strip()}")
+
+
+def _competitors(active: list[str]) -> list[str]:
+    active_set = set(active)
+    return [c for c in POSITION_CONTROLLERS + VELOCITY_CONTROLLERS if c not in active_set]
+
+
+def _switch_controllers(activate: list[str], deactivate: list[str]) -> None:
+    if not _wait_for_controller_manager(timeout_s=5):
+        raise RuntimeError("controller_manager service is not available")
+
+    states = _controller_states()
+    activate = [ctrl for ctrl in activate if states.get(ctrl) != "active"]
+    deactivate = [ctrl for ctrl in deactivate if states.get(ctrl) == "active"]
+    if not activate and not deactivate:
+        return
+    for ctrl in activate:
+        _ensure_controller_loaded(ctrl)
+    req = (
+        "{"
+        f"activate_controllers: [{', '.join(repr(c) for c in activate)}], "
+        f"deactivate_controllers: [{', '.join(repr(c) for c in deactivate)}], "
+        "strictness: 2, activate_asap: true, timeout: {sec: 10, nanosec: 0}"
+        "}"
+    )
+    out = _ros(
+        "service",
+        "call",
+        "/controller_manager/switch_controller",
+        "controller_manager_msgs/srv/SwitchController",
+        req,
+        timeout=15,
+        check=False,
+    )
+    if "ok=True" not in out:
+        req2 = req.replace("strictness: 2", "strictness: 1")
+        out = _ros(
+            "service",
+            "call",
+            "/controller_manager/switch_controller",
+            "controller_manager_msgs/srv/SwitchController",
+            req2,
+            timeout=15,
+            check=False,
+        )
+        if "ok=True" not in out:
+            raise RuntimeError(f"Controller switch failed: {out.strip()}")
+
+
+def _velocity_ramp(start: float, end: float, steps: int) -> list[float]:
+    if steps <= 1:
+        return [start]
+    return [start + (i / (steps - 1)) * (end - start) for i in range(steps)]
+
+
+def _hold_velocity(
+    force: float,
+    target: float,
+    deadzone: float,
+    max_velocity: float,
+    min_overshoot: float,
+    max_overshoot: float,
+) -> float:
+    error = target - force
+    abs_error = abs(error)
+    if abs_error <= deadzone:
+        return 0.0
+    if max_overshoot <= 0.0:
+        return max_velocity if error > 0.0 else -max_velocity
+    scaled = min(max(abs_error, min_overshoot), max_overshoot)
+    velocity = max_velocity * (scaled / max_overshoot)
+    return velocity if error > 0.0 else -velocity
 
 
 class ForceControllerNode(Node):
-    """PI force controller that regulates fingertip normal forces."""
-
     def __init__(self) -> None:
         super().__init__("force_controller")
 
         # ── Parameters ────────────────────────────────────────────────────
         self.declare_parameter("target_force_min", 50.0)
         self.declare_parameter("target_force_max", 200.0)
-        self.declare_parameter("kp", 0.01)
-        self.declare_parameter("ki", 0.001)
-        self.declare_parameter("update_rate_hz", 10.0)
-        self.declare_parameter("max_position_step", 0.05)
-        self.declare_parameter("integral_limit", 50.0)
+        self.declare_parameter("update_rate_hz", 20.0)
+
         self.declare_parameter("stability_window", 1.0)
         self.declare_parameter("stability_tolerance", 30.0)
         self.declare_parameter("slip_threshold", 100.0)
         self.declare_parameter("max_force_emergency", 500.0)
         self.declare_parameter("stale_data_timeout_s", 0.5)
-        self.declare_parameter("emergency_backoff_factor", 2.0)
         self.declare_parameter("force_filter_window", 5)
         self.declare_parameter("manual_adjust_topic", "/force_controller/manual_adjust")
         self.declare_parameter("manual_adjust_step", 10.0)
 
-        # Topic / service name parameters
+        self.declare_parameter("closing_velocity_start", 0.3)
+        self.declare_parameter("closing_velocity_end", 0.1)
+        self.declare_parameter("decay_steps", 5)
+        self.declare_parameter("step_interval_s", 0.2)
+        self.declare_parameter("stop_positions", [1.5, 1.5, 1.5])
+        self.declare_parameter("force_thresholds", [300.0, 300.0, 300.0])
+        self.declare_parameter("open_positions", [0.0, 0.0, 0.0])
+        self.declare_parameter("relaxed_wait_s", 0.5)
+        self.declare_parameter("hold_deadzone", 20.0)
+        self.declare_parameter("hold_max_velocity", 0.08)
+        self.declare_parameter("hold_min_overshoot", 20.0)
+        self.declare_parameter("hold_max_overshoot", 150.0)
+        self.declare_parameter("emergency_backoff_velocity", -0.1)
+        self.declare_parameter("force_adjust_rate_up", 15.0)
+        self.declare_parameter("force_adjust_rate_down", 30.0)
+
         self.declare_parameter("force_data_topic", "data_streams/fingers/forces/data")
         self.declare_parameter("force_stream_switch_service", "data_streams/fingers/forces/switch")
         self.declare_parameter("pipeline_state_topic", "/pipeline/state")
         self.declare_parameter("joint_states_topic", "/joint_states")
-        self.declare_parameter("thumb_cmd_topic", "/thumb_pos_ff_controller/commands")
-        self.declare_parameter("index_cmd_topic", "/index_pos_ff_controller/commands")
-        self.declare_parameter("mrl_cmd_topic", "/mrl_pos_ff_controller/commands")
+        self.declare_parameter("vel_cmd_topic", "/group_vel_ff_controller/commands")
+        self.declare_parameter("pos_cmd_topic", "/group_pos_ff_controller/commands")
         self.declare_parameter("force_status_topic", "/force_controller/status")
         self.declare_parameter("joint_position_limits", [3.14, 3.14, 3.14])
         self.declare_parameter("joint_position_min", [0.0, 0.0, 0.0])
@@ -138,28 +273,38 @@ class ForceControllerNode(Node):
         self._target_min = self.get_parameter("target_force_min").value
         self._target_max = self.get_parameter("target_force_max").value
         self._target_mid = (self._target_min + self._target_max) / 2.0
-        self._kp = self.get_parameter("kp").value
-        self._ki = self.get_parameter("ki").value
-        self._max_step = self.get_parameter("max_position_step").value
+
         self._stability_window = self.get_parameter("stability_window").value
         self._stability_tol = self.get_parameter("stability_tolerance").value
         self._slip_thresh = self.get_parameter("slip_threshold").value
         self._max_force_emerg = self.get_parameter("max_force_emergency").value
         self._filter_win = max(1, self.get_parameter("force_filter_window").value)
-        self._integral_limit = self.get_parameter("integral_limit").value
         self._stale_timeout = self.get_parameter("stale_data_timeout_s").value
-        self._emergency_backoff = self.get_parameter("emergency_backoff_factor").value
         rate_hz = self.get_parameter("update_rate_hz").value
-        self._dt = 1.0 / rate_hz
+        self._dt = 1.0 / max(rate_hz, 1.0)
 
-        # Topic / service names
+        self._closing_start = self.get_parameter("closing_velocity_start").value
+        self._closing_end = self.get_parameter("closing_velocity_end").value
+        self._decay_steps = int(self.get_parameter("decay_steps").value)
+        self._step_interval_s = self.get_parameter("step_interval_s").value
+        self._stop_positions = list(self.get_parameter("stop_positions").value)
+        self._force_thresholds = list(self.get_parameter("force_thresholds").value)
+        self._open_positions = list(self.get_parameter("open_positions").value)
+        self._relaxed_wait_s = self.get_parameter("relaxed_wait_s").value
+        self._hold_deadzone = self.get_parameter("hold_deadzone").value
+        self._hold_max_velocity = self.get_parameter("hold_max_velocity").value
+        self._hold_min_overshoot = self.get_parameter("hold_min_overshoot").value
+        self._hold_max_overshoot = self.get_parameter("hold_max_overshoot").value
+        self._emergency_backoff_vel = self.get_parameter("emergency_backoff_velocity").value
+        self._force_adj_up = self.get_parameter("force_adjust_rate_up").value
+        self._force_adj_down = self.get_parameter("force_adjust_rate_down").value
+
         self._force_data_topic = self.get_parameter("force_data_topic").value
         self._stream_switch_service = self.get_parameter("force_stream_switch_service").value
         self._pipeline_state_topic = self.get_parameter("pipeline_state_topic").value
         self._joint_states_topic = self.get_parameter("joint_states_topic").value
-        self._thumb_cmd_topic = self.get_parameter("thumb_cmd_topic").value
-        self._index_cmd_topic = self.get_parameter("index_cmd_topic").value
-        self._mrl_cmd_topic = self.get_parameter("mrl_cmd_topic").value
+        self._vel_cmd_topic = self.get_parameter("vel_cmd_topic").value
+        self._pos_cmd_topic = self.get_parameter("pos_cmd_topic").value
         self._force_status_topic = self.get_parameter("force_status_topic").value
         self._joint_pos_limits = list(self.get_parameter("joint_position_limits").value)
         self._joint_pos_min = list(self.get_parameter("joint_position_min").value)
@@ -168,40 +313,43 @@ class ForceControllerNode(Node):
 
         # ── Internal state ────────────────────────────────────────────────
         self._pipeline_state: int = STATE_IDLE
-        self._prev_pipeline_state: int = STATE_IDLE
-        self._streaming_active: bool = False
         self._controller_active: bool = False
+        self._streaming_active: bool = False
+        self._hand_phase: str = "IDLE"
 
-        # Current joint positions [thumb, index, mrl] in radians
-        self._joint_pos: list[float] = [0.0, 0.0, 0.0]
+        self._positions: list[float] = [0.0] * FINGER_COUNT
+        self._efforts: list[float] = [0.0] * FINGER_COUNT
         self._joint_pos_received: bool = False
 
-        # Force data — raw readings
-        self._normal_forces: list[float] = [0.0, 0.0, 0.0]
-        self._tangential_forces: list[float] = [0.0, 0.0, 0.0]
-        self._prev_tangential_forces: list[float] = [0.0, 0.0, 0.0]
+        self._normal_forces: list[float] = [0.0] * FINGER_COUNT
+        self._tangential_forces: list[float] = [0.0] * FINGER_COUNT
+        self._prev_tangential_forces: list[float] = [0.0] * FINGER_COUNT
         self._force_data_received: bool = False
         self._last_force_time: float = 0.0
 
-        # Filtered force buffers (moving average per finger)
         self._normal_bufs: list[deque[float]] = [
-            deque(maxlen=self._filter_win) for _ in range(3)
+            deque(maxlen=self._filter_win) for _ in range(FINGER_COUNT)
         ]
         self._tangential_bufs: list[deque[float]] = [
-            deque(maxlen=self._filter_win) for _ in range(3)
+            deque(maxlen=self._filter_win) for _ in range(FINGER_COUNT)
         ]
 
-        # PI controller state per finger
-        self._integral: list[float] = [0.0, 0.0, 0.0]
-
-        # Stability tracking
         self._stable_since: Optional[float] = None
         self._force_stable: bool = False
         self._slip_detected: bool = False
 
-        # Manual force target adjustment (from volitional mode)
-        self._manual_adjust_offset: float = 0.0
-        self._target_base: float = self._target_mid  # stored for clarity
+        self._target_forces: list[float] = [self._target_mid] * FINGER_COUNT
+
+        self._ramp: list[float] = _velocity_ramp(
+            self._closing_start, self._closing_end, self._decay_steps
+        )
+        self._ramp_idx: int = 0
+        self._ramp_last_advance: float = 0.0
+
+        self._phase_entry_time: float = 0.0
+
+        self._last_vel_cmd: Optional[list[float]] = None
+        self._last_pos_cmd: Optional[list[float]] = None
 
         # ── Service clients ───────────────────────────────────────────────
         self._stream_switch = self.create_client(
@@ -227,8 +375,6 @@ class ForceControllerNode(Node):
             self._on_joint_states,
             10,
         )
-
-        # Manual force target adjustment (from volitional mode)
         self.create_subscription(
             Float64,
             self._manual_adjust_topic,
@@ -237,14 +383,11 @@ class ForceControllerNode(Node):
         )
 
         # ── Publishers ────────────────────────────────────────────────────
-        self._thumb_pub = self.create_publisher(
-            Float64MultiArray, self._thumb_cmd_topic, 10
+        self._vel_pub = self.create_publisher(
+            Float64MultiArray, self._vel_cmd_topic, 10
         )
-        self._index_pub = self.create_publisher(
-            Float64MultiArray, self._index_cmd_topic, 10
-        )
-        self._mrl_pub = self.create_publisher(
-            Float64MultiArray, self._mrl_cmd_topic, 10
+        self._pos_pub = self.create_publisher(
+            Float64MultiArray, self._pos_cmd_topic, 10
         )
         self._status_pub = self.create_publisher(
             ForceControllerStatus, self._force_status_topic, 10
@@ -254,46 +397,39 @@ class ForceControllerNode(Node):
         self.create_timer(self._dt, self._control_tick)
 
         self.get_logger().info(
-            f"Force controller started. Target range: [{self._target_min}, "
-            f"{self._target_max}] raw units, kp={self._kp}, ki={self._ki}, "
-            f"rate={rate_hz} Hz"
+            f"Force controller started (velocity-based). "
+            f"Target range: [{self._target_min}, {self._target_max}] raw, "
+            f"rate={rate_hz} Hz, close_vel={self._closing_start}→{self._closing_end} rad/s, "
+            f"hold_deadzone={self._hold_deadzone}, hold_max_v={self._hold_max_velocity}"
         )
 
     # ── Callbacks ──────────────────────────────────────────────────────────
 
     def _on_forces(self, msg: ForceData) -> None:
-        """Store force sensor readings and update filter buffers."""
         raw_normal = [float(msg.thumb_nfor), float(msg.index_nfor), float(msg.mrl_nfor)]
         raw_tangential = [
             float(msg.thumb_tfor),
             float(msg.index_tfor),
             float(msg.mrl_tfor),
         ]
-
-        # Push into filter buffers
-        for i in range(3):
+        for i in range(FINGER_COUNT):
             self._normal_bufs[i].append(raw_normal[i])
             self._tangential_bufs[i].append(raw_tangential[i])
-
-        # Compute filtered (moving average) values
         self._prev_tangential_forces = self._tangential_forces[:]
         self._normal_forces = [
-            sum(self._normal_bufs[i]) / len(self._normal_bufs[i]) for i in range(3)
+            sum(self._normal_bufs[i]) / len(self._normal_bufs[i]) for i in range(FINGER_COUNT)
         ]
         self._tangential_forces = [
             sum(self._tangential_bufs[i]) / len(self._tangential_bufs[i])
-            for i in range(3)
+            for i in range(FINGER_COUNT)
         ]
-
         self._force_data_received = True
         self._last_force_time = time.monotonic()
 
     def _on_pipeline_state(self, msg: Int32) -> None:
-        """Track pipeline state and activate/deactivate controller."""
         new_state = msg.data
         if new_state == self._pipeline_state:
             return
-
         old_state = self._pipeline_state
         self._pipeline_state = new_state
         self.get_logger().info(
@@ -301,73 +437,58 @@ class ForceControllerNode(Node):
             f"{STATE_NAMES.get(new_state, '?')}"
         )
 
-        # Activate on entering GRASPING
         if new_state == STATE_GRASPING and old_state in (
             STATE_APPROACHING,
             STATE_PLANNING,
         ):
             self._activate_controller()
 
-        # Deactivate on leaving GRASPING/HOLDING/VOLITIONAL
-        if old_state in (STATE_GRASPING, STATE_HOLDING, STATE_VOLITIONAL) and new_state not in (
+        if new_state == STATE_RELEASING:
+            self._reset_controller()
+        elif old_state in (STATE_GRASPING, STATE_HOLDING, STATE_VOLITIONAL) and new_state not in (
             STATE_GRASPING,
             STATE_HOLDING,
             STATE_VOLITIONAL,
         ):
-            self._deactivate_controller()
-
-        # Full reset on RELEASING
-        if new_state == STATE_RELEASING:
-            self._reset_controller()
+            self._on_leave_active_states()
 
     def _on_joint_states(self, msg: JointState) -> None:
-        """Track current joint positions for incremental adjustments."""
-        for i, name in enumerate(JOINT_NAMES):
+        for i, name in enumerate(FINGER_JOINTS):
             try:
                 idx = msg.name.index(name)
-                self._joint_pos[i] = msg.position[idx]
+                self._positions[i] = float(msg.position[idx])
+                if idx < len(msg.effort):
+                    self._efforts[i] = float(msg.effort[idx])
             except (ValueError, IndexError):
                 pass
         self._joint_pos_received = True
 
     def _on_manual_adjust(self, msg: Float64) -> None:
-        """Adjust the target force midpoint by a delta.
-
-        Positive values increase target force (tighten grasp).
-        Negative values decrease target force (loosen grasp).
-        The cumulative offset is clamped so target stays in [min, min+2*step].
-        """
-        self._manual_adjust_offset += msg.data
-        # Clamp offset so effective target never exceeds reasonable bounds
-        max_offset = self._target_max - self._target_base
-        min_offset = self._target_min - self._target_base
-        self._manual_adjust_offset = max(min_offset, min(max_offset, self._manual_adjust_offset))
+        delta = msg.data
+        self._target_forces = [
+            max(self._target_min, min(self._target_max, t + delta))
+            for t in self._target_forces
+        ]
         self.get_logger().info(
-            f"Manual adjust: delta={msg.data:.1f}, cumulative_offset="
-            f"{self._manual_adjust_offset:.1f}, effective_target="
-            f"{self._target_base + self._manual_adjust_offset:.1f}"
+            f"Manual adjust: delta={delta:.1f}, targets={[round(t, 1) for t in self._target_forces]}"
         )
 
     # ── Controller lifecycle ───────────────────────────────────────────────
 
     def _activate_controller(self) -> None:
-        """Activate force streaming and initialize controller state."""
-        self.get_logger().info("Activating force controller...")
+        self.get_logger().info("Activating velocity-based force controller...")
         self._controller_active = True
         self._force_stable = False
         self._slip_detected = False
         self._stable_since = None
-        self._integral = [0.0, 0.0, 0.0]
+        self._target_forces = [self._target_mid] * FINGER_COUNT
 
-        # Activate force streaming via service
+        if not self._joint_pos_received:
+            self.get_logger().warn("No joint feedback yet; force controller may malfunction.")
+
         if not self._stream_switch.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warn(
-                "Force stream switch service not available. "
-                "Force data may not flow."
-            )
-            return
-
-        if not self._streaming_active:
+            self.get_logger().warn("Force stream switch service not available.")
+        elif not self._streaming_active:
             req = SetBool.Request()
             req.data = True
             future = self._stream_switch.call_async(req)
@@ -379,36 +500,54 @@ class ForceControllerNode(Node):
                         self._streaming_active = True
                         self.get_logger().info("Force streaming activated.")
                     else:
-                        self.get_logger().warn(
-                            f"Force streaming activation failed: {result.message}"
-                        )
+                        self.get_logger().warn(f"Force streaming activation failed: {result.message}")
                 except Exception as exc:
-                    self.get_logger().error(
-                        f"Force streaming service error: {exc}"
-                    )
+                    self.get_logger().error(f"Force streaming service error: {exc}")
 
             future.add_done_callback(on_response)
 
-    def _deactivate_controller(self) -> None:
-        """Deactivate force streaming and reset controller state."""
-        self.get_logger().info("Deactivating force controller...")
+        self._publish_velocity([0.0] * FINGER_COUNT, force=True)
+        self._publish_position(self._open_positions, force=True)
+        time.sleep(self._relaxed_wait_s)
+
+        try:
+            _switch_controllers(["group_vel_ff_controller"], _competitors(["group_vel_ff_controller"]))
+        except Exception as exc:
+            self.get_logger().error(f"Failed to switch to velocity controller: {exc}")
+            self._controller_active = False
+            return
+
+        self._ramp_idx = 0
+        self._ramp_last_advance = time.monotonic()
+        self._hand_phase = "CLOSING"
+        self._phase_entry_time = time.monotonic()
+        self.get_logger().info("Hand CLOSING: velocity ramp active")
+
+    def _on_leave_active_states(self) -> None:
+        self.get_logger().info("Leaving active force-control states; stopping velocity.")
+        self._controller_active = False
+        self._force_stable = False
+        self._stable_since = None
+        self._hand_phase = "IDLE"
+        self._publish_velocity([0.0] * FINGER_COUNT, force=True)
+        self._publish_position(self._open_positions, force=True)
+
+    def _reset_controller(self) -> None:
+        self.get_logger().info("RESET: releasing grasp, switching to position control.")
         self._controller_active = False
         self._force_stable = False
         self._slip_detected = False
         self._stable_since = None
-        self._integral = [0.0, 0.0, 0.0]
+        self._hand_phase = "IDLE"
+        self._publish_velocity([0.0] * FINGER_COUNT, force=True)
 
-        # Deactivate force streaming
-        if self._streaming_active and self._stream_switch.service_is_ready():
-            req = SetBool.Request()
-            req.data = False
-            self._stream_switch.call_async(req)
-            self._streaming_active = False
-            self.get_logger().info("Force streaming deactivated.")
+        try:
+            _switch_controllers(["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"]))
+        except Exception as exc:
+            self.get_logger().error(f"Failed to switch to position controller: {exc}")
 
-    def _reset_controller(self) -> None:
-        """Full reset — called on RELEASING."""
-        self._deactivate_controller()
+        self._publish_position(self._open_positions, force=True)
+
         self._normal_forces = [0.0, 0.0, 0.0]
         self._tangential_forces = [0.0, 0.0, 0.0]
         self._prev_tangential_forces = [0.0, 0.0, 0.0]
@@ -418,61 +557,48 @@ class ForceControllerNode(Node):
         for buf in self._tangential_bufs:
             buf.clear()
 
+        if self._streaming_active and self._stream_switch.service_is_ready():
+            req = SetBool.Request()
+            req.data = False
+            self._stream_switch.call_async(req)
+            self._streaming_active = False
+            self.get_logger().info("Force streaming deactivated.")
+
     # ── Control loop ───────────────────────────────────────────────────────
 
     def _control_tick(self) -> None:
-        """Main control loop — PI force regulation."""
-        # Only regulate during GRASPING, HOLDING, and VOLITIONAL
         if self._pipeline_state not in (STATE_GRASPING, STATE_HOLDING, STATE_VOLITIONAL):
             self._publish_status()
             return
-
         if not self._controller_active:
             self._publish_status()
             return
-
         if not self._joint_pos_received:
-            self.get_logger().warn(
-                "Control tick skipped: valid joint feedback not available."
-            )
-            status = ForceControllerStatus()
-            status.active = False
-            status.current_normal_forces = self._normal_forces
-            status.current_tangential_forces = self._tangential_forces
-            status.force_errors = [0.0, 0.0, 0.0]
-            status.force_stable = self._force_stable
-            status.slip_detected = self._slip_detected
-            status.state = STATE_NAMES.get(self._pipeline_state, "UNKNOWN")
-            self._status_pub.publish(status)
-            return
-
-        # Check for stale force data (no data for >2 seconds)
-        now = time.monotonic()
-        if self._force_data_received and (now - self._last_force_time) > self._stale_timeout:
-            self.get_logger().error(
-                "Force data stale (no message for >2s). Skipping commands."
-            )
             self._publish_status()
             return
 
+        now = time.monotonic()
+        if self._force_data_received and (now - self._last_force_time) > self._stale_timeout:
+            self.get_logger().error("Force data stale; skipping commands.")
+            self._publish_status()
+            return
         if not self._force_data_received:
-            # No data yet — wait for it
             self._publish_status()
             return
 
         # Emergency force release
-        if any(f > self._max_force_emerg for f in self._normal_forces):
+        if max(self._normal_forces) >= self._max_force_emerg:
             self.get_logger().warn(
                 f"EMERGENCY: Force exceeded {self._max_force_emerg}! "
                 f"Forces: {self._normal_forces} — backing off"
             )
-            self._emergency_release()
+            self._publish_velocity([self._emergency_backoff_vel] * FINGER_COUNT, force=True)
             self._publish_status()
             return
 
-        # Slip detection: tangential force rate-of-change
+        # Slip detection from tangential force rate-of-change (uses ForceData sensors)
         self._slip_detected = False
-        for i in range(3):
+        for i in range(FINGER_COUNT):
             tang_rate = abs(
                 self._tangential_forces[i] - self._prev_tangential_forces[i]
             ) / self._dt
@@ -483,62 +609,72 @@ class ForceControllerNode(Node):
                 )
                 break
 
-        # PI control for each finger
-        new_positions = self._joint_pos[:]
-        force_errors = [0.0, 0.0, 0.0]
+        # Phase-specific control
+        if self._hand_phase == "CLOSING":
+            self._run_closing()
+        elif self._hand_phase == "FORCE_HOLD":
+            self._run_force_hold()
 
-        for i in range(3):
-            # Compute error: positive = need more force (close more)
-            error = self._target_base + self._manual_adjust_offset - self._normal_forces[i]
-            force_errors[i] = error
+        # Stability check
+        self._update_stability()
 
-            # Update integral with anti-windup
-            self._integral[i] += error * self._dt
-            self._integral[i] = max(
-                -self._integral_limit, min(self._integral_limit, self._integral[i])
-            )
+        self._publish_status()
 
-            # PI output
-            adjustment = self._kp * error + self._ki * self._integral[i]
+    def _run_closing(self) -> None:
+        contact = self._first_contact_reason()
+        if contact:
+            self.get_logger().info(f"Force hold entry: {contact}")
+            self._hand_phase = "FORCE_HOLD"
+            self._phase_entry_time = time.monotonic()
+            self._publish_velocity([0.0] * FINGER_COUNT, force=True)
+            return
 
-            # Slip response: if slip detected, close more aggressively
-            if self._slip_detected:
-                adjustment += self._max_step
-
-            # Clamp to max step
-            adjustment = max(-self._max_step, min(self._max_step, adjustment))
-
-            # Closing = positive position direction
-            new_positions[i] = self._joint_pos[i] + adjustment
-
-        # Clamp to joint limits
-        for i in range(3):
-            new_positions[i] = max(
-                self._joint_pos_min[i],
-                min(self._joint_pos_limits[i], new_positions[i]),
-            )
-
-        # Publish position commands
-        self._publish_position_commands(new_positions)
-
-        # Check stability
-        self._update_stability(force_errors)
-
-        # Publish status
-        self._publish_status(force_errors=force_errors)
-
-    def _emergency_release(self) -> None:
-        """Back off all fingers by 2x max step to release force."""
-        new_positions = [
-            self._joint_pos[i] - self._emergency_backoff * self._max_step for i in range(3)
-        ]
-        self._publish_position_commands(new_positions)
-
-    def _update_stability(self, force_errors: list[float]) -> None:
-        """Track whether forces have been within tolerance for stability_window."""
         now = time.monotonic()
-        all_within = all(abs(e) <= self._stability_tol for e in force_errors)
+        if self._ramp_idx < len(self._ramp):
+            if (now - self._ramp_last_advance) >= self._step_interval_s:
+                vel = self._ramp[self._ramp_idx]
+                self._ramp_idx += 1
+                self._ramp_last_advance = now
+                self._publish_velocity([vel] * FINGER_COUNT)
+        else:
+            self._publish_velocity([self._closing_end] * FINGER_COUNT)
 
+    def _run_force_hold(self) -> None:
+        velocities = [
+            _hold_velocity(
+                self._normal_forces[i],
+                self._target_forces[i],
+                self._hold_deadzone,
+                self._hold_max_velocity,
+                self._hold_min_overshoot,
+                self._hold_max_overshoot,
+            )
+            for i in range(FINGER_COUNT)
+        ]
+        # Slip response: boost velocity toward target if slip detected
+        if self._slip_detected:
+            for i in range(FINGER_COUNT):
+                if self._normal_forces[i] < self._target_forces[i]:
+                    velocities[i] = max(velocities[i], self._hold_max_velocity)
+        self._publish_velocity(velocities)
+
+    def _first_contact_reason(self) -> Optional[str]:
+        for i, name in enumerate(FINGER_JOINTS):
+            if self._normal_forces[i] >= self._force_thresholds[i]:
+                return f"{name} force {self._normal_forces[i]:.0f} >= {self._force_thresholds[i]:.0f}"
+        for i, name in enumerate(FINGER_JOINTS):
+            if self._positions[i] >= self._stop_positions[i]:
+                return f"{name} position {self._positions[i]:.3f} >= {self._stop_positions[i]:.2f}"
+        return None
+
+    def _update_stability(self) -> None:
+        if self._hand_phase != "FORCE_HOLD":
+            return
+        now = time.monotonic()
+        force_errors = [
+            abs(self._target_forces[i] - self._normal_forces[i]) for i in range(FINGER_COUNT)
+        ]
+        all_within = all(e <= self._stability_tol for e in force_errors)
         if all_within:
             if self._stable_since is None:
                 self._stable_since = now
@@ -550,34 +686,52 @@ class ForceControllerNode(Node):
             self._stable_since = None
             self._force_stable = False
 
-    # ── Publishing helpers ─────────────────────────────────────────────────
+    # ── Publishers ─────────────────────────────────────────────────────────
 
-    def _publish_position_commands(self, positions: list[float]) -> None:
-        """Publish position commands to the three ForwardCommandController topics."""
-        for i, (pub, pos) in enumerate(zip(
-            [self._thumb_pub, self._index_pub, self._mrl_pub], positions
-        )):
-            assert self._joint_pos_min[i] <= pos <= self._joint_pos_limits[i], (
-                f"Position for joint {i} out of bounds: {pos} not in "
-                f"[{self._joint_pos_min[i]}, {self._joint_pos_limits[i]}]"
-            )
-            msg = Float64MultiArray()
-            msg.data = [pos]
-            pub.publish(msg)
+    def _publish_velocity(self, velocities: list[float], force: bool = False) -> None:
+        if not force and self._last_vel_cmd is not None:
+            if all(math.isclose(a, b, abs_tol=1e-4) for a, b in zip(velocities, self._last_vel_cmd)):
+                return
+        msg = Float64MultiArray()
+        msg.data = [float(v) for v in velocities]
+        self._vel_pub.publish(msg)
+        self._last_vel_cmd = list(msg.data)
 
-    def _publish_status(
-        self, force_errors: Optional[list[float]] = None
-    ) -> None:
-        """Publish ForceControllerStatus for pipeline manager."""
+    def _publish_position(self, positions: list[float], force: bool = False) -> None:
+        if not force and self._last_pos_cmd is not None:
+            if all(math.isclose(a, b, abs_tol=1e-4) for a, b in zip(positions, self._last_pos_cmd)):
+                return
+        for i in range(FINGER_COUNT):
+            positions[i] = max(self._joint_pos_min[i], min(self._joint_pos_limits[i], positions[i]))
+        msg = Float64MultiArray()
+        msg.data = [float(p) for p in positions]
+        self._pos_pub.publish(msg)
+        self._last_pos_cmd = list(msg.data)
+
+    def _publish_status(self) -> None:
+        force_errors = [
+            self._target_forces[i] - self._normal_forces[i] for i in range(FINGER_COUNT)
+        ]
         status = ForceControllerStatus()
         status.active = self._controller_active
         status.current_normal_forces = self._normal_forces
         status.current_tangential_forces = self._tangential_forces
-        status.force_errors = force_errors if force_errors else [0.0, 0.0, 0.0]
+        status.force_errors = force_errors
         status.force_stable = self._force_stable
         status.slip_detected = self._slip_detected
-        status.state = STATE_NAMES.get(self._pipeline_state, "UNKNOWN")
+        status.state = self._hand_phase if self._hand_phase != "IDLE" else STATE_NAMES.get(
+            self._pipeline_state, "UNKNOWN"
+        )
         self._status_pub.publish(status)
+
+    def destroy_node(self) -> bool:
+        try:
+            self._publish_velocity([0.0] * FINGER_COUNT, force=True)
+            _switch_controllers(["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"]))
+            self._publish_position(self._open_positions, force=True)
+        except Exception:
+            pass
+        return super().destroy_node()
 
 
 def main(args=None):

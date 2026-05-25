@@ -47,25 +47,43 @@ force_controller:
         force_stream_switch_service: "data_streams/fingers/forces/switch"
         pipeline_state_topic: "/pipeline/state"
         joint_states_topic: "/joint_states"
-        thumb_cmd_topic: "/thumb_pos_ff_controller/commands"
-        index_cmd_topic: "/index_pos_ff_controller/commands"
-        mrl_cmd_topic: "/mrl_pos_ff_controller/commands"
+        vel_cmd_topic: "/group_vel_ff_controller/commands"
+        pos_cmd_topic: "/group_pos_ff_controller/commands"
         force_status_topic: "/force_controller/status"
-        # Tuning
+        manual_adjust_topic: "/force_controller/manual_adjust"
+        # Force target
         target_force_min: 50.0
         target_force_max: 200.0
-        kp: 0.01
-        ki: 0.001
-        update_rate_hz: 10.0
-        max_position_step: 0.05
-        integral_limit: 50.0
+        update_rate_hz: 20.0
+        # Stability detection
         stability_window: 1.0
-        stability_tolerance: 15.0
-        slip_threshold: 30.0
+        stability_tolerance: 30.0
+        slip_threshold: 100.0
         max_force_emergency: 500.0
         stale_data_timeout_s: 0.5
         force_filter_window: 5
-        emergency_backoff_factor: 2.0
+        # Manual volitional adjustment
+        manual_adjust_step: 10.0
+        # Velocity ramp (closing phase)
+        closing_velocity_start: 0.3
+        closing_velocity_end: 0.1
+        decay_steps: 5
+        step_interval_s: 0.2
+        stop_positions: [1.5, 1.5, 1.5]
+        force_thresholds: [300.0, 300.0, 300.0]
+        open_positions: [0.0, 0.0, 0.0]
+        relaxed_wait_s: 0.5
+        # Force hold (velocity-based deadzone control)
+        hold_deadzone: 20.0
+        hold_max_velocity: 0.08
+        hold_min_overshoot: 20.0
+        hold_max_overshoot: 150.0
+        emergency_backoff_velocity: -0.1
+        force_adjust_rate_up: 15.0
+        force_adjust_rate_down: 30.0
+        # Joint limits
+        joint_position_limits: [3.14, 3.14, 3.14]
+        joint_position_min: [0.0, 0.0, 0.0]
 
 pipeline_manager:
     ros__parameters:
@@ -445,18 +463,31 @@ _reference:
         force:
             target_force_min: 50.0
             target_force_max: 200.0
-            kp: 0.01
-            ki: 0.001
-            update_rate_hz: 10.0
-            max_position_step: 0.05       # Max position increment per tick (rad)
-            integral_limit: 50.0          # Anti-windup: max integral accumulator
+            update_rate_hz: 20.0
             stability_window_s: 1.0       # Seconds forces must be stable before declaring HOLDING
-            stability_tolerance: 15.0     # Raw sensor units — force must be within this of target
-            slip_threshold: 30.0          # Tangential force rate-of-change threshold for slip detection
+            stability_tolerance: 30.0     # Raw sensor units — force must be within this of target
+            slip_threshold: 100.0         # Tangential force rate-of-change threshold for slip detection
             emergency_force: 500.0        # Emergency release threshold (raw sensor units)
             stale_data_timeout_s: 0.5     # Seconds without force data before warning
-            emergency_backoff_factor: 2.0 # Multiplier for max_step on emergency release
             force_filter_window: 5        # Moving-average window for force readings
+            # Velocity ramp (closing phase)
+            closing_velocity_start: 0.3      # rad/s — initial closing velocity
+            closing_velocity_end: 0.1        # rad/s — minimum closing velocity
+            decay_steps: 5
+            step_interval_s: 0.2
+            relaxed_wait_s: 0.5
+            # Contact detection
+            stop_positions: [1.5, 1.5, 1.5]  # rad — mechanical stop per finger
+            force_thresholds: [300.0, 300.0, 300.0]  # raw — force contact threshold
+            open_positions: [0.0, 0.0, 0.0]
+            # Force hold (velocity-based deadzone)
+            hold_deadzone: 20.0
+            hold_max_velocity: 0.08
+            hold_min_overshoot: 20.0
+            hold_max_overshoot: 150.0
+            emergency_backoff_velocity: -0.1
+            force_adjust_rate_up: 15.0
+            force_adjust_rate_down: 30.0
             max_current_percent: 60.0     # Safety: max motor current as percentage (0-80)
 
         # ── Haptic ────────────────────────────────────────────────────────────
