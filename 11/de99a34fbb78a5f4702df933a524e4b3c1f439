@@ -1,0 +1,19 @@
+handoff_report.md
+  s_6ac4f069a72c11::t_a3ef828ec294d2 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "11de99a34fbb78a5f4702df933a524e4b3c1f439",
+  "prompts": {},
+  "sessions": {
+    "s_6ac4f069a72c11": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19f78dbe4ffeECS1KARhGIdUNb",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
