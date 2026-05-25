@@ -73,6 +73,3 @@ models/*.npz
 
 # Worktrees
 .worktrees/
-
-
-logs/
