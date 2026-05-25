@@ -7,15 +7,19 @@
 # Only map devices that are actually connected.  Podman will refuse to start
 # the container if a mapped device does not exist on the host.
 # Uncomment the wrist line when the Dynamixel is connected.
+#
+# The entrypoint script (docker/entrypoint.sh) runs as root before dropping
+# privileges.  It uses MIA_SERIAL_PORT / WRIST_SERIAL_PORT to:
+#   1. Fix device ownership (userns keep-id maps devices to nobody:nogroup)
+#   2. Create persistent symlinks (/dev/ttyMiaHand, /dev/ttyDynamixel)
+#   3. Set low_latency for responsive serial communication
 
 services:
-  prosthesis:
-    devices:
-      # MIA Hand (FTDI FT232 0403:6001) — connected to host ttyUSB0
-      - /dev/ttyUSB0:/dev/ttyUSB0
-      # Wrist Dynamixel (FTDI FT232H 0403:6014) — connected to host ttyUSB1
-      - /dev/ttyUSB1:/dev/ttyUSB1
-    # group_add: "keep-groups" preserves the host user's group memberships
-    # (e.g. dialout) so the container user can access serial devices.
-    group_add:
-      - "keep-groups"
+    prosthesis:
+        environment:
+            - MIA_SERIAL_PORT=/dev/ttyMiaHand
+            - WRIST_SERIAL_PORT=/dev/ttyDynamixel
+        # group_add: "keep-groups" preserves the host user's group memberships
+        # (e.g. dialout) so the container user can access serial devices.
+        group_add:
+            - "keep-groups"

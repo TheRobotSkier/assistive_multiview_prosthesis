@@ -1,3 +1,5 @@
+import os
+
 from launch import LaunchDescription
 from launch.actions import (DeclareLaunchArgument, OpaqueFunction,
                             RegisterEventHandler)
@@ -170,7 +172,7 @@ def generate_launch_description():
     
     serial_port_arg = DeclareLaunchArgument(
         'serial_port',
-        default_value = '/dev/ttyUSB0',
+        default_value = os.environ.get('MIA_SERIAL_PORT', '/dev/ttyUSB0'),
         description = 'Serial port to which Mia Hand is connected.'
     )
 

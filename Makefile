@@ -121,12 +121,12 @@ down-segmentation:
 
 # ── Run ────────────────────────────────────────────────────────────────────
 up:
-	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis segmentation-cuda
+	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis segmentation-cpu
 
 up-prosthesis: dev
 
 up-hw:
-	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis
+	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis segmentation-cpu
 
 # ── Tonight host validation gates ────────────────────────────────────────────
 # These run the in-container Makefile targets from the host checkout. They keep

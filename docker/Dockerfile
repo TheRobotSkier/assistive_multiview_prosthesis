@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-pip \
         python3-scipy \
         python3-pytest \
+        setserial \
         usbutils \
         ros-jazzy-cyclonedds \
         ros-jazzy-rmw-cyclonedds-cpp \

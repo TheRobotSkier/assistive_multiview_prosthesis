@@ -246,7 +246,7 @@ hardware:
   mia_serial_port: "/dev/ttyUSB0"
 
   # Serial port for the wrist servo (used only when mock_wrist == false).
-  wrist_port: "/dev/ttyUSB0"
+  wrist_port: "/dev/ttyUSB1"
 
   # Wrist servo baudrate.
   wrist_baudrate: 57600
