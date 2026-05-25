@@ -194,18 +194,18 @@ def run_latency_stages(objects: list[str], repetitions: int = 30,
 
             # Debug: log all state changes
             if current_trial is not None:
-                state_names = {0: "IDLE", 1: "SEGMENTING", 2: "PLANNING", 3: "APPROACH", 4: "RELEASING"}
+                state_names = {0: "IDLE", 1: "TWISTING", 2: "SEGMENTING", 3: "PLANNING", 4: "APPROACHING", 5: "GRASPING", 6: "HOLDING", 7: "VOLITIONAL", 8: "RELEASING"}
                 state_name = state_names.get(state, f"UNKNOWN({state})")
                 print(f"    State: {state_name}", flush=True)
 
             if current_trial is None:
                 return
 
-            if state == 1:  # SEGMENTING
+            if state == 2:  # SEGMENTING
                 if current_trial["t0"] is None:
                     current_trial["t0"] = t
                     print(f"    [t0] SEGMENTING state received", flush=True)
-            elif state == 2:  # PLANNING
+            elif state == 3:  # PLANNING
                 if current_trial["t4"] is None:
                     current_trial["t4"] = t
                     print(f"    [t4] PLANNING state received", flush=True)

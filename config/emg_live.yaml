@@ -1,7 +1,9 @@
 # Live EMG tuning config — edit while pipeline is running; changes apply without restart.
-confidence_threshold: 0.55
-release_confidence_threshold: 0.25
-grasp_gestures: [1, 3, 4]  # POWER, FLEXION, EXTENSION
+# Grace period: a gesture must be sustained continuously for this long before it
+# triggers a pipeline action.  A single flicker resets the timer.
+gesture_hold_timeout_s: 1.0
+# Minimum classifier confidence for POWER (activate / mode toggle) and OPEN (release).
+gesture_confidence_threshold: 0.7
 release_gesture: 2          # OPEN
 
 # ── EMG grasp adapter configuration ────────────────────────────────────────────

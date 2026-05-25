@@ -308,10 +308,11 @@ class ForceControllerNode(Node):
         ):
             self._activate_controller()
 
-        # Deactivate on leaving GRASPING/HOLDING
-        if old_state in (STATE_GRASPING, STATE_HOLDING) and new_state not in (
+        # Deactivate on leaving GRASPING/HOLDING/VOLITIONAL
+        if old_state in (STATE_GRASPING, STATE_HOLDING, STATE_VOLITIONAL) and new_state not in (
             STATE_GRASPING,
             STATE_HOLDING,
+            STATE_VOLITIONAL,
         ):
             self._deactivate_controller()
 
@@ -421,8 +422,8 @@ class ForceControllerNode(Node):
 
     def _control_tick(self) -> None:
         """Main control loop — PI force regulation."""
-        # Only regulate during GRASPING and HOLDING
-        if self._pipeline_state not in (STATE_GRASPING, STATE_HOLDING):
+        # Only regulate during GRASPING, HOLDING, and VOLITIONAL
+        if self._pipeline_state not in (STATE_GRASPING, STATE_HOLDING, STATE_VOLITIONAL):
             self._publish_status()
             return
 

@@ -1,19 +1,24 @@
-# Hardware overlay — convenience alias for starting with segmentation.
+# Hardware overlay — adds USB device passthrough for Podman.
 #
 # Usage:  make up-hw
 # Behind the scenes:
 #   podman-compose -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis segmentation-cpu
 #
-# The base docker-compose.yml already sets privileged: true, which exposes
-# all host devices (including USB serial ports) to the container.
+# Podman's --privileged flag does NOT automatically populate /dev with host
+# devices (unlike Docker).  Explicit device mappings are required.
 # Device identification and symlink creation is handled by:
 #   scripts/setup_usb_devices.sh  (run inside the container before launch)
 #
-# No device mappings or group settings are needed here.
+# IMPORTANT: Podman will refuse to start if a mapped device does not exist
+# on the host.  If you only have one of the two devices connected, comment
+# out the missing line.
 
 services:
     prosthesis:
-        # No additional configuration needed — privileged mode in the base
-        # compose already provides full device access.
+        devices:
+            # Both FTDI USB-serial devices — enumeration order can swap,
+            # but setup_usb_devices.sh identifies each by serial number.
+            - /dev/ttyUSB0:/dev/ttyUSB0
+            - /dev/ttyUSB1:/dev/ttyUSB1
         group_add:
             - "keep-groups"

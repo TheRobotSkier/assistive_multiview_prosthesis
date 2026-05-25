@@ -184,9 +184,9 @@ class GraspProximityControllerNode(Node):
     # ── Control loop ──────────────────────────────────────────────────────────
 
     def _control_loop(self) -> None:
-        # Do not publish joint commands during GRASPING/HOLDING —
+        # Do not publish joint commands during GRASPING/HOLDING/VOLITIONAL —
         # the force controller owns the joint topics in those states.
-        if self._pipeline_state in (4, 5):  # GRASPING, HOLDING
+        if self._pipeline_state in (5, 6, 7):  # GRASPING, HOLDING, VOLITIONAL
             return
 
         if (self._planned_closures is None

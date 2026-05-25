@@ -21,8 +21,8 @@ Parameters:
   publish_rate_hz   (float, default: 10.0) — timer publish rate
 
 Pipeline states (from pipeline_manager_node.py):
-  IDLE=0, SEGMENTING=1, PLANNING=2, APPROACHING=3,
-  GRASPING=4, HOLDING=5, RELEASING=6
+  IDLE=0, TWISTING=1, SEGMENTING=2, PLANNING=3, APPROACHING=4,
+  GRASPING=5, HOLDING=6, VOLITIONAL=7, RELEASING=8
 """
 
 import copy
@@ -35,20 +35,24 @@ from std_msgs.msg import Int32
 
 # Pipeline states (must match pipeline_manager_node.py State enum)
 IDLE = 0
-SEGMENTING = 1
-PLANNING = 2
-APPROACHING = 3
-GRASPING = 4
-HOLDING = 5
-RELEASING = 6
+TWISTING = 1
+SEGMENTING = 2
+PLANNING = 3
+APPROACHING = 4
+GRASPING = 5
+HOLDING = 6
+VOLITIONAL = 7
+RELEASING = 8
 
 _STATE_NAMES = {
     IDLE: "IDLE",
+    TWISTING: "TWISTING",
     SEGMENTING: "SEGMENTING",
     PLANNING: "PLANNING",
     APPROACHING: "APPROACHING",
     GRASPING: "GRASPING",
     HOLDING: "HOLDING",
+    VOLITIONAL: "VOLITIONAL",
     RELEASING: "RELEASING",
 }
 

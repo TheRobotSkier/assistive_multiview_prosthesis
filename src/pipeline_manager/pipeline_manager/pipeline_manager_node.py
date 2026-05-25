@@ -12,26 +12,25 @@ States:
   VOLITIONAL  User-in-the-loop EMG control (force adjust or wrist control)
   RELEASING   Opening hand to release object
 
-  Transitions:
-  IDLE -> TWISTING          (EMG POWER/FLEXION/EXTENSION)
+Transitions:
+  IDLE -> TWISTING          (EMG POWER held >= gesture_hold_timeout_s)
   TWISTING -> SEGMENTING    (twist hit detected -> segmentation triggered)
   SEGMENTING -> PLANNING    (object cloud received)
   PLANNING -> APPROACHING   (preshaping complete)
   APPROACHING -> GRASPING   (proximity near zone entered)
   GRASPING -> HOLDING       (force stable)
   HOLDING -> VOLITIONAL     (sustained force stable -> user control)
-  VOLITIONAL -> RELEASING   (EMG OPEN)
+  VOLITIONAL -> RELEASING   (EMG OPEN held >= gesture_hold_timeout_s)
   RELEASING -> IDLE         (hand physically open)
-  ANY -> IDLE               (abort, emergency stop, failure)
 
-EMG Gesture Contract:
-  POWER/FLEXION/EXTENSION (in grasp_gestures) -> Enter TWISTING from IDLE
-  OPEN -> Release from any active state
-  REST (in abort_gestures) -> Abort/cancel from any active state
-  In VOLITIONAL:
-    FLEXION -> Force+ (force mode) or Wrist+ (wrist mode)
-    EXTENSION -> Force- (force mode) or Wrist- (wrist mode)
-    POWER -> Toggle between force and wrist mode"""
+EMG Gesture Contract (all discrete gestures require hold duration + confidence):
+  POWER (held >= 1.0s, conf >= 0.7) -> Enter TWISTING from IDLE
+  POWER (held >= 1.0s, conf >= 0.7) -> Toggle force/wrist mode in VOLITIONAL
+  OPEN  (held >= 1.0s, conf >= 0.7) -> Release from any active state
+  REST  -> Ignored (no action)
+  In VOLITIONAL (continuous, no hold required, proportional):
+    FLEXION   -> Force+ (force mode) or Wrist+ (wrist mode)
+    EXTENSION -> Force- (force mode) or Wrist- (wrist mode)"""
 
 from __future__ import annotations
 
@@ -54,10 +53,7 @@ from mia_hand_msgs.msg import ForceControllerStatus
 
 
 # Intent type strings published by /emg_grasp/intent
-_INTENT_WRIST_POSITIVE = "wrist_velocity_positive"
-_INTENT_WRIST_NEGATIVE = "wrist_velocity_negative"
 _INTENT_STOP_ALL = "stop_all"
-_INTENT_MODE_TOGGLE = "mode_toggle"
 
 
 class State(enum.IntEnum):
@@ -95,17 +91,12 @@ class PipelineManagerNode(Node):
         super().__init__('pipeline_manager')
 
         # ── Parameters ────────────────────────────────────────────────────
-        self.declare_parameter('confidence_threshold', 0.55)
-        self.declare_parameter('release_confidence_threshold', 0.25)
-        self.declare_parameter('grasp_gestures', [GESTURE_POWER, GESTURE_FLEXION, GESTURE_EXTENSION])
         self.declare_parameter('release_gesture', GESTURE_OPEN)
         self.declare_parameter('state_publish_rate_hz', 5.0)
 
-        # Gesture contract parameters
-        self.declare_parameter('abort_gestures', [GESTURE_REST])
-        self.declare_parameter('emergency_stop_gesture', -1)
-        self.declare_parameter('manual_tighten_gesture', -1)
-        self.declare_parameter('manual_loosen_gesture', -1)
+        # Grace period parameters (uniform for all discrete gestures)
+        self.declare_parameter('gesture_hold_timeout_s', 1.0)
+        self.declare_parameter('gesture_confidence_threshold', 0.7)
 
         # Release behavior parameters
         self.declare_parameter('release_open_position', [0.0, 0.0, 0.0])
@@ -135,6 +126,7 @@ class PipelineManagerNode(Node):
         # Topic / service name parameters
         self.declare_parameter('emg_gesture_topic', '/emg/gesture_label')
         self.declare_parameter('emg_confidence_topic', '/emg/confidence')
+        self.declare_parameter('emg_proportional_topic', '/emg/proportional')
         self.declare_parameter('grasp_type_topic', '/grasp_preshaping/grasp_type')
         self.declare_parameter('force_status_topic', '/force_controller/status')
         self.declare_parameter('compute_grasp_service', '/grasp_preshaping/compute_grasp')
@@ -143,14 +135,9 @@ class PipelineManagerNode(Node):
         self.declare_parameter('pipeline_state_topic', '/pipeline/state')
         self.declare_parameter('pipeline_state_name_topic', '/pipeline/state_name')
 
-        self._confidence_threshold = self.get_parameter('confidence_threshold').value
-        self._release_confidence_threshold = self.get_parameter('release_confidence_threshold').value
-        self._grasp_gestures = self.get_parameter('grasp_gestures').value
         self._release_gesture = self.get_parameter('release_gesture').value
-        self._abort_gestures = self.get_parameter('abort_gestures').value
-        self._emergency_stop_gesture = self.get_parameter('emergency_stop_gesture').value
-        self._manual_tighten_gesture = self.get_parameter('manual_tighten_gesture').value
-        self._manual_loosen_gesture = self.get_parameter('manual_loosen_gesture').value
+        self._gesture_hold_timeout_s = self.get_parameter('gesture_hold_timeout_s').value
+        self._gesture_confidence_threshold = self.get_parameter('gesture_confidence_threshold').value
         self._release_open_position = self.get_parameter('release_open_position').value
         self._release_joint_threshold = self.get_parameter('release_joint_threshold').value
         self._release_timeout_s = self.get_parameter('release_timeout_s').value
@@ -168,15 +155,21 @@ class PipelineManagerNode(Node):
         self._history: list[Transition] = []
         self._grasp_type: int = 0
         self._latest_confidence: float = 0.0
+        self._latest_proportional: float = 0.0
         self._segmenting_start_time: Optional[rclpy.time.Time] = None
+
+        # Gesture hold-duration tracking
+        self._pending_gesture: int = GESTURE_REST
+        self._pending_gesture_start: float = time.monotonic()
+        self._gesture_action_fired: bool = False
 
         # Release monitoring state
         self._release_start_time: Optional[float] = None
         self._release_joint_positions: list[float] = [0.0, 0.0, 0.0]
         self._release_debounce_counter: int = 0
 
-        # EMG wrist relay state
-        self._emg_wrist_target_deg: float = 0.0
+        # EMG wrist relay state — initialized from hardware on first state msg
+        self._emg_wrist_target_deg: Optional[float] = None
 
         # Volitional mode tracking
         self._emg_volitional_mode: str = "force"  # "force" or "wrist"
@@ -213,7 +206,10 @@ class PipelineManagerNode(Node):
             self._on_emg_gesture, 10)
         self.create_subscription(
             Float32, self.get_parameter('emg_confidence_topic').value,
-            self._on_emg_confidence, 10)  # noqa: F821
+            self._on_emg_confidence, 10)
+        self.create_subscription(
+            Float32, self.get_parameter('emg_proportional_topic').value,
+            self._on_emg_proportional, 10)
         self.create_subscription(
             Int32, '/grasp_preshaping/grasp_type', self._on_grasp_type, 10)
         self.create_subscription(
@@ -239,6 +235,9 @@ class PipelineManagerNode(Node):
         self.create_subscription(
             Float32, self.get_parameter('collision_distance_topic').value,
             self._on_collision_distance, 10)
+        # Subscribe to wrist state to initialize target from hardware position
+        self.create_subscription(
+            Float64MultiArray, '/wrist/state', self._on_wrist_state, 10)
 
         # ── Service clients ───────────────────────────────────────────────
         self._compute_client = self.create_client(
@@ -294,6 +293,18 @@ class PipelineManagerNode(Node):
         }
         return new_state in valid.get(self._state, set())
 
+    # ── Helpers ───────────────────────────────────────────────────────────
+
+    def _ensure_wrist_target(self) -> float:
+        """Return the wrist target, initializing from hardware if needed."""
+        if self._emg_wrist_target_deg is None:
+            self._emg_wrist_target_deg = 0.0
+        return self._emg_wrist_target_deg
+
+    def _set_wrist_target(self, deg: float):
+        """Set wrist target, clamped to [0, 359]."""
+        self._emg_wrist_target_deg = max(0.0, min(359.0, deg))
+
     # ── Callbacks ─────────────────────────────────────────────────────────
 
     def _on_force_status(self, msg: ForceControllerStatus):
@@ -324,6 +335,7 @@ class PipelineManagerNode(Node):
         # Slip detection during HOLDING or VOLITIONAL
         if self._state in (State.HOLDING, State.VOLITIONAL) and msg.slip_detected:
             self.get_logger().warn('Slip detected \u2014 grip may be unstable')
+
     def _activate_twist_propagation(self):
         if not self._twist_activate_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn('Twist propagation activate service not available')
@@ -360,100 +372,101 @@ class PipelineManagerNode(Node):
 
     def _on_emg_gesture(self, msg: Int32):
         gesture = msg.data
+        now = time.monotonic()
 
-        # Emergency stop — pre-empts everything
-        if self._emergency_stop_gesture >= 0 and gesture == self._emergency_stop_gesture:
-            self._transition(State.IDLE, 'EMG: emergency stop')
-            self._deactivate_twist_propagation()
-            return
+        # ── Gesture change detection ──────────────────────────────────────
+        if gesture != self._pending_gesture:
+            self.get_logger().debug(
+                f'Gesture changed: {self._pending_gesture} -> {gesture}, hold timer reset')
+            self._pending_gesture = gesture
+            self._pending_gesture_start = now
+            self._gesture_action_fired = False
 
-        # Abort gesture: cancel the current grasp and return to IDLE
-        if gesture in self._abort_gestures and self._state != State.IDLE:
-            self._transition(State.IDLE, f'EMG: abort gesture={gesture}')
-            self._deactivate_twist_propagation()
-            self._volitional_entry_time = None
-            return
+        held = now - self._pending_gesture_start
+        held_long_enough = held >= self._gesture_hold_timeout_s
+        high_confidence = self._latest_confidence >= self._gesture_confidence_threshold
 
-        # Release gesture works from any active state
+        # ── OPEN release (from any active state) ──────────────────────────
         if gesture == self._release_gesture:
             if self._state not in (State.IDLE, State.RELEASING):
-                # Release is allowed even at lower confidence for safety
-                if self._latest_confidence >= self._release_confidence_threshold:
+                if held_long_enough and high_confidence and not self._gesture_action_fired:
                     self._transition(State.RELEASING, 'EMG: OPEN')
                     self._deactivate_twist_propagation()
+                    self._publish_finger_command(self._thumb_cmd_pub, self._release_open_position[0])
+                    self._publish_finger_command(self._index_cmd_pub, self._release_open_position[1])
+                    self._publish_finger_command(self._mrl_cmd_pub, self._release_open_position[2])
                     self._schedule_release_complete()
                     self._volitional_entry_time = None
-                else:
-                    self.get_logger().debug(
-                        f'Release gesture ignored: confidence {self._latest_confidence:.2f} '
-                        f'< threshold {self._release_confidence_threshold}')
+                    self._gesture_action_fired = True
             return
 
-        # ── Volitional mode gestures ────────────────────────────────────────
-        if self._state == State.VOLITIONAL:
-            # POWER toggles between force and wrist control
-            if gesture == GESTURE_POWER:
+        # ── POWER: activate from IDLE ─────────────────────────────────────
+        if gesture == GESTURE_POWER and self._state == State.IDLE:
+            if held_long_enough and high_confidence and not self._gesture_action_fired:
+                self._transition(State.TWISTING, 'EMG: POWER (held {:.1f}s)'.format(held))
+                self._activate_twist_propagation()
+                self._gesture_action_fired = True
+            return
+
+        # ── POWER: toggle mode in VOLITIONAL ──────────────────────────────
+        if gesture == GESTURE_POWER and self._state == State.VOLITIONAL:
+            if held_long_enough and high_confidence and not self._gesture_action_fired:
                 if self._emg_volitional_mode == "force":
                     self._emg_volitional_mode = "wrist"
                     self.get_logger().info('VOLITIONAL: switched to WRIST mode')
                 else:
                     self._emg_volitional_mode = "force"
                     self.get_logger().info('VOLITIONAL: switched to FORCE mode')
-                return
+                self._gesture_action_fired = True
+            return
 
-            # EXTENSION – decrease force / wrist negative
+        # ── Continuous gestures in VOLITIONAL (proportional, no hold) ─────
+        if self._state == State.VOLITIONAL:
+            prop = self._latest_proportional
+
+            # EXTENSION — decrease force / wrist negative
             if gesture == GESTURE_EXTENSION:
+                if prop <= 0.0:
+                    return
                 if self._emg_volitional_mode == "force":
-                    self._manual_adjust_pub.publish(Float64(data=-self._volitional_force_step))
+                    self._manual_adjust_pub.publish(
+                        Float64(data=-self._volitional_force_step * prop))
                     self.get_logger().debug('VOLITIONAL: force -', throttle_duration_sec=0.5)
                 else:
-                    # Wrist mode: move wrist negative
-                    self._emg_wrist_target_deg = max(0.0, self._emg_wrist_target_deg - self._volitional_wrist_scale * 0.1)
+                    delta = self._volitional_wrist_scale * 0.1 * prop
+                    self._set_wrist_target(self._ensure_wrist_target() - delta)
                     cmd = Float64MultiArray()
                     cmd.data = [self._emg_wrist_target_deg, 180.0]
                     self._wrist_cmd_pub.publish(cmd)
                     self.get_logger().debug('VOLITIONAL: wrist -', throttle_duration_sec=0.5)
                 return
 
-            # FLEXION – increase force / wrist positive
+            # FLEXION — increase force / wrist positive
             if gesture == GESTURE_FLEXION:
+                if prop <= 0.0:
+                    return
                 if self._emg_volitional_mode == "force":
-                    self._manual_adjust_pub.publish(Float64(data=self._volitional_force_step))
+                    self._manual_adjust_pub.publish(
+                        Float64(data=self._volitional_force_step * prop))
                     self.get_logger().debug('VOLITIONAL: force +', throttle_duration_sec=0.5)
                 else:
-                    self._emg_wrist_target_deg = min(359.0, self._emg_wrist_target_deg + self._volitional_wrist_scale * 0.1)
+                    delta = self._volitional_wrist_scale * 0.1 * prop
+                    self._set_wrist_target(self._ensure_wrist_target() + delta)
                     cmd = Float64MultiArray()
                     cmd.data = [self._emg_wrist_target_deg, 180.0]
                     self._wrist_cmd_pub.publish(cmd)
                     self.get_logger().debug('VOLITIONAL: wrist +', throttle_duration_sec=0.5)
                 return
+
             return  # Other gestures ignored in VOLITIONAL
 
-        # Manual tighten during GRASPING or HOLDING (non-volitional)
-        if self._manual_tighten_gesture >= 0 and gesture == self._manual_tighten_gesture:
-            if self._state in (State.GRASPING, State.HOLDING):
-                self._manual_adjust_pub.publish(Float64(data=1.0))
-                self.get_logger().debug('EMG: manual tighten')
-            return
+        # ── All other gestures (REST, etc.) — ignored ────────────────────
 
-        # Manual loosen during GRASPING or HOLDING (non-volitional)
-        if self._manual_loosen_gesture >= 0 and gesture == self._manual_loosen_gesture:
-            if self._state in (State.GRASPING, State.HOLDING):
-                self._manual_adjust_pub.publish(Float64(data=-1.0))
-                self.get_logger().debug('EMG: manual loosen')
-            return
-
-        # Grasp trigger gesture from IDLE → TWISTING
-        if gesture in self._grasp_gestures and self._state == State.IDLE:
-            if self._latest_confidence < self._confidence_threshold:
-                self.get_logger().debug(
-                    f'Grasp gesture {gesture} ignored: confidence {self._latest_confidence:.2f} '
-                    f'below threshold {self._confidence_threshold}')
-                return
-            self._transition(State.TWISTING, f'EMG: gesture={gesture}')
-            self._activate_twist_propagation()
-            # Twist propagation will detect a hit and publish hit_detected
-            # which triggers the TWISTING -> SEGMENTING transition
+    def _publish_finger_command(self, publisher, position: float):
+        """Publish a single-joint position command as Float64MultiArray."""
+        msg = Float64MultiArray()
+        msg.data = [position]
+        publisher.publish(msg)
 
     def _schedule_release_complete(self):
         """Monitor joint positions to detect when the hand has physically opened.
@@ -493,6 +506,9 @@ class PipelineManagerNode(Node):
     def _on_emg_confidence(self, msg: Float32):
         self._latest_confidence = msg.data
 
+    def _on_emg_proportional(self, msg: Float32):
+        self._latest_proportional = msg.data
+
     def _on_grasp_type(self, msg: Int32):
         self._grasp_type = msg.data
 
@@ -504,6 +520,13 @@ class PipelineManagerNode(Node):
                 self._release_joint_positions[i] = msg.position[idx]
             except (ValueError, IndexError):
                 pass
+
+    def _on_wrist_state(self, msg: Float64MultiArray):
+        """Track wrist position from hardware to initialize target on first msg."""
+        if len(msg.data) >= 1 and self._emg_wrist_target_deg is None:
+            self._emg_wrist_target_deg = msg.data[0]
+            self.get_logger().info(
+                f'Wrist target initialized from hardware: {self._emg_wrist_target_deg:.1f} deg')
 
     def _on_twist_hit_detected(self, msg: Bool):
         """Transition TWISTING -> SEGMENTING when a collision hit is detected."""
@@ -535,22 +558,16 @@ class PipelineManagerNode(Node):
             self._transition(State.GRASPING, 'Proximity: near zone entered')
 
     def _on_emg_grasp_intent(self, msg: String):
-        """Parse EMG grasp controller intents and relay to hardware.
+        """Handle EMG grasp controller intents — only STOP_ALL for safety.
 
-        Wrist velocity intents are converted to incremental position
-        commands and published to /wrist/set_position as
-        [position_deg, accel_deg_s2].
-
-        Supported intent types:
-          wrist_velocity_positive  -> increment wrist position
-          wrist_velocity_negative  -> decrement wrist position
-          stop_all                 -> hold current position
+        Wrist velocity and force adjust intents are handled directly by
+        _on_emg_gesture in VOLITIONAL mode. This callback only processes
+        STOP_ALL to hold the current wrist position when the EmgGraspController
+        detects REST (safety stop).
         """
-        import json
         try:
             intent = json.loads(msg.data)
             intent_type = intent.get("intent_type", "")
-            value = intent.get("value", 0.0)
         except (json.JSONDecodeError, TypeError):
             self.get_logger().warn(f"Invalid EMG intent JSON: {msg.data}", throttle_duration_sec=5.0)
             return
@@ -558,22 +575,8 @@ class PipelineManagerNode(Node):
         if intent_type == _INTENT_STOP_ALL:
             # Hold current position — publish to stop any motion
             cmd = Float64MultiArray()
-            cmd.data = [self._emg_wrist_target_deg, 0.0]
+            cmd.data = [self._ensure_wrist_target(), 0.0]
             self._wrist_cmd_pub.publish(cmd)
-
-        elif intent_type in (_INTENT_WRIST_POSITIVE, _INTENT_WRIST_NEGATIVE):
-            # value is proportional [-1, 1]; scale to degrees per tick
-            direction = 1.0 if intent_type == _INTENT_WRIST_POSITIVE else -1.0
-            delta = direction * abs(value) * self._wrist_velocity_scale * 0.1
-            self._emg_wrist_target_deg = max(0.0, min(359.0, self._emg_wrist_target_deg + delta))
-            cmd = Float64MultiArray()
-            cmd.data = [self._emg_wrist_target_deg, 180.0]  # 180 deg/s^2 accel
-            self._wrist_cmd_pub.publish(cmd)
-            self.get_logger().debug(
-                f"EMG wrist: {intent_type} value={value:.3f} -> "
-                f"target={self._emg_wrist_target_deg:.1f} deg",
-                throttle_duration_sec=1.0,
-            )
 
     def _load_emg_live_config(self):
         """Load EMG live config from emg_live.yaml into dynamic parameters."""
@@ -587,12 +590,14 @@ class PipelineManagerNode(Node):
             if config is None:
                 return
             # Update parameters from live config
-            if 'confidence_threshold' in config:
-                self._confidence_threshold = float(config['confidence_threshold'])
-            if 'release_confidence_threshold' in config:
-                self._release_confidence_threshold = float(config['release_confidence_threshold'])
-            if 'grasp_gestures' in config:
-                self._grasp_gestures = list(config['grasp_gestures'])
+            if 'gesture_hold_timeout_s' in config:
+                val = float(config['gesture_hold_timeout_s'])
+                if val > 0:
+                    self._gesture_hold_timeout_s = val
+            if 'gesture_confidence_threshold' in config:
+                val = float(config['gesture_confidence_threshold'])
+                if 0.0 <= val <= 1.0:
+                    self._gesture_confidence_threshold = val
             if 'release_gesture' in config:
                 self._release_gesture = int(config['release_gesture'])
             self.get_logger().info(f'Loaded EMG live config: {path}')
@@ -632,6 +637,7 @@ class PipelineManagerNode(Node):
                 throttle_duration_sec=5.0)
         self._transition(State.PLANNING, 'Segmentation complete: object cloud received')
         self._request_preshaping()
+
     def _request_preshaping(self):
         """Call the grasp preshaping compute service.
 
@@ -665,7 +671,7 @@ class PipelineManagerNode(Node):
             # the hand reaches the stop-distance threshold during APPROACHING.
             pass
 
-    # \u2500\u2500 Publishing \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n
+    # ── Publishing ────────────────────────────────────────────────────────
     def _publish_state(self):
         msg = Int32()
         msg.data = int(self._state)

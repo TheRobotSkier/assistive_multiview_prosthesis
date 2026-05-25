@@ -84,9 +84,8 @@ pipeline_manager:
         twist_hit_detected_topic: "/twist_propagation/hit_detected"
         twist_stop_distance_m: 0.20
         # Tuning
-        confidence_threshold: 0.8
-        release_confidence_threshold: 0.8
-        grasp_gestures: [1]
+        gesture_hold_timeout_s: 1.0
+        gesture_confidence_threshold: 0.7
         release_gesture: 2
         state_publish_rate_hz: 5.0
         # EMG intent relay
@@ -403,7 +402,7 @@ _reference:
         # ── EMG ───────────────────────────────────────────────────────────────
         emg:
             confidence_threshold: 0.8
-            gesture_names: ["REST", "POWER", "PINCH", "OPEN", "POINT"]
+            gesture_names: ["REST", "POWER", "OPEN", "FLEXION", "EXTENSION"]
             # Gesture to pipeline action mapping
             gesture_actions:
                 POWER: "start_grasp"

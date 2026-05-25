@@ -118,16 +118,25 @@ grasp-test: ## Launch legacy grasp test mode
 
 collect-data: ## Record EMG training data (wearing armband, guided prompts)
 	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
 	rm -rf /app/data/* && \
 	ros2 run emg_bridge collect_data --output-dir /app/data && \
 	ros2 run emg_bridge train --data-dir /app/data --model-dir /app/models
 
 train: ## Train classifier from recorded data
 	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
 	ros2 run emg_bridge train --data-dir /app/data --model-dir /app/models
 
 run-classifier: ## Run live EMG classifier inference (prints gesture/confidence to terminal)
 	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
 	ros2 run emg_bridge run_classifier --model-dir /app/models
 
 twist-test: ## Launch safe Jetson twist/fusion pipeline with TF bridge

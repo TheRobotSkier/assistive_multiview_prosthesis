@@ -823,7 +823,7 @@ class TwistPropagationNode(Node):
 
     def _on_hand_twist(self, msg: TwistStamped):
         """Store the latest external twist from odometry."""
-        now_s = self.get_clock().now().nanoseconds / 1e-9
+        now_s = self.get_clock().now().nanoseconds / 1e9
         with self._lock:
             self._external_twist = (
                 msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z,
