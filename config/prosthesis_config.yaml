@@ -131,7 +131,7 @@ proximity_controller:
         wrist_cmd_topic: "/wrist/set_position"
         # Tuning
         proximity_enter_threshold_m: 0.08
-        proximity_exit_threshold_m: 0.10
+        proximity_exit_threshold_m: 0.20
         partial_closure_factor: 0.3
         min_closure_amount: 0.1
         wrist_accel_deg_s2: 180.0
@@ -340,7 +340,6 @@ emg_grasp_controller:
 
 _reference:
     ros__parameters:
-
         # ── ROS Topics ────────────────────────────────────────────────────────
         topics:
             hand_pose: "/hand_pose"
@@ -464,21 +463,21 @@ _reference:
             target_force_min: 50.0
             target_force_max: 200.0
             update_rate_hz: 20.0
-            stability_window_s: 1.0       # Seconds forces must be stable before declaring HOLDING
-            stability_tolerance: 30.0     # Raw sensor units — force must be within this of target
-            slip_threshold: 100.0         # Tangential force rate-of-change threshold for slip detection
-            emergency_force: 500.0        # Emergency release threshold (raw sensor units)
-            stale_data_timeout_s: 0.5     # Seconds without force data before warning
-            force_filter_window: 5        # Moving-average window for force readings
+            stability_window_s: 1.0 # Seconds forces must be stable before declaring HOLDING
+            stability_tolerance: 30.0 # Raw sensor units — force must be within this of target
+            slip_threshold: 100.0 # Tangential force rate-of-change threshold for slip detection
+            emergency_force: 500.0 # Emergency release threshold (raw sensor units)
+            stale_data_timeout_s: 0.5 # Seconds without force data before warning
+            force_filter_window: 5 # Moving-average window for force readings
             # Velocity ramp (closing phase)
-            closing_velocity_start: 0.3      # rad/s — initial closing velocity
-            closing_velocity_end: 0.1        # rad/s — minimum closing velocity
+            closing_velocity_start: 0.3 # rad/s — initial closing velocity
+            closing_velocity_end: 0.1 # rad/s — minimum closing velocity
             decay_steps: 5
             step_interval_s: 0.2
             relaxed_wait_s: 0.5
             # Contact detection
-            stop_positions: [1.5, 1.5, 1.5]  # rad — mechanical stop per finger
-            force_thresholds: [300.0, 300.0, 300.0]  # raw — force contact threshold
+            stop_positions: [1.5, 1.5, 1.5] # rad — mechanical stop per finger
+            force_thresholds: [300.0, 300.0, 300.0] # raw — force contact threshold
             open_positions: [0.0, 0.0, 0.0]
             # Force hold (velocity-based deadzone)
             hold_deadzone: 20.0
@@ -488,7 +487,7 @@ _reference:
             emergency_backoff_velocity: -0.1
             force_adjust_rate_up: 15.0
             force_adjust_rate_down: 30.0
-            max_current_percent: 60.0     # Safety: max motor current as percentage (0-80)
+            max_current_percent: 60.0 # Safety: max motor current as percentage (0-80)
 
         # ── Haptic ────────────────────────────────────────────────────────────
         haptic:

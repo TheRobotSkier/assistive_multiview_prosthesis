@@ -1,0 +1,1327 @@
+   multiview_prosthesis >  make run
+cd docker && podman-compose -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis segmentation-cpu
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+ ** merged:
+ {
+  "services": {
+    "prosthesis": {
+      "container_name": "prosthesis",
+      "image": "prosthesis:latest",
+      "build": {
+        "context": "..",
+        "dockerfile": "docker/Dockerfile",
+        "target": "base",
+        "args": {
+          "USER_UID": "1000",
+          "USER_GID": "1000"
+        }
+      },
+      "environment": {
+        "DISPLAY": ":0",
+        "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp",
+        "CYCLONEDDS_URI": "/tmp/cyclonedds_peer.xml",
+        "ROS_DOMAIN_ID": "0",
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all"
+      },
+      "network_mode": "host",
+      "userns_mode": "keep-id",
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro",
+        "../config/chrony-host.conf:/tmp/chrony-host.conf:ro",
+        "../src:/prosthesis_ws/src:rw",
+        "../config:/prosthesis_ws/config:rw",
+        "../rviz:/prosthesis_ws/rviz:rw",
+        "../scripts:/prosthesis_ws/scripts:rw",
+        "../tests:/prosthesis_ws/tests:rw",
+        "../Makefile.workspace:/prosthesis_ws/Makefile:ro",
+        "prosthesis-build:/prosthesis_ws/build",
+        "prosthesis-install:/prosthesis_ws/install",
+        "prosthesis-log:/prosthesis_ws/log",
+        "../data:/app/data:rw",
+        "../models:/app/models:rw"
+      ],
+      "privileged": true,
+      "ipc": "host",
+      "stdin_open": true,
+      "tty": true,
+      "devices": [
+        "/dev/ttyUSB0:/dev/ttyUSB0",
+        "/dev/ttyUSB1:/dev/ttyUSB1"
+      ],
+      "group_add": [
+        "keep-groups"
+      ]
+    },
+    "segmentation-cuda": {
+      "container_name": "segmentation-cuda",
+      "image": "segmentation:cuda",
+      "build": {
+        "context": "../src/segmentation",
+        "dockerfile": "../../docker/Dockerfile.segmentation",
+        "args": {
+          "BACKEND": "cuda"
+        }
+      },
+      "environment": {
+        "INFERENCE_SERVER_PORT": "5678",
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        "exec python /nodes/inference_server.py"
+      ],
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "/home/daniel/prosthesis_data/weights:/weights:rw"
+      ],
+      "network_mode": "host",
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')\""
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 5,
+        "start_period": "120s"
+      },
+      "profiles": [
+        "segmentation-cuda"
+      ],
+      "privileged": true,
+      "userns_mode": "keep-id"
+    },
+    "segmentation-cpu": {
+      "container_name": "segmentation-cpu",
+      "image": "segmentation:cpu",
+      "build": {
+        "context": "../src/segmentation",
+        "dockerfile": "../../docker/Dockerfile.segmentation",
+        "args": {
+          "BACKEND": "cpu"
+        }
+      },
+      "environment": {
+        "INFERENCE_SERVER_PORT": "5678"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        "exec python /nodes/inference_server.py"
+      ],
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "/home/daniel/prosthesis_data/weights:/weights:rw"
+      ],
+      "network_mode": "host",
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')\""
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 5,
+        "start_period": "120s"
+      },
+      "profiles": [
+        "segmentation-cpu"
+      ],
+      "privileged": true,
+      "userns_mode": "keep-id"
+    },
+    "test": {
+      "container_name": "test",
+      "build": {
+        "context": "..",
+        "dockerfile": "docker/Dockerfile",
+        "target": "production",
+        "args": {
+          "USER_UID": "1000",
+          "USER_GID": "1000"
+        }
+      },
+      "user": "1000:1000",
+      "userns_mode": "keep-id",
+      "environment": {
+        "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp",
+        "ROS_DOMAIN_ID": "0",
+        "GRASP_CONFIG_PATH": "/prosthesis_ws/config/grasp_preshaping.yaml"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        ". /opt/ros/jazzy/setup.sh && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && /prosthesis_ws/scripts/run_tests.sh"
+      ],
+      "profiles": [
+        "test"
+      ],
+      "network_mode": "host",
+      "volumes": [
+        "../tests:/prosthesis_ws/tests:rw"
+      ]
+    }
+  },
+  "volumes": {
+    "prosthesis-build": null,
+    "prosthesis-install": null,
+    "prosthesis-log": null
+  },
+  "_dirname": "/home/daniel/multiview_prosthesis/docker"
+}
+** excluding:  {'segmentation-cuda', 'test'}
+['podman', 'inspect', '-t', 'image', '-f', '{{.Id}}', 'prosthesis:latest']
+['podman', 'inspect', '-t', 'image', '-f', '{{.Id}}', 'segmentation:cpu']
+['podman', 'ps', '--filter', 'label=io.podman.compose.project=docker', '-a', '--format', '{{ index .Labels "io.podman.compose.config-hash"}}']
+podman volume inspect docker_prosthesis-build || podman volume create docker_prosthesis-build
+['podman', 'volume', 'inspect', 'docker_prosthesis-build']
+podman volume inspect docker_prosthesis-install || podman volume create docker_prosthesis-install
+['podman', 'volume', 'inspect', 'docker_prosthesis-install']
+podman volume inspect docker_prosthesis-log || podman volume create docker_prosthesis-log
+['podman', 'volume', 'inspect', 'docker_prosthesis-log']
+podman run --name=prosthesis -d --label io.podman.compose.config-hash=041a88b78a4f147dd02a5c0227417cf1180a2d161090f37ca6d02f447f02e3bc --label io.podman.compose.project=docker --label io.podman.compose.version=1.0.6 --label PODMAN_SYSTEMD_UNIT=podman-compose@docker.service --label com.docker.compose.project=docker --label com.docker.compose.project.working_dir=/home/daniel/multiview_prosthesis/docker --label com.docker.compose.project.config_files=docker-compose.yml,docker-compose.hw.yml --label com.docker.compose.container-number=1 --label com.docker.compose.service=prosthesis --group-add keep-groups --device /dev/ttyUSB0:/dev/ttyUSB0 --device /dev/ttyUSB1:/dev/ttyUSB1 -e DISPLAY=:0 -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml -e ROS_DOMAIN_ID=0 -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all -v /tmp/.X11-unix:/tmp/.X11-unix:rw -v /home/daniel/multiview_prosthesis/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro -v /home/daniel/multiview_prosthesis/config/chrony-host.conf:/tmp/chrony-host.conf:ro -v /home/daniel/multiview_prosthesis/src:/prosthesis_ws/src:rw -v /home/daniel/multiview_prosthesis/config:/prosthesis_ws/config:rw -v /home/daniel/multiview_prosthesis/rviz:/prosthesis_ws/rviz:rw -v /home/daniel/multiview_prosthesis/scripts:/prosthesis_ws/scripts:rw -v /home/daniel/multiview_prosthesis/tests:/prosthesis_ws/tests:rw -v /home/daniel/multiview_prosthesis/Makefile.workspace:/prosthesis_ws/Makefile:ro -v docker_prosthesis-build:/prosthesis_ws/build -v docker_prosthesis-install:/prosthesis_ws/install -v docker_prosthesis-log:/prosthesis_ws/log -v /home/daniel/multiview_prosthesis/data:/app/data:rw -v /home/daniel/multiview_prosthesis/models:/app/models:rw --network host --userns keep-id -i --tty --privileged prosthesis:latest
+Error: creating container storage: the container name "prosthesis" is already in use by 529c9488c1edc8feb061cd34aa76436002d5b3cb49c572e16eb98cf8740665c0. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+exit code: 125
+podman start prosthesis
+exit code: 0
+** skipping:  segmentation-cuda
+podman run --name=segmentation-cpu -d --label io.podman.compose.config-hash=041a88b78a4f147dd02a5c0227417cf1180a2d161090f37ca6d02f447f02e3bc --label io.podman.compose.project=docker --label io.podman.compose.version=1.0.6 --label PODMAN_SYSTEMD_UNIT=podman-compose@docker.service --label com.docker.compose.project=docker --label com.docker.compose.project.working_dir=/home/daniel/multiview_prosthesis/docker --label com.docker.compose.project.config_files=docker-compose.yml,docker-compose.hw.yml --label com.docker.compose.container-number=1 --label com.docker.compose.service=segmentation-cpu -e INFERENCE_SERVER_PORT=5678 -v /tmp/.X11-unix:/tmp/.X11-unix:rw -v /home/daniel/prosthesis_data/weights:/weights:rw --network host --userns keep-id --privileged --restart unless-stopped --healthcheck-command /bin/sh -c 'python -c "import urllib.request; urllib.request.urlopen('"'"'http://127.0.0.1:5678/health'"'"')"' --healthcheck-interval 10s --healthcheck-timeout 5s --healthcheck-start-period 120s --healthcheck-retries 5 segmentation:cpu /bin/bash -c exec python /nodes/inference_server.py
+Error: creating container storage: the container name "segmentation-cpu" is already in use by 53aa3422a4cc5bdd9484780892d2a69e83fd25700a088fdc488ac0e7c641f350. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+exit code: 125
+podman start segmentation-cpu
+exit code: 0
+** skipping:  test
+make segmentation-status
+make[1]: Entering directory '/home/daniel/multiview_prosthesis'
+=== Segmentation container status ===
+NAMES             STATUS                   PORTS
+segmentation-cpu  Up 32 minutes (healthy)
+
+=== Health check ===
+{"device":"cpu","max_points":50000,"minkowski_engine_cuda":false,"minkowski_engine_version":"0.5.4","model_ready":true,"status":"ok","torch_cuda_available":false,"torch_cuda_version":null}
+
+
+=== Weights ===
+  145M /home/daniel/prosthesis_data/weights/weights_exp14_14.pth
+make[1]: Leaving directory '/home/daniel/multiview_prosthesis'
+make timesync-check
+make[1]: Entering directory '/home/daniel/multiview_prosthesis'
+=== Robotlab Connectivity Check ===
+[OK] Host IP 10.42.0.1 is present on a WSL2 interface (mirrored networking active)
+Pinging Jetson at 10.42.0.2... [OK]
+Checking SSH connectivity... [OK] (key-based auth working)
+
+=== Connected ===
+SSH:  ssh robotlab@10.42.0.2
+Make: make jetson-cameras   (sync + start cameras + local RViz)
+=== Clock comparison ===
+Host time:   Tue May 26 00:58:43 CEST 2026
+Jetson time: Tue 26 May 00:58:44 CEST 2026
+
+=== Host chrony status ===
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+
+Reference ID    : 7F7F0101 ()
+Stratum         : 10
+Last offset     : +0.000000000 seconds
+RMS offset      : 0.000000000 seconds
+
+=== Jetson chrony status ===
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^* 10.42.0.1                    10   4   377     6   +307us[ +337us] +/- 1770us
+
+Reference ID    : 0A2A0001 (10.42.0.1)
+Stratum         : 11
+Last offset     : +0.000029632 seconds
+RMS offset      : 0.000146303 seconds
+make[1]: Leaving directory '/home/daniel/multiview_prosthesis'
+[detect-usb] MIA Hand found: /dev/ttyUSB0  (by-id serial FTBY495J)
+[detect-usb] Wrist Dynamixel found: /dev/ttyUSB1  (by-id serial FTAO4Z0Y)
+[host] Detected: MIA=/dev/ttyUSB0  WRIST=/dev/ttyUSB1
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+podman exec --interactive --tty --env DISPLAY=:0 --env RMW_IMPLEMENTATION=rmw_cyclonedds_cpp --env CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml --env ROS_DOMAIN_ID=0 --env NVIDIA_VISIBLE_DEVICES=all --env NVIDIA_DRIVER_CAPABILITIES=all --env MIA_SERIAL_PORT=/dev/ttyUSB0 --env WRIST_SERIAL_PORT=/dev/ttyUSB1 prosthesis /bin/bash -lc make setup-usb
+[setup-usb] Configuration:
+[setup-usb]   MIA_SERIAL_PORT  = /dev/ttyUSB0
+[setup-usb]   WRIST_SERIAL_PORT = /dev/ttyUSB1
+[setup-usb] Linked /dev/ttyUSB0 → /dev/ttyMiaHand, /dev/mia_hand
+[setup-usb] Linked /dev/ttyUSB1 → /dev/ttyDynamixel, /dev/wrist_motor
+[setup-usb] Done.
+[setup-usb] MIA Hand  = /dev/ttyMiaHand → /dev/ttyUSB0
+[setup-usb] Wrist     = /dev/ttyDynamixel → /dev/ttyUSB1
+exit code: 0
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+podman exec --interactive --user prosthesis --tty --env DISPLAY=:0 --env RMW_IMPLEMENTATION=rmw_cyclonedds_cpp --env CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml --env ROS_DOMAIN_ID=0 --env NVIDIA_VISIBLE_DEVICES=all --env NVIDIA_DRIVER_CAPABILITIES=all prosthesis /bin/bash -lc make run
+Starting >>> mia_hand_msgs
+Starting >>> camera
+Starting >>> emg_bridge
+Starting >>> grasp_preshaping
+Starting >>> mia_hand_description
+Starting >>> pointcloud_fusion
+Starting >>> segmentation_bridge
+Starting >>> twist_propagation
+Starting >>> wrist_driver
+Starting >>> sensor_fusion_bringup
+Finished <<< mia_hand_description [2.54s]
+Finished <<< grasp_preshaping [2.58s]
+Finished <<< sensor_fusion_bringup [2.56s]
+Finished <<< mia_hand_msgs [2.68s]
+Starting >>> mia_hand_driver
+Starting >>> command_bridge
+Starting >>> force_controller
+Starting >>> haptic_bridge
+Starting >>> pipeline_manager
+Finished <<< mia_hand_driver [1.22s]
+Starting >>> mia_hand_ros2_control
+Finished <<< mia_hand_ros2_control [0.26s]
+Finished <<< pointcloud_fusion [4.64s]
+Finished <<< camera [4.70s]
+Finished <<< wrist_driver [4.68s]
+Finished <<< emg_bridge [4.75s]
+Finished <<< segmentation_bridge [4.75s]
+Finished <<< twist_propagation [4.77s]
+Finished <<< force_controller [2.67s]
+Finished <<< haptic_bridge [2.68s]
+Finished <<< command_bridge [2.71s]
+Finished <<< pipeline_manager [2.70s]
+Starting >>> prosthesis_launch
+Finished <<< prosthesis_launch [2.40s]
+
+Summary: 17 packages finished [8.13s]
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-25-22-59-01-549361-KingBob-3541
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [3964]
+[INFO] [mia_hand_driver_node-2]: process started with pid [3965]
+[INFO] [command_bridge_node-3]: process started with pid [3966]
+[INFO] [wrist_driver_node-4]: process started with pid [3967]
+[INFO] [run_classifier-5]: process started with pid [3968]
+[INFO] [emg_grasp_controller-6]: process started with pid [3969]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process started with pid [3970]
+[INFO] [camera_mount_tf_publisher-8]: process started with pid [3971]
+[INFO] [tf_pipeline_diagnostics-9]: process started with pid [3972]
+[INFO] [pointcloud_fusion_node-10]: process started with pid [3973]
+[INFO] [odom_to_pose_relay-11]: process started with pid [3974]
+[INFO] [openvins_odom_tf_relay-12]: process started with pid [3975]
+[INFO] [segmentation_ros2_node-13]: process started with pid [3976]
+[INFO] [twist_propagation_node-14]: process started with pid [3977]
+[INFO] [preshaping_service_bridge_node-15]: process started with pid [3978]
+[INFO] [grasp_proximity_controller_node.py-16]: process started with pid [3979]
+[INFO] [force_controller_node-17]: process started with pid [3980]
+[INFO] [rviz2-18]: process started with pid [3981]
+[preshaping_service_bridge_node-15] [INFO] [1779749942.243073612] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-15] [INFO] [1779749942.246109130] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-18] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[mia_hand_driver_node-2] [INFO] [1779749942.819728748] [mia_hand_driver]: /dev/ttyMiaHand serial port opened.
+[mia_hand_driver_node-2] [INFO] [1779749943.206424627] [mia_hand_driver]: Mia Hand connected.
+[emg_grasp_controller-6] [INFO] [1779749943.213544556] [emg_grasp_controller]: EMG grasp controller started — rate=20.0 Hz, stale_timeout=1.0s
+[wrist_driver_node-4] [INFO] [1779749943.229948743] [wrist_driver]: Wrist motor connected on /dev/ttyDynamixel, ID=1
+[rviz2-18] [INFO] [1779749943.610266155] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779749943.610429719] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-18] [INFO] [1779749943.704479855] [rviz2]: Stereo is NOT SUPPORTED
+[command_bridge_node-3] [INFO] [1779749943.747692719] [command_bridge]: Command bridge started — speed=80%, joint_states → /joint_states
+[rviz2-18] [INFO] [1779749943.875567722] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779749943.877666598] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779749943.903043080] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779749943.905431717] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[force_controller_node-17] [INFO] [1779749943.963152787] [force_controller]: Force controller started. Target range: [50.0, 200.0] raw units, kp=0.01, ki=0.001, rate=10.0 Hz
+[pipeline_manager_node-1] [INFO] [1779749944.113648217] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1779749944.114597698] [pipeline_manager]: Pipeline manager started — state: IDLE
+[pipeline_manager_node-1] [INFO] [1779749944.116076022] [pipeline_manager]: Wrist target initialized from hardware: 47.9 deg
+[rviz2-18] [INFO] [1779749944.187591392] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779749944.263400362] [rviz2]: Stereo is NOT SUPPORTED
+[tf_pipeline_diagnostics-9] [INFO] [1779749944.792225132] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[grasp_proximity_controller_node.py-16] [INFO] [1779749944.935698673] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-16] [INFO] [1779749944.960926264] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[pipeline_manager_node-1] [INFO] [1779749945.118611318] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779749945.158045266] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779749945.160051045] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779749945.265043237] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779749945.267047204] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779749945.267549269] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[camera_mount_tf_publisher-8] [INFO] [1779749945.278190524] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-8] [INFO] [1779749945.281443089] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[pointcloud_fusion_node-10] [INFO] [1779749945.381009132] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-10] [INFO] [1779749945.382512243] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-10] [INFO] [1779749945.422954618] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-10] [WARN] [1779749945.425277424] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [INFO] [1779749945.427339286] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-10] [INFO] [1779749945.429063067] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[twist_propagation_node-14] [INFO] [1779749945.441851380] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-14] [INFO] [1779749945.532853780] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-14] [INFO] [1779749945.534193434] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[run_classifier-5] [2026-05-25 22:59:05.561] [board_logger] [info] incoming json: {
+[run_classifier-5]     "file": "",
+[run_classifier-5]     "file_anc": "",
+[run_classifier-5]     "file_aux": "",
+[run_classifier-5]     "ip_address": "",
+[run_classifier-5]     "ip_address_anc": "",
+[run_classifier-5]     "ip_address_aux": "",
+[run_classifier-5]     "ip_port": 0,
+[run_classifier-5]     "ip_port_anc": 0,
+[run_classifier-5]     "ip_port_aux": 0,
+[run_classifier-5]     "ip_protocol": 0,
+[run_classifier-5]     "mac_address": "",
+[run_classifier-5]     "master_board": -100,
+[run_classifier-5]     "other_info": "",
+[run_classifier-5]     "serial_number": "",
+[run_classifier-5]     "serial_port": "",
+[run_classifier-5]     "timeout": 0
+[run_classifier-5] }
+[run_classifier-5] [2026-05-25 22:59:05.562] [board_logger] [info] Target address is set to : 192.168.4.1::4210
+[segmentation_ros2_node-13] [INFO] [1779749945.575280675] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[command_bridge_node-3] [INFO] [1779749945.738199190] [command_bridge]: Joint position stream activated.
+[mia_hand_driver_node-2] [INFO] [1779749947.252461147] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779749947.431552730] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[mia_hand_driver_node-2] [INFO] [1779749948.615347391] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779749949.426544206] [pointcloud_fusion]: TF wait gate: not connected after 4s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[openvins_odom_tf_relay-12] [WARN] [1779749954.711356738] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779749955.424373202] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-10] [WARN] [1779749955.425220668] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779749955.427070560] [pointcloud_fusion]: TF wait gate: not connected after 10s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779749956.784915079] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779749964.667542300] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779749965.424369298] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-10] [WARN] [1779749965.425014679] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779749965.427353912] [pointcloud_fusion]: TF wait gate: not connected after 20s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779749966.794331629] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[wrist_driver_node-4] [WARN] [1779749967.327942872] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] There is no status packet!, vel=[TxRxResult] Communication success!
+[mia_hand_driver_node-2] [INFO] [1779749969.234738884] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779749971.626088999] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779749974.668920023] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779749975.424420327] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.0s
+[pointcloud_fusion_node-10] [WARN] [1779749975.425837451] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: fresh (0.01s); cam1 TF: "marker_map" passed to lookupTransform argument target_frame does not exist. ; cam2: fresh (0.07s); cam2 TF: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [WARN] [1779749975.429295934] [pointcloud_fusion]: TF wait gate: not connected after 30s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[grasp_proximity_controller_node.py-16] [INFO] [1779749975.606424529] [proximity_controller]: Received first hand pose — control loop now active
+[openvins_odom_tf_relay-12] [WARN] [1779749975.610959629] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(0.009, -0.010, -0.002), cov_trace=1.70e-02, pos_norm=0.014m, elapsed=30.9s, actual_imu_frame='arm_imu')
+[tf_pipeline_diagnostics-9] [WARN] [1779749976.794849535] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779749977.428075515] [pointcloud_fusion]: TF tree connected via 'arm_d435i_arm_depth_optical_frame' — starting point cloud fusion (waited 32.0s since node startup)
+[pointcloud_fusion_node-10] [WARN] [1779749977.499214483] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779749984.667375575] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: OK (1487 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779749985.791410266] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779749985.838227595] [pointcloud_fusion]: Stats: published=45 (dual=0, cam1_only=64) dist_removed=2613202 bbox_removed=100 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:69} last_publish_ago=0.2s
+[pointcloud_fusion_node-10] [WARN] [1779749987.518182763] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779749988.712167025] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779749988.906940645] [pointcloud_fusion]: Using cached transform for palm_frame (age=1.03s) — fresh lookup failed
+[pipeline_manager_node-1] [INFO] [1779749994.412748420] [pipeline_manager]: State: IDLE -> TWISTING (EMG: POWER (held 1.1s))
+[force_controller_node-17] [INFO] [1779749994.418141748] [force_controller]: Pipeline state: IDLE -> TWISTING
+[twist_propagation_node-14] [INFO] [1779749994.454338749] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779749994.462249793] [pipeline_manager]: Twist propagation activated
+[openvins_odom_tf_relay-12] [WARN] [1779749994.669006076] [openvins_odom_tf_relay]: [RELAY-STATUS] 50s elapsed — head: WAITING (0 msgs), arm: OK (3276 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779749995.772754926] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779749996.625732401] [pointcloud_fusion]: Stats: published=57 (dual=0, cam1_only=53) dist_removed=1273396 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=1 tf_fail={arm_d435i_arm_depth_optical_frame:8, head_d435i_head_depth_optical_frame:69} last_publish_ago=0.3s
+[pointcloud_fusion_node-10] [WARN] [1779749997.521029974] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[twist_propagation_node-14] [INFO] [1779750003.163277140] [twist_propagation]: Hit found at (0.322, 0.101, 0.047) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750003.166328185] [twist_propagation]: Published contact state: pos=(0.322, 0.101, 0.047) orient=(-0.884, -0.060, 0.464, 0.020) zero_twist
+[twist_propagation_node-14] [INFO] [1779750003.168518318] [twist_propagation]: Hit detected — collision distance: 0.373m
+[pipeline_manager_node-1] [INFO] [1779750003.168950818] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[twist_propagation_node-14] [INFO] [1779750003.172466672] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.322, 0.101, 0.047), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779750003.174172934] [segmentation_bridge]: [+] positive click at (0.322, 0.101, 0.047) (cloud frame)
+[force_controller_node-17] [INFO] [1779750003.177465786] [force_controller]: Pipeline state: TWISTING -> SEGMENTING
+[segmentation_ros2_node-13] [INFO] [1779750003.209907082] [segmentation_bridge]: Running inference with 1 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750003.232974916] [segmentation_bridge]: ROI crop: 848/30870 points within 0.1m of click centroid
+[segmentation_ros2_node-13] [INFO] [1779750004.023168433] [segmentation_bridge]: Published segmented cloud: 848/30870 points.
+[pipeline_manager_node-1] [INFO] [1779750004.023240416] [pipeline_manager]: Object cloud received but grasp_type is 0 — proceeding anyway
+[pipeline_manager_node-1] [INFO] [1779750004.026702939] [pipeline_manager]: State: SEGMENTING -> PLANNING (Segmentation complete: object cloud received)
+[force_controller_node-17] [INFO] [1779750004.028019488] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[preshaping_service_bridge_node-15] [INFO] [1779750004.031656384] [preshaping_service]: Planner called with contact override: target=(0.322,0.101,0.047) zero_twist=true
+[preshaping_service_bridge_node-15] [WARN] [1779750004.031832627] [preshaping_service]: Could not lookup camera frame 'head_d435i_head_depth_optical_frame' in 'marker_map': Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[preshaping_service_bridge_node-15] [INFO] [1779750004.031905957] [preshaping_service]: Planner called with 1 camera(s): target_frame=marker_map cam0=(0.597,0.010,0.282)
+[preshaping_service_bridge_node-15] [runtime_config] Loaded config from "/prosthesis_ws/config/grasp_preshaping.yaml"
+[twist_propagation_node-14] [INFO] [1779750004.065443630] [twist_propagation]: Segmented cloud received
+[preshaping_service_bridge_node-15] [INFO] [1779750004.484572476] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486380108] [preshaping_service]:   Pipeline Time: 452 ms
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486407443] [preshaping_service]:   SMC Iterations: 5
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486415575] [preshaping_service]:   Grasp Type: Cylindrical
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486421568] [preshaping_service]:   Combined Score: 0.2708
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486432422] [preshaping_service]:   Alignment Score: 0.0000
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486439973] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486448184] [preshaping_service]:   Contact Count Score: 0.3333
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486456270] [preshaping_service]:   Contact Score: 0.2083
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486463667] [preshaping_service]:   Closure Amount: 0.0500
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486471481] [preshaping_service]:   2nd Best Grasp: Lateral
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486477737] [preshaping_service]:   2nd Best Score: 0.2167 (margin: 0.0542)
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486485990] [preshaping_service]: ===========================
+[preshaping_service_bridge_node-15] [INFO] [1779750004.486493420] [preshaping_service]: Overriding to cylindrical grasp with 10% initial closure (planner: Cylindrical, closure=0.0500)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750004.495106962] [proximity_controller]: New plan committed — closures=[0.1, 0.1, 0.1], wrist=277.2°
+[pipeline_manager_node-1] [INFO] [1779750004.509390396] [pipeline_manager]: State: PLANNING -> APPROACHING (Preshaping: cylindrical grasp, closure=0.0500, combined=0.2708, alignment=0.0000, force_clos)
+[force_controller_node-17] [INFO] [1779750004.514182429] [force_controller]: Pipeline state: PLANNING -> APPROACHING
+[twist_propagation_node-14] [INFO] [1779750004.545550533] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779750004.561442867] [pipeline_manager]: Twist propagation deactivated
+[grasp_proximity_controller_node.py-16] [INFO] [1779750004.561673446] [proximity_controller]: FAR mode (dist=0.385 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750004.669830646] [openvins_odom_tf_relay]: [RELAY-STATUS] 60s elapsed — head: WAITING (0 msgs), arm: OK (5077 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750005.565490980] [proximity_controller]: FAR mode (dist=0.394 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750005.779604822] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750006.096855734] [pointcloud_fusion]: Stats: published=52 (dual=0, cam1_only=46) dist_removed=859997 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:47} last_publish_ago=0.1s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750006.660985088] [proximity_controller]: FAR mode (dist=0.374 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750007.676081269] [proximity_controller]: FAR mode (dist=0.346 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750007.842951387] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750008.762297566] [proximity_controller]: FAR mode (dist=0.355 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750009.771150125] [proximity_controller]: FAR mode (dist=0.358 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750010.862652965] [proximity_controller]: FAR mode (dist=0.379 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750011.865150548] [proximity_controller]: FAR mode (dist=0.355 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750011.921479076] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750011.927440738] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750012.963037165] [proximity_controller]: FAR mode (dist=0.350 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750013.122824298] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750013.963921413] [proximity_controller]: FAR mode (dist=0.350 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750014.667717984] [openvins_odom_tf_relay]: [RELAY-STATUS] 70s elapsed — head: WAITING (0 msgs), arm: OK (6877 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750015.062494385] [proximity_controller]: FAR mode (dist=0.343 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750015.741586255] [pointcloud_fusion]: Stats: published=51 (dual=0, cam1_only=55) dist_removed=1627928 bbox_removed=54340 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:63} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779750015.773402253] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750016.065135759] [proximity_controller]: FAR mode (dist=0.371 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750017.072655606] [proximity_controller]: FAR mode (dist=0.436 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750017.870680478] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750018.077620077] [proximity_controller]: FAR mode (dist=0.347 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750019.163837489] [proximity_controller]: FAR mode (dist=0.313 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750019.814793449] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750019.821875781] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750020.166003266] [proximity_controller]: FAR mode (dist=0.294 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750021.262804788] [proximity_controller]: FAR mode (dist=0.249 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750022.360592577] [proximity_controller]: FAR mode (dist=0.257 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750023.375400359] [proximity_controller]: FAR mode (dist=0.261 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750024.475706614] [proximity_controller]: FAR mode (dist=0.371 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750024.667995385] [openvins_odom_tf_relay]: [RELAY-STATUS] 80s elapsed — head: WAITING (0 msgs), arm: OK (8683 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779750025.220003125] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779750025.355898570] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.75s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750025.562407433] [proximity_controller]: FAR mode (dist=0.481 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750025.698738393] [pointcloud_fusion]: Stats: published=56 (dual=0, cam1_only=53) dist_removed=1700578 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=3 tf_fail={arm_d435i_arm_depth_optical_frame:8, head_d435i_head_depth_optical_frame:56} last_publish_ago=0.2s
+[tf_pipeline_diagnostics-9] [WARN] [1779750025.770699982] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750026.565329941] [proximity_controller]: FAR mode (dist=0.486 m): partial closure + wrist
+[pipeline_manager_node-1] [INFO] [1779750027.511504998] [pipeline_manager]: State: APPROACHING -> RELEASING (EMG: OPEN)
+[force_controller_node-17] [INFO] [1779750027.514469607] [force_controller]: Pipeline state: APPROACHING -> RELEASING
+[force_controller_node-17] [INFO] [1779750027.517784973] [force_controller]: Deactivating force controller...
+[twist_propagation_node-14] [INFO] [1779750027.519883873] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779750027.525081198] [pipeline_manager]: Twist propagation deactivated
+[grasp_proximity_controller_node.py-16] [INFO] [1779750027.567069899] [proximity_controller]: FAR mode (dist=0.491 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750027.941074500] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750028.664427913] [proximity_controller]: FAR mode (dist=0.498 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750029.761907701] [proximity_controller]: FAR mode (dist=0.496 m): partial closure + wrist
+[pipeline_manager_node-1] [INFO] [1779750030.521759790] [pipeline_manager]: State: RELEASING -> IDLE (Release timed out)
+[force_controller_node-17] [INFO] [1779750030.532836729] [force_controller]: Pipeline state: RELEASING -> IDLE
+[grasp_proximity_controller_node.py-16] [INFO] [1779750030.875119208] [proximity_controller]: FAR mode (dist=0.493 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750031.963317850] [proximity_controller]: FAR mode (dist=0.499 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750032.359013036] [command_bridge]: Trajectory rejected for mrl: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750032.391801781] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750032.967089269] [proximity_controller]: FAR mode (dist=0.498 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750033.967491633] [proximity_controller]: FAR mode (dist=0.497 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750034.667169389] [openvins_odom_tf_relay]: [RELAY-STATUS] 90s elapsed — head: WAITING (0 msgs), arm: OK (10419 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750035.061821681] [proximity_controller]: FAR mode (dist=0.497 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750035.784312238] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750035.921701004] [pointcloud_fusion]: Stats: published=52 (dual=0, cam1_only=59) dist_removed=2326114 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=2 tf_fail={arm_d435i_arm_depth_optical_frame:8, head_d435i_head_depth_optical_frame:76} last_publish_ago=0.1s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750036.067618364] [proximity_controller]: FAR mode (dist=0.498 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750037.162391310] [proximity_controller]: FAR mode (dist=0.498 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750038.264236614] [proximity_controller]: FAR mode (dist=0.501 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750038.315992558] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750039.277944106] [proximity_controller]: FAR mode (dist=0.503 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750040.364651423] [proximity_controller]: FAR mode (dist=0.496 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750041.014095023] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750041.462342170] [proximity_controller]: FAR mode (dist=0.492 m): partial closure + wrist
+[pipeline_manager_node-1] [INFO] [1779750041.567998147] [pipeline_manager]: State: IDLE -> TWISTING (EMG: POWER (held 1.0s))
+[force_controller_node-17] [INFO] [1779750041.571570292] [force_controller]: Pipeline state: IDLE -> TWISTING
+[twist_propagation_node-14] [INFO] [1779750041.585287953] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779750041.599341210] [pipeline_manager]: Twist propagation activated
+[grasp_proximity_controller_node.py-16] [INFO] [1779750042.463491660] [proximity_controller]: FAR mode (dist=0.488 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750043.382341254] [command_bridge]: Trajectory rejected for thumb: Timeout occurred before receiving command acknowledge from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750043.465377185] [proximity_controller]: FAR mode (dist=0.489 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750044.499633024] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750044.569705336] [proximity_controller]: FAR mode (dist=0.489 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750044.675387583] [openvins_odom_tf_relay]: [RELAY-STATUS] 100s elapsed — head: WAITING (0 msgs), arm: OK (12103 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779750045.385090970] [pointcloud_fusion]: Using cached transform for palm_frame (age=1.86s) — fresh lookup failed
+[pointcloud_fusion_node-10] [INFO] [1779750045.564179428] [pointcloud_fusion]: Stats: published=43 (dual=0, cam1_only=41) dist_removed=1071655 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=2 tf_fail={arm_d435i_arm_depth_optical_frame:9, head_d435i_head_depth_optical_frame:48} last_publish_ago=0.0s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750045.663137707] [proximity_controller]: FAR mode (dist=0.490 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750045.671726176] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.5s > 2.0s), skipping
+[tf_pipeline_diagnostics-9] [WARN] [1779750045.799026930] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750046.679226556] [proximity_controller]: FAR mode (dist=0.491 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750047.762822522] [proximity_controller]: FAR mode (dist=0.491 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750048.327586243] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750048.764330903] [proximity_controller]: FAR mode (dist=0.493 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750049.863010972] [proximity_controller]: FAR mode (dist=0.489 m): partial closure + wrist
+[twist_propagation_node-14] [INFO] [1779750050.871145163] [twist_propagation]: Hit found at (0.415, 0.068, 0.039) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750050.876034214] [twist_propagation]: Published contact state: pos=(0.415, 0.068, 0.039) orient=(0.841, 0.083, -0.529, 0.084) zero_twist
+[twist_propagation_node-14] [INFO] [1779750050.879401900] [twist_propagation]: Hit detected — collision distance: 0.298m
+[pipeline_manager_node-1] [INFO] [1779750050.880689292] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[twist_propagation_node-14] [INFO] [1779750050.881557496] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.415, 0.068, 0.039), r=[0.0050, 0.0300]m
+[force_controller_node-17] [INFO] [1779750050.884475102] [force_controller]: Pipeline state: TWISTING -> SEGMENTING
+[segmentation_ros2_node-13] [INFO] [1779750050.885623415] [segmentation_bridge]: [+] positive click at (0.415, 0.068, 0.039) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779750050.912555035] [segmentation_bridge]: Running inference with 2 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750050.915758523] [segmentation_bridge]: ROI crop: 650/32933 points within 0.1m of click centroid
+[grasp_proximity_controller_node.py-16] [INFO] [1779750050.973892157] [proximity_controller]: FAR mode (dist=0.431 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750052.079475084] [proximity_controller]: FAR mode (dist=0.393 m): partial closure + wrist
+[pipeline_manager_node-1] [INFO] [1779750052.982912635] [pipeline_manager]: State: SEGMENTING -> PLANNING (Segmentation complete: object cloud received)
+[segmentation_ros2_node-13] [INFO] [1779750052.986824358] [segmentation_bridge]: Published segmented cloud: 650/32933 points.
+[force_controller_node-17] [INFO] [1779750052.993119146] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[preshaping_service_bridge_node-15] [WARN] [1779750053.000503994] [preshaping_service]: Could not lookup camera frame 'head_d435i_head_depth_optical_frame' in 'marker_map': Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[preshaping_service_bridge_node-15] [INFO] [1779750053.000644835] [preshaping_service]: Planner called with 1 camera(s): target_frame=marker_map cam0=(0.683,0.001,0.345)
+[twist_propagation_node-14] [INFO] [1779750053.001329446] [twist_propagation]: Segmented cloud received
+[pipeline_manager_node-1] [WARN] [1779750053.067199475] [pipeline_manager]: Preshaping failed: No points in ROI, cannot score grasps
+[pipeline_manager_node-1] [INFO] [1779750053.068502191] [pipeline_manager]: State: PLANNING -> IDLE (Preshaping failed: No points in ROI, cannot score grasps)
+[force_controller_node-17] [INFO] [1779750053.070794708] [force_controller]: Pipeline state: PLANNING -> IDLE
+[grasp_proximity_controller_node.py-16] [INFO] [1779750053.164102697] [proximity_controller]: FAR mode (dist=0.412 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750054.267695029] [proximity_controller]: FAR mode (dist=0.419 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750054.669171231] [openvins_odom_tf_relay]: [RELAY-STATUS] 110s elapsed — head: WAITING (0 msgs), arm: OK (13827 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750055.360840858] [proximity_controller]: FAR mode (dist=0.431 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750055.777765845] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[command_bridge_node-3] [WARN] [1779750056.168993167] [command_bridge]: Trajectory rejected for index: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750056.175491960] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750056.361076160] [proximity_controller]: FAR mode (dist=0.438 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750056.478359376] [pointcloud_fusion]: Stats: published=35 (dual=0, cam1_only=50) dist_removed=931396 bbox_removed=0 bbox_skipped=3 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:5, head_d435i_head_depth_optical_frame:62} last_publish_ago=-0.5s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750057.463080049] [proximity_controller]: FAR mode (dist=0.457 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750058.426034701] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750058.561012408] [proximity_controller]: FAR mode (dist=0.463 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750059.562760166] [proximity_controller]: FAR mode (dist=0.473 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750060.563138061] [proximity_controller]: FAR mode (dist=0.474 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750061.663235191] [proximity_controller]: FAR mode (dist=0.475 m): partial closure + wrist
+[twist_propagation_node-14] [INFO] [1779750062.365084738] [twist_propagation]: Hit found at (0.395, -0.006, 0.003) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750062.366613116] [twist_propagation]: Published contact state: pos=(0.395, -0.006, 0.003) orient=(0.818, 0.094, -0.555, 0.121) zero_twist
+[twist_propagation_node-14] [INFO] [1779750062.368810532] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.395, -0.006, 0.003), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779750062.371375361] [segmentation_bridge]: [+] positive click at (0.395, -0.006, 0.003) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779750062.395235982] [segmentation_bridge]: Running inference with 3 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750062.401488811] [segmentation_bridge]: ROI crop: 339/25302 points within 0.1m of click centroid
+[grasp_proximity_controller_node.py-16] [INFO] [1779750062.669397055] [proximity_controller]: FAR mode (dist=0.421 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750063.672456771] [proximity_controller]: FAR mode (dist=0.381 m): partial closure + wrist
+[segmentation_ros2_node-13] [INFO] [1779750064.535467887] [segmentation_bridge]: Published segmented cloud: 339/25302 points.
+[twist_propagation_node-14] [INFO] [1779750064.552253617] [twist_propagation]: Segmented cloud received
+[openvins_odom_tf_relay-12] [WARN] [1779750064.667055081] [openvins_odom_tf_relay]: [RELAY-STATUS] 120s elapsed — head: WAITING (0 msgs), arm: OK (15593 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750064.764564737] [proximity_controller]: FAR mode (dist=0.358 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750065.787731270] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750065.861652828] [proximity_controller]: FAR mode (dist=0.351 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750066.969952359] [proximity_controller]: FAR mode (dist=0.350 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750067.101014183] [pointcloud_fusion]: Stats: published=36 (dual=0, cam1_only=50) dist_removed=1005608 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:58} last_publish_ago=-1.0s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750068.077338673] [proximity_controller]: FAR mode (dist=0.352 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750069.161938531] [proximity_controller]: FAR mode (dist=0.345 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750069.401219347] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750070.167592663] [proximity_controller]: FAR mode (dist=0.344 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750071.261058523] [proximity_controller]: FAR mode (dist=0.347 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750072.261597469] [proximity_controller]: FAR mode (dist=0.352 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750073.070866225] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.47s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750073.362972364] [proximity_controller]: FAR mode (dist=0.355 m): partial closure + wrist
+[wrist_driver_node-4] [WARN] [1779750074.362042206] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] Incorrect status packet!, vel=[TxRxResult] Communication success!
+[command_bridge_node-3] [WARN] [1779750074.382097092] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750074.464216812] [proximity_controller]: FAR mode (dist=0.355 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750074.669222565] [openvins_odom_tf_relay]: [RELAY-STATUS] 130s elapsed — head: WAITING (0 msgs), arm: OK (17318 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750075.564090838] [proximity_controller]: FAR mode (dist=0.354 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750075.775292053] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750076.513267572] [pointcloud_fusion]: Stats: published=45 (dual=0, cam1_only=43) dist_removed=1275670 bbox_removed=302131 bbox_skipped=0 bbox_cache_hits=1 tf_fail={arm_d435i_arm_depth_optical_frame:1, head_d435i_head_depth_optical_frame:47} last_publish_ago=-0.7s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750076.666007211] [proximity_controller]: FAR mode (dist=0.356 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750077.761028926] [proximity_controller]: FAR mode (dist=0.357 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750078.769301660] [proximity_controller]: FAR mode (dist=0.345 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750079.863084401] [proximity_controller]: FAR mode (dist=0.345 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750080.343362719] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750080.863301100] [proximity_controller]: FAR mode (dist=0.345 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750081.864014370] [proximity_controller]: FAR mode (dist=0.401 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750082.869153414] [proximity_controller]: FAR mode (dist=0.433 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750083.964573005] [proximity_controller]: FAR mode (dist=0.453 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750084.668084908] [openvins_odom_tf_relay]: [RELAY-STATUS] 140s elapsed — head: WAITING (0 msgs), arm: OK (19105 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750085.061968951] [proximity_controller]: FAR mode (dist=0.457 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750085.690254316] [command_bridge]: Trajectory rejected for thumb: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750085.693979364] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[tf_pipeline_diagnostics-9] [WARN] [1779750085.779644060] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750086.063857270] [proximity_controller]: FAR mode (dist=0.452 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750087.165536262] [proximity_controller]: FAR mode (dist=0.322 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750087.262844068] [pointcloud_fusion]: Stats: published=47 (dual=0, cam1_only=59) dist_removed=1691433 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:64} last_publish_ago=-1.4s
+[twist_propagation_node-14] [INFO] [1779750087.292253462] [twist_propagation]: Hit found at (0.042, -0.077, 0.079) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750087.295997716] [twist_propagation]: Published contact state: pos=(0.042, -0.077, 0.079) orient=(0.803, 0.004, -0.590, 0.087) zero_twist
+[twist_propagation_node-14] [INFO] [1779750087.299270851] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.042, -0.077, 0.079), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779750087.305425802] [segmentation_bridge]: [+] positive click at (0.042, -0.077, 0.079) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779750087.335040679] [segmentation_bridge]: Running inference with 4 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750087.343025295] [segmentation_bridge]: ROI crop: 0/18087 points within 0.1m of click centroid
+[grasp_proximity_controller_node.py-16] [INFO] [1779750088.261732941] [proximity_controller]: FAR mode (dist=0.171 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750089.270266618] [proximity_controller]: FAR mode (dist=0.192 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750090.369956376] [proximity_controller]: FAR mode (dist=0.230 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750090.796883657] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750091.461004191] [proximity_controller]: FAR mode (dist=0.246 m): partial closure + wrist
+[twist_propagation_node-14] [WARN] [1779750092.322085177] [twist_propagation]: Segmentation timeout (5.0s), returning to IDLE
+[grasp_proximity_controller_node.py-16] [INFO] [1779750092.463453794] [proximity_controller]: FAR mode (dist=0.257 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750093.467670702] [proximity_controller]: FAR mode (dist=0.259 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750094.563786659] [proximity_controller]: FAR mode (dist=0.260 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750094.669516279] [openvins_odom_tf_relay]: [RELAY-STATUS] 150s elapsed — head: WAITING (0 msgs), arm: OK (20806 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750095.662080089] [proximity_controller]: FAR mode (dist=0.260 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750095.767415816] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750096.537320014] [pointcloud_fusion]: Stats: published=43 (dual=0, cam1_only=31) dist_removed=795317 bbox_removed=8292 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:43} last_publish_ago=-0.9s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750096.665470205] [proximity_controller]: FAR mode (dist=0.205 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750096.756454595] [pointcloud_fusion]: Bbox removal via fresh TF removed 382 points from palm_frame
+[grasp_proximity_controller_node.py-16] [INFO] [1779750097.761685910] [proximity_controller]: FAR mode (dist=0.119 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750098.763433277] [proximity_controller]: FAR mode (dist=0.115 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750099.861352320] [proximity_controller]: FAR mode (dist=0.118 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750100.963590676] [proximity_controller]: FAR mode (dist=0.122 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750101.236658213] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[command_bridge_node-3] [WARN] [1779750101.731294279] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750101.749065434] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750101.968220963] [proximity_controller]: FAR mode (dist=0.130 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750103.064387305] [proximity_controller]: FAR mode (dist=0.129 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750104.165207663] [proximity_controller]: FAR mode (dist=0.180 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750104.670971981] [openvins_odom_tf_relay]: [RELAY-STATUS] 160s elapsed — head: WAITING (0 msgs), arm: OK (22527 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750105.265582126] [proximity_controller]: FAR mode (dist=0.208 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750105.792131359] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750106.269481486] [proximity_controller]: FAR mode (dist=0.208 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750107.123279924] [pointcloud_fusion]: Stats: published=52 (dual=0, cam1_only=67) dist_removed=1501394 bbox_removed=35662 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:79} last_publish_ago=-1.5s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750107.361284884] [proximity_controller]: FAR mode (dist=0.208 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750108.362929719] [proximity_controller]: FAR mode (dist=0.203 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750109.462286208] [proximity_controller]: FAR mode (dist=0.149 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750110.569061844] [proximity_controller]: FAR mode (dist=0.131 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750111.663717749] [proximity_controller]: FAR mode (dist=0.133 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750111.945132272] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750112.665050444] [proximity_controller]: FAR mode (dist=0.128 m): partial closure + wrist
+[twist_propagation_node-14] [INFO] [1779750113.563123120] [twist_propagation]: Hit found at (0.003, 0.123, -0.006) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750113.564647368] [twist_propagation]: Published contact state: pos=(0.003, 0.123, -0.006) orient=(0.843, -0.003, -0.515, 0.159) zero_twist
+[twist_propagation_node-14] [INFO] [1779750113.566677906] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.003, 0.123, -0.006), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779750113.571151886] [segmentation_bridge]: [+] positive click at (0.003, 0.123, -0.006) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779750113.609186551] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750113.625069388] [segmentation_bridge]: ROI crop: 0/14795 points within 0.1m of click centroid
+[grasp_proximity_controller_node.py-16] [INFO] [1779750113.764132441] [proximity_controller]: FAR mode (dist=0.168 m): partial closure + wrist
+[segmentation_ros2_node-13] [ERROR] [1779750114.650973172] [segmentation_bridge]: Inference request failed: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))
+[segmentation_ros2_node-13] [ERROR] [1779750114.653295069] [segmentation_bridge]: Inference request failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[openvins_odom_tf_relay-12] [WARN] [1779750114.685169227] [openvins_odom_tf_relay]: [RELAY-STATUS] 170s elapsed — head: WAITING (0 msgs), arm: OK (24212 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750114.765509640] [proximity_controller]: FAR mode (dist=0.089 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750115.779261850] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750115.862713304] [proximity_controller]: FAR mode (dist=0.103 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750116.225859549] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.73s) — fresh lookup failed
+[command_bridge_node-3] [WARN] [1779750116.446039668] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750116.870802355] [proximity_controller]: FAR mode (dist=0.087 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750117.540572460] [pointcloud_fusion]: Stats: published=47 (dual=0, cam1_only=23) dist_removed=718198 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=7 tf_fail={head_d435i_head_depth_optical_frame:39} last_publish_ago=-2.0s
+[pointcloud_fusion_node-10] [WARN] [1779750117.582678471] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (3.0s > 2.0s), skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750117.961371691] [proximity_controller]: FAR mode (dist=0.088 m): partial closure + wrist
+[twist_propagation_node-14] [WARN] [1779750118.582019482] [twist_propagation]: Segmentation timeout (5.0s), returning to IDLE
+[grasp_proximity_controller_node.py-16] [INFO] [1779750118.963138546] [proximity_controller]: FAR mode (dist=0.085 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750119.963262753] [proximity_controller]: FAR mode (dist=0.084 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750121.069771347] [proximity_controller]: FAR mode (dist=0.084 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750121.665444981] [proximity_controller]: Entered near zone (dist=0.080 m < enter=0.080 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750121.675772374] [proximity_controller]: NEAR mode (dist=0.080 m): full closure
+[pointcloud_fusion_node-10] [WARN] [1779750122.676792856] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (8.6s > 2.0s), skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750122.766246273] [proximity_controller]: NEAR mode (dist=0.082 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750123.872775182] [proximity_controller]: NEAR mode (dist=0.082 m): full closure
+[pointcloud_fusion_node-10] [WARN] [1779750123.912660697] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779750124.674255796] [openvins_odom_tf_relay]: [RELAY-STATUS] 180s elapsed — head: WAITING (0 msgs), arm: OK (25841 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750124.962338668] [proximity_controller]: NEAR mode (dist=0.083 m): full closure
+[pointcloud_fusion_node-10] [WARN] [1779750125.712592026] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-9] [WARN] [1779750125.778176259] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750125.918847519] [pointcloud_fusion]: Stats: published=21 (dual=0, cam1_only=4) dist_removed=160594 bbox_removed=0 bbox_skipped=57 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:1, head_d435i_head_depth_optical_frame:8} last_publish_ago=0.1s
+[pointcloud_fusion_node-10] [ERROR] [1779750125.989546972] [pointcloud_fusion]: Bbox removal success rate is 75% over 29s (225/299 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750126.064105942] [proximity_controller]: NEAR mode (dist=0.084 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750127.077175835] [proximity_controller]: NEAR mode (dist=0.083 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750128.161070928] [proximity_controller]: NEAR mode (dist=0.080 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750129.163051390] [proximity_controller]: NEAR mode (dist=0.083 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750130.261893683] [proximity_controller]: NEAR mode (dist=0.083 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750131.262074594] [proximity_controller]: NEAR mode (dist=0.081 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750132.263418810] [proximity_controller]: NEAR mode (dist=0.084 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750133.361422433] [proximity_controller]: NEAR mode (dist=0.088 m): full closure
+[pointcloud_fusion_node-10] [WARN] [1779750134.052206013] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750134.361997683] [proximity_controller]: NEAR mode (dist=0.088 m): full closure
+[openvins_odom_tf_relay-12] [WARN] [1779750134.668288478] [openvins_odom_tf_relay]: [RELAY-STATUS] 190s elapsed — head: WAITING (0 msgs), arm: OK (27528 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750135.365306368] [proximity_controller]: NEAR mode (dist=0.091 m): full closure
+[tf_pipeline_diagnostics-9] [WARN] [1779750135.767282895] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750136.285125852] [pointcloud_fusion]: Stats: published=44 (dual=0, cam1_only=49) dist_removed=704271 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:1, head_d435i_head_depth_optical_frame:57} last_publish_ago=0.1s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750136.461557194] [proximity_controller]: NEAR mode (dist=0.093 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750137.466240021] [proximity_controller]: NEAR mode (dist=0.100 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750138.262081598] [proximity_controller]: Left near zone (dist=0.100 m > exit=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750138.263588518] [proximity_controller]: FAR mode (dist=0.100 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750139.364333796] [proximity_controller]: FAR mode (dist=0.104 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750140.463582018] [proximity_controller]: FAR mode (dist=0.106 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750141.464125515] [proximity_controller]: FAR mode (dist=0.107 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750142.478699709] [proximity_controller]: FAR mode (dist=0.108 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750143.563782760] [proximity_controller]: FAR mode (dist=0.110 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750144.459221065] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750144.661104515] [proximity_controller]: FAR mode (dist=0.108 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750144.667270808] [openvins_odom_tf_relay]: [RELAY-STATUS] 200s elapsed — head: WAITING (0 msgs), arm: OK (29238 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750145.668076584] [proximity_controller]: FAR mode (dist=0.110 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750145.782321239] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750146.126275506] [pointcloud_fusion]: Stats: published=51 (dual=0, cam1_only=49) dist_removed=717323 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:50} last_publish_ago=0.2s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750146.764785671] [proximity_controller]: FAR mode (dist=0.108 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750147.765441020] [proximity_controller]: FAR mode (dist=0.114 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750148.107160414] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750148.123359635] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750148.775231513] [proximity_controller]: FAR mode (dist=0.115 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750149.715631579] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750149.861758693] [proximity_controller]: FAR mode (dist=0.116 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750150.056949334] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.57s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750150.967324629] [proximity_controller]: FAR mode (dist=0.110 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750152.061717002] [proximity_controller]: FAR mode (dist=0.120 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750153.061954961] [proximity_controller]: FAR mode (dist=0.121 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750154.164712565] [proximity_controller]: FAR mode (dist=0.123 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750154.667735451] [openvins_odom_tf_relay]: [RELAY-STATUS] 210s elapsed — head: WAITING (0 msgs), arm: OK (30947 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779750154.853161293] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750155.267541146] [proximity_controller]: FAR mode (dist=0.119 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750155.786004524] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750156.189075292] [pointcloud_fusion]: Stats: published=46 (dual=0, cam1_only=45) dist_removed=554724 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=10 tf_fail={arm_d435i_arm_depth_optical_frame:14, head_d435i_head_depth_optical_frame:64} last_publish_ago=0.3s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750156.361730650] [proximity_controller]: FAR mode (dist=0.121 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750157.362541321] [proximity_controller]: FAR mode (dist=0.121 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750157.437871774] [command_bridge]: Trajectory rejected for thumb: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750157.454728822] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750158.364226265] [proximity_controller]: FAR mode (dist=0.152 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750159.462632466] [proximity_controller]: FAR mode (dist=0.175 m): partial closure + wrist
+[wrist_driver_node-4] [WARN] [1779750159.827739218] [wrist_driver]: Failed to set acceleration after 3 attempts: [TxRxResult] There is no status packet!
+[command_bridge_node-3] [WARN] [1779750159.851087250] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750160.463823425] [proximity_controller]: FAR mode (dist=0.173 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750161.445354762] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750161.457459858] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750161.501817909] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750161.566309708] [proximity_controller]: FAR mode (dist=0.162 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750162.566383311] [proximity_controller]: FAR mode (dist=0.158 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750162.657567151] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779750163.270765741] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.48s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750163.661556595] [proximity_controller]: FAR mode (dist=0.158 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750164.662669551] [proximity_controller]: FAR mode (dist=0.152 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750164.667420030] [openvins_odom_tf_relay]: [RELAY-STATUS] 220s elapsed — head: WAITING (0 msgs), arm: OK (32586 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779750164.868515538] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779750165.195721185] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.4s > 2.0s), skipping
+[pointcloud_fusion_node-10] [INFO] [1779750165.503729301] [pointcloud_fusion]: Stats: published=43 (dual=0, cam1_only=34) dist_removed=434001 bbox_removed=0 bbox_skipped=1 bbox_cache_hits=15 tf_fail={arm_d435i_arm_depth_optical_frame:25, head_d435i_head_depth_optical_frame:56} last_publish_ago=0.3s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750165.664191058] [proximity_controller]: FAR mode (dist=0.152 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750165.780513311] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[command_bridge_node-3] [WARN] [1779750166.577202084] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750166.665181284] [proximity_controller]: FAR mode (dist=0.152 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750167.675277270] [proximity_controller]: FAR mode (dist=0.151 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750168.597355527] [command_bridge]: Trajectory rejected for mrl: Timeout occurred before receiving command acknowledge from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750168.768731835] [proximity_controller]: FAR mode (dist=0.156 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750169.868728024] [proximity_controller]: FAR mode (dist=0.152 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750170.964126660] [proximity_controller]: FAR mode (dist=0.134 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750172.078270680] [proximity_controller]: FAR mode (dist=0.131 m): partial closure + wrist
+[twist_propagation_node-14] [INFO] [1779750172.546263665] [twist_propagation]: Hit found at (0.102, 0.062, 0.001) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750172.549074227] [twist_propagation]: Published contact state: pos=(0.102, 0.062, 0.001) orient=(0.842, 0.124, -0.505, 0.146) zero_twist
+[twist_propagation_node-14] [INFO] [1779750172.553801407] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.102, 0.062, 0.001), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779750172.558804171] [segmentation_bridge]: [+] positive click at (0.102, 0.062, 0.001) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779750172.584887224] [segmentation_bridge]: Running inference with 6 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750172.597936323] [segmentation_bridge]: ROI crop: 0/20821 points within 0.1m of click centroid
+[grasp_proximity_controller_node.py-16] [INFO] [1779750173.161979002] [proximity_controller]: FAR mode (dist=0.181 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750174.162146604] [proximity_controller]: FAR mode (dist=0.197 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750174.669184946] [openvins_odom_tf_relay]: [RELAY-STATUS] 230s elapsed — head: WAITING (0 msgs), arm: OK (34194 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750175.266047756] [proximity_controller]: FAR mode (dist=0.185 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750175.388102550] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779750175.694265669] [pointcloud_fusion]: Stats: published=38 (dual=0, cam1_only=51) dist_removed=852917 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:11, head_d435i_head_depth_optical_frame:63} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779750175.772456184] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[command_bridge_node-3] [WARN] [1779750176.339047056] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750176.367148528] [proximity_controller]: FAR mode (dist=0.191 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750177.474263266] [proximity_controller]: FAR mode (dist=0.184 m): partial closure + wrist
+[twist_propagation_node-14] [WARN] [1779750177.611782795] [twist_propagation]: Segmentation timeout (5.1s), returning to IDLE
+[grasp_proximity_controller_node.py-16] [INFO] [1779750178.561365981] [proximity_controller]: FAR mode (dist=0.178 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750179.563798841] [proximity_controller]: FAR mode (dist=0.164 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750180.660619763] [proximity_controller]: FAR mode (dist=0.153 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750181.011926403] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750181.662164183] [proximity_controller]: FAR mode (dist=0.133 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750182.662448061] [proximity_controller]: FAR mode (dist=0.133 m): partial closure + wrist
+[mia_hand_driver_node-2] [INFO] [1779750183.265659771] [mia_hand_driver]: Mia Hand disconnected.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750183.666442936] [proximity_controller]: FAR mode (dist=0.132 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750184.672803220] [openvins_odom_tf_relay]: [RELAY-STATUS] 240s elapsed — head: WAITING (0 msgs), arm: OK (35761 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750184.762657082] [proximity_controller]: FAR mode (dist=0.124 m): partial closure + wrist
+[mia_hand_driver_node-2] [INFO] [1779750185.667344574] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779750185.681173818] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779750185.751026330] [pointcloud_fusion]: Stats: published=44 (dual=0, cam1_only=43) dist_removed=826544 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:10, head_d435i_head_depth_optical_frame:54} last_publish_ago=0.3s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750185.765390832] [proximity_controller]: FAR mode (dist=0.121 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750185.772364673] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750186.765568414] [proximity_controller]: FAR mode (dist=0.110 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750187.861586854] [proximity_controller]: FAR mode (dist=0.107 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750188.436045533] [command_bridge]: Trajectory rejected for index: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750188.442557498] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750188.454596160] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[segmentation_ros2_node-13] [ERROR] [1779750188.610221164] [segmentation_bridge]: Inference request failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[grasp_proximity_controller_node.py-16] [INFO] [1779750188.863316708] [proximity_controller]: FAR mode (dist=0.104 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750189.874329978] [proximity_controller]: FAR mode (dist=0.107 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750190.964669961] [proximity_controller]: FAR mode (dist=0.099 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750192.069240611] [proximity_controller]: FAR mode (dist=0.095 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750193.101425482] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750193.162936190] [proximity_controller]: FAR mode (dist=0.100 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750193.293381178] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.68s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750194.164704282] [proximity_controller]: FAR mode (dist=0.088 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750194.669006020] [openvins_odom_tf_relay]: [RELAY-STATUS] 250s elapsed — head: WAITING (0 msgs), arm: OK (37354 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750195.265657752] [proximity_controller]: FAR mode (dist=0.093 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750195.533062721] [pointcloud_fusion]: Stats: published=47 (dual=0, cam1_only=43) dist_removed=390728 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=4 tf_fail={arm_d435i_arm_depth_optical_frame:12, head_d435i_head_depth_optical_frame:52} last_publish_ago=0.1s
+[pointcloud_fusion_node-10] [WARN] [1779750195.753560094] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[tf_pipeline_diagnostics-9] [WARN] [1779750195.784454392] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779750195.860949981] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.1s > 2.0s), skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750196.269997298] [proximity_controller]: FAR mode (dist=0.082 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750197.362998097] [proximity_controller]: FAR mode (dist=0.091 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750198.363293727] [proximity_controller]: FAR mode (dist=0.128 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750199.364580813] [proximity_controller]: FAR mode (dist=0.127 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750200.368245868] [proximity_controller]: FAR mode (dist=0.100 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750200.860968485] [proximity_controller]: Entered near zone (dist=0.078 m < enter=0.080 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750200.861992280] [proximity_controller]: NEAR mode (dist=0.078 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750201.865593338] [proximity_controller]: NEAR mode (dist=0.081 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750202.865901312] [proximity_controller]: NEAR mode (dist=0.092 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750203.362697785] [proximity_controller]: Left near zone (dist=0.102 m > exit=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750203.365876664] [proximity_controller]: FAR mode (dist=0.102 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750204.464261049] [proximity_controller]: FAR mode (dist=0.118 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750204.521922119] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750204.532347737] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750204.552334772] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750204.620178110] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750204.632719086] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[openvins_odom_tf_relay-12] [WARN] [1779750204.667895356] [openvins_odom_tf_relay]: [RELAY-STATUS] 260s elapsed — head: WAITING (0 msgs), arm: OK (38940 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750205.565169250] [proximity_controller]: FAR mode (dist=0.129 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750205.764841884] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[tf_pipeline_diagnostics-9] [WARN] [1779750205.793299452] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750206.258362951] [pointcloud_fusion]: Stats: published=52 (dual=0, cam1_only=55) dist_removed=732849 bbox_removed=0 bbox_skipped=4 bbox_cache_hits=3 tf_fail={head_d435i_head_depth_optical_frame:59} last_publish_ago=0.1s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750206.671441635] [proximity_controller]: FAR mode (dist=0.092 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750207.762112632] [proximity_controller]: FAR mode (dist=0.099 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750208.863621120] [proximity_controller]: FAR mode (dist=0.092 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750209.964516445] [proximity_controller]: FAR mode (dist=0.088 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750210.965375174] [proximity_controller]: FAR mode (dist=0.086 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750211.974919205] [proximity_controller]: FAR mode (dist=0.085 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750212.519775795] [command_bridge]: Trajectory rejected for index: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750212.524378288] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750212.532792829] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750212.561451533] [proximity_controller]: Entered near zone (dist=0.078 m < enter=0.080 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750212.562955646] [proximity_controller]: NEAR mode (dist=0.078 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750213.564888005] [proximity_controller]: NEAR mode (dist=0.070 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750214.568298081] [proximity_controller]: NEAR mode (dist=0.021 m): full closure
+[openvins_odom_tf_relay-12] [WARN] [1779750214.670234936] [openvins_odom_tf_relay]: [RELAY-STATUS] 270s elapsed — head: WAITING (0 msgs), arm: OK (40566 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779750215.538818007] [pointcloud_fusion]: Stats: published=50 (dual=0, cam1_only=48) dist_removed=714821 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=1 tf_fail={arm_d435i_arm_depth_optical_frame:7, head_d435i_head_depth_optical_frame:55} last_publish_ago=0.2s
+[pointcloud_fusion_node-10] [WARN] [1779750215.550124586] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.71s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779750215.560528750] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750215.661901895] [proximity_controller]: NEAR mode (dist=0.035 m): full closure
+[tf_pipeline_diagnostics-9] [WARN] [1779750215.791682016] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779750215.809225391] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750216.761120084] [proximity_controller]: NEAR mode (dist=0.051 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750217.764606463] [proximity_controller]: NEAR mode (dist=0.061 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750218.865761727] [proximity_controller]: NEAR mode (dist=0.066 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750219.967754216] [proximity_controller]: NEAR mode (dist=0.061 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750221.061155149] [proximity_controller]: NEAR mode (dist=0.057 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750222.062358606] [proximity_controller]: NEAR mode (dist=0.051 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750223.063836668] [proximity_controller]: NEAR mode (dist=0.073 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750224.163486650] [proximity_controller]: NEAR mode (dist=0.072 m): full closure
+[openvins_odom_tf_relay-12] [WARN] [1779750224.667488702] [openvins_odom_tf_relay]: [RELAY-STATUS] 280s elapsed — head: WAITING (0 msgs), arm: OK (42196 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750225.260481529] [proximity_controller]: NEAR mode (dist=0.085 m): full closure
+[pointcloud_fusion_node-10] [INFO] [1779750225.733817173] [pointcloud_fusion]: Stats: published=53 (dual=0, cam1_only=58) dist_removed=349636 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=5 tf_fail={arm_d435i_arm_depth_optical_frame:7, head_d435i_head_depth_optical_frame:69} last_publish_ago=0.8s
+[tf_pipeline_diagnostics-9] [WARN] [1779750225.770715337] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779750225.877671802] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750226.261152185] [proximity_controller]: NEAR mode (dist=0.083 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750227.264947880] [proximity_controller]: NEAR mode (dist=0.087 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750228.366394089] [proximity_controller]: NEAR mode (dist=0.063 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750229.461931072] [proximity_controller]: NEAR mode (dist=0.081 m): full closure
+[command_bridge_node-3] [WARN] [1779750230.175377044] [command_bridge]: Trajectory rejected for mrl: Timeout occurred before receiving command acknowledge from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750230.463060292] [proximity_controller]: NEAR mode (dist=0.093 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750230.865560162] [proximity_controller]: Left near zone (dist=0.100 m > exit=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750230.866620856] [proximity_controller]: FAR mode (dist=0.100 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750231.964338067] [proximity_controller]: FAR mode (dist=0.112 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750233.063121508] [proximity_controller]: FAR mode (dist=0.118 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750233.558258995] [command_bridge]: Trajectory rejected for index: Timeout occurred before receiving command acknowledge from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750234.065153779] [proximity_controller]: FAR mode (dist=0.118 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750234.671135993] [openvins_odom_tf_relay]: [RELAY-STATUS] 290s elapsed — head: WAITING (0 msgs), arm: OK (43796 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750235.160789874] [proximity_controller]: FAR mode (dist=0.117 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750235.785528454] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779750235.886548804] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750236.167770083] [proximity_controller]: FAR mode (dist=0.103 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750236.333291381] [pointcloud_fusion]: Stats: published=66 (dual=0, cam1_only=65) dist_removed=979699 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:61} last_publish_ago=0.1s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750236.463186836] [proximity_controller]: Entered near zone (dist=0.077 m < enter=0.080 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750236.464023468] [proximity_controller]: NEAR mode (dist=0.077 m): full closure
+[twist_propagation_node-14] [INFO] [1779750237.210522244] [twist_propagation]: Hit found at (0.044, 0.118, 0.360) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750237.212491221] [twist_propagation]: Published contact state: pos=(0.044, 0.118, 0.360) orient=(0.823, -0.017, -0.529, 0.207) zero_twist
+[segmentation_ros2_node-13] [INFO] [1779750237.218152720] [segmentation_bridge]: [+] positive click at (0.044, 0.118, 0.360) (cloud frame)
+[twist_propagation_node-14] [INFO] [1779750237.219029001] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.044, 0.118, 0.360), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779750237.243295021] [segmentation_bridge]: Running inference with 7 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750237.247046865] [segmentation_bridge]: ROI crop: 0/10256 points within 0.1m of click centroid
+[grasp_proximity_controller_node.py-16] [INFO] [1779750237.465447403] [proximity_controller]: NEAR mode (dist=0.059 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750238.562947750] [proximity_controller]: NEAR mode (dist=0.090 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750239.662160765] [proximity_controller]: NEAR mode (dist=0.091 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750240.670633255] [proximity_controller]: NEAR mode (dist=0.096 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750241.766710314] [proximity_controller]: NEAR mode (dist=0.099 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750241.970724526] [proximity_controller]: Left near zone (dist=0.100 m > exit=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750241.979052735] [proximity_controller]: FAR mode (dist=0.100 m): partial closure + wrist
+[twist_propagation_node-14] [WARN] [1779750242.222657657] [twist_propagation]: Segmentation timeout (5.0s), returning to IDLE
+[grasp_proximity_controller_node.py-16] [INFO] [1779750243.076316104] [proximity_controller]: FAR mode (dist=0.101 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750244.165553702] [proximity_controller]: FAR mode (dist=0.105 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750244.670912980] [openvins_odom_tf_relay]: [RELAY-STATUS] 300s elapsed — head: WAITING (0 msgs), arm: OK (45315 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750245.265013427] [proximity_controller]: FAR mode (dist=0.099 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750245.765869920] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750245.824640149] [pointcloud_fusion]: Stats: published=42 (dual=0, cam1_only=52) dist_removed=1352519 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:53} last_publish_ago=0.1s
+[pointcloud_fusion_node-10] [INFO] [1779750245.906766535] [pointcloud_fusion]: Bbox removal via fresh TF removed 35 points from palm_frame
+[pointcloud_fusion_node-10] [WARN] [1779750245.925129471] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750246.361471329] [proximity_controller]: FAR mode (dist=0.105 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750247.367117391] [proximity_controller]: FAR mode (dist=0.104 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750248.194263426] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[twist_propagation_node-14] [INFO] [1779750248.316596951] [twist_propagation]: Hit found at (0.040, 0.121, 0.291) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750248.318305386] [twist_propagation]: Published contact state: pos=(0.040, 0.121, 0.291) orient=(0.818, -0.073, -0.535, 0.197) zero_twist
+[pointcloud_fusion_node-10] [WARN] [1779750248.319511819] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.56s) — fresh lookup failed
+[segmentation_ros2_node-13] [INFO] [1779750248.324343963] [segmentation_bridge]: [+] positive click at (0.040, 0.121, 0.291) (cloud frame)
+[twist_propagation_node-14] [INFO] [1779750248.324931422] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.040, 0.121, 0.291), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779750248.357210262] [segmentation_bridge]: Running inference with 8 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750248.401212097] [segmentation_bridge]: ROI crop: 0/12230 points within 0.1m of click centroid
+[grasp_proximity_controller_node.py-16] [INFO] [1779750248.473381190] [proximity_controller]: FAR mode (dist=0.104 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750249.570158536] [proximity_controller]: FAR mode (dist=0.099 m): partial closure + wrist
+[segmentation_ros2_node-13] [ERROR] [1779750249.690751180] [segmentation_bridge]: Inference request failed: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))
+[segmentation_ros2_node-13] [ERROR] [1779750249.696750868] [segmentation_bridge]: Inference request failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[grasp_proximity_controller_node.py-16] [INFO] [1779750250.673796285] [proximity_controller]: FAR mode (dist=0.102 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750251.771036565] [proximity_controller]: FAR mode (dist=0.097 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750252.863277397] [proximity_controller]: FAR mode (dist=0.098 m): partial closure + wrist
+[twist_propagation_node-14] [WARN] [1779750253.334756565] [twist_propagation]: Segmentation timeout (5.0s), returning to IDLE
+[grasp_proximity_controller_node.py-16] [INFO] [1779750253.963124603] [proximity_controller]: FAR mode (dist=0.098 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750254.669368570] [openvins_odom_tf_relay]: [RELAY-STATUS] 310s elapsed — head: WAITING (0 msgs), arm: OK (46843 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750255.070106425] [proximity_controller]: FAR mode (dist=0.095 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750255.111497034] [command_bridge]: Trajectory rejected for index: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750255.112513337] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[tf_pipeline_diagnostics-9] [WARN] [1779750255.779796713] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779750256.105709221] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779750256.111502671] [pointcloud_fusion]: Stats: published=46 (dual=0, cam1_only=45) dist_removed=1019702 bbox_removed=43 bbox_skipped=0 bbox_cache_hits=9 tf_fail={arm_d435i_arm_depth_optical_frame:15, head_d435i_head_depth_optical_frame:63} last_publish_ago=0.3s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750256.172048893] [proximity_controller]: FAR mode (dist=0.097 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750257.169733299] [proximity_controller]: FAR mode (dist=0.093 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750258.262346872] [proximity_controller]: FAR mode (dist=0.094 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750259.231111509] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750259.362697364] [proximity_controller]: FAR mode (dist=0.090 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750259.712792607] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.65s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750260.461812303] [proximity_controller]: FAR mode (dist=0.092 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750260.664960050] [command_bridge]: Trajectory rejected for mrl: Timeout occurred before receiving command acknowledge from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750261.564754148] [proximity_controller]: FAR mode (dist=0.087 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750262.670430375] [proximity_controller]: FAR mode (dist=0.084 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750263.760660438] [proximity_controller]: FAR mode (dist=0.085 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750264.263324991] [proximity_controller]: Entered near zone (dist=0.079 m < enter=0.080 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750264.265143694] [proximity_controller]: NEAR mode (dist=0.079 m): full closure
+[openvins_odom_tf_relay-12] [WARN] [1779750264.668129472] [openvins_odom_tf_relay]: [RELAY-STATUS] 320s elapsed — head: WAITING (0 msgs), arm: OK (48402 msgs)
+[command_bridge_node-3] [WARN] [1779750264.942148153] [command_bridge]: Trajectory rejected for index: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750264.958572146] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750265.370797994] [proximity_controller]: NEAR mode (dist=0.079 m): full closure
+[tf_pipeline_diagnostics-9] [WARN] [1779750265.770061735] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779750266.389767751] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750266.463906826] [proximity_controller]: NEAR mode (dist=0.078 m): full closure
+[pointcloud_fusion_node-10] [INFO] [1779750267.064646667] [pointcloud_fusion]: Stats: published=50 (dual=0, cam1_only=52) dist_removed=1063441 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=6 tf_fail={arm_d435i_arm_depth_optical_frame:11, head_d435i_head_depth_optical_frame:70} last_publish_ago=0.2s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750267.571040632] [proximity_controller]: NEAR mode (dist=0.076 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750268.661770290] [proximity_controller]: NEAR mode (dist=0.074 m): full closure
+[command_bridge_node-3] [WARN] [1779750269.633086689] [command_bridge]: Trajectory rejected for index: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750269.765367263] [proximity_controller]: NEAR mode (dist=0.069 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750270.767141815] [proximity_controller]: NEAR mode (dist=0.061 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750271.866700269] [proximity_controller]: NEAR mode (dist=0.062 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750272.963201416] [proximity_controller]: NEAR mode (dist=0.059 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750273.973898470] [proximity_controller]: NEAR mode (dist=0.056 m): full closure
+[openvins_odom_tf_relay-12] [WARN] [1779750274.667140430] [openvins_odom_tf_relay]: [RELAY-STATUS] 330s elapsed — head: WAITING (0 msgs), arm: OK (49974 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750275.061741014] [proximity_controller]: NEAR mode (dist=0.062 m): full closure
+[tf_pipeline_diagnostics-9] [WARN] [1779750275.780244933] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750276.160807136] [proximity_controller]: NEAR mode (dist=0.065 m): full closure
+[pointcloud_fusion_node-10] [INFO] [1779750276.204314901] [pointcloud_fusion]: Stats: published=51 (dual=0, cam1_only=53) dist_removed=1213686 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:59} last_publish_ago=0.2s
+[pointcloud_fusion_node-10] [WARN] [1779750276.432302366] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750277.162548547] [proximity_controller]: NEAR mode (dist=0.056 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750278.262049849] [proximity_controller]: NEAR mode (dist=0.081 m): full closure
+[pointcloud_fusion_node-10] [WARN] [1779750278.724678686] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.53s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750279.363489259] [proximity_controller]: NEAR mode (dist=0.089 m): full closure
+[pointcloud_fusion_node-10] [WARN] [1779750279.737492232] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.1s > 2.0s), skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750279.861648190] [proximity_controller]: Left near zone (dist=0.103 m > exit=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750279.862982967] [proximity_controller]: FAR mode (dist=0.103 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750280.863298888] [proximity_controller]: FAR mode (dist=0.136 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750281.366176502] [proximity_controller]: Entered near zone (dist=0.076 m < enter=0.080 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750281.367680954] [proximity_controller]: NEAR mode (dist=0.076 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750282.469272143] [proximity_controller]: NEAR mode (dist=0.095 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750282.560583668] [proximity_controller]: Left near zone (dist=0.103 m > exit=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750282.561550909] [proximity_controller]: FAR mode (dist=0.103 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750283.314536520] [command_bridge]: Trajectory rejected for index: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750283.317034975] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750283.341309923] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750283.669659250] [proximity_controller]: FAR mode (dist=0.109 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750284.261373871] [proximity_controller]: Entered near zone (dist=0.074 m < enter=0.080 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750284.262303880] [proximity_controller]: NEAR mode (dist=0.074 m): full closure
+[openvins_odom_tf_relay-12] [WARN] [1779750284.668063506] [openvins_odom_tf_relay]: [RELAY-STATUS] 340s elapsed — head: WAITING (0 msgs), arm: OK (51562 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750285.365748916] [proximity_controller]: Left near zone (dist=0.104 m > exit=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750285.368351356] [proximity_controller]: FAR mode (dist=0.104 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750285.778236398] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750285.958868165] [pointcloud_fusion]: Stats: published=56 (dual=0, cam1_only=57) dist_removed=1624208 bbox_removed=0 bbox_skipped=36 bbox_cache_hits=23 tf_fail={head_d435i_head_depth_optical_frame:65} last_publish_ago=0.0s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750286.466223562] [proximity_controller]: FAR mode (dist=0.108 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750286.731449798] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750287.161342363] [proximity_controller]: Entered near zone (dist=0.076 m < enter=0.080 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750287.162918376] [proximity_controller]: NEAR mode (dist=0.076 m): full closure
+[grasp_proximity_controller_node.py-16] [INFO] [1779750288.261153345] [proximity_controller]: Left near zone (dist=0.104 m > exit=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750288.266998561] [proximity_controller]: FAR mode (dist=0.104 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750289.361050489] [proximity_controller]: FAR mode (dist=0.088 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750290.361622022] [proximity_controller]: FAR mode (dist=0.104 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750291.362176078] [proximity_controller]: FAR mode (dist=0.139 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750292.460556206] [proximity_controller]: FAR mode (dist=0.126 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750293.466056415] [proximity_controller]: FAR mode (dist=0.110 m): partial closure + wrist
+[twist_propagation_node-14] [INFO] [1779750293.993810688] [twist_propagation]: Hit found at (0.022, 0.102, 0.014) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779750293.995118472] [twist_propagation]: Published contact state: pos=(0.022, 0.102, 0.014) orient=(0.772, 0.021, -0.610, 0.177) zero_twist
+[twist_propagation_node-14] [INFO] [1779750293.997019061] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.022, 0.102, 0.014), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779750293.997382890] [segmentation_bridge]: [+] positive click at (0.022, 0.102, 0.014) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779750294.019417747] [segmentation_bridge]: Running inference with 9 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779750294.026263345] [segmentation_bridge]: ROI crop: 0/18660 points within 0.1m of click centroid
+[grasp_proximity_controller_node.py-16] [INFO] [1779750294.564884248] [proximity_controller]: FAR mode (dist=0.149 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750294.667804071] [openvins_odom_tf_relay]: [RELAY-STATUS] 350s elapsed — head: WAITING (0 msgs), arm: OK (53153 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750295.663637829] [proximity_controller]: FAR mode (dist=0.208 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750295.785570189] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750295.877183326] [pointcloud_fusion]: Stats: published=62 (dual=0, cam1_only=59) dist_removed=1747256 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:58} last_publish_ago=0.0s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750296.682796264] [proximity_controller]: FAR mode (dist=0.326 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750296.788040059] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750297.760860256] [proximity_controller]: FAR mode (dist=0.298 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750298.296388310] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.54s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750298.761839099] [proximity_controller]: FAR mode (dist=0.313 m): partial closure + wrist
+[twist_propagation_node-14] [WARN] [1779750299.026662508] [twist_propagation]: Segmentation timeout (5.0s), returning to IDLE
+[grasp_proximity_controller_node.py-16] [INFO] [1779750299.763620693] [proximity_controller]: FAR mode (dist=0.370 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750299.943230399] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.1s > 2.0s), skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750300.766334151] [proximity_controller]: FAR mode (dist=0.493 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750301.767764125] [proximity_controller]: FAR mode (dist=0.950 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750302.866520186] [proximity_controller]: FAR mode (dist=1.948 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750303.962976798] [proximity_controller]: FAR mode (dist=3.528 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750304.668728897] [openvins_odom_tf_relay]: [RELAY-STATUS] 360s elapsed — head: WAITING (0 msgs), arm: OK (54671 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779750304.975331668] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (7.0s > 2.0s), skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750304.990786912] [proximity_controller]: FAR mode (dist=5.791 m): partial closure + wrist
+[segmentation_ros2_node-13] [ERROR] [1779750305.111834347] [segmentation_bridge]: Inference request failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[tf_pipeline_diagnostics-9] [WARN] [1779750305.781120844] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779750305.899306359] [pointcloud_fusion]: Stats: published=62 (dual=0, cam1_only=77) dist_removed=6210987 bbox_removed=1359 bbox_skipped=83 bbox_cache_hits=23 tf_fail={head_d435i_head_depth_optical_frame:84} last_publish_ago=0.1s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750306.062329498] [proximity_controller]: FAR mode (dist=9.263 m): partial closure + wrist
+[pointcloud_fusion_node-10] [ERROR] [1779750306.281717844] [pointcloud_fusion]: Bbox removal success rate is 65% over 30s (257/396 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[pointcloud_fusion_node-10] [WARN] [1779750306.854128302] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750307.067013101] [proximity_controller]: FAR mode (dist=13.355 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750308.162920866] [proximity_controller]: FAR mode (dist=19.362 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750309.270307051] [proximity_controller]: FAR mode (dist=26.886 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750310.364738971] [proximity_controller]: FAR mode (dist=36.019 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750310.539534882] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.63s) — fresh lookup failed
+[grasp_proximity_controller_node.py-16] [INFO] [1779750311.477833265] [proximity_controller]: FAR mode (dist=47.065 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750312.024941597] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.1s > 2.0s), skipping
+[grasp_proximity_controller_node.py-16] [INFO] [1779750312.563778573] [proximity_controller]: FAR mode (dist=60.671 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750313.665657178] [proximity_controller]: FAR mode (dist=76.193 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750314.668594560] [openvins_odom_tf_relay]: [RELAY-STATUS] 370s elapsed — head: WAITING (0 msgs), arm: OK (56145 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750314.761065903] [proximity_controller]: FAR mode (dist=93.707 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750315.586975542] [pointcloud_fusion]: Stats: published=93 (dual=0, cam1_only=78) dist_removed=6918110 bbox_removed=0 bbox_skipped=54 bbox_cache_hits=36 tf_fail={head_d435i_head_depth_optical_frame:85} last_publish_ago=0.0s
+[grasp_proximity_controller_node.py-16] [INFO] [1779750315.764631219] [proximity_controller]: FAR mode (dist=112.226 m): partial closure + wrist
+[tf_pipeline_diagnostics-9] [WARN] [1779750315.789996417] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750316.861132088] [proximity_controller]: FAR mode (dist=134.992 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750316.956300498] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750317.864291879] [proximity_controller]: FAR mode (dist=158.895 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750318.940534080] [command_bridge]: Trajectory rejected for thumb: Timeout occurred before receiving command acknowledge from Mia Hand.
+[command_bridge_node-3] [WARN] [1779750318.947368710] [command_bridge]: Trajectory rejected for mrl: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750318.965977023] [proximity_controller]: FAR mode (dist=187.081 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750319.969963811] [proximity_controller]: FAR mode (dist=215.263 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750321.065190632] [proximity_controller]: FAR mode (dist=249.576 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750322.162386956] [proximity_controller]: FAR mode (dist=286.811 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750323.169860933] [proximity_controller]: FAR mode (dist=325.251 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750324.261010230] [proximity_controller]: FAR mode (dist=369.105 m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779750324.670762091] [openvins_odom_tf_relay]: [RELAY-STATUS] 380s elapsed — head: WAITING (0 msgs), arm: OK (57657 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779750325.262284421] [proximity_controller]: FAR mode (dist=413.853 m): partial closure + wrist
+[pointcloud_fusion_node-10] [INFO] [1779750325.486079919] [pointcloud_fusion]: Stats: published=79 (dual=0, cam1_only=117) dist_removed=11004595 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:118} last_publish_ago=0.1s
+[tf_pipeline_diagnostics-9] [WARN] [1779750325.767857155] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750326.361567488] [proximity_controller]: FAR mode (dist=466.115 m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779750327.123386980] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750327.362241811] [proximity_controller]: FAR mode (dist=517.082 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750327.761432669] [command_bridge]: Trajectory rejected for thumb: Timeout occurred before receiving command acknowledge from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750328.465373470] [proximity_controller]: FAR mode (dist=576.868 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750329.563511902] [proximity_controller]: FAR mode (dist=642.135 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750330.663576039] [proximity_controller]: FAR mode (dist=711.158 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750331.761574503] [proximity_controller]: FAR mode (dist=782.199 m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779750332.770550202] [proximity_controller]: FAR mode (dist=853.288 m): partial closure + wrist
+[command_bridge_node-3] [WARN] [1779750332.930566062] [command_bridge]: Trajectory rejected for thumb: Invalid ACK received back from Mia Hand.
+[grasp_proximity_controller_node.py-16] [INFO] [1779750333.771555856] [proximity_controller]: FAR mode (dist=930.350 m): partial closure + wrist
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[preshaping_service_bridge_node-15] [INFO] [1779750334.537118945] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[rviz2-18] [INFO] [1779750334.537409885] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[run_classifier-5] Exception in thread Thread-1 (_run):
+[run_classifier-5] Traceback (most recent call last):
+[run_classifier-5]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[run_classifier-5] [2026-05-25 23:05:34.537] [board_logger] [info] Releasing board ...
+[mia_hand_driver_node-2] [INFO] [1779750334.544984764] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[run_classifier-5] ROS 2 bridge active — publishing on /emg/* topics.
+[run_classifier-5]
+[run_classifier-5] ====================================================
+[run_classifier-5]     EMG Classifier — Live
+[run_classifier-5] ====================================================
+[run_classifier-5] Loading classifier from /app/models …
+[run_classifier-5] Models loaded.
+[run_classifier-5]
+[run_classifier-5] Connecting to MindRove WiFi board …
+[run_classifier-5] Connected!  500 Hz  8 channels
+[run_classifier-5]
+[run_classifier-5] Filling buffer …
+[run_classifier-5] Ready.
+[run_classifier-5]
+[run_classifier-5] [emg] EXTENSION -> REST (conf=100%, prop=0.00, mode=NOT_GRASPING) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.00, mode=NOT_GRASPING) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=NOT_GRASPING) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=58)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=108)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.5 Hz, frame=158)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=209)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.17, mode=NOT_GRASPING) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.3 Hz, frame=335)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.5 Hz, frame=386)
+[run_classifier-5] [emg] status: REST (conf=97%, prop=0.00, 10.1 Hz, frame=436)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.3 Hz, frame=487)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=537)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=588)
+[run_classifier-5] [emg] REST -> OPEN (conf=81%, prop=0.68, mode=CONTROL_GRASP) REST:0% POWER:0% OPEN:81% FLEXION:19% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=665)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=716)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: POWER (conf=100%, prop=0.43, 10.1 Hz, frame=781)
+[run_classifier-5] [emg] POWER -> OPEN (conf=94%, prop=0.00, mode=CONTROL_WRIST) REST:6% POWER:0% OPEN:94% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 13.8 Hz, frame=857)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=908)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=958)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=1009)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1060)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1111)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1161)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1211)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1261)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=1311)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.3 Hz, frame=1362)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=1412)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=1462)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1512)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 9.9 Hz, frame=1562)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1613)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=1663)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=1714)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1765)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=1815)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1865)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1915)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=1965)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.4 Hz, frame=2016)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2066)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 15.6 Hz, frame=2116)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.5 Hz, frame=2166)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2217)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=2268)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2318)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2368)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2419)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2469)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2520)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2571)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 9.9 Hz, frame=2622)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.3 Hz, frame=2673)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.3 Hz, frame=2724)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2774)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2824)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=2874)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2924)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2974)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=3025)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=3075)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=3126)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=3176)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=3227)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=3277)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=3327)
+[run_classifier-5] [emg] REST -> OPEN (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:0% POWER:0% OPEN:100% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> OPEN (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:0% POWER:0% OPEN:100% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> OPEN (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:0% POWER:0% OPEN:100% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=93%, prop=0.00, mode=CONTROL_WRIST) REST:93% POWER:0% OPEN:7% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> OPEN (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:0% POWER:0% OPEN:100% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=3470)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=3521)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=3572)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=3623)
+[run_classifier-5] [emg] Stopped.
+[run_classifier-5] Session released. Bye!
+[pointcloud_fusion_node-10] Exception in thread Thread-2240 (_process_clouds):
+[pointcloud_fusion_node-10] Traceback (most recent call last):
+[pointcloud_fusion_node-10]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[pointcloud_fusion_node-10] Exception in thread Thread-2238 (_process_clouds):
+[pointcloud_fusion_node-10] Traceback (most recent call last):
+[pointcloud_fusion_node-10]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[pointcloud_fusion_node-10]     self.run()
+[pointcloud_fusion_node-10]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[pointcloud_fusion_node-10] Exception in thread Thread-2245 (_process_clouds):
+[pointcloud_fusion_node-10] Traceback (most recent call last):
+[pointcloud_fusion_node-10]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[pointcloud_fusion_node-10]     self.run()
+[pointcloud_fusion_node-10]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[pointcloud_fusion_node-10]     self._target(*self._args, **self._kwargs)
+[pointcloud_fusion_node-10]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 607, in _process_clouds
+[pointcloud_fusion_node-10]     self._target(*self._args, **self._kwargs)
+[pointcloud_fusion_node-10] Exception in thread Thread-2239 (_process_clouds):
+[pointcloud_fusion_node-10] Traceback (most recent call last):
+[pointcloud_fusion_node-10]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[tf_pipeline_diagnostics-9] Traceback (most recent call last):
+[tf_pipeline_diagnostics-9]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-9]     main()
+[tf_pipeline_diagnostics-9]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 147, in main
+[tf_pipeline_diagnostics-9]     rclpy.shutdown()
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[tf_pipeline_diagnostics-9]     _shutdown(context=context)
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[tf_pipeline_diagnostics-9]     context.shutdown()
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[tf_pipeline_diagnostics-9]     self.__context.shutdown()
+[tf_pipeline_diagnostics-9] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[camera_mount_tf_publisher-8] Traceback (most recent call last):
+[camera_mount_tf_publisher-8]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-8]     main()
+[camera_mount_tf_publisher-8]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-8]     rclpy.shutdown()
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-8]     _shutdown(context=context)
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-8]     context.shutdown()
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-8]     self.__context.shutdown()
+[camera_mount_tf_publisher-8] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[segmentation_ros2_node-13] Traceback (most recent call last):
+[segmentation_ros2_node-13]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-13]     sys.exit(load_entry_point('segmentation-bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-13]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 359, in main
+[segmentation_ros2_node-13]     rclpy.spin(node)
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[segmentation_ros2_node-13]     executor.spin_once()
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[segmentation_ros2_node-13]     self._spin_once_impl(timeout_sec)
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[segmentation_ros2_node-13]     handler, entity, node = self.wait_for_ready_callbacks(
+[segmentation_ros2_node-13]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[INFO] [preshaping_service_bridge_node-15]: process has finished cleanly [pid 3978]
+[segmentation_ros2_node-13]     return next(self._cb_iter)
+[segmentation_ros2_node-13]            ^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 778, in _wait_for_ready_callbacks
+[segmentation_ros2_node-13]     waitable.add_to_wait_set(wait_set)
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/event_handler.py", line 125, in add_to_wait_set
+[segmentation_ros2_node-13]     self._event_index = wait_set.add_event(self.__event)
+[segmentation_ros2_node-13]                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13] KeyboardInterrupt
+[pointcloud_fusion_node-10]     self.run()
+[pointcloud_fusion_node-10]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[pointcloud_fusion_node-10]     self.run()
+[pointcloud_fusion_node-10]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[ERROR] [tf_pipeline_diagnostics-9]: process has died [pid 3972, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[pointcloud_fusion_node-10]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 607, in _process_clouds
+[pointcloud_fusion_node-10]     self._pub.publish(out_msg)
+[pointcloud_fusion_node-10]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/publisher.py", line 68, in publish
+[INFO] [force_controller_node-17]: process has finished cleanly [pid 3980]
+[ERROR] [camera_mount_tf_publisher-8]: process has died [pid 3971, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[pointcloud_fusion_node-10] Exception in thread Thread-2246 (_process_clouds):
+[pointcloud_fusion_node-10] Traceback (most recent call last):
+[pointcloud_fusion_node-10]     with self.handle:
+[pointcloud_fusion_node-10] rclpy._rclpy_pybind11.InvalidHandle: cannot use Destroyable because destruction was requested
+[pointcloud_fusion_node-10]     self._target(*self._args, **self._kwargs)
+[pointcloud_fusion_node-10]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 607, in _process_clouds
+[pointcloud_fusion_node-10] Exception in thread Thread-2242 (_process_clouds):
+[pointcloud_fusion_node-10]     self._pub.publish(out_msg)
+[pointcloud_fusion_node-10]     self._target(*self._args, **self._kwargs)
+[pointcloud_fusion_node-10]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 607, in _process_clouds
+[INFO] [wrist_driver_node-4]: process has finished cleanly [pid 3967]
+[INFO] [grasp_proximity_controller_node.py-16]: process has finished cleanly [pid 3979]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process has finished cleanly [pid 3970]
+[INFO] [odom_to_pose_relay-11]: process has finished cleanly [pid 3974]
+[ERROR] [segmentation_ros2_node-13]: process has died [pid 3976, exit code -2, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_gfo5yg2a -r /segmentation/input_cloud:=/fused_pointcloud'].
+[INFO] [run_classifier-5]: process has finished cleanly [pid 3968]
+[INFO] [emg_grasp_controller-6]: process has finished cleanly [pid 3969]
+[INFO] [command_bridge_node-3]: process has finished cleanly [pid 3966]
+[INFO] [twist_propagation_node-14]: process has finished cleanly [pid 3977]
+[INFO] [openvins_odom_tf_relay-12]: process has finished cleanly [pid 3975]
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 3964]
+[INFO] [pointcloud_fusion_node-10]: process has finished cleanly [pid 3973]
+[INFO] [mia_hand_driver_node-2]: process has finished cleanly [pid 3965]
+[ERROR] [rviz2-18]: process[rviz2-18] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [rviz2-18]: sending signal 'SIGTERM' to process[rviz2-18]
+[ERROR] [rviz2-18]: process[rviz2-18] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'
+[INFO] [rviz2-18]: sending signal 'SIGKILL' to process[rviz2-18]
+[ERROR] [rviz2-18]: process has died [pid 3981, exit code -9, cmd '/opt/ros/jazzy/lib/rviz2/rviz2 -d /prosthesis_ws/rviz/prosthesis.rviz --ros-args -r __node:=rviz2'].
+exit code: 130
+make: *** [Makefile:148: run] Error 130
+   multiview_prosthesis >
