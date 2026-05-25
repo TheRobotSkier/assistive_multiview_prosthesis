@@ -1,0 +1,27 @@
+docker/Dockerfile.wrist-test
+  ai_agent 1-31
+docker/docker-compose.wrist-test.yml
+  ai_agent 1-25
+src/wrist_driver/wrist_driver/wrist_driver_node.py
+  s_d4d4e8d9a58f06::t_8df5f71d53216d 170,172,175-192
+Makefile
+  s_d4d4e8d9a58f06::t_8df5f71d53216d 749-768
+scripts/wrist_test.py
+  ai_agent 1-236
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "841594d3ba1a3ddcb520dd4bb18d63cd1d2a9d66",
+  "prompts": {},
+  "sessions": {
+    "s_d4d4e8d9a58f06": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19eb13592ffe1QUvvjmyhh9HOp",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
