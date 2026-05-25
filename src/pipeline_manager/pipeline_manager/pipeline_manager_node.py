@@ -35,7 +35,6 @@ EMG Gesture Contract (all discrete gestures require hold duration + confidence):
 from __future__ import annotations
 
 import enum
-import json
 import os
 import time
 from dataclasses import dataclass
@@ -52,8 +51,7 @@ from std_srvs.srv import Trigger
 from mia_hand_msgs.msg import ForceControllerStatus
 
 
-# Intent type strings published by /emg_grasp/intent
-_INTENT_STOP_ALL = "stop_all"
+
 
 
 class State(enum.IntEnum):
@@ -108,8 +106,7 @@ class PipelineManagerNode(Node):
         # Live config parameters
         self.declare_parameter('emg_live_config_path', '')
 
-        # EMG intent relay parameters
-        self.declare_parameter('emg_grasp_intent_topic', '/emg_grasp/intent')
+        # EMG parameters
         self.declare_parameter('wrist_cmd_topic', '/wrist/set_position')
         self.declare_parameter('wrist_velocity_scale', 45.0)   # deg/s per unit proportional
 
@@ -225,9 +222,7 @@ class PipelineManagerNode(Node):
         self.create_subscription(
             Bool, '/proximity/near_zone_entered', self._on_proximity_near_zone,
             QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
-        self.create_subscription(
-            String, self.get_parameter('emg_grasp_intent_topic').value,
-            self._on_emg_grasp_intent, 10)
+
         self.create_subscription(
             Bool, self.get_parameter('twist_hit_detected_topic').value,
             self._on_twist_hit_detected,
@@ -545,7 +540,7 @@ class PipelineManagerNode(Node):
         self._twist_distance_to_hit = msg.data
 
         # Deactivate twist when close enough to collision point
-        if self._state in (State.TWISTING, State.APPROACHING):
+        if self._state == State.TWISTING:
             if 0.0 < msg.data < self._twist_stop_distance:
                 self._deactivate_twist_propagation()
                 self.get_logger().info(
@@ -557,26 +552,7 @@ class PipelineManagerNode(Node):
         if msg.data and self._state == State.APPROACHING:
             self._transition(State.GRASPING, 'Proximity: near zone entered')
 
-    def _on_emg_grasp_intent(self, msg: String):
-        """Handle EMG grasp controller intents — only STOP_ALL for safety.
 
-        Wrist velocity and force adjust intents are handled directly by
-        _on_emg_gesture in VOLITIONAL mode. This callback only processes
-        STOP_ALL to hold the current wrist position when the EmgGraspController
-        detects REST (safety stop).
-        """
-        try:
-            intent = json.loads(msg.data)
-            intent_type = intent.get("intent_type", "")
-        except (json.JSONDecodeError, TypeError):
-            self.get_logger().warn(f"Invalid EMG intent JSON: {msg.data}", throttle_duration_sec=5.0)
-            return
-
-        if intent_type == _INTENT_STOP_ALL:
-            # Hold current position — publish to stop any motion
-            cmd = Float64MultiArray()
-            cmd.data = [self._ensure_wrist_target(), 0.0]
-            self._wrist_cmd_pub.publish(cmd)
 
     def _load_emg_live_config(self):
         """Load EMG live config from emg_live.yaml into dynamic parameters."""
@@ -659,17 +635,13 @@ class PipelineManagerNode(Node):
             response = future.result()
             if response.success:
                 self._transition(State.APPROACHING, f'Preshaping: {response.message[:80]}')
+                self._deactivate_twist_propagation()
             else:
                 self.get_logger().warn(f'Preshaping failed: {response.message}')
                 self._transition(State.IDLE, f'Preshaping failed: {response.message[:60]}')
         except Exception as e:
             self.get_logger().error(f'Preshaping service error: {e}')
             self._transition(State.IDLE, f'Preshaping error: {e}')
-        finally:
-            # NOTE: twist is NOT deactivated here during normal flow.
-            # The twist is deactivated later by _on_collision_distance when
-            # the hand reaches the stop-distance threshold during APPROACHING.
-            pass
 
     # ── Publishing ────────────────────────────────────────────────────────
     def _publish_state(self):

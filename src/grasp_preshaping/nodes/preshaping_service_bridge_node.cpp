@@ -512,10 +512,21 @@ private:
     }
     RCLCPP_INFO(get_logger(), "===========================");
 
-    // ── Full closure values from the planner ────────────────────────────
-    const double full_thumb = ffi_response.thumb_closure;
-    const double full_index = ffi_response.index_closure;
-    const double full_mrl   = ffi_response.mrl_closure;
+    // ── Override: always use cylindrical grasp with fixed 10% closure ────
+    // The force controller only supports cylindrical grasp (all 3 fingers).
+    // Override the planner's result to ensure a valid preshape regardless of
+    // what the planner found (it may return pinch/lateral with zero closure
+    // for sparse point clouds).
+    const double fixed_closure = 0.10;  // 10% initial closure for cylindrical preshape
+    const double full_thumb = fixed_closure;
+    const double full_index = fixed_closure;
+    const double full_mrl   = fixed_closure;
+    RCLCPP_INFO(
+      get_logger(),
+      "Overriding to cylindrical grasp with %.0f%% initial closure (planner: %s, closure=%.4f)",
+      fixed_closure * 100.0,
+      grasp_type_to_string(ffi_response.grasp_type),
+      ffi_response.closure_amount);
 
     // ── Reduced (preshape) closure sent immediately to controllers ───────
     // -- Reduced (preshape) closure sent immediately to controllers --
@@ -525,9 +536,8 @@ private:
     if (publish_initial_commands_) {
       publish_joint_commands(preshape_thumb, preshape_index, preshape_mrl);
     }
-    // ── Publish wrist rotation in degrees (immediate) ───────────────────
-    // -- Publish wrist rotation in degrees (immediate, if enabled) --
-    if (publish_initial_commands_) {
+    // ── Publish wrist rotation in degrees (always, for proximity controller) ──
+    {
       std_msgs::msg::Float64 wrist_msg;
       wrist_msg.data = ffi_response.wrist_rotation_deg;
       wrist_pose_pub_->publish(wrist_msg);
@@ -556,10 +566,10 @@ private:
       target_finger_closures_pub_->publish(closures);
     }
 
-    // Grasp type.
+    // Grasp type (always cylindrical override).
     {
       std_msgs::msg::Int32 grasp_type_msg;
-      grasp_type_msg.data = ffi_response.grasp_type;
+      grasp_type_msg.data = grasp_preshaping::kGraspTypeCylindrical;
       grasp_type_pub_->publish(grasp_type_msg);
     }
 
@@ -575,7 +585,8 @@ private:
     response->success = true;
     response->message = message.empty() ? "Preshaping completed" : message;
     response->message +=
-      " (grasp_type=" + std::to_string(ffi_response.grasp_type) +
+      " (override=cylindrical_10pct"
+      ", planner_grasp_type=" + std::to_string(ffi_response.grasp_type) +
       ", preshape_fraction=" + std::to_string(preshaping_closure_fraction_) +
       ", preshape=[" + std::to_string(preshape_thumb) + ","
                         + std::to_string(preshape_index) + ","

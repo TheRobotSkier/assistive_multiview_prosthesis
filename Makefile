@@ -143,6 +143,7 @@ $(TONIGHT_TARGETS): dev
 
 # ── Launch proxies (from host) ─────────────────────────────────────────────
 run: up-hw
+	make segmentation-status
 	make timesync-check
 	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
 	echo "[host] Detected: MIA=$$DETECTED_MIA_PORT  WRIST=$$DETECTED_WRIST_PORT" && \

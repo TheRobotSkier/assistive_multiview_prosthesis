@@ -17,8 +17,9 @@ import math
 
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy
 from geometry_msgs.msg import Pose, PoseStamped
-from std_msgs.msg import Float64, Float64MultiArray, Int32
+from std_msgs.msg import Bool, Float64, Float64MultiArray, Int32
 
 
 class GraspProximityControllerNode(Node):
@@ -120,6 +121,9 @@ class GraspProximityControllerNode(Node):
             Float64MultiArray, self.get_parameter('mrl_cmd_topic').value, 10)
         self._wrist_pub = self.create_publisher(
             Float64MultiArray, self.get_parameter('wrist_cmd_topic').value, 10)
+        self._near_zone_pub = self.create_publisher(
+            Bool, '/proximity/near_zone_entered',
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
 
         # ── Control timer ─────────────────────────────────────────────────────
         self.create_timer(1.0 / rate, self._control_loop)
@@ -151,6 +155,8 @@ class GraspProximityControllerNode(Node):
         self._try_commit_plan()
 
     def _on_current_hand_pose(self, msg: PoseStamped) -> None:
+        if self._current_hand_pose is None:
+            self.get_logger().info('Received first hand pose — control loop now active')
         self._current_hand_pose = msg
 
     def _on_pipeline_state(self, msg: Int32) -> None:
@@ -193,6 +199,19 @@ class GraspProximityControllerNode(Node):
                 or self._planned_wrist_deg is None
                 or self._planned_hand_frame is None
                 or self._current_hand_pose is None):
+            # Throttled diagnostic: report which prerequisites are missing
+            missing = []
+            if self._planned_closures is None:
+                missing.append('closures')
+            if self._planned_wrist_deg is None:
+                missing.append('wrist')
+            if self._planned_hand_frame is None:
+                missing.append('hand_frame')
+            if self._current_hand_pose is None:
+                missing.append('current_pose')
+            self.get_logger().debug(
+                f'Control loop waiting for: {missing}',
+                throttle_duration_sec=5.0)
             return
 
         dist = self._euclidean_distance(self._current_hand_pose, self._planned_hand_frame)
@@ -204,20 +223,26 @@ class GraspProximityControllerNode(Node):
                 self.get_logger().info(
                     f'Left near zone (dist={dist:.3f} m > exit={self._exit_thresh:.3f} m)'
                 )
+                self._near_zone_pub.publish(Bool(data=False))
         else:
             if dist < self._enter_thresh:
                 self._is_near = True
                 self.get_logger().info(
                     f'Entered near zone (dist={dist:.3f} m < enter={self._enter_thresh:.3f} m)'
                 )
+                self._near_zone_pub.publish(Bool(data=True))
 
         thumb, index, mrl = self._planned_closures
 
         if self._is_near:
-            self.get_logger().debug(f'NEAR mode (dist={dist:.3f} m): full closure')
+            self.get_logger().info(
+                f'NEAR mode (dist={dist:.3f} m): full closure',
+                throttle_duration_sec=1.0)
             self._publish_joint_commands(thumb, index, mrl)
         else:
-            self.get_logger().debug(f'FAR mode (dist={dist:.3f} m): partial closure + wrist')
+            self.get_logger().info(
+                f'FAR mode (dist={dist:.3f} m): partial closure + wrist',
+                throttle_duration_sec=1.0)
             self._publish_wrist_command(self._planned_wrist_deg)
             self._publish_joint_commands(
                 self._partial_factor * thumb,
