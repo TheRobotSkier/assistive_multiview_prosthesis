@@ -1,0 +1,45 @@
+src/emg_bridge/test_emg_adapter.py
+  s_2187fa6515a542::t_86a8aa199bbd7d 102
+  s_2187fa6515a542::t_06b62dcc1430f8 167,171
+  s_2187fa6515a542::t_228a8807ef5dc2 150
+src/emg_bridge/emg_grasp_adapter.py
+  s_2187fa6515a542::t_af722d6c1ad426 94
+src/mia_hand_ros2_control/mia_hand_ros2_control/emg_force_controller.py
+  s_2187fa6515a542::t_4690b2a77b1a10 523,532-533,535-539
+src/mia_hand_ros2_control/mia_hand_ros2_control/force_hold_controller.py
+  s_2187fa6515a542::t_2fbac47b38fb28 128-129
+src/emg_bridge/emg_bridge/emg_grasp_controller.py
+  s_2187fa6515a542::t_17552022d348bb 69,71
+  s_2187fa6515a542::t_8b7694c73e7341 22,24
+config/emg_live.yaml
+  s_2187fa6515a542::t_f79494aea2aa11 26
+src/emg_bridge/test_state_machine.py
+  s_2187fa6515a542::t_7a477d8233a028 31,33
+  s_2187fa6515a542::t_a69dc42123c346 92,101,108,117,126,133,142,149,158,165,178,200,211,220,229,238,262,274,286,295,307,316,333,346,363,380,395,406,414,425,454,462
+src/emg_bridge/scripts/run_classifier.py
+  s_2187fa6515a542::t_8f533d188956ec 77,89,106-107
+  s_2187fa6515a542::t_75b8b22270645d 241-246,248
+src/mia_hand_ros2_control/test_force_controller.py
+  s_2187fa6515a542::t_7573e5ff55c47f 117,120,123
+src/emg_bridge/emg_bridge/emg_grasp_state_machine.py
+  s_2187fa6515a542::t_192a599372af79 75,77
+src/emg_bridge/emg_bridge/ros_bridge_node.py
+  s_2187fa6515a542::t_d395e4d82c7200 36
+  s_2187fa6515a542::t_cdc0157cdf97b0 48,51-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "6a2ca36c663486aa961e88fe791524ffb11b1297",
+  "prompts": {},
+  "sessions": {
+    "s_2187fa6515a542": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3557729ffeuZlDn2KUkMnDKS",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
