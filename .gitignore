@@ -70,4 +70,4 @@ rosbags/
 .worktrees/
 
 
-#logs/
+logs/
