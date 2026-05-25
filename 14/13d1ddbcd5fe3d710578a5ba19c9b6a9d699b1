@@ -1,0 +1,75 @@
+src/emg_bridge/setup.py
+  s_10fa13a27408f4::t_b2381ca7ef8c29 8
+  s_10fa13a27408f4::t_8192357f03e8bb 1
+tests/emg_grasp/emg_grasp_test.yaml
+  s_ab84f261763849::t_9c8234325e5a4f 26-27,29,31-32,37,39-41
+scripts/emg_force_grasp_bridge.py
+  s_ab84f261763849::t_3784637da49436 392-394,443-448,487-496,638-639,645-656,673-675,682-683
+  s_ab84f261763849::t_55c4b1ddb727ef 1-391,395-442,449-486,497-637,640-644,657-672,676-681,684-735
+config/emg_grasp_test.yaml
+  s_ab84f261763849::t_3e0d5aa4191f19 24-27,33,36,39
+src/emg_bridge/emg_bridge/train_entry.py
+  s_10fa13a27408f4::t_7882a22ed444bc 13
+src/prosthesis_launch/launch/emg_grasp_test.launch.py
+  s_ab84f261763849::t_c929ff33068629 114,129-137,140-141,224-234
+  s_ab84f261763849::t_afe17572427342 145-154,159
+  s_10fa13a27408f4::t_5460a731e1634f 165-166
+  s_10fa13a27408f4::t_3f129f2a77817f 270
+src/emg_bridge/emg_bridge/run_classifier_entry.py
+  s_10fa13a27408f4::t_123e502b129a10 79
+config/emg_grasp_launch.yaml
+  s_10fa13a27408f4::t_1a1a578f6428ec 19
+scripts/emg_force_grasp.sh
+  s_10fa13a27408f4::t_f66e98a5d86190 5
+  s_10fa13a27408f4::t_6c4a4358ba0a5b 45-46,59
+  s_10fa13a27408f4::t_fec22c859b28d4 8-9
+  s_ab84f261763849::t_ca5a9cf3a069f7 49-51,191-193,213
+  s_10fa13a27408f4::t_aebe3780acc27d 54
+  s_10fa13a27408f4::t_23d9a750a2e62f 92
+  s_10fa13a27408f4::t_98c4b9ac3be12e 101,103,106-146,151,157,181,188
+  s_10fa13a27408f4::t_b9f1df6f373a2f 1-4,6-7,10-33,36-44,47-48,52-53,55-58,60-91,93-100,102,104-105,147-150,152-156,158-180,182-187,189-190,194-198,201,207-209,214-217,219-224,226-227
+  s_10fa13a27408f4::t_e6ecd525059aaf 34-35
+  s_10fa13a27408f4::t_ad0c7113b5e0ce 199,225
+  s_10fa13a27408f4::t_e63187aa7f2256 200,202-206,210
+  s_10fa13a27408f4::t_5179ff15d5aff5 218
+  s_10fa13a27408f4::t_4fc8fee66cc052 211-212
+src/emg_bridge/emg_bridge/config.py
+  s_10fa13a27408f4::t_d3825937c430b7 34
+  s_10fa13a27408f4::t_23673b44d938af 20-24
+src/emg_bridge/emg_bridge/collect_data_entry.py
+  s_10fa13a27408f4::t_8459e0b32d3d7a 13
+Makefile
+  s_10fa13a27408f4::t_f53fb4fb0e4342 549,551-552
+  s_10fa13a27408f4::t_2278745d9fd79c 57
+  s_10fa13a27408f4::t_f7c987199075bc 563-564
+  s_10fa13a27408f4::t_d9dce6d418c413 550
+  s_10fa13a27408f4::t_681db1540d959d 520-522,525-532,534-548,553-560,565-575
+  s_10fa13a27408f4::t_615e8ad466623b 561-562
+  s_10fa13a27408f4::t_d4704a780ae1d4 519
+  s_10fa13a27408f4::t_34ccc43ece25f1 533
+  s_10fa13a27408f4::t_6e3638307b9c2f 523-524
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "1413d1ddbcd5fe3d710578a5ba19c9b6a9d699b1",
+  "prompts": {},
+  "sessions": {
+    "s_10fa13a27408f4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a3e4c750ffeQkUx66gJ2MhvdU",
+        "model": "kimi-k2.6"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    },
+    "s_ab84f261763849": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e5bbd-0435-7c20-8e12-598ca4800ba8",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
