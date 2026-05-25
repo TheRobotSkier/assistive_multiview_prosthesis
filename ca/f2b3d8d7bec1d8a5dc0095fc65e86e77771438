@@ -1,0 +1,33 @@
+config/emg_live.yaml
+  s_85a1f585f2b2b8::t_aaf416962d6e73 4-5
+src/pipeline_manager/pipeline_manager/pipeline_manager_node.py
+  s_85a1f585f2b2b8::t_1b68fac266d581 15-16,28
+  s_85a1f585f2b2b8::t_42e97856405cba 100
+  s_85a1f585f2b2b8::t_baa5136a216b75 80-82
+  s_85a1f585f2b2b8::t_3ccb582033d980 404-405
+  s_85a1f585f2b2b8::t_9fa3c55aa0b322 418-419
+config/prosthesis_config.yaml
+  s_85a1f585f2b2b8::t_a7a65468dc47b1 90
+  s_85a1f585f2b2b8::t_304006f14814fb 295,297
+src/emg_bridge/emg_bridge/emg_grasp_state_machine.py
+  s_85a1f585f2b2b8::t_2f53f14dd93f5a 70-72
+src/emg_bridge/emg_bridge/emg_grasp_controller.py
+  s_85a1f585f2b2b8::t_0b114a9b5b62b7 19,21
+  s_85a1f585f2b2b8::t_1d15174c3c4341 65,67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "caf2b3d8d7bec1d8a5dc0095fc65e86e77771438",
+  "prompts": {},
+  "sessions": {
+    "s_85a1f585f2b2b8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19f75860affelosYMKpT5SxPkC",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
