@@ -21,6 +21,35 @@ from rclpy.qos import QoSProfile, DurabilityPolicy
 from geometry_msgs.msg import Pose, PoseStamped
 from std_msgs.msg import Bool, Float64, Float64MultiArray, Int32
 
+try:
+    from scipy.spatial.transform import Rotation as R
+    _HAS_SCIPY = True
+except ImportError:
+    _HAS_SCIPY = False
+
+
+def _quat_rotate(q: list[float], v: list[float]) -> list[float]:
+    """Rotate vector *v* by unit quaternion *q* = [x, y, z, w].
+
+    Uses the identity:  v' = v + 2·w·(u × v) + 2·(u × (u × v))
+    where u = (x, y, z) is the vector part of the quaternion.
+    """
+    qx, qy, qz, qw = q
+    vx, vy, vz = v
+    # u × v
+    uvx = qy * vz - qz * vy
+    uvy = qz * vx - qx * vz
+    uvz = qx * vy - qy * vx
+    # u × (u × v)
+    uuvx = qy * uvz - qz * uvy
+    uuvy = qz * uvx - qx * uvz
+    uuvz = qx * uvy - qy * uvx
+    return [
+        vx + 2.0 * qw * uvx + 2.0 * uuvx,
+        vy + 2.0 * qw * uvy + 2.0 * uuvy,
+        vz + 2.0 * qw * uvz + 2.0 * uuvz,
+    ]
+
 
 class GraspProximityControllerNode(Node):
     def __init__(self) -> None:
@@ -33,6 +62,7 @@ class GraspProximityControllerNode(Node):
         self.declare_parameter('min_closure_amount', 0.1)
         self.declare_parameter('wrist_accel_deg_s2', 180.0)
         self.declare_parameter('control_rate_hz', 10.0)
+        self.declare_parameter('grasp_contact_offset', [0.0, 0.0, 0.0])
 
         # Topic name parameters
         self.declare_parameter('target_closures_topic', '/grasp_preshaping/target_finger_closures')
@@ -51,6 +81,15 @@ class GraspProximityControllerNode(Node):
         self._min_closure = self.get_parameter('min_closure_amount').value
         self._wrist_accel = self.get_parameter('wrist_accel_deg_s2').value
         rate = self.get_parameter('control_rate_hz').value
+
+        # Offset from tracked pose origin (camera) to grasp contact point
+        # (fingertips), expressed in the pose's local frame.  Applied by
+        # rotating by pose orientation before computing distance.
+        # Same value as twist_propagation's propagation_origin_offset.
+        self._grasp_contact_offset = self.get_parameter('grasp_contact_offset').value
+        if self._grasp_contact_offset and any(v != 0.0 for v in self._grasp_contact_offset):
+            self.get_logger().info(
+                f'Grasp contact offset enabled: {self._grasp_contact_offset}')
 
         # ── State ─────────────────────────────────────────────────────────────
         # Pipeline state — used to gate commands during GRASPING/HOLDING
@@ -214,7 +253,8 @@ class GraspProximityControllerNode(Node):
                 throttle_duration_sec=5.0)
             return
 
-        dist = self._euclidean_distance(self._current_hand_pose, self._planned_hand_frame)
+        dist = self._compute_proximity_distance(
+            self._current_hand_pose, self._planned_hand_frame)
 
         # Hysteretic state transitions
         if self._is_near:
@@ -252,12 +292,43 @@ class GraspProximityControllerNode(Node):
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _euclidean_distance(a: PoseStamped, b: Pose) -> float:
-        dx = a.pose.position.x - b.position.x
-        dy = a.pose.position.y - b.position.y
-        dz = a.pose.position.z - b.position.z
+    def _compute_proximity_distance(self, current: PoseStamped, planned: Pose) -> float:
+        """Compute distance between current and planned hand positions.
+
+        Both positions are shifted from the tracked pose origin (camera) to
+        the grasp contact point (fingertips) using ``_grasp_contact_offset``
+        before computing the Euclidean distance.  The offset is expressed in
+        each pose's local frame and rotated by that pose's orientation.
+        """
+        cur_pos = self._apply_offset(current.pose, self._grasp_contact_offset)
+        plan_pos = self._apply_offset(planned, self._grasp_contact_offset)
+        dx = cur_pos[0] - plan_pos[0]
+        dy = cur_pos[1] - plan_pos[1]
+        dz = cur_pos[2] - plan_pos[2]
         return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    @staticmethod
+    def _apply_offset(pose: Pose, offset: list[float]) -> tuple[float, float, float]:
+        """Shift a pose position by *offset* expressed in the pose's local frame.
+
+        Returns the world-frame position of the offset point.
+        """
+        if not offset or all(v == 0.0 for v in offset):
+            return (pose.position.x, pose.position.y, pose.position.z)
+
+        q = pose.orientation
+        if _HAS_SCIPY:
+            rot = R.from_quat([q.x, q.y, q.z, q.w])
+            rotated = rot.apply(offset)
+        else:
+            # Fallback: manual rotation using quaternion
+            rotated = _quat_rotate([q.x, q.y, q.z, q.w], offset)
+
+        return (
+            pose.position.x + rotated[0],
+            pose.position.y + rotated[1],
+            pose.position.z + rotated[2],
+        )
 
     def _floor_closure(self, planned: float) -> float:
         """Apply min_closure_amount only to non-zero planned values.

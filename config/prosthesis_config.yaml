@@ -118,6 +118,10 @@ proximity_controller:
         min_closure_amount: 0.1
         wrist_accel_deg_s2: 180.0
         control_rate_hz: 10.0
+        # Offset from tracked pose origin (camera) to grasp contact point
+        # (fingertips), expressed in the pose's local frame.
+        # Same value as twist_propagation's propagation_origin_offset.
+        grasp_contact_offset: [0.1543, -0.1485, 0.1352]
 
 preshaping_service:
     ros__parameters:
@@ -434,6 +438,8 @@ _reference:
             min_closure_amount: 0.1
             wrist_accel_deg_s2: 180.0
             control_rate_hz: 10.0
+            # Offset from tracked pose origin (camera) to grasp contact point
+            grasp_contact_offset: [0.1543, -0.1485, 0.1352]
 
         # ── Force Control ─────────────────────────────────────────────────────
         force:
