@@ -1,0 +1,949 @@
+   multiview_prosthesis >  make run
+cd docker && podman-compose -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis segmentation-cpu
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+ ** merged:
+ {
+  "services": {
+    "prosthesis": {
+      "container_name": "prosthesis",
+      "image": "prosthesis:latest",
+      "build": {
+        "context": "..",
+        "dockerfile": "docker/Dockerfile",
+        "target": "base",
+        "args": {
+          "USER_UID": "1000",
+          "USER_GID": "1000"
+        }
+      },
+      "environment": {
+        "DISPLAY": ":0",
+        "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp",
+        "CYCLONEDDS_URI": "/tmp/cyclonedds_peer.xml",
+        "ROS_DOMAIN_ID": "0",
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all"
+      },
+      "network_mode": "host",
+      "userns_mode": "keep-id",
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro",
+        "../config/chrony-host.conf:/tmp/chrony-host.conf:ro",
+        "../src:/prosthesis_ws/src:rw",
+        "../config:/prosthesis_ws/config:rw",
+        "../rviz:/prosthesis_ws/rviz:rw",
+        "../scripts:/prosthesis_ws/scripts:rw",
+        "../tests:/prosthesis_ws/tests:rw",
+        "../Makefile.workspace:/prosthesis_ws/Makefile:ro",
+        "prosthesis-build:/prosthesis_ws/build",
+        "prosthesis-install:/prosthesis_ws/install",
+        "prosthesis-log:/prosthesis_ws/log",
+        "../data:/app/data:rw",
+        "../models:/app/models:rw"
+      ],
+      "privileged": true,
+      "ipc": "host",
+      "stdin_open": true,
+      "tty": true,
+      "group_add": [
+        "keep-groups"
+      ]
+    },
+    "segmentation-cuda": {
+      "container_name": "segmentation-cuda",
+      "image": "segmentation:cuda",
+      "build": {
+        "context": "../src/segmentation",
+        "dockerfile": "../../docker/Dockerfile.segmentation",
+        "args": {
+          "BACKEND": "cuda"
+        }
+      },
+      "environment": {
+        "INFERENCE_SERVER_PORT": "5678",
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        "exec python /nodes/inference_server.py"
+      ],
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "/home/daniel/prosthesis_data/weights:/weights:rw"
+      ],
+      "network_mode": "host",
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')\""
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 5,
+        "start_period": "120s"
+      },
+      "profiles": [
+        "segmentation-cuda"
+      ],
+      "privileged": true,
+      "userns_mode": "keep-id"
+    },
+    "segmentation-cpu": {
+      "container_name": "segmentation-cpu",
+      "image": "segmentation:cpu",
+      "build": {
+        "context": "../src/segmentation",
+        "dockerfile": "../../docker/Dockerfile.segmentation",
+        "args": {
+          "BACKEND": "cpu"
+        }
+      },
+      "environment": {
+        "INFERENCE_SERVER_PORT": "5678"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        "exec python /nodes/inference_server.py"
+      ],
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "/home/daniel/prosthesis_data/weights:/weights:rw"
+      ],
+      "network_mode": "host",
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')\""
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 5,
+        "start_period": "120s"
+      },
+      "profiles": [
+        "segmentation-cpu"
+      ],
+      "privileged": true,
+      "userns_mode": "keep-id"
+    },
+    "test": {
+      "container_name": "test",
+      "build": {
+        "context": "..",
+        "dockerfile": "docker/Dockerfile",
+        "target": "production",
+        "args": {
+          "USER_UID": "1000",
+          "USER_GID": "1000"
+        }
+      },
+      "user": "1000:1000",
+      "userns_mode": "keep-id",
+      "environment": {
+        "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp",
+        "ROS_DOMAIN_ID": "0",
+        "GRASP_CONFIG_PATH": "/prosthesis_ws/config/grasp_preshaping.yaml"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        ". /opt/ros/jazzy/setup.sh && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && /prosthesis_ws/scripts/run_tests.sh"
+      ],
+      "profiles": [
+        "test"
+      ],
+      "network_mode": "host",
+      "volumes": [
+        "../tests:/prosthesis_ws/tests:rw"
+      ]
+    }
+  },
+  "volumes": {
+    "prosthesis-build": null,
+    "prosthesis-install": null,
+    "prosthesis-log": null
+  },
+  "_dirname": "/home/daniel/multiview_prosthesis/docker"
+}
+** excluding:  {'segmentation-cuda', 'test'}
+['podman', 'inspect', '-t', 'image', '-f', '{{.Id}}', 'prosthesis:latest']
+['podman', 'inspect', '-t', 'image', '-f', '{{.Id}}', 'segmentation:cpu']
+['podman', 'ps', '--filter', 'label=io.podman.compose.project=docker', '-a', '--format', '{{ index .Labels "io.podman.compose.config-hash"}}']
+podman volume inspect docker_prosthesis-build || podman volume create docker_prosthesis-build
+['podman', 'volume', 'inspect', 'docker_prosthesis-build']
+podman volume inspect docker_prosthesis-install || podman volume create docker_prosthesis-install
+['podman', 'volume', 'inspect', 'docker_prosthesis-install']
+podman volume inspect docker_prosthesis-log || podman volume create docker_prosthesis-log
+['podman', 'volume', 'inspect', 'docker_prosthesis-log']
+podman run --name=prosthesis -d --label io.podman.compose.config-hash=a5bf5c73dfe2dc7745a0d526fc98f68c0ef6e72f02414019cc2930956da8a8ae --label io.podman.compose.project=docker --label io.podman.compose.version=1.0.6 --label PODMAN_SYSTEMD_UNIT=podman-compose@docker.service --label com.docker.compose.project=docker --label com.docker.compose.project.working_dir=/home/daniel/multiview_prosthesis/docker --label com.docker.compose.project.config_files=docker-compose.yml,docker-compose.hw.yml --label com.docker.compose.container-number=1 --label com.docker.compose.service=prosthesis --group-add keep-groups -e DISPLAY=:0 -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml -e ROS_DOMAIN_ID=0 -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all -v /tmp/.X11-unix:/tmp/.X11-unix:rw -v /home/daniel/multiview_prosthesis/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro -v /home/daniel/multiview_prosthesis/config/chrony-host.conf:/tmp/chrony-host.conf:ro -v /home/daniel/multiview_prosthesis/src:/prosthesis_ws/src:rw -v /home/daniel/multiview_prosthesis/config:/prosthesis_ws/config:rw -v /home/daniel/multiview_prosthesis/rviz:/prosthesis_ws/rviz:rw -v /home/daniel/multiview_prosthesis/scripts:/prosthesis_ws/scripts:rw -v /home/daniel/multiview_prosthesis/tests:/prosthesis_ws/tests:rw -v /home/daniel/multiview_prosthesis/Makefile.workspace:/prosthesis_ws/Makefile:ro -v docker_prosthesis-build:/prosthesis_ws/build -v docker_prosthesis-install:/prosthesis_ws/install -v docker_prosthesis-log:/prosthesis_ws/log -v /home/daniel/multiview_prosthesis/data:/app/data:rw -v /home/daniel/multiview_prosthesis/models:/app/models:rw --network host --userns keep-id -i --tty --privileged prosthesis:latest
+Error: creating container storage: the container name "prosthesis" is already in use by f6619dad790ca2bd8c84d9f39dd8b85a225b6ca62fd7f2109ce4cd1b15dccfb0. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+exit code: 125
+podman start prosthesis
+exit code: 0
+** skipping:  segmentation-cuda
+podman run --name=segmentation-cpu -d --label io.podman.compose.config-hash=a5bf5c73dfe2dc7745a0d526fc98f68c0ef6e72f02414019cc2930956da8a8ae --label io.podman.compose.project=docker --label io.podman.compose.version=1.0.6 --label PODMAN_SYSTEMD_UNIT=podman-compose@docker.service --label com.docker.compose.project=docker --label com.docker.compose.project.working_dir=/home/daniel/multiview_prosthesis/docker --label com.docker.compose.project.config_files=docker-compose.yml,docker-compose.hw.yml --label com.docker.compose.container-number=1 --label com.docker.compose.service=segmentation-cpu -e INFERENCE_SERVER_PORT=5678 -v /tmp/.X11-unix:/tmp/.X11-unix:rw -v /home/daniel/prosthesis_data/weights:/weights:rw --network host --userns keep-id --privileged --restart unless-stopped --healthcheck-command /bin/sh -c 'python -c "import urllib.request; urllib.request.urlopen('"'"'http://127.0.0.1:5678/health'"'"')"' --healthcheck-interval 10s --healthcheck-timeout 5s --healthcheck-start-period 120s --healthcheck-retries 5 segmentation:cpu /bin/bash -c exec python /nodes/inference_server.py
+Error: creating container storage: the container name "segmentation-cpu" is already in use by 2b3144f8477fbb0f154ecca3ab6e3b82a7430a6688722afe9284dcb165f1938e. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+exit code: 125
+podman start segmentation-cpu
+exit code: 0
+** skipping:  test
+make timesync-check
+make[1]: Entering directory '/home/daniel/multiview_prosthesis'
+=== Robotlab Connectivity Check ===
+[OK] Host IP 10.42.0.1 is present on a WSL2 interface (mirrored networking active)
+Pinging Jetson at 10.42.0.2... [OK]
+Checking SSH connectivity... [OK] (key-based auth working)
+
+=== Connected ===
+SSH:  ssh robotlab@10.42.0.2
+Make: make jetson-cameras   (sync + start cameras + local RViz)
+=== Clock comparison ===
+Host time:   Mon May 25 20:09:38 CEST 2026
+Jetson time: Mon 25 May 20:09:39 CEST 2026
+
+=== Host chrony status ===
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+
+Reference ID    : 50484330 (PHC0)
+Stratum         : 1
+Last offset     : -0.000002223 seconds
+RMS offset      : 0.000014579 seconds
+
+=== Jetson chrony status ===
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^* 10.42.0.1                    10   4   377     5    -61us[  -64us] +/- 1512us
+
+Reference ID    : 0A2A0001 (10.42.0.1)
+Stratum         : 11
+Last offset     : -0.000002474 seconds
+RMS offset      : 0.000020975 seconds
+make[1]: Leaving directory '/home/daniel/multiview_prosthesis'
+[detect-usb] MIA Hand found: /dev/ttyUSB1  (by-id serial FTBY495J)
+[detect-usb] Wrist Dynamixel found: /dev/ttyUSB0  (by-id serial FTAO4Z0Y)
+[host] Detected: MIA=/dev/ttyUSB1  WRIST=/dev/ttyUSB0
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+podman exec --interactive --tty --env DISPLAY=:0 --env RMW_IMPLEMENTATION=rmw_cyclonedds_cpp --env CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml --env ROS_DOMAIN_ID=0 --env NVIDIA_VISIBLE_DEVICES=all --env NVIDIA_DRIVER_CAPABILITIES=all --env MIA_SERIAL_PORT=/dev/ttyUSB1 --env WRIST_SERIAL_PORT=/dev/ttyUSB0 prosthesis /bin/bash -lc make setup-usb
+[setup-usb] Configuration:
+[setup-usb]   MIA_SERIAL_PORT  = /dev/ttyUSB1
+[setup-usb]   WRIST_SERIAL_PORT = /dev/ttyUSB0
+[setup-usb] Linked /dev/ttyUSB1 → /dev/ttyMiaHand, /dev/mia_hand
+[setup-usb] Linked /dev/ttyUSB0 → /dev/ttyDynamixel, /dev/wrist_motor
+[setup-usb] Done.
+[setup-usb] MIA Hand  = /dev/ttyMiaHand → /dev/ttyUSB1
+[setup-usb] Wrist     = /dev/ttyDynamixel → /dev/ttyUSB0
+exit code: 0
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+podman exec --interactive --user prosthesis --tty --env DISPLAY=:0 --env RMW_IMPLEMENTATION=rmw_cyclonedds_cpp --env CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml --env ROS_DOMAIN_ID=0 --env NVIDIA_VISIBLE_DEVICES=all --env NVIDIA_DRIVER_CAPABILITIES=all prosthesis /bin/bash -lc make run
+Starting >>> mia_hand_msgs
+Starting >>> camera
+Starting >>> emg_bridge
+Starting >>> grasp_preshaping
+Starting >>> mia_hand_description
+Starting >>> pointcloud_fusion
+Starting >>> segmentation_bridge
+Starting >>> twist_propagation
+Starting >>> wrist_driver
+Starting >>> sensor_fusion_bringup
+Finished <<< grasp_preshaping [2.18s]
+Finished <<< mia_hand_description [2.19s]
+Finished <<< mia_hand_msgs [2.27s]
+Starting >>> mia_hand_driver
+Starting >>> command_bridge
+Starting >>> force_controller
+Starting >>> haptic_bridge
+Starting >>> pipeline_manager
+Finished <<< sensor_fusion_bringup [2.20s]
+Finished <<< mia_hand_driver [1.55s]
+Starting >>> mia_hand_ros2_control
+Finished <<< mia_hand_ros2_control [0.26s]
+Finished <<< wrist_driver [4.52s]
+Finished <<< camera [4.65s]
+Finished <<< segmentation_bridge [4.60s]
+Finished <<< twist_propagation [4.59s]
+Finished <<< emg_bridge [4.68s]
+Finished <<< pointcloud_fusion [4.66s]
+Finished <<< haptic_bridge [2.98s]
+Finished <<< command_bridge [3.03s]
+Finished <<< force_controller [3.03s]
+Finished <<< pipeline_manager [3.02s]
+Starting >>> prosthesis_launch
+Finished <<< prosthesis_launch [1.72s]
+
+Summary: 17 packages finished [7.33s]
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-25-18-09-51-220488-KingBob-3550
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [3972]
+[INFO] [mia_hand_driver_node-2]: process started with pid [3973]
+[INFO] [command_bridge_node-3]: process started with pid [3974]
+[INFO] [wrist_driver_node-4]: process started with pid [3975]
+[INFO] [run_classifier-5]: process started with pid [3976]
+[INFO] [emg_grasp_controller-6]: process started with pid [3977]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process started with pid [3978]
+[INFO] [camera_mount_tf_publisher-8]: process started with pid [3979]
+[INFO] [tf_pipeline_diagnostics-9]: process started with pid [3980]
+[INFO] [pointcloud_fusion_node-10]: process started with pid [3981]
+[INFO] [odom_to_pose_relay-11]: process started with pid [3982]
+[INFO] [openvins_odom_tf_relay-12]: process started with pid [3983]
+[INFO] [segmentation_ros2_node-13]: process started with pid [3984]
+[INFO] [twist_propagation_node-14]: process started with pid [3989]
+[INFO] [preshaping_service_bridge_node-15]: process started with pid [3990]
+[INFO] [grasp_proximity_controller_node.py-16]: process started with pid [3991]
+[INFO] [force_controller_node-17]: process started with pid [3998]
+[INFO] [rviz2-18]: process started with pid [4000]
+[preshaping_service_bridge_node-15] [INFO] [1779732591.646461654] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-15] [INFO] [1779732591.652665444] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-18] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[mia_hand_driver_node-2] [INFO] [1779732592.115822326] [mia_hand_driver]: /dev/ttyMiaHand serial port opened.
+[rviz2-18] [INFO] [1779732592.258714928] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779732592.259642459] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[wrist_driver_node-4] [INFO] [1779732592.333950201] [wrist_driver]: Wrist motor connected on /dev/ttyDynamixel, ID=1
+[emg_grasp_controller-6] [INFO] [1779732592.349625430] [emg_grasp_controller]: EMG grasp controller started — rate=20.0 Hz, stale_timeout=1.0s
+[rviz2-18] [INFO] [1779732592.400406336] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779732592.491158945] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779732592.503464827] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779732592.520133313] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[mia_hand_driver_node-2] [INFO] [1779732592.520457903] [mia_hand_driver]: Mia Hand connected.
+[rviz2-18] [INFO] [1779732592.528384292] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779732592.900285386] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779732593.039364056] [rviz2]: Stereo is NOT SUPPORTED
+[command_bridge_node-3] [INFO] [1779732593.265453487] [command_bridge]: Command bridge started — speed=80%, joint_states → /joint_states
+[pipeline_manager_node-1] [INFO] [1779732593.447620669] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1779732593.449616708] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tf_pipeline_diagnostics-9] [INFO] [1779732593.704583971] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[grasp_proximity_controller_node.py-16] [INFO] [1779732593.934163207] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[force_controller_node-17] [INFO] [1779732594.120376563] [force_controller]: Force controller started. Target range: [50.0, 200.0] raw units, kp=0.01, ki=0.001, rate=10.0 Hz
+[camera_mount_tf_publisher-8] [INFO] [1779732594.281686759] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-8] [INFO] [1779732594.283520373] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779732594.418880982] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779732594.419472606] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[pipeline_manager_node-1] [INFO] [1779732594.450696690] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779732594.524735891] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779732594.526510182] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779732594.527126995] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[pointcloud_fusion_node-10] [INFO] [1779732594.553177953] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-10] [INFO] [1779732594.554314159] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-10] [INFO] [1779732594.598882421] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-10] [WARN] [1779732594.601283575] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [INFO] [1779732594.603051595] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-10] [INFO] [1779732594.604809835] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[run_classifier-5] [2026-05-25 18:09:54.716] [board_logger] [info] incoming json: {
+[run_classifier-5]     "file": "",
+[run_classifier-5]     "file_anc": "",
+[run_classifier-5]     "file_aux": "",
+[run_classifier-5]     "ip_address": "",
+[run_classifier-5]     "ip_address_anc": "",
+[run_classifier-5]     "ip_address_aux": "",
+[run_classifier-5]     "ip_port": 0,
+[run_classifier-5]     "ip_port_anc": 0,
+[run_classifier-5]     "ip_port_aux": 0,
+[run_classifier-5]     "ip_protocol": 0,
+[run_classifier-5]     "mac_address": "",
+[run_classifier-5]     "master_board": -100,
+[run_classifier-5]     "other_info": "",
+[run_classifier-5]     "serial_number": "",
+[run_classifier-5]     "serial_port": "",
+[run_classifier-5]     "timeout": 0
+[run_classifier-5] }
+[run_classifier-5] [2026-05-25 18:09:54.716] [board_logger] [info] Target address is set to : 192.168.4.1::4210
+[twist_propagation_node-14] [INFO] [1779732594.752579504] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[segmentation_ros2_node-13] [INFO] [1779732594.823315324] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[twist_propagation_node-14] [INFO] [1779732594.833633127] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-14] [INFO] [1779732594.842594582] [twist_propagation]: External twist source: /hand_twist (max_age=0.5s)
+[pipeline_manager_node-1] [INFO] [1779732595.102894203] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[force_controller_node-17] [INFO] [1779732595.104649779] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732595.105278110] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732595.106509538] [pipeline_manager]: Twist propagation activated
+[command_bridge_node-3] [INFO] [1779732595.241781020] [command_bridge]: Joint position stream activated.
+[pipeline_manager_node-1] [INFO] [1779732595.446579642] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732595.448248043] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732595.449216207] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732595.451134037] [pipeline_manager]: Twist propagation deactivated
+[pointcloud_fusion_node-10] [WARN] [1779732596.603633872] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [WARN] [1779732598.605353098] [pointcloud_fusion]: TF wait gate: not connected after 4s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[openvins_odom_tf_relay-12] [WARN] [1779732604.384631867] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732604.602670636] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-10] [WARN] [1779732604.607795303] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779732604.610512217] [pointcloud_fusion]: TF wait gate: not connected after 10s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779732605.691369523] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779732614.344496364] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732614.601426871] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-10] [WARN] [1779732614.603385489] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779732614.607168696] [pointcloud_fusion]: TF wait gate: not connected after 20s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779732615.694481254] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779732624.344510610] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732624.604857141] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.0s
+[pointcloud_fusion_node-10] [WARN] [1779732624.606719450] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: fresh (0.00s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.01s); cam2 TF: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779732624.610588155] [pointcloud_fusion]: TF wait gate: not connected after 30s — head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[tf_pipeline_diagnostics-9] [WARN] [1779732625.698865004] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779732634.346588423] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732634.602921364] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=40.0s
+[pointcloud_fusion_node-10] [WARN] [1779732634.604602319] [pointcloud_fusion]: Stall diagnostic (no publish for 40s): cam1: fresh (0.04s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.02s); cam2 TF: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779732634.609341653] [pointcloud_fusion]: TF wait gate: not connected after 40s — head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[tf_pipeline_diagnostics-9] [WARN] [1779732635.694733993] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779732643.730967160] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.010, -0.001, 0.002), cov_trace=2.06e-02, pos_norm=0.011m, elapsed=49.4s, actual_imu_frame='arm_imu')
+[openvins_odom_tf_relay-12] [WARN] [1779732644.345594485] [openvins_odom_tf_relay]: [RELAY-STATUS] 50s elapsed — head: WAITING (0 msgs), arm: OK (66 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732644.600741827] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=50.0s
+[pointcloud_fusion_node-10] [WARN] [1779732644.602115464] [pointcloud_fusion]: Stall diagnostic (no publish for 50s): cam1: fresh (0.00s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.00s)
+[pointcloud_fusion_node-10] [WARN] [1779732644.605350854] [pointcloud_fusion]: TF tree connected via 'arm_d435i_arm_depth_optical_frame' — starting point cloud fusion (waited 50.0s since node startup)
+[pointcloud_fusion_node-10] [WARN] [1779732644.667210133] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[tf_pipeline_diagnostics-9] [WARN] [1779732645.697456539] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732647.836450895] [pointcloud_fusion]: TF tree is connected but first cloud batch had no successful transforms — retrying on next batch
+[openvins_odom_tf_relay-12] [WARN] [1779732654.344853127] [openvins_odom_tf_relay]: [RELAY-STATUS] 60s elapsed — head: WAITING (0 msgs), arm: OK (598 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732654.696254830] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779732654.727010313] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779732654.786082492] [pointcloud_fusion]: Stats: published=74 (dual=0, cam1_only=111) dist_removed=7971213 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:119} last_publish_ago=0.1s
+[openvins_odom_tf_relay-12] [WARN] [1779732664.347012658] [openvins_odom_tf_relay]: [RELAY-STATUS] 70s elapsed — head: WAITING (0 msgs), arm: OK (1231 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732664.703193967] [pointcloud_fusion]: Stats: published=88 (dual=0, cam1_only=105) dist_removed=7993736 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:105} last_publish_ago=0.4s
+[tf_pipeline_diagnostics-9] [WARN] [1779732664.706450812] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779732664.753819535] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779732674.344925457] [openvins_odom_tf_relay]: [RELAY-STATUS] 80s elapsed — head: WAITING (0 msgs), arm: OK (1847 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732674.696099217] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732674.877530242] [pointcloud_fusion]: Stats: published=91 (dual=0, cam1_only=116) dist_removed=9497830 bbox_removed=125 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:114} last_publish_ago=0.3s
+[pointcloud_fusion_node-10] [WARN] [1779732675.070699637] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779732680.563188308] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779732681.955761995] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779732684.346731535] [openvins_odom_tf_relay]: [RELAY-STATUS] 90s elapsed — head: WAITING (0 msgs), arm: OK (2426 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732684.686249339] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732684.893393093] [pointcloud_fusion]: Stats: published=81 (dual=0, cam1_only=103) dist_removed=7717051 bbox_removed=1111 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:112} last_publish_ago=0.2s
+[pointcloud_fusion_node-10] [WARN] [1779732685.546632663] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779732694.344747718] [openvins_odom_tf_relay]: [RELAY-STATUS] 100s elapsed — head: WAITING (0 msgs), arm: OK (3124 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732694.690996984] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732694.748294852] [pointcloud_fusion]: Stats: published=83 (dual=0, cam1_only=107) dist_removed=7730404 bbox_removed=1032 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:112} last_publish_ago=0.0s
+[pointcloud_fusion_node-10] [WARN] [1779732695.579402919] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[wrist_driver_node-4] [WARN] [1779732696.077903746] [wrist_driver]: Failed to set position: [TxRxResult] There is no status packet!
+[pipeline_manager_node-1] [INFO] [1779732696.998791057] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=4)
+[force_controller_node-17] [INFO] [1779732697.002229938] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732697.007004042] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732697.010929935] [pipeline_manager]: Twist propagation activated
+[twist_propagation_node-14] [INFO] [1779732697.463227235] [twist_propagation]: Hit found at (0.422, 9.704, -10.000) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779732697.464825016] [twist_propagation]: Published contact state: pos=(0.422, 9.704, -10.000) orient=(-0.668, 0.688, 0.128, 0.254) zero_twist
+[twist_propagation_node-14] [INFO] [1779732697.466354997] [twist_propagation]: Hit detected — collision distance: 7.914m
+[pipeline_manager_node-1] [INFO] [1779732697.467049005] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[force_controller_node-17] [INFO] [1779732697.468261480] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[twist_propagation_node-14] [INFO] [1779732697.468556245] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.422, 9.704, -10.000), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779732697.469105039] [segmentation_bridge]: [+] positive click at (0.422, 9.704, -10.000) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779732697.497959488] [segmentation_bridge]: Running inference with 1 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779732697.519353033] [segmentation_bridge]: ROI crop: 445/14716 points within 0.1m of click centroid
+[wrist_driver_node-4] [WARN] [1779732697.978566580] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] Communication success!, vel=[TxRxResult] Incorrect status packet!
+[wrist_driver_node-4] [WARN] [1779732698.022141194] [wrist_driver]: Failed to set position: [TxRxResult] There is no status packet!
+[wrist_driver_node-4] [WARN] [1779732698.433155086] [wrist_driver]: Failed to set position: [TxRxResult] Incorrect status packet!
+[pipeline_manager_node-1] [INFO] [1779732699.039009195] [pipeline_manager]: State: SEGMENTING -> IDLE (EMG: abort gesture=0)
+[twist_propagation_node-14] [INFO] [1779732699.043046427] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732699.069351375] [pipeline_manager]: Twist propagation deactivated
+[force_controller_node-17] [INFO] [1779732699.077262071] [force_controller]: Pipeline state: PLANNING -> IDLE
+[segmentation_ros2_node-13] [INFO] [1779732699.136378311] [segmentation_bridge]: Published segmented cloud: 445/14716 points.
+[pipeline_manager_node-1] [INFO] [1779732700.797088043] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[twist_propagation_node-14] [INFO] [1779732700.800370852] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732700.804085647] [pipeline_manager]: Twist propagation activated
+[force_controller_node-17] [INFO] [1779732700.807242075] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[pipeline_manager_node-1] [INFO] [1779732702.102638974] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732702.105326490] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732702.107891743] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732702.111510012] [pipeline_manager]: Twist propagation deactivated
+[openvins_odom_tf_relay-12] [WARN] [1779732704.350872853] [openvins_odom_tf_relay]: [RELAY-STATUS] 110s elapsed — head: WAITING (0 msgs), arm: OK (3899 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732704.694400467] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732704.792642190] [pointcloud_fusion]: Stats: published=70 (dual=0, cam1_only=101) dist_removed=8345866 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:97} last_publish_ago=0.1s
+[pointcloud_fusion_node-10] [WARN] [1779732705.614583655] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779732714.346385670] [openvins_odom_tf_relay]: [RELAY-STATUS] 120s elapsed — head: WAITING (0 msgs), arm: OK (4303 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732714.678187092] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732715.061346970] [pointcloud_fusion]: Stats: published=95 (dual=0, cam1_only=98) dist_removed=7368482 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:101} last_publish_ago=0.2s
+[pipeline_manager_node-1] [INFO] [1779732715.207604300] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=2)
+[force_controller_node-17] [INFO] [1779732715.209405933] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732715.214532793] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732715.219371239] [pipeline_manager]: Twist propagation activated
+[pointcloud_fusion_node-10] [WARN] [1779732715.636581090] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pipeline_manager_node-1] [INFO] [1779732718.997279400] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732719.001417663] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732719.037430301] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732719.040294078] [pipeline_manager]: Twist propagation deactivated
+[openvins_odom_tf_relay-12] [WARN] [1779732724.346199179] [openvins_odom_tf_relay]: [RELAY-STATUS] 130s elapsed — head: WAITING (0 msgs), arm: OK (4549 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732724.695065863] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732724.758993731] [pointcloud_fusion]: Stats: published=92 (dual=0, cam1_only=101) dist_removed=7000543 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:100} last_publish_ago=0.5s
+[pointcloud_fusion_node-10] [WARN] [1779732725.912130400] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pipeline_manager_node-1] [INFO] [1779732728.851929219] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[force_controller_node-17] [INFO] [1779732728.854544527] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732728.857802112] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732728.869922486] [pipeline_manager]: Twist propagation activated
+[twist_propagation_node-14] [INFO] [1779732729.774671705] [twist_propagation]: Hit found at (0.343, 10.501, -10.847) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779732729.780335601] [twist_propagation]: Published contact state: pos=(0.343, 10.501, -10.847) orient=(-0.672, 0.687, 0.112, 0.251) zero_twist
+[twist_propagation_node-14] [INFO] [1779732729.782849529] [twist_propagation]: Hit detected — collision distance: 8.914m
+[pipeline_manager_node-1] [INFO] [1779732729.792644170] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[segmentation_ros2_node-13] [INFO] [1779732729.792672951] [segmentation_bridge]: [+] positive click at (0.343, 10.501, -10.847) (cloud frame)
+[twist_propagation_node-14] [INFO] [1779732729.799473261] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.343, 10.501, -10.847), r=[0.0050, 0.0300]m
+[force_controller_node-17] [INFO] [1779732729.802667374] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[segmentation_ros2_node-13] [INFO] [1779732729.817619186] [segmentation_bridge]: Running inference with 2 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779732729.835215548] [segmentation_bridge]: ROI crop: 0/14719 points within 0.1m of click centroid
+[pipeline_manager_node-1] [INFO] [1779732729.851138530] [pipeline_manager]: State: SEGMENTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732729.864364374] [force_controller]: Pipeline state: PLANNING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732729.877045382] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732729.886833332] [pipeline_manager]: Twist propagation deactivated
+[wrist_driver_node-4] [WARN] [1779732730.472523451] [wrist_driver]: Failed to set position: [TxRxResult] There is no status packet!
+[wrist_driver_node-4] [WARN] [1779732730.476590008] [wrist_driver]: Dynamixel read failed (communication error): list index out of range
+[wrist_driver_node-4] [WARN] [1779732730.514549931] [wrist_driver]: Failed to set position: [TxRxResult] Incorrect status packet!
+[openvins_odom_tf_relay-12] [WARN] [1779732734.345509066] [openvins_odom_tf_relay]: [RELAY-STATUS] 140s elapsed — head: WAITING (0 msgs), arm: OK (5141 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732734.694596147] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732734.777817481] [pointcloud_fusion]: Stats: published=84 (dual=0, cam1_only=98) dist_removed=7752503 bbox_removed=2957 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:100} last_publish_ago=0.1s
+[pointcloud_fusion_node-10] [WARN] [1779732735.980222059] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[wrist_driver_node-4] [WARN] [1779732737.278992330] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] Communication success!, vel=[TxRxResult] There is no status packet!
+[wrist_driver_node-4] [WARN] [1779732737.751429052] [wrist_driver]: Failed to set position: [TxRxResult] Incorrect status packet!
+[mia_hand_driver_node-2] [INFO] [1779732742.541442129] [mia_hand_driver]: Mia Hand disconnected.
+[openvins_odom_tf_relay-12] [WARN] [1779732744.345265817] [openvins_odom_tf_relay]: [RELAY-STATUS] 150s elapsed — head: WAITING (0 msgs), arm: OK (6100 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732744.693914844] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732744.919547207] [pointcloud_fusion]: Stats: published=78 (dual=0, cam1_only=94) dist_removed=7328083 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:95} last_publish_ago=0.1s
+[mia_hand_driver_node-2] [INFO] [1779732745.942187499] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779732745.994616277] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[wrist_driver_node-4] [WARN] [1779732747.610547349] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] Communication success!, vel=[TxRxResult] Incorrect status packet!
+[pipeline_manager_node-1] [INFO] [1779732748.946765089] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=2)
+[force_controller_node-17] [INFO] [1779732748.949579314] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732748.951203763] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732748.958655198] [pipeline_manager]: Twist propagation activated
+[pipeline_manager_node-1] [INFO] [1779732749.850723644] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732749.856201283] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732749.880558191] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732749.896208437] [pipeline_manager]: Twist propagation deactivated
+[wrist_driver_node-4] [WARN] [1779732750.858191114] [wrist_driver]: Failed to set position: [TxRxResult] There is no status packet!
+[openvins_odom_tf_relay-12] [WARN] [1779732754.351423256] [openvins_odom_tf_relay]: [RELAY-STATUS] 160s elapsed — head: WAITING (0 msgs), arm: OK (6948 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732754.683046923] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732754.941883987] [pointcloud_fusion]: Stats: published=61 (dual=0, cam1_only=92) dist_removed=7110964 bbox_removed=3418 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:86} last_publish_ago=0.0s
+[mia_hand_driver_node-2] [INFO] [1779732755.540256719] [mia_hand_driver]: Mia Hand disconnected.
+[segmentation_ros2_node-13] [ERROR] [1779732755.988337519] [segmentation_bridge]: Inference request failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[pointcloud_fusion_node-10] [WARN] [1779732756.014302691] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779732756.961776127] [mia_hand_driver]: Mia Hand connected.
+[pipeline_manager_node-1] [INFO] [1779732757.550427779] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=2)
+[force_controller_node-17] [INFO] [1779732757.558901526] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732757.562528525] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732757.566643599] [pipeline_manager]: Twist propagation activated
+[mia_hand_driver_node-2] [INFO] [1779732758.530494903] [mia_hand_driver]: Mia Hand disconnected.
+[pipeline_manager_node-1] [INFO] [1779732758.796883575] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732758.806515723] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732758.841814201] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732758.844302890] [pipeline_manager]: Twist propagation deactivated
+[mia_hand_driver_node-2] [INFO] [1779732760.926716365] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779732764.348633326] [openvins_odom_tf_relay]: [RELAY-STATUS] 170s elapsed — head: WAITING (0 msgs), arm: OK (7453 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732764.692420515] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732764.807517804] [pointcloud_fusion]: Stats: published=71 (dual=0, cam1_only=101) dist_removed=8199324 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:109} last_publish_ago=0.0s
+[pipeline_manager_node-1] [INFO] [1779732765.801213217] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[force_controller_node-17] [INFO] [1779732765.807930337] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732765.831072716] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732765.835930524] [pipeline_manager]: Twist propagation activated
+[pointcloud_fusion_node-10] [WARN] [1779732766.151802671] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pipeline_manager_node-1] [INFO] [1779732767.201125519] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732767.202612970] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732767.245970153] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732767.250170447] [pipeline_manager]: Twist propagation deactivated
+[pipeline_manager_node-1] [INFO] [1779732769.098728651] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[force_controller_node-17] [INFO] [1779732769.102346664] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732769.107982747] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732769.115483467] [pipeline_manager]: Twist propagation activated
+[twist_propagation_node-14] [INFO] [1779732769.253130665] [twist_propagation]: Hit found at (0.542, 18.679, -19.600) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779732769.254706450] [twist_propagation]: Published contact state: pos=(0.542, 18.679, -19.600) orient=(-0.673, 0.687, 0.111, 0.250) zero_twist
+[twist_propagation_node-14] [INFO] [1779732769.257867022] [twist_propagation]: Hit detected — collision distance: 21.333m
+[pipeline_manager_node-1] [INFO] [1779732769.260465140] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[twist_propagation_node-14] [INFO] [1779732769.261997560] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.542, 18.679, -19.600), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779732769.262761807] [segmentation_bridge]: [+] positive click at (0.542, 18.679, -19.600) (cloud frame)
+[force_controller_node-17] [INFO] [1779732769.264380208] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[segmentation_ros2_node-13] [INFO] [1779732769.294335833] [segmentation_bridge]: Running inference with 3 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779732769.319851921] [segmentation_bridge]: ROI crop: 0/14908 points within 0.1m of click centroid
+[pipeline_manager_node-1] [INFO] [1779732770.002511803] [pipeline_manager]: State: SEGMENTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732770.009090771] [force_controller]: Pipeline state: PLANNING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732770.013202497] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732770.015434881] [pipeline_manager]: Twist propagation deactivated
+[openvins_odom_tf_relay-12] [WARN] [1779732774.345023258] [openvins_odom_tf_relay]: [RELAY-STATUS] 180s elapsed — head: WAITING (0 msgs), arm: OK (8020 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732774.677609410] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732775.025242788] [pointcloud_fusion]: Stats: published=76 (dual=0, cam1_only=106) dist_removed=8117497 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:106} last_publish_ago=0.0s
+[wrist_driver_node-4] [WARN] [1779732775.792248610] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] There is no status packet!, vel=[TxRxResult] Communication success!
+[pointcloud_fusion_node-10] [WARN] [1779732776.252180756] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779732778.541205834] [mia_hand_driver]: Mia Hand disconnected.
+[pipeline_manager_node-1] [INFO] [1779732779.600887236] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[force_controller_node-17] [INFO] [1779732779.604546105] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732779.606065424] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732779.610177095] [pipeline_manager]: Twist propagation activated
+[pipeline_manager_node-1] [INFO] [1779732780.401216153] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732780.403503930] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[segmentation_ros2_node-13] [ERROR] [1779732780.451086405] [segmentation_bridge]: Inference request failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[twist_propagation_node-14] [INFO] [1779732780.485701574] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732780.489411690] [pipeline_manager]: Twist propagation deactivated
+[mia_hand_driver_node-2] [INFO] [1779732780.915098734] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779732784.349669137] [openvins_odom_tf_relay]: [RELAY-STATUS] 190s elapsed — head: WAITING (0 msgs), arm: OK (8250 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732784.696794790] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732784.892704499] [pointcloud_fusion]: Stats: published=80 (dual=0, cam1_only=101) dist_removed=7382182 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:108} last_publish_ago=0.1s
+[pointcloud_fusion_node-10] [WARN] [1779732786.275523602] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pipeline_manager_node-1] [INFO] [1779732790.398216016] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[twist_propagation_node-14] [INFO] [1779732790.401203132] [twist_propagation]: Activated
+[force_controller_node-17] [INFO] [1779732790.402765207] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[pipeline_manager_node-1] [INFO] [1779732790.403334078] [pipeline_manager]: Twist propagation activated
+[pipeline_manager_node-1] [INFO] [1779732791.000822466] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732791.003539217] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732791.005071814] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732791.007429335] [pipeline_manager]: Twist propagation deactivated
+[pointcloud_fusion_node-10] [WARN] [1779732792.159160475] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter �� skipping
+[pointcloud_fusion_node-10] [WARN] [1779732792.426008695] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.60s) — fresh lookup failed
+[openvins_odom_tf_relay-12] [WARN] [1779732794.345301736] [openvins_odom_tf_relay]: [RELAY-STATUS] 200s elapsed — head: WAITING (0 msgs), arm: OK (8344 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732794.686105643] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732794.924270774] [pointcloud_fusion]: Stats: published=96 (dual=0, cam1_only=94) dist_removed=6654858 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=9 tf_fail={arm_d435i_arm_depth_optical_frame:16, head_d435i_head_depth_optical_frame:113} last_publish_ago=0.0s
+[pointcloud_fusion_node-10] [WARN] [1779732796.416280466] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779732804.344754581] [openvins_odom_tf_relay]: [RELAY-STATUS] 210s elapsed — head: WAITING (0 msgs), arm: OK (9215 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732804.679169211] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732804.812638727] [pointcloud_fusion]: Stats: published=79 (dual=0, cam1_only=101) dist_removed=7925035 bbox_removed=6711 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:103} last_publish_ago=0.2s
+[pointcloud_fusion_node-10] [WARN] [1779732806.428186566] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pipeline_manager_node-1] [INFO] [1779732808.555678584] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[twist_propagation_node-14] [INFO] [1779732808.559867090] [twist_propagation]: Activated
+[force_controller_node-17] [INFO] [1779732808.561955289] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[pipeline_manager_node-1] [INFO] [1779732808.565285387] [pipeline_manager]: Twist propagation activated
+[pipeline_manager_node-1] [INFO] [1779732809.146710684] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732809.155048344] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732809.157784838] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732809.163472400] [pipeline_manager]: Twist propagation deactivated
+[openvins_odom_tf_relay-12] [WARN] [1779732814.344874966] [openvins_odom_tf_relay]: [RELAY-STATUS] 220s elapsed — head: WAITING (0 msgs), arm: OK (9487 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732814.696413304] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732814.915451895] [pointcloud_fusion]: Stats: published=90 (dual=0, cam1_only=114) dist_removed=8620830 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:115} last_publish_ago=0.2s
+[pointcloud_fusion_node-10] [WARN] [1779732816.591088862] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779732824.347435152] [openvins_odom_tf_relay]: [RELAY-STATUS] 230s elapsed — head: WAITING (0 msgs), arm: OK (9921 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732824.688214501] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732824.694215907] [pointcloud_fusion]: Stats: published=94 (dual=0, cam1_only=107) dist_removed=8155236 bbox_removed=12205 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:110} last_publish_ago=0.1s
+[pipeline_manager_node-1] [INFO] [1779732825.160982460] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[force_controller_node-17] [INFO] [1779732825.169615067] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732825.170617656] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732825.190350319] [pipeline_manager]: Twist propagation activated
+[twist_propagation_node-14] [INFO] [1779732825.237319145] [twist_propagation]: Hit found at (0.585, 15.014, -15.919) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779732825.239800624] [twist_propagation]: Published contact state: pos=(0.585, 15.014, -15.919) orient=(-0.668, 0.689, 0.119, 0.254) zero_twist
+[twist_propagation_node-14] [INFO] [1779732825.242645277] [twist_propagation]: Hit detected — collision distance: 9.560m
+[twist_propagation_node-14] [INFO] [1779732825.245425007] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.585, 15.014, -15.919), r=[0.0050, 0.0300]m
+[pipeline_manager_node-1] [INFO] [1779732825.246494773] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[force_controller_node-17] [INFO] [1779732825.251274537] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[segmentation_ros2_node-13] [INFO] [1779732825.259118480] [segmentation_bridge]: [+] positive click at (0.585, 15.014, -15.919) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779732825.283807884] [segmentation_bridge]: Running inference with 4 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779732825.293719725] [segmentation_bridge]: ROI crop: 0/14708 points within 0.1m of click centroid
+[mia_hand_driver_node-2] [INFO] [1779732825.533937965] [mia_hand_driver]: Mia Hand disconnected.
+[pipeline_manager_node-1] [INFO] [1779732826.150823316] [pipeline_manager]: State: SEGMENTING -> IDLE (EMG: abort gesture=0)
+[twist_propagation_node-14] [INFO] [1779732826.158274226] [twist_propagation]: Deactivated
+[force_controller_node-17] [INFO] [1779732826.159720419] [force_controller]: Pipeline state: PLANNING -> IDLE
+[pipeline_manager_node-1] [INFO] [1779732826.164745015] [pipeline_manager]: Twist propagation deactivated
+[pointcloud_fusion_node-10] [WARN] [1779732826.685755595] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779732826.998603416] [mia_hand_driver]: Mia Hand connected.
+[wrist_driver_node-4] [WARN] [1779732827.731594635] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] There is no status packet!, vel=[TxRxResult] Communication success!
+[mia_hand_driver_node-2] [INFO] [1779732830.533852363] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779732831.970977072] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779732832.531041316] [mia_hand_driver]: Mia Hand disconnected.
+[pipeline_manager_node-1] [INFO] [1779732832.851135015] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[force_controller_node-17] [INFO] [1779732832.853619910] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732832.865443356] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732832.871872449] [pipeline_manager]: Twist propagation activated
+[twist_propagation_node-14] [INFO] [1779732833.514498550] [twist_propagation]: Hit found at (0.422, 10.503, -11.298) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779732833.516415773] [twist_propagation]: Published contact state: pos=(0.422, 10.503, -11.298) orient=(-0.670, 0.689, 0.113, 0.251) zero_twist
+[twist_propagation_node-14] [INFO] [1779732833.518006799] [twist_propagation]: Hit detected — collision distance: 10.323m
+[segmentation_ros2_node-13] [INFO] [1779732833.520378371] [segmentation_bridge]: [+] positive click at (0.422, 10.503, -11.298) (cloud frame)
+[twist_propagation_node-14] [INFO] [1779732833.520598611] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.422, 10.503, -11.298), r=[0.0050, 0.0300]m
+[pipeline_manager_node-1] [INFO] [1779732833.520987551] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[force_controller_node-17] [INFO] [1779732833.522298928] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[segmentation_ros2_node-13] [INFO] [1779732833.543609880] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779732833.549873654] [segmentation_bridge]: ROI crop: 0/14787 points within 0.1m of click centroid
+[pipeline_manager_node-1] [INFO] [1779732833.846751519] [pipeline_manager]: State: SEGMENTING -> IDLE (EMG: abort gesture=0)
+[twist_propagation_node-14] [INFO] [1779732833.855620486] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732833.858553538] [pipeline_manager]: Twist propagation deactivated
+[force_controller_node-17] [INFO] [1779732833.860123867] [force_controller]: Pipeline state: PLANNING -> IDLE
+[mia_hand_driver_node-2] [INFO] [1779732833.964556716] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779732834.345454972] [openvins_odom_tf_relay]: [RELAY-STATUS] 240s elapsed — head: WAITING (0 msgs), arm: OK (10658 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732834.694010576] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732834.820337486] [pointcloud_fusion]: Stats: published=79 (dual=0, cam1_only=90) dist_removed=6782471 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:96} last_publish_ago=0.0s
+[wrist_driver_node-4] [WARN] [1779732835.403851973] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] Communication success!, vel=[TxRxResult] Incorrect status packet!
+[pointcloud_fusion_node-10] [WARN] [1779732836.690847914] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pipeline_manager_node-1] [INFO] [1779732837.698966768] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[force_controller_node-17] [INFO] [1779732837.702646636] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732837.705379642] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732837.708906596] [pipeline_manager]: Twist propagation activated
+[pipeline_manager_node-1] [INFO] [1779732838.452039607] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732838.454707756] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732838.461586048] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732838.463845609] [pipeline_manager]: Twist propagation deactivated
+[pipeline_manager_node-1] [INFO] [1779732841.197715508] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[twist_propagation_node-14] [INFO] [1779732841.199775368] [twist_propagation]: Activated
+[force_controller_node-17] [INFO] [1779732841.200962230] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[pipeline_manager_node-1] [INFO] [1779732841.205030025] [pipeline_manager]: Twist propagation activated
+[segmentation_ros2_node-13] [ERROR] [1779732842.601215912] [segmentation_bridge]: Inference request failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[segmentation_ros2_node-13] [ERROR] [1779732842.605358888] [segmentation_bridge]: Inference request failed: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))
+[openvins_odom_tf_relay-12] [WARN] [1779732844.345307977] [openvins_odom_tf_relay]: [RELAY-STATUS] 250s elapsed — head: WAITING (0 msgs), arm: OK (10931 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779732844.679212761] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779732845.138228812] [pointcloud_fusion]: Stats: published=85 (dual=0, cam1_only=100) dist_removed=6984283 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:100} last_publish_ago=0.1s
+[pipeline_manager_node-1] [INFO] [1779732845.899519919] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732845.902300130] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732845.921539041] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732845.929007856] [pipeline_manager]: Twist propagation deactivated
+[pipeline_manager_node-1] [INFO] [1779732846.104521004] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=1)
+[twist_propagation_node-14] [INFO] [1779732846.109885758] [twist_propagation]: Activated
+[force_controller_node-17] [INFO] [1779732846.111840953] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[pipeline_manager_node-1] [INFO] [1779732846.115912699] [pipeline_manager]: Twist propagation activated
+[pointcloud_fusion_node-10] [WARN] [1779732846.720371276] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779732848.490829339] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779732849.135423224] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.64s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779732850.862989690] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.0s > 2.0s), skipping
+[openvins_odom_tf_relay-12] [WARN] [1779732854.349763031] [openvins_odom_tf_relay]: [RELAY-STATUS] 260s elapsed — head: WAITING (0 msgs), arm: OK (10931 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732854.605818548] [pointcloud_fusion]: Stats: published=55 (dual=0, cam1_only=38) dist_removed=2384371 bbox_removed=0 bbox_skipped=2 bbox_cache_hits=21 tf_fail={arm_d435i_arm_depth_optical_frame:87, head_d435i_head_depth_optical_frame:118} last_publish_ago=2.5s
+[tf_pipeline_diagnostics-9] [WARN] [1779732855.703153197] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pipeline_manager_node-1] [INFO] [1779732856.298226445] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732856.300329001] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732856.302028193] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732856.306627882] [pipeline_manager]: Twist propagation deactivated
+[pointcloud_fusion_node-10] [WARN] [1779732856.734145751] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pipeline_manager_node-1] [INFO] [1779732857.798392389] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=2)
+[force_controller_node-17] [INFO] [1779732857.802227082] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732857.803799618] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732857.807144513] [pipeline_manager]: Twist propagation activated
+[pipeline_manager_node-1] [INFO] [1779732859.199090926] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732859.201299645] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732859.212201423] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732859.214890527] [pipeline_manager]: Twist propagation deactivated
+[pipeline_manager_node-1] [INFO] [1779732859.496700345] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=2)
+[force_controller_node-17] [INFO] [1779732859.498371014] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732859.498967338] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732859.500791144] [pipeline_manager]: Twist propagation activated
+[pipeline_manager_node-1] [INFO] [1779732861.399123579] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+[force_controller_node-17] [INFO] [1779732861.400584287] [force_controller]: Pipeline state: SEGMENTING -> IDLE
+[twist_propagation_node-14] [INFO] [1779732861.403402272] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779732861.406038763] [pipeline_manager]: Twist propagation deactivated
+[openvins_odom_tf_relay-12] [WARN] [1779732864.346823100] [openvins_odom_tf_relay]: [RELAY-STATUS] 270s elapsed — head: WAITING (0 msgs), arm: OK (10931 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732864.609874131] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:151, head_d435i_head_depth_optical_frame:150} last_publish_ago=12.5s
+[pointcloud_fusion_node-10] [WARN] [1779732864.611892055] [pointcloud_fusion]: Stall diagnostic (no publish for 13s): cam1: fresh (0.03s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.05s); cam2 TF: Lookup would require extrapolation into the past.  Requested time 1779732839.133121 but the earliest data is at time 1779732854.431707, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[tf_pipeline_diagnostics-9] [WARN] [1779732865.696734292] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779732866.734927759] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[run_classifier-5] ROS 2 bridge active — publishing on /emg/* topics.
+[run_classifier-5]
+[run_classifier-5] ====================================================
+[run_classifier-5]     EMG Classifier — Live
+[run_classifier-5] ====================================================
+[run_classifier-5] Loading classifier from /app/models …
+[run_classifier-5] Models loaded.
+[run_classifier-5]
+[run_classifier-5] Connecting to MindRove WiFi board …
+[run_classifier-5] Connected!  500 Hz  8 channels
+[run_classifier-5]
+[run_classifier-5] Filling buffer …
+[run_classifier-5] Ready.
+[run_classifier-5]
+[run_classifier-5] [emg] EXTENSION -> POWER (conf=99%, prop=1.00, mode=NOT_GRASPING) REST:0% POWER:99% OPEN:0% FLEXION:1% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=NOT_GRASPING) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=55)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=105)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=155)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=205)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=255)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=305)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=355)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=405)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=455)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=505)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=555)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=605)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=655)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=705)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.4 Hz, frame=755)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=805)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=855)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=905)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=955)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 9.9 Hz, frame=1005)
+[run_classifier-5] [emg] REST -> EXTENSION (conf=100%, prop=1.00, mode=NOT_GRASPING) REST:0% POWER:0% OPEN:0% FLEXION:0% EXTENSION:100%
+[run_classifier-5] [emg] EXTENSION -> REST (conf=100%, prop=0.00, mode=NOT_GRASPING) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.62, mode=NOT_GRASPING) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=1121)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=1171)
+[run_classifier-5] [emg] REST -> OPEN (conf=100%, prop=0.09, mode=CONTROL_GRASP) REST:0% POWER:0% OPEN:100% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1289)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=1.00, mode=CONTROL_GRASP) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1397)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1447)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=1497)
+[run_classifier-5] [emg] REST -> OPEN (conf=100%, prop=0.57, mode=CONTROL_GRASP) REST:0% POWER:0% OPEN:100% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=1597)
+[run_classifier-5] [emg] REST -> OPEN (conf=97%, prop=0.36, mode=CONTROL_GRASP) REST:0% POWER:0% OPEN:97% FLEXION:3% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=1686)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.03, mode=CONTROL_GRASP) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=1798)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.27, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=1902)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.45, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2008)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2058)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2109)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.85, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2189)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.0 Hz, frame=2239)
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.2 Hz, frame=2289)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.34, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=58%, prop=0.00, 10.1 Hz, frame=2359)
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.38, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.01, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> REST (conf=51%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:45% OPEN:51% FLEXION:4% EXTENSION:0%
+[run_classifier-5] [emg] REST -> POWER (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> OPEN (conf=99%, prop=0.19, mode=CONTROL_WRIST) REST:0% POWER:0% OPEN:99% FLEXION:1% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> POWER (conf=100%, prop=0.00, mode=CONTROL_WRIST) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> OPEN (conf=99%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:0% OPEN:99% FLEXION:1% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> POWER (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> OPEN (conf=72%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:18% OPEN:72% FLEXION:10% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> POWER (conf=97%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:97% OPEN:3% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> OPEN (conf=89%, prop=0.01, mode=CONTROL_GRASP) REST:0% POWER:11% OPEN:89% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> POWER (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:100% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] POWER -> OPEN (conf=94%, prop=0.03, mode=CONTROL_GRASP) REST:0% POWER:3% OPEN:94% FLEXION:3% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> OPEN (conf=92%, prop=0.65, mode=CONTROL_GRASP) REST:0% POWER:0% OPEN:92% FLEXION:8% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=99%, prop=0.00, mode=CONTROL_GRASP) REST:99% POWER:0% OPEN:1% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] REST -> OPEN (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:0% POWER:0% OPEN:100% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] OPEN -> REST (conf=100%, prop=0.00, mode=CONTROL_GRASP) REST:100% POWER:0% OPEN:0% FLEXION:0% EXTENSION:0%
+[run_classifier-5] [emg] status: REST (conf=100%, prop=0.00, 10.1 Hz, frame=2711)
+[pipeline_manager_node-1] [INFO] [1779732868.100262626] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=4)
+[force_controller_node-17] [INFO] [1779732868.102053595] [force_controller]: Pipeline state: IDLE -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779732868.107014145] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779732868.110846936] [pipeline_manager]: Twist propagation activated
+[openvins_odom_tf_relay-12] [WARN] [1779732874.345045502] [openvins_odom_tf_relay]: [RELAY-STATUS] 280s elapsed — head: WAITING (0 msgs), arm: OK (10931 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779732874.601047114] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:149, head_d435i_head_depth_optical_frame:150} last_publish_ago=22.5s
+[pointcloud_fusion_node-10] [WARN] [1779732874.610773854] [pointcloud_fusion]: Stall diagnostic (no publish for 23s): cam1: fresh (0.02s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.00s); cam2 TF: Lookup would require extrapolation into the past.  Requested time 1779732839.133121 but the earliest data is at time 1779732864.428163, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[tf_pipeline_diagnostics-9] [WARN] [1779732875.679896949] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779732876.735508638] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[rviz2-18] [INFO] [1779732878.626652514] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[preshaping_service_bridge_node-15] [INFO] [1779732878.626854469] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[mia_hand_driver_node-2] [INFO] [1779732878.628219546] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[run_classifier-5] Exception in thread Thread-1 (_run):
+[run_classifier-5] Traceback (most recent call last):
+[run_classifier-5]   File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+[run_classifier-5] [2026-05-25 18:14:38.648] [board_logger] [info] Releasing board ...
+[run_classifier-5] Traceback (most recent call last):
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/emg_bridge/run_classifier", line 33, in <module>
+[run_classifier-5]     self.run()
+[run_classifier-5]   File "/usr/lib/python3.12/threading.py", line 1010, in run
+[run_classifier-5]     self._target(*self._args, **self._kwargs)
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/python3.12/site-packages/emg_bridge/ros_bridge_node.py", line 72, in _run
+[run_classifier-5]     rclpy.spin(node)
+[run_classifier-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[run_classifier-5]     executor.spin_once()
+[run_classifier-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[run_classifier-5]     self._spin_once_impl(timeout_sec)
+[run_classifier-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[run_classifier-5]     handler, entity, node = self.wait_for_ready_callbacks(
+[run_classifier-5]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[run_classifier-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[run_classifier-5]     return next(self._cb_iter)
+[run_classifier-5]            ^^^^^^^^^^^^^^^^^^^
+[run_classifier-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 785, in _wait_for_ready_callbacks
+[run_classifier-5]     raise ExternalShutdownException()
+[run_classifier-5] rclpy.executors.ExternalShutdownException
+[run_classifier-5]     sys.exit(load_entry_point('emg-bridge==0.1.0', 'console_scripts', 'run_classifier')())
+[run_classifier-5]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/python3.12/site-packages/emg_bridge/run_classifier_entry.py", line 74, in main
+[run_classifier-5]     classifier_main()
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/python3.12/site-packages/emg_bridge/scripts/run_classifier.py", line 251, in main
+[run_classifier-5]     chunk = reader.read(WINDOW_STEP)
+[run_classifier-5]             ^^^^^^^^^^^^^^^^^^^^^^^^
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/python3.12/site-packages/emg_bridge/board_reader.py", line 73, in read
+[run_classifier-5]     while self._board.get_board_data_count() < n_samples:
+[run_classifier-5]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[run_classifier-5]   File "/usr/local/lib/python3.12/dist-packages/mindrove/board_shim.py", line 1324, in get_board_data_count
+[run_classifier-5]     res = BoardControllerDLL.get_instance().get_board_data_count(preset, data_size, self.board_id, self.input_json)
+[run_classifier-5]           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[run_classifier-5] ctypes.ArgumentError: argument 2: KeyboardInterrupt:
+[run_classifier-5] [emg] REST -> EXTENSION (conf=100%, prop=1.00, mode=CONTROL_GRASP) REST:0% POWER:0% OPEN:0% FLEXION:0% EXTENSION:100%
+[run_classifier-5] [emg] status: EXTENSION (conf=100%, prop=0.13, 10.1 Hz, frame=2778)
+[run_classifier-5] [emg] status: EXTENSION (conf=100%, prop=0.02, 10.0 Hz, frame=2828)
+[run_classifier-5] Session released. Bye!
+[camera_mount_tf_publisher-8] Traceback (most recent call last):
+[camera_mount_tf_publisher-8]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-8]     main()
+[camera_mount_tf_publisher-8]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-8]     rclpy.shutdown()
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-8]     _shutdown(context=context)
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-8]     context.shutdown()
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-8]     self.__context.shutdown()
+[camera_mount_tf_publisher-8] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[segmentation_ros2_node-13] Traceback (most recent call last):
+[segmentation_ros2_node-13]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-13]     sys.exit(load_entry_point('segmentation-bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-13]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 359, in main
+[segmentation_ros2_node-13]     rclpy.spin(node)
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[segmentation_ros2_node-13]     executor.spin_once()
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[segmentation_ros2_node-13]     self._spin_once_impl(timeout_sec)
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[segmentation_ros2_node-13]     handler, entity, node = self.wait_for_ready_callbacks(
+[segmentation_ros2_node-13]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[segmentation_ros2_node-13]     return next(self._cb_iter)
+[segmentation_ros2_node-13]            ^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 781, in _wait_for_ready_callbacks
+[segmentation_ros2_node-13]     wait_set.wait(timeout_nsec)
+[segmentation_ros2_node-13] KeyboardInterrupt
+[tf_pipeline_diagnostics-9] Traceback (most recent call last):
+[tf_pipeline_diagnostics-9]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-9]     main()
+[tf_pipeline_diagnostics-9]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 147, in main
+[tf_pipeline_diagnostics-9]     rclpy.shutdown()
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[tf_pipeline_diagnostics-9]     _shutdown(context=context)
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[tf_pipeline_diagnostics-9]     context.shutdown()
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[tf_pipeline_diagnostics-9]     self.__context.shutdown()
+[tf_pipeline_diagnostics-9] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[INFO] [preshaping_service_bridge_node-15]: process has finished cleanly [pid 3990]
+[ERROR] [camera_mount_tf_publisher-8]: process has died [pid 3979, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[INFO] [wrist_driver_node-4]: process has finished cleanly [pid 3975]
+[ERROR] [tf_pipeline_diagnostics-9]: process has died [pid 3980, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[INFO] [grasp_proximity_controller_node.py-16]: process has finished cleanly [pid 3991]
+[INFO] [force_controller_node-17]: process has finished cleanly [pid 3998]
+[INFO] [emg_grasp_controller-6]: process has finished cleanly [pid 3977]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process has finished cleanly [pid 3978]
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 3972]
+[INFO] [odom_to_pose_relay-11]: process has finished cleanly [pid 3982]
+[INFO] [openvins_odom_tf_relay-12]: process has finished cleanly [pid 3983]
+[INFO] [pointcloud_fusion_node-10]: process has finished cleanly [pid 3981]
+[ERROR] [segmentation_ros2_node-13]: process has died [pid 3984, exit code -2, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_89qkah7a -r /segmentation/input_cloud:=/fused_pointcloud'].
+[INFO] [mia_hand_driver_node-2]: process has finished cleanly [pid 3973]
+[INFO] [command_bridge_node-3]: process has finished cleanly [pid 3974]
+[INFO] [twist_propagation_node-14]: process has finished cleanly [pid 3989]
+[ERROR] [run_classifier-5]: process has died [pid 3976, exit code 1, cmd '/prosthesis_ws/install/emg_bridge/lib/emg_bridge/run_classifier --model-dir /app/models --ros-args -r __node:=emg_bridge'].
+[ERROR] [rviz2-18]: process[rviz2-18] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [rviz2-18]: sending signal 'SIGTERM' to process[rviz2-18]
+[rviz2-18] [INFO] [1779732883.710809378] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[ERROR] [rviz2-18]: process[rviz2-18] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'
+[INFO] [rviz2-18]: sending signal 'SIGKILL' to process[rviz2-18]
+[ERROR] [rviz2-18]: process has died [pid 4000, exit code -9, cmd '/opt/ros/jazzy/lib/rviz2/rviz2 -d /prosthesis_ws/rviz/prosthesis.rviz --ros-args -r __node:=rviz2'].
+exit code: 130
+make: *** [Makefile:147: run] Error 130
+   multiview_prosthesis >

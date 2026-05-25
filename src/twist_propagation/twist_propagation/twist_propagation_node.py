@@ -72,7 +72,7 @@ from geometry_msgs.msg import (
 )
 from nav_msgs.msg import Path, Odometry
 from sensor_msgs.msg import PointCloud2, PointField
-from std_msgs.msg import String, ColorRGBA, Empty, Float64
+from std_msgs.msg import Bool, String, ColorRGBA, Empty, Float64
 from std_srvs.srv import Trigger
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -645,6 +645,9 @@ class TwistPropagationNode(Node):
         # Status publication throttle counter
         self._status_counter: int = 0
 
+        # Hit detection state
+        self._hit_detected: bool = False
+
         # Marker ID counters for RViz visualization
         self._sphere_marker_ns = "collision_spheres"
         self._hit_marker_ns = "hit_marker"
@@ -712,6 +715,11 @@ class TwistPropagationNode(Node):
             MarkerArray, "/twist_propagation/trajectory_line", 10)
         self._hit_time_pub = self.create_publisher(
             Float64, "/grasp_preshaping/hit_time", 10)
+        self._collision_distance_pub = self.create_publisher(
+            Float64, "/twist_propagation/collision_distance", 10)
+        self._hit_detected_pub = self.create_publisher(
+            Bool, "/twist_propagation/hit_detected",
+            QoSProfile(depth=10, durability=DurabilityPolicy.TRANSIENT_LOCAL))
 
         # Contact-state override for grasp preshaping: published immediately
         # when a hit is detected so the preshaping bridge can use the

@@ -1,0 +1,857 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-25-16-16-15-945998-KingBob-52
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [476]
+[INFO] [mia_hand_driver_node-2]: process started with pid [477]
+[INFO] [command_bridge_node-3]: process started with pid [478]
+[INFO] [wrist_driver_node-4]: process started with pid [479]
+[INFO] [run_classifier-5]: process started with pid [480]
+[INFO] [emg_grasp_controller-6]: process started with pid [481]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process started with pid [482]
+[INFO] [camera_mount_tf_publisher-8]: process started with pid [483]
+[INFO] [tf_pipeline_diagnostics-9]: process started with pid [484]
+[INFO] [pointcloud_fusion_node-10]: process started with pid [485]
+[INFO] [odom_to_pose_relay-11]: process started with pid [486]
+[INFO] [openvins_odom_tf_relay-12]: process started with pid [487]
+[INFO] [segmentation_ros2_node-13]: process started with pid [488]
+[INFO] [twist_propagation_node-14]: process started with pid [493]
+[INFO] [preshaping_service_bridge_node-15]: process started with pid [494]
+[INFO] [grasp_proximity_controller_node.py-16]: process started with pid [495]
+[INFO] [force_controller_node-17]: process started with pid [496]
+[INFO] [rviz2-18]: process started with pid [497]
+[rviz2-18] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[preshaping_service_bridge_node-15] [INFO] [1779725776.481982286] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-15] [INFO] [1779725776.485192504] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[mia_hand_driver_node-2] [INFO] [1779725776.885221746] [mia_hand_driver]: /dev/ttyMiaHand serial port opened.
+[rviz2-18] [INFO] [1779725777.147763835] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779725777.148860435] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[mia_hand_driver_node-2] [INFO] [1779725777.272114239] [mia_hand_driver]: Mia Hand connected.
+[rviz2-18] [INFO] [1779725777.372652005] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779725777.477197810] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[wrist_driver_node-4] [INFO] [1779725777.488200358] [wrist_driver]: Wrist motor connected on /dev/ttyDynamixel, ID=1
+[emg_grasp_controller-6] [INFO] [1779725777.488260227] [emg_grasp_controller]: EMG grasp controller started — rate=20.0 Hz, stale_timeout=1.0s
+[rviz2-18] [INFO] [1779725777.493330225] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779725777.516904661] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779725777.521073534] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[pipeline_manager_node-1] [INFO] [1779725777.569956114] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1779725777.571491066] [pipeline_manager]: Pipeline manager started — state: IDLE
+[rviz2-18] [INFO] [1779725777.909822986] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779725778.062530533] [rviz2]: Stereo is NOT SUPPORTED
+[command_bridge_node-3] [INFO] [1779725778.456053777] [command_bridge]: Command bridge started — speed=80%, joint_states → /joint_states
+[pipeline_manager_node-1] [INFO] [1779725778.576713563] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[tf_pipeline_diagnostics-9] [INFO] [1779725778.904216070] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779725779.069643164] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779725779.070621801] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779725779.172135270] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779725779.174659956] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779725779.176214611] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[force_controller_node-17] [INFO] [1779725779.262723540] [force_controller]: Force controller started. Target range: [50.0, 200.0] raw units, kp=0.01, ki=0.001, rate=10.0 Hz
+[grasp_proximity_controller_node.py-16] [INFO] [1779725779.334058278] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[pointcloud_fusion_node-10] [INFO] [1779725779.415464462] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-10] [INFO] [1779725779.418434386] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-10] [INFO] [1779725779.440108142] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-10] [WARN] [1779725779.441537893] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [INFO] [1779725779.442703967] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-10] [INFO] [1779725779.443743505] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[camera_mount_tf_publisher-8] [INFO] [1779725779.772446157] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-8] [INFO] [1779725779.775798790] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[run_classifier-5] ROS 2 bridge active — publishing on /emg/* topics.
+[run_classifier-5]
+[run_classifier-5] ====================================================
+[run_classifier-5]     EMG Classifier — Live
+[run_classifier-5] ====================================================
+[run_classifier-5] Loading classifier from /app/models …
+[run_classifier-5] Model file not found: /app/models/classifier.pkl
+[run_classifier-5]   Please train a model first:
+[run_classifier-5]     ros2 run emg_bridge train --data-dir /app/data --model-dir /app/models
+[run_classifier-5]   Or run collect_data to record training data:
+[run_classifier-5]     ros2 run emg_bridge collect_data --output-dir /app/data
+[segmentation_ros2_node-13] [INFO] [1779725779.924333943] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[twist_propagation_node-14] [INFO] [1779725779.968444737] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-14] [INFO] [1779725780.042010373] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-14] [INFO] [1779725780.043925604] [twist_propagation]: External twist source: /hand_twist (max_age=0.5s)
+[ERROR] [run_classifier-5]: process has died [pid 480, exit code 1, cmd '/prosthesis_ws/install/emg_bridge/lib/emg_bridge/run_classifier --model-dir /app/models --ros-args -r __node:=emg_bridge'].
+[command_bridge_node-3] [INFO] [1779725780.431101379] [command_bridge]: Joint position stream activated.
+[pointcloud_fusion_node-10] [WARN] [1779725781.443443289] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [WARN] [1779725783.442618327] [pointcloud_fusion]: TF wait gate: not connected after 4s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [INFO] [1779725789.442566299] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-10] [WARN] [1779725789.443765846] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779725789.446497770] [pointcloud_fusion]: TF wait gate: not connected after 10s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[openvins_odom_tf_relay-12] [WARN] [1779725789.615528816] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725790.900957173] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725799.441366424] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-10] [WARN] [1779725799.443690663] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: fresh (0.09s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.05s); cam2 TF: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779725799.447333484] [pointcloud_fusion]: TF wait gate: not connected after 20s — head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725799.583897206] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725800.916264119] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725809.442151989] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.0s
+[pointcloud_fusion_node-10] [WARN] [1779725809.444115854] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: fresh (0.07s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.09s); cam2 TF: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779725809.447407621] [pointcloud_fusion]: TF wait gate: not connected after 30s — head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725809.586504910] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725810.892413140] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779725815.758489073] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(0.455, -0.782, -0.383), cov_trace=2.79e-02, pos_norm=0.982m, elapsed=36.2s, actual_imu_frame='arm_imu')
+[pointcloud_fusion_node-10] [WARN] [1779725817.443491006] [pointcloud_fusion]: TF tree connected via 'arm_d435i_arm_depth_optical_frame' — starting point cloud fusion (waited 38.0s since node startup)
+[pointcloud_fusion_node-10] [WARN] [1779725817.516607204] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779725817.938898827] [pointcloud_fusion]: TF tree is connected but first cloud batch had no successful transforms — retrying on next batch
+[openvins_odom_tf_relay-12] [WARN] [1779725819.589103948] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: OK (531 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779725819.644974020] [pointcloud_fusion]: Stats: published=4 (dual=0, cam1_only=17) dist_removed=355777 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:24} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779725819.899749776] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[wrist_driver_node-4] Traceback (most recent call last):
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/wrist_driver/wrist_driver_node", line 33, in <module>
+[wrist_driver_node-4]     sys.exit(load_entry_point('wrist-driver==0.1.0', 'console_scripts', 'wrist_driver_node')())
+[wrist_driver_node-4]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/python3.12/site-packages/wrist_driver/wrist_driver_node.py", line 163, in main
+[wrist_driver_node-4]     rclpy.spin(node)
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[wrist_driver_node-4]     executor.spin_once()
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[wrist_driver_node-4]     self._spin_once_impl(timeout_sec)
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[wrist_driver_node-4]     raise handler.exception()
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[wrist_driver_node-4]     result = coro.send(None)
+[wrist_driver_node-4]              ^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 592, in handler
+[wrist_driver_node-4]     await call_coroutine()
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 454, in _execute
+[wrist_driver_node-4]     await await_or_execute(tmr.callback)
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 115, in await_or_execute
+[wrist_driver_node-4]     return callback(*args)
+[wrist_driver_node-4]            ^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/python3.12/site-packages/wrist_driver/wrist_driver_node.py", line 145, in _publish_state
+[wrist_driver_node-4]     self.get_logger().throttle(
+[wrist_driver_node-4]     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4] AttributeError: 'RcutilsLogger' object has no attribute 'throttle'
+[ERROR] [wrist_driver_node-4]: process has died [pid 479, exit code 1, cmd '/prosthesis_ws/install/wrist_driver/lib/wrist_driver/wrist_driver_node --ros-args -r __node:=wrist_driver --params-file /tmp/launch_params_6iao9em1'].
+[mia_hand_driver_node-2] [INFO] [1779725825.289132359] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725826.700198813] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779725827.547453529] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725829.584979183] [openvins_odom_tf_relay]: [RELAY-STATUS] 50s elapsed — head: WAITING (0 msgs), arm: OK (2253 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779725829.802591532] [pointcloud_fusion]: Stats: published=53 (dual=0, cam1_only=65) dist_removed=2440127 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:66} last_publish_ago=0.3s
+[tf_pipeline_diagnostics-9] [WARN] [1779725829.893410612] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779725835.281243139] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725836.719866198] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779725837.612261914] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725839.585421888] [openvins_odom_tf_relay]: [RELAY-STATUS] 60s elapsed — head: WAITING (0 msgs), arm: OK (3821 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779725839.877298935] [pointcloud_fusion]: Stats: published=77 (dual=0, cam1_only=78) dist_removed=4894807 bbox_removed=13736 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:85} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779725839.899664883] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779725846.308482221] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779725847.658199716] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725849.585005188] [openvins_odom_tf_relay]: [RELAY-STATUS] 70s elapsed — head: WAITING (0 msgs), arm: OK (5574 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779725849.631648553] [pointcloud_fusion]: Stats: published=76 (dual=0, cam1_only=87) dist_removed=4957028 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:87} last_publish_ago=0.1s
+[mia_hand_driver_node-2] [INFO] [1779725849.706927733] [mia_hand_driver]: Mia Hand connected.
+[tf_pipeline_diagnostics-9] [WARN] [1779725849.883724778] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779725857.961578286] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725859.591232037] [openvins_odom_tf_relay]: [RELAY-STATUS] 80s elapsed — head: WAITING (0 msgs), arm: OK (7207 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725859.883448207] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725860.457760848] [pointcloud_fusion]: Stats: published=47 (dual=0, cam1_only=61) dist_removed=1389379 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:65} last_publish_ago=0.2s
+[mia_hand_driver_node-2] [INFO] [1779725864.289820555] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725865.674751896] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779725868.051669631] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725869.591039679] [openvins_odom_tf_relay]: [RELAY-STATUS] 90s elapsed — head: WAITING (0 msgs), arm: OK (8960 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725869.889792926] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725870.177386912] [pointcloud_fusion]: Stats: published=51 (dual=0, cam1_only=60) dist_removed=1878811 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:64} last_publish_ago=0.0s
+[pointcloud_fusion_node-10] [WARN] [1779725871.549141458] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.52s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779725872.922232151] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.1s > 2.0s), skipping
+[twist_propagation_node-14] [INFO] [1779725876.769262537] [twist_propagation]: Activated
+[pointcloud_fusion_node-10] [WARN] [1779725878.085523295] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (7.0s > 2.0s), skipping
+[pointcloud_fusion_node-10] [WARN] [1779725878.214156652] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725879.584839975] [openvins_odom_tf_relay]: [RELAY-STATUS] 100s elapsed — head: WAITING (0 msgs), arm: OK (10733 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725879.894554576] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725880.351749715] [pointcloud_fusion]: Stats: published=51 (dual=0, cam1_only=56) dist_removed=1741547 bbox_removed=0 bbox_skipped=77 bbox_cache_hits=22 tf_fail={head_d435i_head_depth_optical_frame:55} last_publish_ago=1.1s
+[pointcloud_fusion_node-10] [WARN] [1779725882.046791431] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779725883.160837648] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (12.0s > 2.0s), skipping
+[twist_propagation_node-14] [INFO] [1779725885.690269805] [twist_propagation]: Hit found at (0.043, 0.022, 0.027) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725885.691665341] [twist_propagation]: Published contact state: pos=(0.043, 0.022, 0.027) orient=(-0.810, 0.366, 0.368, 0.274) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725885.701730803] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725885.749672973] [twist_propagation]: Hit found at (0.102, 0.003, 0.022) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725885.750873011] [twist_propagation]: Published contact state: pos=(0.102, 0.003, 0.022) orient=(-0.812, 0.365, 0.365, 0.272) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725885.762944587] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725885.814808833] [twist_propagation]: Hit found at (0.102, -0.018, 0.023) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725885.818303223] [twist_propagation]: Published contact state: pos=(0.102, -0.018, 0.023) orient=(-0.815, 0.364, 0.362, 0.269) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725885.829888141] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725885.865097370] [twist_propagation]: Hit found at (0.102, -0.018, 0.023) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725885.873702718] [twist_propagation]: Published contact state: pos=(0.102, -0.018, 0.023) orient=(-0.820, 0.362, 0.358, 0.262) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725885.891505263] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725885.954701380] [twist_propagation]: Hit found at (0.123, -0.051, 0.020) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725885.956629259] [twist_propagation]: Published contact state: pos=(0.123, -0.051, 0.020) orient=(-0.824, 0.360, 0.354, 0.257) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725885.966799693] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.003931422] [twist_propagation]: Hit found at (0.153, -0.038, 0.020) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.005923768] [twist_propagation]: Published contact state: pos=(0.153, -0.038, 0.020) orient=(-0.825, 0.359, 0.353, 0.255) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.014651176] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.062265908] [twist_propagation]: Hit found at (0.153, -0.038, 0.020) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.064418755] [twist_propagation]: Published contact state: pos=(0.153, -0.038, 0.020) orient=(-0.827, 0.357, 0.352, 0.254) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.080965600] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.092286120] [twist_propagation]: Hit found at (0.162, -0.031, 0.022) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.095239110] [twist_propagation]: Published contact state: pos=(0.162, -0.031, 0.022) orient=(-0.831, 0.356, 0.346, 0.251) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.162760515] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.218893801] [twist_propagation]: Hit found at (0.162, -0.031, 0.022) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.220434985] [twist_propagation]: Published contact state: pos=(0.162, -0.031, 0.022) orient=(-0.834, 0.355, 0.344, 0.247) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.228956187] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.245666548] [twist_propagation]: Hit found at (0.123, -0.051, 0.020) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.248023077] [twist_propagation]: Published contact state: pos=(0.123, -0.051, 0.020) orient=(-0.836, 0.356, 0.341, 0.240) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.257284853] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.267173668] [twist_propagation]: Hit found at (0.123, -0.051, 0.020) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.269843210] [twist_propagation]: Published contact state: pos=(0.123, -0.051, 0.020) orient=(-0.836, 0.356, 0.341, 0.240) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.286180870] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.307603651] [twist_propagation]: Hit found at (0.123, -0.051, 0.020) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.311942318] [twist_propagation]: Published contact state: pos=(0.123, -0.051, 0.020) orient=(-0.837, 0.356, 0.341, 0.239) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.326871980] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.377980806] [twist_propagation]: Hit found at (0.102, -0.077, 0.022) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.385785462] [twist_propagation]: Published contact state: pos=(0.102, -0.077, 0.022) orient=(-0.838, 0.355, 0.339, 0.237) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.403439944] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.460416427] [twist_propagation]: Hit found at (0.101, -0.066, 0.024) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.463380933] [twist_propagation]: Published contact state: pos=(0.101, -0.066, 0.024) orient=(-0.838, 0.356, 0.339, 0.237) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.472621003] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.488938455] [twist_propagation]: Hit found at (0.101, -0.066, 0.024) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.492354340] [twist_propagation]: Published contact state: pos=(0.101, -0.066, 0.024) orient=(-0.839, 0.355, 0.338, 0.237) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.506315565] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.531756896] [twist_propagation]: Hit found at (0.121, -0.051, 0.023) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.538973238] [twist_propagation]: Published contact state: pos=(0.121, -0.051, 0.023) orient=(-0.838, 0.356, 0.337, 0.237) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.551552990] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725886.729162894] [twist_propagation]: Hit found at (0.161, -0.025, 0.013) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725886.731942339] [twist_propagation]: Published contact state: pos=(0.161, -0.025, 0.013) orient=(-0.832, 0.363, 0.347, 0.238) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725886.744337004] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725888.287512411] [twist_propagation]: Hit found at (0.141, -0.051, 0.064) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725888.289197026] [twist_propagation]: Published contact state: pos=(0.141, -0.051, 0.064) orient=(-0.803, 0.372, 0.379, 0.271) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725888.303038399] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725888.326294943] [twist_propagation]: Hit found at (0.141, -0.051, 0.064) in frame 'marker_map'
+[pointcloud_fusion_node-10] [WARN] [1779725888.329572193] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[twist_propagation_node-14] [INFO] [1779725888.330973740] [twist_propagation]: Published contact state: pos=(0.141, -0.051, 0.064) orient=(-0.804, 0.371, 0.377, 0.270) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725888.341621936] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725888.376744323] [twist_propagation]: Hit found at (0.141, -0.051, 0.064) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725888.378532867] [twist_propagation]: Published contact state: pos=(0.141, -0.051, 0.064) orient=(-0.810, 0.368, 0.368, 0.270) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725888.393194811] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725888.493850296] [twist_propagation]: Hit found at (0.060, -0.010, 0.060) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725888.495039258] [twist_propagation]: Published contact state: pos=(0.060, -0.010, 0.060) orient=(-0.814, 0.371, 0.359, 0.265) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725888.502138157] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725888.542612801] [twist_propagation]: Hit found at (0.083, -0.057, 0.052) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725888.549850654] [twist_propagation]: Published contact state: pos=(0.083, -0.057, 0.052) orient=(-0.814, 0.373, 0.357, 0.264) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725888.571396343] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725888.599588014] [twist_propagation]: Hit found at (0.083, -0.057, 0.052) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725888.606602222] [twist_propagation]: Published contact state: pos=(0.083, -0.057, 0.052) orient=(-0.816, 0.375, 0.350, 0.267) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725888.617596079] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725888.666019095] [twist_propagation]: Hit found at (0.082, -0.077, 0.064) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725888.670523499] [twist_propagation]: Published contact state: pos=(0.082, -0.077, 0.064) orient=(-0.817, 0.374, 0.348, 0.266) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725888.689934622] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725888.712323805] [twist_propagation]: Hit found at (0.122, -0.058, 0.062) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725888.714437407] [twist_propagation]: Published contact state: pos=(0.122, -0.058, 0.062) orient=(-0.824, 0.371, 0.339, 0.261) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725888.733102142] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[openvins_odom_tf_relay-12] [WARN] [1779725889.587686608] [openvins_odom_tf_relay]: [RELAY-STATUS] 110s elapsed — head: WAITING (0 msgs), arm: OK (12521 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779725889.832805936] [pointcloud_fusion]: Stats: published=59 (dual=0, cam1_only=52) dist_removed=2412103 bbox_removed=0 bbox_skipped=35 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:40, head_d435i_head_depth_optical_frame:99} last_publish_ago=0.1s
+[tf_pipeline_diagnostics-9] [WARN] [1779725889.899452376] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[twist_propagation_node-14] [INFO] [1779725890.603385063] [twist_propagation]: Hit found at (0.222, 0.038, 0.062) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725890.604544619] [twist_propagation]: Published contact state: pos=(0.222, 0.038, 0.062) orient=(-0.781, 0.363, 0.439, 0.256) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725890.611712656] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[mia_hand_driver_node-2] [INFO] [1779725892.277635719] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725893.814836342] [mia_hand_driver]: Mia Hand connected.
+[twist_propagation_node-14] [INFO] [1779725897.179145610] [twist_propagation]: Hit found at (0.042, 0.098, -0.089) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.181837668] [twist_propagation]: Published contact state: pos=(0.042, 0.098, -0.089) orient=(-0.862, 0.394, 0.195, 0.253) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.197697765] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.293907156] [twist_propagation]: Hit found at (0.098, 0.163, -0.077) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.297485295] [twist_propagation]: Published contact state: pos=(0.098, 0.163, -0.077) orient=(-0.858, 0.403, 0.190, 0.255) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.309386823] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.382538374] [twist_propagation]: Hit found at (0.063, 0.113, -0.086) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.385133761] [twist_propagation]: Published contact state: pos=(0.063, 0.113, -0.086) orient=(-0.854, 0.408, 0.192, 0.260) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.395523372] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.454285248] [twist_propagation]: Hit found at (0.054, 0.200, -0.060) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.456277649] [twist_propagation]: Published contact state: pos=(0.054, 0.200, -0.060) orient=(-0.842, 0.421, 0.197, 0.274) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.469288281] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.510987213] [twist_propagation]: Hit found at (0.054, 0.200, -0.060) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.513435374] [twist_propagation]: Published contact state: pos=(0.054, 0.200, -0.060) orient=(-0.834, 0.428, 0.199, 0.285) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.523094571] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.589019363] [twist_propagation]: Hit found at (0.021, 0.141, -0.065) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.593128323] [twist_propagation]: Published contact state: pos=(0.021, 0.141, -0.065) orient=(-0.833, 0.429, 0.199, 0.288) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.604678426] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.636133628] [twist_propagation]: Hit found at (0.002, 0.103, -0.067) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.641953725] [twist_propagation]: Published contact state: pos=(0.002, 0.103, -0.067) orient=(-0.838, 0.420, 0.201, 0.285) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.654781017] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.694832650] [twist_propagation]: Hit found at (-0.038, 0.113, -0.059) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.698761177] [twist_propagation]: Published contact state: pos=(-0.038, 0.113, -0.059) orient=(-0.841, 0.414, 0.204, 0.282) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.710232839] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.743570929] [twist_propagation]: Hit found at (0.002, 0.103, -0.067) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.746308717] [twist_propagation]: Published contact state: pos=(0.002, 0.103, -0.067) orient=(-0.842, 0.412, 0.206, 0.279) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.772796778] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725897.810815201] [twist_propagation]: Hit found at (0.042, 0.088, -0.074) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725897.816534564] [twist_propagation]: Published contact state: pos=(0.042, 0.088, -0.074) orient=(-0.841, 0.414, 0.208, 0.279) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725897.842709979] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[pointcloud_fusion_node-10] [WARN] [1779725898.346338925] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779725898.739354914] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.75s) — fresh lookup failed
+[openvins_odom_tf_relay-12] [WARN] [1779725899.582713115] [openvins_odom_tf_relay]: [RELAY-STATUS] 120s elapsed — head: WAITING (0 msgs), arm: OK (14321 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725899.894506941] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[twist_propagation_node-14] [INFO] [1779725899.913108117] [twist_propagation]: Hit found at (-0.059, 0.184, -0.099) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725899.914738433] [twist_propagation]: Published contact state: pos=(-0.059, 0.184, -0.099) orient=(-0.810, 0.434, 0.258, 0.298) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725899.930990161] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725899.981008306] [twist_propagation]: Hit found at (-0.059, 0.184, -0.099) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725899.983059772] [twist_propagation]: Published contact state: pos=(-0.059, 0.184, -0.099) orient=(-0.813, 0.431, 0.258, 0.295) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725899.995817937] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725900.021620265] [twist_propagation]: Hit found at (-0.059, 0.184, -0.099) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725900.027027326] [twist_propagation]: Published contact state: pos=(-0.059, 0.184, -0.099) orient=(-0.820, 0.422, 0.261, 0.286) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725900.043203783] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725900.092963038] [twist_propagation]: Hit found at (-0.057, 0.142, -0.113) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725900.095051818] [twist_propagation]: Published contact state: pos=(-0.057, 0.142, -0.113) orient=(-0.821, 0.421, 0.261, 0.284) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725900.106366818] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725900.160092208] [twist_propagation]: Hit found at (-0.018, 0.123, -0.126) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725900.162830936] [twist_propagation]: Published contact state: pos=(-0.018, 0.123, -0.126) orient=(-0.828, 0.412, 0.262, 0.274) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725900.175116194] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725900.206689918] [twist_propagation]: Hit found at (0.002, 0.098, -0.136) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725900.210683665] [twist_propagation]: Published contact state: pos=(0.002, 0.098, -0.136) orient=(-0.835, 0.404, 0.261, 0.268) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725900.223932272] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725900.254186807] [twist_propagation]: Hit found at (0.002, 0.142, -0.126) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725900.255694162] [twist_propagation]: Published contact state: pos=(0.002, 0.142, -0.126) orient=(-0.836, 0.403, 0.262, 0.266) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725900.267783187] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725900.306699204] [twist_propagation]: Hit found at (-0.019, 0.192, -0.099) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725900.310742727] [twist_propagation]: Published contact state: pos=(-0.019, 0.192, -0.099) orient=(-0.839, 0.399, 0.267, 0.256) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725900.323820278] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725900.365577716] [twist_propagation]: Hit found at (0.021, 0.192, -0.116) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725900.368340540] [twist_propagation]: Published contact state: pos=(0.021, 0.192, -0.116) orient=(-0.839, 0.399, 0.271, 0.252) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725900.388082371] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725900.522640686] [twist_propagation]: Hit found at (0.100, 0.172, -0.126) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725900.524162975] [twist_propagation]: Published contact state: pos=(0.100, 0.172, -0.126) orient=(-0.836, 0.399, 0.284, 0.247) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725900.548295077] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[pointcloud_fusion_node-10] [INFO] [1779725901.025082623] [pointcloud_fusion]: Stats: published=67 (dual=0, cam1_only=77) dist_removed=2745195 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=11 tf_fail={head_d435i_head_depth_optical_frame:80} last_publish_ago=0.9s
+[pointcloud_fusion_node-10] [ERROR] [1779725901.980468604] [pointcloud_fusion]: Bbox removal success rate is 70% over 31s (281/400 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[twist_propagation_node-14] [INFO] [1779725904.390418127] [twist_propagation]: Hit found at (0.102, 0.102, -0.008) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725904.391912008] [twist_propagation]: Published contact state: pos=(0.102, 0.102, -0.008) orient=(-0.813, 0.443, 0.249, 0.284) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725904.438492154] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725904.538533554] [twist_propagation]: Hit found at (0.022, 0.021, -0.025) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725904.544341160] [twist_propagation]: Published contact state: pos=(0.022, 0.021, -0.025) orient=(-0.816, 0.437, 0.253, 0.281) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725904.557330739] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725904.655092084] [twist_propagation]: Hit found at (0.062, 0.062, 0.078) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725904.657139030] [twist_propagation]: Published contact state: pos=(0.062, 0.062, 0.078) orient=(-0.819, 0.426, 0.270, 0.273) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725904.671578036] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725904.753398056] [twist_propagation]: Hit found at (0.023, 0.005, -0.026) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725904.758114907] [twist_propagation]: Published contact state: pos=(0.023, 0.005, -0.026) orient=(-0.824, 0.417, 0.274, 0.268) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725904.774588439] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725904.829647876] [twist_propagation]: Hit found at (0.102, 0.003, -0.052) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725904.833814329] [twist_propagation]: Published contact state: pos=(0.102, 0.003, -0.052) orient=(-0.854, 0.389, 0.243, 0.246) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725904.854695944] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725904.890990229] [twist_propagation]: Hit found at (0.102, 0.003, -0.052) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725904.891870834] [twist_propagation]: Published contact state: pos=(0.102, 0.003, -0.052) orient=(-0.864, 0.384, 0.221, 0.237) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725904.905302466] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725904.968750981] [twist_propagation]: Hit found at (0.023, 0.043, -0.051) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725904.971093298] [twist_propagation]: Published contact state: pos=(0.023, 0.043, -0.051) orient=(-0.867, 0.382, 0.221, 0.232) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725904.988036916] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725905.106288846] [twist_propagation]: Hit found at (0.082, 0.043, -0.050) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725905.107808006] [twist_propagation]: Published contact state: pos=(0.082, 0.043, -0.050) orient=(-0.864, 0.382, 0.236, 0.229) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725905.121482267] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725905.159324024] [twist_propagation]: Hit found at (0.082, 0.022, -0.052) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725905.161046584] [twist_propagation]: Published contact state: pos=(0.082, 0.022, -0.052) orient=(-0.864, 0.381, 0.236, 0.229) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725905.177208624] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [INFO] [1779725906.006776095] [twist_propagation]: Hit found at (0.202, 0.053, -0.017) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779725906.009325463] [twist_propagation]: Published contact state: pos=(0.202, 0.053, -0.017) orient=(-0.866, 0.379, 0.237, 0.222) zero_twist
+[twist_propagation_node-14] [ERROR] [1779725906.019575567] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1482, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1715, in _run_idle_cycle
+[twist_propagation_node-14]     if not self._hit_detected:
+[twist_propagation_node-14]            ^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_hit_detected'
+[twist_propagation_node-14]
+[pointcloud_fusion_node-10] [WARN] [1779725908.443520647] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779725909.476753107] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.45s) — fresh lookup failed
+[openvins_odom_tf_relay-12] [WARN] [1779725909.583233941] [openvins_odom_tf_relay]: [RELAY-STATUS] 130s elapsed — head: WAITING (0 msgs), arm: OK (16091 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779725909.686572518] [pointcloud_fusion]: Stats: published=65 (dual=0, cam1_only=56) dist_removed=1668057 bbox_removed=33 bbox_skipped=0 bbox_cache_hits=8 tf_fail={head_d435i_head_depth_optical_frame:59} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779725909.897315697] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779725918.663890507] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725919.582700345] [openvins_odom_tf_relay]: [RELAY-STATUS] 140s elapsed — head: WAITING (0 msgs), arm: OK (17736 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725919.885528557] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725920.139702365] [pointcloud_fusion]: Stats: published=85 (dual=0, cam1_only=90) dist_removed=5074128 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:91} last_publish_ago=0.0s
+[mia_hand_driver_node-2] [INFO] [1779725922.295168832] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725923.710381883] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779725927.292794105] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779725928.855168777] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725929.583219799] [openvins_odom_tf_relay]: [RELAY-STATUS] 150s elapsed — head: WAITING (0 msgs), arm: OK (19445 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779725929.677176397] [pointcloud_fusion]: Stats: published=67 (dual=0, cam1_only=66) dist_removed=3525110 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:73} last_publish_ago=0.2s
+[tf_pipeline_diagnostics-9] [WARN] [1779725929.885032595] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779725930.748437707] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779725931.295536830] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725932.722297813] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779725934.284065482] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779725934.692377994] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779725935.019086747] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.65s) — fresh lookup failed
+[mia_hand_driver_node-2] [INFO] [1779725935.721263824] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779725939.175883814] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725939.585304980] [openvins_odom_tf_relay]: [RELAY-STATUS] 160s elapsed — head: WAITING (0 msgs), arm: OK (21144 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725939.883390923] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725940.016382677] [pointcloud_fusion]: Stats: published=67 (dual=0, cam1_only=62) dist_removed=2961990 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=5 tf_fail={arm_d435i_arm_depth_optical_frame:13, head_d435i_head_depth_optical_frame:75} last_publish_ago=0.0s
+[mia_hand_driver_node-2] [INFO] [1779725940.324936402] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725942.722316313] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779725944.285680348] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725946.705311088] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779725947.191055357] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.53s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779725948.873259278] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.0s > 2.0s), skipping
+[pointcloud_fusion_node-10] [WARN] [1779725949.380981076] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725949.584964668] [openvins_odom_tf_relay]: [RELAY-STATUS] 170s elapsed — head: WAITING (0 msgs), arm: OK (22792 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725949.919650033] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725951.428512257] [pointcloud_fusion]: Stats: published=59 (dual=0, cam1_only=79) dist_removed=3733140 bbox_removed=0 bbox_skipped=9 bbox_cache_hits=24 tf_fail={head_d435i_head_depth_optical_frame:74} last_publish_ago=0.0s
+[mia_hand_driver_node-2] [INFO] [1779725955.285824892] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725956.776399248] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779725959.471115653] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779725959.586100301] [openvins_odom_tf_relay]: [RELAY-STATUS] 180s elapsed — head: WAITING (0 msgs), arm: OK (24537 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779725959.881864820] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779725960.144748528] [pointcloud_fusion]: Stats: published=62 (dual=0, cam1_only=55) dist_removed=2619412 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:63} last_publish_ago=0.2s
+[openvins_odom_tf_relay-12] [WARN] [1779725969.586536162] [openvins_odom_tf_relay]: [RELAY-STATUS] 190s elapsed — head: WAITING (0 msgs), arm: OK (26259 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779725969.616106698] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779725969.647977826] [pointcloud_fusion]: Stats: published=73 (dual=0, cam1_only=66) dist_removed=3524496 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:74} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779725969.897686346] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779725976.290061746] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779725976.755477306] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779725976.995705799] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.62s) — fresh lookup failed
+[mia_hand_driver_node-2] [INFO] [1779725977.695259211] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779725979.583670334] [openvins_odom_tf_relay]: [RELAY-STATUS] 200s elapsed — head: WAITING (0 msgs), arm: OK (27989 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779725979.729450642] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779725979.744763306] [pointcloud_fusion]: Stats: published=64 (dual=0, cam1_only=66) dist_removed=3144556 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=3 tf_fail={arm_d435i_arm_depth_optical_frame:9, head_d435i_head_depth_optical_frame:77} last_publish_ago=0.2s
+[tf_pipeline_diagnostics-9] [WARN] [1779725979.886279631] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779725982.287428120] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779725983.815111384] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779725988.218439208] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779725988.565997178] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.70s) — fresh lookup failed
+[openvins_odom_tf_relay-12] [WARN] [1779725989.583437314] [openvins_odom_tf_relay]: [RELAY-STATUS] 210s elapsed — head: WAITING (0 msgs), arm: OK (29657 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779725989.755834000] [pointcloud_fusion]: Stats: published=65 (dual=0, cam1_only=57) dist_removed=2730464 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=12 tf_fail={arm_d435i_arm_depth_optical_frame:21, head_d435i_head_depth_optical_frame:75} last_publish_ago=0.1s
+[tf_pipeline_diagnostics-9] [WARN] [1779725989.887808447] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779725990.188839218] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.

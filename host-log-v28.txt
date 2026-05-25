@@ -1,0 +1,2236 @@
+   multiview_prosthesis >  make run
+cd docker && podman-compose -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis segmentation-cpu
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+ ** merged:
+ {
+  "services": {
+    "prosthesis": {
+      "container_name": "prosthesis",
+      "image": "prosthesis:latest",
+      "build": {
+        "context": "..",
+        "dockerfile": "docker/Dockerfile",
+        "target": "base",
+        "args": {
+          "USER_UID": "1000",
+          "USER_GID": "1000"
+        }
+      },
+      "environment": {
+        "DISPLAY": ":0",
+        "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp",
+        "CYCLONEDDS_URI": "/tmp/cyclonedds_peer.xml",
+        "ROS_DOMAIN_ID": "0",
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all"
+      },
+      "network_mode": "host",
+      "userns_mode": "keep-id",
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro",
+        "../config/chrony-host.conf:/tmp/chrony-host.conf:ro",
+        "../src:/prosthesis_ws/src:rw",
+        "../config:/prosthesis_ws/config:rw",
+        "../rviz:/prosthesis_ws/rviz:rw",
+        "../scripts:/prosthesis_ws/scripts:rw",
+        "../tests:/prosthesis_ws/tests:rw",
+        "../Makefile.workspace:/prosthesis_ws/Makefile:ro",
+        "prosthesis-build:/prosthesis_ws/build",
+        "prosthesis-install:/prosthesis_ws/install",
+        "prosthesis-log:/prosthesis_ws/log"
+      ],
+      "privileged": true,
+      "ipc": "host",
+      "stdin_open": true,
+      "tty": true,
+      "group_add": [
+        "keep-groups"
+      ]
+    },
+    "segmentation-cuda": {
+      "container_name": "segmentation-cuda",
+      "image": "segmentation:cuda",
+      "build": {
+        "context": "../src/segmentation",
+        "dockerfile": "../../docker/Dockerfile.segmentation",
+        "args": {
+          "BACKEND": "cuda"
+        }
+      },
+      "environment": {
+        "INFERENCE_SERVER_PORT": "5678",
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        "exec python /nodes/inference_server.py"
+      ],
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "/home/daniel/prosthesis_data/weights:/weights:rw"
+      ],
+      "network_mode": "host",
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')\""
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 5,
+        "start_period": "120s"
+      },
+      "profiles": [
+        "segmentation-cuda"
+      ],
+      "privileged": true,
+      "userns_mode": "keep-id"
+    },
+    "segmentation-cpu": {
+      "container_name": "segmentation-cpu",
+      "image": "segmentation:cpu",
+      "build": {
+        "context": "../src/segmentation",
+        "dockerfile": "../../docker/Dockerfile.segmentation",
+        "args": {
+          "BACKEND": "cpu"
+        }
+      },
+      "environment": {
+        "INFERENCE_SERVER_PORT": "5678"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        "exec python /nodes/inference_server.py"
+      ],
+      "volumes": [
+        "/tmp/.X11-unix:/tmp/.X11-unix:rw",
+        "/home/daniel/prosthesis_data/weights:/weights:rw"
+      ],
+      "network_mode": "host",
+      "restart": "unless-stopped",
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5678/health')\""
+        ],
+        "interval": "10s",
+        "timeout": "5s",
+        "retries": 5,
+        "start_period": "120s"
+      },
+      "profiles": [
+        "segmentation-cpu"
+      ],
+      "privileged": true,
+      "userns_mode": "keep-id"
+    },
+    "test": {
+      "container_name": "test",
+      "build": {
+        "context": "..",
+        "dockerfile": "docker/Dockerfile",
+        "target": "production",
+        "args": {
+          "USER_UID": "1000",
+          "USER_GID": "1000"
+        }
+      },
+      "user": "1000:1000",
+      "userns_mode": "keep-id",
+      "environment": {
+        "RMW_IMPLEMENTATION": "rmw_cyclonedds_cpp",
+        "ROS_DOMAIN_ID": "0",
+        "GRASP_CONFIG_PATH": "/prosthesis_ws/config/grasp_preshaping.yaml"
+      },
+      "command": [
+        "/bin/bash",
+        "-c",
+        ". /opt/ros/jazzy/setup.sh && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && /prosthesis_ws/scripts/run_tests.sh"
+      ],
+      "profiles": [
+        "test"
+      ],
+      "network_mode": "host",
+      "volumes": [
+        "../tests:/prosthesis_ws/tests:rw"
+      ]
+    }
+  },
+  "volumes": {
+    "prosthesis-build": null,
+    "prosthesis-install": null,
+    "prosthesis-log": null
+  },
+  "_dirname": "/home/daniel/multiview_prosthesis/docker"
+}
+** excluding:  {'segmentation-cuda', 'test'}
+['podman', 'inspect', '-t', 'image', '-f', '{{.Id}}', 'prosthesis:latest']
+['podman', 'inspect', '-t', 'image', '-f', '{{.Id}}', 'segmentation:cpu']
+['podman', 'ps', '--filter', 'label=io.podman.compose.project=docker', '-a', '--format', '{{ index .Labels "io.podman.compose.config-hash"}}']
+podman volume inspect docker_prosthesis-build || podman volume create docker_prosthesis-build
+['podman', 'volume', 'inspect', 'docker_prosthesis-build']
+podman volume inspect docker_prosthesis-install || podman volume create docker_prosthesis-install
+['podman', 'volume', 'inspect', 'docker_prosthesis-install']
+podman volume inspect docker_prosthesis-log || podman volume create docker_prosthesis-log
+['podman', 'volume', 'inspect', 'docker_prosthesis-log']
+podman run --name=prosthesis -d --label io.podman.compose.config-hash=b935b1fd84bc7c871918e546a6af97dde7fbd3e8b0007ebacfd8ba3b0341e041 --label io.podman.compose.project=docker --label io.podman.compose.version=1.0.6 --label PODMAN_SYSTEMD_UNIT=podman-compose@docker.service --label com.docker.compose.project=docker --label com.docker.compose.project.working_dir=/home/daniel/multiview_prosthesis/docker --label com.docker.compose.project.config_files=docker-compose.yml,docker-compose.hw.yml --label com.docker.compose.container-number=1 --label com.docker.compose.service=prosthesis --group-add keep-groups -e DISPLAY=:0 -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml -e ROS_DOMAIN_ID=0 -e NVIDIA_VISIBLE_DEVICES=all -e NVIDIA_DRIVER_CAPABILITIES=all -v /tmp/.X11-unix:/tmp/.X11-unix:rw -v /home/daniel/multiview_prosthesis/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro -v /home/daniel/multiview_prosthesis/config/chrony-host.conf:/tmp/chrony-host.conf:ro -v /home/daniel/multiview_prosthesis/src:/prosthesis_ws/src:rw -v /home/daniel/multiview_prosthesis/config:/prosthesis_ws/config:rw -v /home/daniel/multiview_prosthesis/rviz:/prosthesis_ws/rviz:rw -v /home/daniel/multiview_prosthesis/scripts:/prosthesis_ws/scripts:rw -v /home/daniel/multiview_prosthesis/tests:/prosthesis_ws/tests:rw -v /home/daniel/multiview_prosthesis/Makefile.workspace:/prosthesis_ws/Makefile:ro -v docker_prosthesis-build:/prosthesis_ws/build -v docker_prosthesis-install:/prosthesis_ws/install -v docker_prosthesis-log:/prosthesis_ws/log --network host --userns keep-id -i --tty --privileged prosthesis:latest
+Error: creating container storage: the container name "prosthesis" is already in use by c9bfe8496c8f5b758d5d3101815df5e5bca3bfe89837ef14c3b89291429e9b00. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+exit code: 125
+podman start prosthesis
+exit code: 0
+** skipping:  segmentation-cuda
+podman run --name=segmentation-cpu -d --label io.podman.compose.config-hash=b935b1fd84bc7c871918e546a6af97dde7fbd3e8b0007ebacfd8ba3b0341e041 --label io.podman.compose.project=docker --label io.podman.compose.version=1.0.6 --label PODMAN_SYSTEMD_UNIT=podman-compose@docker.service --label com.docker.compose.project=docker --label com.docker.compose.project.working_dir=/home/daniel/multiview_prosthesis/docker --label com.docker.compose.project.config_files=docker-compose.yml,docker-compose.hw.yml --label com.docker.compose.container-number=1 --label com.docker.compose.service=segmentation-cpu -e INFERENCE_SERVER_PORT=5678 -v /tmp/.X11-unix:/tmp/.X11-unix:rw -v /home/daniel/prosthesis_data/weights:/weights:rw --network host --userns keep-id --privileged --restart unless-stopped --healthcheck-command /bin/sh -c 'python -c "import urllib.request; urllib.request.urlopen('"'"'http://127.0.0.1:5678/health'"'"')"' --healthcheck-interval 10s --healthcheck-timeout 5s --healthcheck-start-period 120s --healthcheck-retries 5 segmentation:cpu /bin/bash -c exec python /nodes/inference_server.py
+Error: creating container storage: the container name "segmentation-cpu" is already in use by 37d80120d4b61a149317e71b220f56fb551029180188413c9b3272605682e3b7. You have to remove that container to be able to reuse that name: that name is already in use, or use --replace to instruct Podman to do so.
+exit code: 125
+podman start segmentation-cpu
+exit code: 0
+** skipping:  test
+make timesync-check
+make[1]: Entering directory '/home/daniel/multiview_prosthesis'
+=== Robotlab Connectivity Check ===
+[OK] Host IP 10.42.0.1 is present on a WSL2 interface (mirrored networking active)
+Pinging Jetson at 10.42.0.2... [OK]
+Checking SSH connectivity... [OK] (key-based auth working)
+
+=== Connected ===
+SSH:  ssh robotlab@10.42.0.2
+Make: make jetson-cameras   (sync + start cameras + local RViz)
+=== Clock comparison ===
+Host time:   Mon May 25 19:19:23 CEST 2026
+Jetson time: Mon 25 May 19:19:23 CEST 2026
+
+=== Host chrony status ===
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+
+Reference ID    : 7F7F0101 ()
+Stratum         : 10
+Last offset     : +0.000000000 seconds
+RMS offset      : 0.000000000 seconds
+
+=== Jetson chrony status ===
+MS Name/IP address         Stratum Poll Reach LastRx Last sample
+===============================================================================
+^* 10.42.0.1                    10   4   377    15   +237us[ +289us] +/-  615us
+
+Reference ID    : 0A2A0001 (10.42.0.1)
+Stratum         : 11
+Last offset     : +0.000052406 seconds
+RMS offset      : 0.000021237 seconds
+make[1]: Leaving directory '/home/daniel/multiview_prosthesis'
+[detect-usb] MIA Hand found: /dev/ttyUSB1  (by-id serial FTBY495J)
+[detect-usb] Wrist Dynamixel found: /dev/ttyUSB0  (by-id serial FTAO4Z0Y)
+[host] Detected: MIA=/dev/ttyUSB1  WRIST=/dev/ttyUSB0
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+podman exec --interactive --tty --env DISPLAY=:0 --env RMW_IMPLEMENTATION=rmw_cyclonedds_cpp --env CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml --env ROS_DOMAIN_ID=0 --env NVIDIA_VISIBLE_DEVICES=all --env NVIDIA_DRIVER_CAPABILITIES=all --env MIA_SERIAL_PORT=/dev/ttyUSB1 --env WRIST_SERIAL_PORT=/dev/ttyUSB0 prosthesis /bin/bash -lc make setup-usb
+[setup-usb] Configuration:
+[setup-usb]   MIA_SERIAL_PORT  = /dev/ttyUSB1
+[setup-usb]   WRIST_SERIAL_PORT = /dev/ttyUSB0
+[setup-usb] Linked /dev/ttyUSB1 → /dev/ttyMiaHand, /dev/mia_hand
+[setup-usb] Linked /dev/ttyUSB0 → /dev/ttyDynamixel, /dev/wrist_motor
+[setup-usb] Done.
+[setup-usb] MIA Hand  = /dev/ttyMiaHand → /dev/ttyUSB1
+[setup-usb] Wrist     = /dev/ttyDynamixel → /dev/ttyUSB0
+exit code: 0
+podman-compose version: 1.0.6
+['podman', '--version', '']
+using podman version: 4.9.3
+podman exec --interactive --user prosthesis --tty --env DISPLAY=:0 --env RMW_IMPLEMENTATION=rmw_cyclonedds_cpp --env CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml --env ROS_DOMAIN_ID=0 --env NVIDIA_VISIBLE_DEVICES=all --env NVIDIA_DRIVER_CAPABILITIES=all prosthesis /bin/bash -lc make run
+Starting >>> mia_hand_msgs
+Starting >>> camera
+Starting >>> emg_bridge
+Starting >>> grasp_preshaping
+Starting >>> mia_hand_description
+Starting >>> pointcloud_fusion
+Starting >>> segmentation_bridge
+Starting >>> twist_propagation
+Starting >>> wrist_driver
+Starting >>> sensor_fusion_bringup
+Finished <<< mia_hand_description [2.38s]
+Finished <<< grasp_preshaping [2.41s]
+Finished <<< mia_hand_msgs [2.48s]
+Starting >>> mia_hand_driver
+Starting >>> command_bridge
+Starting >>> force_controller
+Starting >>> haptic_bridge
+Starting >>> pipeline_manager
+Finished <<< sensor_fusion_bringup [2.48s]
+Finished <<< mia_hand_driver [1.52s]
+Starting >>> mia_hand_ros2_control
+Finished <<< mia_hand_ros2_control [0.26s]
+Finished <<< pointcloud_fusion [4.83s]
+Finished <<< emg_bridge [4.88s]
+Finished <<< wrist_driver [4.85s]
+Finished <<< camera [4.93s]
+Finished <<< twist_propagation [4.89s]
+Finished <<< segmentation_bridge [4.92s]
+Finished <<< haptic_bridge [3.05s]
+Finished <<< command_bridge [3.10s]
+Finished <<< pipeline_manager [3.07s]
+Finished <<< force_controller [3.11s]
+Starting >>> prosthesis_launch
+Finished <<< prosthesis_launch [1.86s]
+
+Summary: 17 packages finished [7.72s]
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-25-17-19-36-207740-KingBob-6360
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [6782]
+[INFO] [mia_hand_driver_node-2]: process started with pid [6783]
+[INFO] [command_bridge_node-3]: process started with pid [6784]
+[INFO] [wrist_driver_node-4]: process started with pid [6785]
+[INFO] [run_classifier-5]: process started with pid [6786]
+[INFO] [emg_grasp_controller-6]: process started with pid [6787]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process started with pid [6788]
+[INFO] [camera_mount_tf_publisher-8]: process started with pid [6789]
+[INFO] [tf_pipeline_diagnostics-9]: process started with pid [6790]
+[INFO] [pointcloud_fusion_node-10]: process started with pid [6791]
+[INFO] [odom_to_pose_relay-11]: process started with pid [6792]
+[INFO] [openvins_odom_tf_relay-12]: process started with pid [6793]
+[INFO] [segmentation_ros2_node-13]: process started with pid [6794]
+[INFO] [twist_propagation_node-14]: process started with pid [6799]
+[INFO] [preshaping_service_bridge_node-15]: process started with pid [6800]
+[INFO] [grasp_proximity_controller_node.py-16]: process started with pid [6801]
+[INFO] [force_controller_node-17]: process started with pid [6802]
+[INFO] [rviz2-18]: process started with pid [6803]
+[preshaping_service_bridge_node-15] [INFO] [1779729576.585782988] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-15] [INFO] [1779729576.593184379] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-18] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[mia_hand_driver_node-2] [INFO] [1779729577.081921156] [mia_hand_driver]: /dev/ttyMiaHand serial port opened.
+[wrist_driver_node-4] [INFO] [1779729577.218944258] [wrist_driver]: Wrist motor connected on /dev/ttyDynamixel, ID=1
+[rviz2-18] [INFO] [1779729577.246776193] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779729577.247021560] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-18] [INFO] [1779729577.335180920] [rviz2]: Stereo is NOT SUPPORTED
+[emg_grasp_controller-6] [INFO] [1779729577.351851038] [emg_grasp_controller]: EMG grasp controller started — rate=20.0 Hz, stale_timeout=1.0s
+[rviz2-18] [INFO] [1779729577.455324013] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779729577.462279579] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779729577.482153028] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779729577.484955443] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[mia_hand_driver_node-2] [INFO] [1779729577.499635226] [mia_hand_driver]: Mia Hand connected.
+[rviz2-18] [INFO] [1779729577.661974439] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779729577.727100200] [rviz2]: Stereo is NOT SUPPORTED
+[pipeline_manager_node-1] [INFO] [1779729578.032401295] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1779729578.033330660] [pipeline_manager]: Pipeline manager started — state: IDLE
+[command_bridge_node-3] [INFO] [1779729578.209525378] [command_bridge]: Command bridge started — speed=80%, joint_states → /joint_states
+[tf_pipeline_diagnostics-9] [INFO] [1779729578.376839931] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[grasp_proximity_controller_node.py-16] [INFO] [1779729578.964982284] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[pipeline_manager_node-1] [INFO] [1779729579.036310292] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pointcloud_fusion_node-10] [INFO] [1779729579.135043669] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-10] [INFO] [1779729579.137619633] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-10] [INFO] [1779729579.166663970] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-10] [WARN] [1779729579.168878292] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [INFO] [1779729579.171469859] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-10] [INFO] [1779729579.173612151] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[force_controller_node-17] [INFO] [1779729579.343936172] [force_controller]: Force controller started. Target range: [50.0, 200.0] raw units, kp=0.01, ki=0.001, rate=10.0 Hz
+[segmentation_ros2_node-13] [INFO] [1779729579.508838537] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779729579.685401811] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779729579.686553518] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[camera_mount_tf_publisher-8] [INFO] [1779729579.754754239] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[run_classifier-5] [2026-05-25 17:19:39.755] [board_logger] [info] incoming json: {
+[run_classifier-5]     "file": "",
+[run_classifier-5]     "file_anc": "",
+[run_classifier-5]     "file_aux": "",
+[run_classifier-5]     "ip_address": "",
+[run_classifier-5]     "ip_address_anc": "",
+[run_classifier-5]     "ip_address_aux": "",
+[run_classifier-5]     "ip_port": 0,
+[run_classifier-5]     "ip_port_anc": 0,
+[run_classifier-5]     "ip_port_aux": 0,
+[run_classifier-5]     "ip_protocol": 0,
+[run_classifier-5]     "mac_address": "",
+[run_classifier-5]     "master_board": -100,
+[run_classifier-5]     "other_info": "",
+[run_classifier-5]     "serial_number": "",
+[run_classifier-5]     "serial_port": "",
+[run_classifier-5]     "timeout": 0
+[run_classifier-5] }
+[camera_mount_tf_publisher-8] [INFO] [1779729579.760419668] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[run_classifier-5] [2026-05-25 17:19:39.763] [board_logger] [info] Target address is set to : 192.168.4.1::4210
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779729579.795344041] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779729579.798942320] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779729579.799923456] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[twist_propagation_node-14] [INFO] [1779729579.859676776] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-14] [INFO] [1779729579.954849064] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-14] [INFO] [1779729579.958683703] [twist_propagation]: External twist source: /hand_twist (max_age=0.5s)
+[run_classifier-5] ROS 2 bridge active — publishing on /emg/* topics.
+[run_classifier-5]
+[run_classifier-5] ====================================================
+[run_classifier-5]     EMG Classifier — Live
+[run_classifier-5] ====================================================
+[run_classifier-5] Loading classifier from /app/models …
+[run_classifier-5] Models loaded.
+[run_classifier-5]
+[run_classifier-5] Connecting to MindRove WiFi board …
+[run_classifier-5] Connected!  500 Hz  8 channels
+[run_classifier-5]
+[run_classifier-5] Filling buffer …
+[run_classifier-5] Ready.
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 1.00
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 2)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 5)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 11)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 31)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 91)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 96)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 103)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 191)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[pointcloud_fusion_node-10] [INFO] [1779729599.173681502] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-10] [WARN] [1779729599.176025628] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: fresh (0.06s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_h                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 195)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 203)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 218)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████████···] 86%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:14%  POWER:0%  OPEN:86%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 222)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 237)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:1%  POWER:0%  OPEN:99%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 240)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:98%  POWER:0%  OPEN:2%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 250)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 252)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:97%  POWER:0%  OPEN:3%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 258)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 262)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 263)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 269)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 271)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 272)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 288)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 293)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:99%  POWER:0%  OPEN:1%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 295)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 330)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 73%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:27%  POWER:0%  OPEN:73%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 331)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 94%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:94%  POWER:0%  OPEN:6%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 339)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 345)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:2%  POWER:0%  OPEN:98%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 346)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 349)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:99%  POWER:0%  OPEN:1%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 374)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 393)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 395)
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 424)
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 474)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 493)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 494)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 495)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 571)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 78%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:22%  POWER:0%  OPEN:78%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 575)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 91%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:91%  POWER:0%  OPEN:9%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 576)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 592)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 595)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 611)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 618)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 619)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 640)
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 676)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 692)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 694)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 695)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 721)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 76%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:24%  POWER:0%  OPEN:76%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 751)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████████···] 80%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:80%  POWER:0%  OPEN:20%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 754)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 78%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:22%  POWER:0%  OPEN:78%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 755)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 762)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 777)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 791)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 792)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 794)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 812)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:98%  POWER:0%  OPEN:2%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 825)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 843)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 849)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 854)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████·····] 73%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:73%  FLEXION:0%  EXTENSION:27%
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : EXTENSION  (frame 878)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 885)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████·······] 57%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:57%  POWER:0%  OPEN:43%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 892)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 894)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 78%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 903)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 904)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 910)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 978)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 992)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 994)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1004)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████████] 100%
+[run_classifier-5]   Prop. ctrl: [▓▓▓▓▓░░░░░░░░░░░░░░░] 0.29
+[run_classifier-5]   REST:0%  POWER:100%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1005)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████████] 100%
+[run_classifier-5]   Prop. ctrl: [▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░] 0.61
+[run_classifier-5]   REST:0%  POWER:100%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[twist_propagation_node-14] [INFO] [1779729680.673985184] [twist_propagation]: Hit found at (0.724, 17.083, -17.192) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779729680.677170085] [twist_propagation]: Published contact state: pos=(0.724, 17.083, -17.192) orient=(-0.623, 0.757, 0.147, 0.133) zero_twist
+[twist_propagation_node-14] [INFO] [1779729680.681180759] [twist_propagation]: Hit detected — collision distance: 15.071m
+[twist_propagation_node-14] [INFO] [1779729680.690755989] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.724, 17.083, -17.192), r=[0.0050, 0.0300]m
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1006)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1007)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1009)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1013)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1030)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1037)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1041)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1079)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1092)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1093)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1094)
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1130)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [▓▓▓▓▓▓░░░░░░░░░░░░░░] 0.32
+[run_classifier-5]   REST:0%  POWER:100%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1139)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1140)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 89%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:89%  POWER:0%  OPEN:11%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1150)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1179)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1191)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1192)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1194)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1196)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[twist_propagation_node-14] [INFO] [1779729699.849882658] [twist_propagation]: Hit found at (0.524, 11.428, -11.407) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779729699.855169062] [twist_propagation]: Published contact state: pos=(0.524, 11.428, -11.407) orient=(-0.624, 0.756, 0.144, 0.132) zero_twist
+[twist_propagation_node-14] [INFO] [1779729699.856545835] [twist_propagation]: Hit detected — collision distance: 8.887m
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1197)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1209)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1279)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1282)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1291)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1294)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1333)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1349)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1353)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:1%  POWER:0%  OPEN:99%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1372)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 74%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:74%  POWER:0%  OPEN:26%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1380)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.1 Hz  |  Ctrl-C to quit
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1382)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1384)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 96%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:96%  POWER:0%  OPEN:4%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1391)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:99%  POWER:0%  OPEN:1%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1393)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1395)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1421)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1431)
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1439)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████······] 64%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:36%  POWER:0%  OPEN:64%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1445)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 76%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:76%  POWER:0%  OPEN:24%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1448)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:3%  POWER:0%  OPEN:97%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1449)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1452)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1461)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████·····] 72%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:28%  POWER:0%  OPEN:72%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1462)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:97%  POWER:0%  OPEN:3%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.1 Hz  |  Ctrl-C to quit
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1469)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████████···] 83%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:17%  POWER:0%  OPEN:83%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1470)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████████···] 86%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:86%  POWER:0%  OPEN:14%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1484)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1491)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1493)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1496)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1508)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1516)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1517)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1561)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████······] 62%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:38%  POWER:0%  OPEN:62%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1562)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████·······] 56%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:56%  POWER:0%  OPEN:44%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1574)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:1%  POWER:0%  OPEN:99%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1578)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:99%  POWER:0%  OPEN:1%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1584)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1591)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 92%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:92%  POWER:0%  OPEN:8%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1593)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1597)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████·······] 54%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:54%  POWER:0%  OPEN:46%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1625)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 90%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:10%  POWER:0%  OPEN:90%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1628)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1650)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1681)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1682)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1685)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1688)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1690)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1692)
+[run_classifier-5]   Mode     : NOT_GRASPING
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1693)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1702)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1714)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1715)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1719)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 90%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:10%  POWER:0%  OPEN:90%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1724)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:99%  POWER:0%  OPEN:1%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1734)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1739)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████······] 64%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:36%  POWER:0%  OPEN:64%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1750)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:3%  POWER:0%  OPEN:97%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.1 Hz  |  Ctrl-C to quit
+[wrist_driver_node-4] [WARN] [1779729755.274428600] [wrist_driver]: Dynamixel read failed (communication error): device reports readiness to read but returned no data (device disconnected or multiple access on port?)
+[wrist_driver_node-4] [WARN] [1779729755.279586729] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[wrist_driver_node-4] [WARN] [1779729755.282814552] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[wrist_driver_node-4] [WARN] [1779729755.289371845] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[wrist_driver_node-4] [WARN] [1779729755.291675839] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[wrist_driver_node-4] [WARN] [1779729755.294766066] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[wrist_driver_node-4] [WARN] [1779729755.296120633] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[wrist_driver_node-4] [WARN] [1779729755.297482887] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[wrist_driver_node-4] [WARN] [1779729755.298786356] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1751)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1752)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1753)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 89%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1754)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 90%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1755)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1756)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1757)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1758)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1759)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1760)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 96%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1761)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1762)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1763)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1764)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1765)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1766)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 90%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1767)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1768)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 95%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:95%  POWER:0%  OPEN:5%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.1 Hz  |  Ctrl-C to quit
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1769)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████·····] 67%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:67%  POWER:0%  OPEN:33%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1770)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████······] 65%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1771)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 73%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1772)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████·····] 73%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1773)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.1 Hz  |  Ctrl-C to quit
+[pipeline_manager_node-1] [INFO] [1779729757.583379854] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=2)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1774)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1775)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1776)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1777)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1778)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1779)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1780)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1781)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1782)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1783)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1784)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 77%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:77%  POWER:0%  OPEN:23%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1785)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████········] 53%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:53%  POWER:0%  OPEN:47%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1786)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1787)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1788)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1789)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[wrist_driver_node-4] [WARN] [1779729759.204203752] [wrist_driver]: Failed to set position: [TxRxResult] Po                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1790)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1791)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1792)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1793)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1794)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1795)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 92%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1796)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1797)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1798)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1799)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1800)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1801)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1802)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.03
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1803)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1804)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:97%  FLEXION:0%  EXTENSION:3%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1805)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1806)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1807)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1808)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1809)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1810)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1811)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████████···] 86%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1812)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████······] 63%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1813)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1814)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1815)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1816)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1817)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1818)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1819)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1820)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1821)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 91%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1822)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1823)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [▓▓▓░░░░░░░░░░░░░░░░░] 0.19
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1824)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1825)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1826)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.04
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1827)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1828)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1829)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1830)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1831)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 91%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1832)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1833)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1834)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████·······] 60%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:60%  POWER:0%  OPEN:40%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1835)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1836)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1837)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1838)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 77%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1839)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:1%  POWER:0%  OPEN:99%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1840)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1841)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1842)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1843)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████·······] 58%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1844)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████······] 63%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1845)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1846)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:99%  POWER:0%  OPEN:1%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.1 Hz  |  Ctrl-C to quit
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1847)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1848)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1849)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1850)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1851)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1852)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1853)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1854)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1855)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1856)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1857)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1858)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1859)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1860)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1861)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1862)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1863)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1864)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████········] 51%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:48%  POWER:0%  OPEN:51%  FLEXION:0%  EXTENSION:1%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1865)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1866)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1867)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[wrist_driver_node-4] [WARN] [1779729766.990533009] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[pipeline_manager_node-1] [INFO] [1779729767.030207164] [pipeline_manager]: State: IDLE -> TWISTING (EMG: gesture=2)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1868)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1869)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1870)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1871)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[pipeline_manager_node-1] [INFO] [1779729767.431519514] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1872)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1873)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1874)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1875)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1876)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1877)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1878)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1879)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1880)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1881)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [█████████████··] 89%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1882)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1883)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:98%  POWER:0%  OPEN:2%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1884)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1885)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 94%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1886)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:1%  POWER:0%  OPEN:99%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[wrist_driver_node-4] [WARN] [1779729768.888711331] [wrist_driver]: Failed to set position: [TxRxResult] Po                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1887)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1888)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1889)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1890)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████████···] 82%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:82%  POWER:0%  OPEN:18%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.1 Hz  |  Ctrl-C to quit
+[wrist_driver_node-4] [WARN] [1779729769.287755045] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+[pointcloud_fusion_node-10] [INFO] [1779729769.294881427] [pointcloud_fusion]: Stats: published=99 (dual=0, cam1_only=119) dist_removed=10760979 bbox_removed=6439 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1891)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████·······] 55%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1892)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 94%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:94%  POWER:0%  OPEN:6%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1893)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1894)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1895)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1896)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1897)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1898)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1899)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████████···] 81%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:81%  POWER:0%  OPEN:19%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1900)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1901)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 98%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1902)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:100%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1903)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : POWER  (frame 1904)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1908)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1909)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1910)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1911)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1912)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1913)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:0%  POWER:0%  OPEN:100%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1914)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1915)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████████···] 84%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1916)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [████████·······] 53%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1917)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [███████████····] 78%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1918)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1919)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1923)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1924)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1925)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : OPEN  (frame 1926)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1927)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.1 Hz  |  Ctrl-C to quit
+[pipeline_manager_node-1] [INFO] [1779729773.031936017] [pipeline_manager]: State: TWISTING -> IDLE (EMG: abort gesture=0)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1928)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1929)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1930)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 99%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1931)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1932)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1933)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1934)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1935)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1936)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1937)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1938)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1939)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1940)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1941)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1942)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1943)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 97%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1944)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1945)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1946)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1947)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1948)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1949)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1950)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1951)
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1952)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1953)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1954)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1955)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1956)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1957)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1958)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1959)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1960)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1961)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1962)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1963)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1964)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1965)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1966)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1967)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1968)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1969)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1970)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1971)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1972)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1973)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1974)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1975)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1976)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1977)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1978)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1979)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1980)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1981)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1982)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1983)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1984)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1985)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1986)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1987)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1988)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1989)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1990)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[wrist_driver_node-4] [WARN] [1779729779.337995456] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+                   ────────────────────────────────────────────────────
+[run_classifier-5]   Gesture  : REST  (frame 1991)
+[run_classifier-5]   Mode     : NOT_GRASPING
+[run_classifier-5]   Confidence: [██████████████·] 100%
+[run_classifier-5]   Prop. ctrl: [░░░░░░░░░░░░░░░░░░░░] 0.00
+[run_classifier-5]   REST:100%  POWER:0%  OPEN:0%  FLEXION:0%  EXTENSION:0%
+[run_classifier-5] ────────────────────────────────────────────────────
+[run_classifier-5]   10.0 Hz  |  Ctrl-C to quit
+[wrist_driver_node-4] [WARN] [1779729779.442845200] [wrist_driver]: Failed to set position: [TxRxResult] Port is in use!
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[rviz2-18] [INFO] [1779729779.465975644] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[preshaping_service_bridge_node-15] [INFO] [1779729779.468052368] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[tf_pipeline_diagnostics-9] Traceback (most recent call last):
+[tf_pipeline_diagnostics-9]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-9]     main()
+[tf_pipeline_diagnostics-9]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 143, in main
+[tf_pipeline_diagnostics-9]     rclpy.spin(node)
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[tf_pipeline_diagnostics-9]     executor.spin_once()
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[tf_pipeline_diagnostics-9]     self._spin_once_impl(timeout_sec)
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[tf_pipeline_diagnostics-9]     raise handler.exception()
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[tf_pipeline_diagnostics-9]     result = coro.send(None)
+[tf_pipeline_diagnostics-9]              ^^^^^^^^^^^^^^^
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 584, in handler
+[tf_pipeline_diagnostics-9]     call_coroutine = take_from_wait_list(entity)
+[tf_pipeline_diagnostics-9]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[tf_pipeline_diagnostics-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 470, in _take_subscription
+[tf_pipeline_diagnostics-9]     msg_info = sub.handle.take_message(sub.msg_type, sub.raw)
+[tf_pipeline_diagnostics-9]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[tf_pipeline_diagnostics-9] RuntimeError: Unable to convert call argument '0' to Python object (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)
+[mia_hand_driver_node-2] [INFO] [1779729779.487118124] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[run_classifier-5] [2026-05-25 17:22:59.494] [board_logger] [info] Releasing board ...
+[segmentation_ros2_node-13] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py:604: RuntimeWarning: coroutine 'Executor._make_handler.<locals>.handler' was never awaited
+[segmentation_ros2_node-13]   task = Task(
+[segmentation_ros2_node-13] RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+[run_classifier-5]
+[run_classifier-5]
+[run_classifier-5] Stopped.
+[run_classifier-5] Session released. Bye!
+[run_classifier-5] terminate called without an active exception
+[segmentation_ros2_node-13] Traceback (most recent call last):
+[segmentation_ros2_node-13]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-13]     sys.exit(load_entry_point('segmentation-bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-13]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 359, in main
+[segmentation_ros2_node-13]     rclpy.spin(node)
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[segmentation_ros2_node-13]     executor.spin_once()
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[segmentation_ros2_node-13]     self._spin_once_impl(timeout_sec)
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[segmentation_ros2_node-13]     handler, entity, node = self.wait_for_ready_callbacks(
+[segmentation_ros2_node-13]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[segmentation_ros2_node-13]     return next(self._cb_iter)
+[segmentation_ros2_node-13]            ^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 823, in _wait_for_ready_callbacks
+[segmentation_ros2_node-13]     handler = self._make_handler(sub, node, self._take_subscription)
+[segmentation_ros2_node-13]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-13]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 604, in _make_handler
+[segmentation_ros2_node-13]     task = Task(
+[segmentation_ros2_node-13]            ^^^^^
+[segmentation_ros2_node-13] KeyboardInterrupt
+[camera_mount_tf_publisher-8] Traceback (most recent call last):
+[camera_mount_tf_publisher-8]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-8]     main()
+[camera_mount_tf_publisher-8]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-8]     rclpy.shutdown()
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-8]     _shutdown(context=context)
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-8]     context.shutdown()
+[camera_mount_tf_publisher-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-8]     self.__context.shutdown()
+[camera_mount_tf_publisher-8] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[INFO] [preshaping_service_bridge_node-15]: process has finished cleanly [pid 6800]
+[ERROR] [tf_pipeline_diagnostics-9]: process has died [pid 6790, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[INFO] [wrist_driver_node-4]: process has finished cleanly [pid 6785]
+[ERROR] [camera_mount_tf_publisher-8]: process has died [pid 6789, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[INFO] [command_bridge_node-3]: process has finished cleanly [pid 6784]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process has finished cleanly [pid 6788]
+[INFO] [odom_to_pose_relay-11]: process has finished cleanly [pid 6792]
+[INFO] [grasp_proximity_controller_node.py-16]: process has finished cleanly [pid 6801]
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 6782]
+[ERROR] [segmentation_ros2_node-13]: process has died [pid 6794, exit code -2, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_hb1nfufa -r /segmentation/input_cloud:=/fused_pointcloud'].
+[INFO] [openvins_odom_tf_relay-12]: process has finished cleanly [pid 6793]
+[INFO] [force_controller_node-17]: process has finished cleanly [pid 6802]
+[INFO] [mia_hand_driver_node-2]: process has finished cleanly [pid 6783]
+[INFO] [twist_propagation_node-14]: process has finished cleanly [pid 6799]
+[INFO] [pointcloud_fusion_node-10]: process has finished cleanly [pid 6791]
+[INFO] [emg_grasp_controller-6]: process has finished cleanly [pid 6787]
+[ERROR] [rviz2-18]: process[rviz2-18] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [rviz2-18]: sending signal 'SIGTERM' to process[rviz2-18]
+[ERROR] [run_classifier-5]: process[run_classifier-5] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [run_classifier-5]: sending signal 'SIGTERM' to process[run_classifier-5]
+[ERROR] [run_classifier-5]: process has died [pid 6786, exit code -6, cmd '/prosthesis_ws/install/emg_bridge/lib/emg_bridge/run_classifier --model-dir /app/models --ros-args -r __node:=emg_bridge'].
+[ERROR] [rviz2-18]: process[rviz2-18] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'
+[INFO] [rviz2-18]: sending signal 'SIGKILL' to process[rviz2-18]
+[ERROR] [rviz2-18]: process has died [pid 6803, exit code -9, cmd '/opt/ros/jazzy/lib/rviz2/rviz2 -d /prosthesis_ws/rviz/prosthesis.rviz --ros-args -r __node:=rviz2'].
+exit code: 130
+make: *** [Makefile:147: run] Error 130
+   multiview_prosthesis >

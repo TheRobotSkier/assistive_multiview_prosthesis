@@ -66,6 +66,11 @@ tests/test2_hw_force_controller/results/
 # Rosbags
 rosbags/
 
+# EMG training data and trained models (persist via bind mounts)
+data/*.npz
+models/*.pkl
+models/*.npz
+
 # Worktrees
 .worktrees/
 

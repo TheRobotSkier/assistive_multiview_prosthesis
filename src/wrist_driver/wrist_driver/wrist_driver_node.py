@@ -109,22 +109,31 @@ class WristDriverNode(Node):
         target_deg = msg.data[0]
         accel = msg.data[1] if len(msg.data) > 1 else 0.0
 
-        dxl_pos = _deg_to_dx(target_deg)
-        dxl_comm_result, dxl_error = self._packet_handler.write4ByteTxRx(
-            self._port_handler, self._motor_id, ADDR_GOAL_POSITION, dxl_pos)
-        if dxl_comm_result != COMM_SUCCESS:
-            self.get_logger().warn(f'Failed to set position: {self._packet_handler.getTxRxResult(dxl_comm_result)}')
+        try:
+            dxl_pos = _deg_to_dx(target_deg)
+            dxl_comm_result, dxl_error = self._packet_handler.write4ByteTxRx(
+                self._port_handler, self._motor_id, ADDR_GOAL_POSITION, dxl_pos)
+            if dxl_comm_result != COMM_SUCCESS:
+                self.get_logger().warn(f'Failed to set position: {self._packet_handler.getTxRxResult(dxl_comm_result)}')
 
-        if accel > 0:
-            accel_val = int(accel)
-            self._packet_handler.write4ByteTxRx(
-                self._port_handler, self._motor_id, ADDR_PROFILE_ACCELERATION, accel_val)
+            if accel > 0:
+                accel_val = int(accel)
+                self._packet_handler.write4ByteTxRx(
+                    self._port_handler, self._motor_id, ADDR_PROFILE_ACCELERATION, accel_val)
+        except (IndexError, OSError) as exc:
+            self.get_logger().warn(
+                f'Dynamixel write failed (communication error): {exc}')
 
     def _publish_state(self):
-        dxl_pos, comm_result, _ = self._packet_handler.read4ByteTxRx(
-            self._port_handler, self._motor_id, ADDR_PRESENT_POSITION)
-        dxl_vel, comm_result_v, _ = self._packet_handler.read4ByteTxRx(
-            self._port_handler, self._motor_id, ADDR_PRESENT_VELOCITY)
+        try:
+            dxl_pos, comm_result, _ = self._packet_handler.read4ByteTxRx(
+                self._port_handler, self._motor_id, ADDR_PRESENT_POSITION)
+            dxl_vel, comm_result_v, _ = self._packet_handler.read4ByteTxRx(
+                self._port_handler, self._motor_id, ADDR_PRESENT_VELOCITY)
+        except (IndexError, OSError) as exc:
+            self.get_logger().warn(
+                f'Dynamixel read failed (communication error): {exc}')
+            return
 
         if comm_result == COMM_SUCCESS and comm_result_v == COMM_SUCCESS:
             pos_deg = _dx_to_deg(dxl_pos)
@@ -132,6 +141,12 @@ class WristDriverNode(Node):
             msg = Float64MultiArray()
             msg.data = [pos_deg, vel_deg]
             self._pub.publish(msg)
+        else:
+            self.get_logger().warn(
+                f'Dynamixel read failed: pos={self._packet_handler.getTxRxResult(comm_result)}, '
+                f'vel={self._packet_handler.getTxRxResult(comm_result_v)}',
+                throttle_duration_sec=5.0,
+            )
 
     def destroy_node(self):
         if HAS_DYNAMIXEL and self._port_handler.is_open:

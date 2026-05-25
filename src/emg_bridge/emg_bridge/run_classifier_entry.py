@@ -39,8 +39,16 @@ def _extract_ros_param(args: list[str], name: str) -> tuple[str | None, list[str
                     else:
                         cleaned.extend(["-p", param])
                     j += 2
+                elif ros_section[j] == "-r" and j + 1 < len(ros_section):
+                    # Strip ROS remapping arguments (e.g. -r __node:=name)
+                    j += 2
+                elif ros_section[j] == "--params-file" and j + 1 < len(ros_section):
+                    # Strip params-file arguments
+                    j += 2
+                elif ros_section[j].startswith("-"):
+                    # Strip other ROS flags (e.g. --log-level)
+                    j += 1
                 else:
-                    cleaned.append(ros_section[j])
                     j += 1
             continue
         cleaned.append(args[i])

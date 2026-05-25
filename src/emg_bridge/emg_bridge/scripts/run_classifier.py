@@ -129,6 +129,43 @@ def _draw(
     _first_draw = False
 
 
+# ── Compact output (non-TTY / ROS launch) ──────────────────────────────────
+
+def _print_compact(
+    prev_label: int,
+    label: int,
+    confidence: float,
+    proportional: float,
+    probs: np.ndarray,
+    gesture_names: list[str],
+    frame_count: int,
+    fps: float,
+    mode: str,
+) -> None:
+    """Print a single-line gesture transition for non-interactive output."""
+    prev_name = gesture_names[prev_label] if prev_label < len(gesture_names) else f"G{prev_label}"
+    curr_name = gesture_names[label] if label < len(gesture_names) else f"G{label}"
+    prob_parts = " ".join(f"{name}:{probs[i] * 100:.0f}%" for i, name in enumerate(gesture_names))
+    print(
+        f"[emg] {prev_name} -> {curr_name} "
+        f"(conf={confidence * 100:.0f}%, prop={proportional:.2f}, mode={mode}) "
+        f"{prob_parts}"
+    )
+
+
+def _print_status(
+    label: int,
+    confidence: float,
+    proportional: float,
+    gesture_names: list[str],
+    frame_count: int,
+    fps: float,
+) -> None:
+    """Print a periodic heartbeat status line."""
+    name = gesture_names[label] if label < len(gesture_names) else f"G{label}"
+    print(f"[emg] status: {name} (conf={confidence * 100:.0f}%, prop={proportional:.2f}, {fps:.1f} Hz, frame={frame_count})")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -196,12 +233,17 @@ def main() -> None:
         ring.push(filtered)
     print(_green("Ready.\n"))
 
+    interactive = sys.stdout.isatty()
     _first_draw = True
     frame_count = 0
     last_time = time.monotonic()
     fps_history: deque[float] = deque(maxlen=20)
+    prev_label = -1
+    last_status_time = time.monotonic()
+    _STATUS_INTERVAL = 5.0  # seconds between heartbeat status lines
 
-    print("\n" * _DISPLAY_LINES)  # reserve display area
+    if interactive:
+        print("\n" * _DISPLAY_LINES)  # reserve display area
 
     try:
         while True:
@@ -245,10 +287,24 @@ def main() -> None:
                     mode = _ros_state.mode
 
             frame_count += 1
-            _draw(smoothed_label, confidence, prop_val, probs, gesture_names, frame_count, fps, mode)
+
+            if interactive:
+                _draw(smoothed_label, confidence, prop_val, probs, gesture_names, frame_count, fps, mode)
+            else:
+                now_wall = time.monotonic()
+                if smoothed_label != prev_label:
+                    _print_compact(prev_label, smoothed_label, confidence, prop_val, probs, gesture_names, frame_count, fps, mode)
+                    prev_label = smoothed_label
+                    last_status_time = now_wall  # reset timer on transition
+                elif now_wall - last_status_time >= _STATUS_INTERVAL:
+                    _print_status(smoothed_label, confidence, prop_val, gesture_names, frame_count, fps)
+                    last_status_time = now_wall
 
     except KeyboardInterrupt:
-        print(f"\n\n{_yellow('Stopped.')}")
+        if interactive:
+            print(f"\n\n{_yellow('Stopped.')}")
+        else:
+            print("[emg] Stopped.")
     finally:
         reader.disconnect()
         print(_green("Session released. Bye!"))
