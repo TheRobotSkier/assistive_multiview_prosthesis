@@ -1,0 +1,42 @@
+# EMG Grasp Launch — convenience config with all launch argument defaults.
+#
+# This file is read by emg_grasp_test.launch.py to set default values.
+# Override any value on the command line:
+#   ros2 launch prosthesis_launch emg_grasp_test.launch.py config_path:=/my/config.yaml
+#
+# For a full list of launch arguments with descriptions, run:
+#   ros2 launch prosthesis_launch emg_grasp_test.launch.py --show-args
+
+# Path to the EMG grasp test YAML configuration.
+# Must define: closing_velocity_start, closing_velocity_end, decay_steps,
+#   step_interval_s, stop_positions, force_thresholds,
+#   emg_gesture_topic, emg_confidence_topic, emg_grasp_trigger_gesture,
+#   emg_release_gesture, emg_grasp_confidence_threshold, gesture_hold_timeout_s.
+config_path: "/prosthesis_ws/tests/emg_grasp/emg_grasp_test.yaml"
+
+# Directory containing the trained EMG classifier model files.
+# Must contain: classifier.pkl  (and optionally proportional calibration).
+emg_model_dir: "/prosthesis_ws/models"
+
+# EMG device path (reserved for future use — BoardReader auto-discovers).
+emg_device: ""
+
+# Serial port for the Mia Hand (e.g. /dev/ttyUSB0).
+mia_port: "/dev/ttyUSB0"
+
+# Serial port for the wrist Dynamixel motor (e.g. /dev/ttyUSB1).
+# Only used when wrist_enable is true.
+wrist_port: "/dev/ttyUSB1"
+
+# Enable the wrist Dynamixel driver.
+# Set to "true" to include wrist control.
+wrist_enable: "false"
+
+# Enable mock hardware mode.
+# When true, the ros2_control node mirrors commands to states
+# so the hand can be tested without physical hardware.
+mock_hardware: "false"
+
+# ROS 2 logging level for the EMG grasp controller node.
+# Valid values: debug, info, warn, error, fatal.
+log_level: "info"

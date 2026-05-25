@@ -54,6 +54,7 @@ COMPOSE_SEGMENTATION_CPU := -f docker-compose.yml
 COMPOSE_SEGMENTATION_CUDA := -f docker-compose.yml -f docker-compose.segmentation.cuda.yml
 COMPOSE_SEGMENTATION_CUDA_PODMAN := -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml
 
+<<<<<<< HEAD
 # Select the correct GPU runtime compose override based on the detected backend.
 # DOCKER_CMD is always set correctly (by explicit selection or auto-detect),
 # unlike CONTAINER_BACKEND which is only set when explicitly provided.
@@ -64,6 +65,9 @@ else
 endif
 
 .PHONY: build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config
+=======
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force
+>>>>>>> 1413d1d (aweh maaannn)
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -536,3 +540,165 @@ rviz-imu-test-kill:
 	-podman kill rviz-imu-test 2>/dev/null
 	-podman rm rviz-imu-test 2>/dev/null
 	@echo "IMU test RViz stopped."
+<<<<<<< HEAD
+=======
+
+# ── Grasp Test ──────────────────────────────────────────────────────────────
+up-grasp-test:
+	$(COMPOSE) rm -f grasp_test 2>/dev/null || true
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test up grasp_test
+
+down-grasp-test:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test down
+
+logs-grasp-test:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile grasp_test logs -f
+
+print-force:
+	@echo "=== MIA Hand Force Monitor ==="
+	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
+	@test -f scripts/print_force.sh || { echo "Missing scripts/print_force.sh"; exit 1; }
+	-podman rm -f mia-force-print 2>/dev/null
+	podman run --rm -it --name mia-force-print \
+		--network host \
+		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-e MIA_PORT=/dev/ttyUSB0 \
+		prosthesis:latest \
+		bash /prosthesis_ws/scripts/print_force.sh
+
+test-static-grasp:
+	@echo "=== MIA Hand Static Grasp Test ==="
+	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
+	@test -f scripts/static_grasp_test.sh || { echo "Missing scripts/static_grasp_test.sh"; exit 1; }
+	@test -f config/static_grasp_test.yaml || { echo "Missing config/static_grasp_test.yaml"; exit 1; }
+	@mkdir -p build install log
+	-podman rm -f mia-static-grasp 2>/dev/null
+	podman run --rm -it --name mia-static-grasp \
+		--network host \
+		--userns keep-id \
+		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-v $(CURDIR)/build:/prosthesis_ws/build:rw \
+		-v $(CURDIR)/install:/prosthesis_ws/install:rw \
+		-v $(CURDIR)/log:/prosthesis_ws/log:rw \
+		-e MIA_PORT=$${MIA_PORT:-/dev/ttyUSB0} \
+		-e GRASP_TEST_CONFIG=/prosthesis_ws/config/static_grasp_test.yaml \
+		-e GRASP_TEST_START_CONTROLLER=$${GRASP_TEST_START_CONTROLLER:-true} \
+		-e GRASP_TEST_USE_MOCK_HARDWARE=$${GRASP_TEST_USE_MOCK_HARDWARE:-false} \
+		-e GRASP_TEST_MAX_CLOSING_DURATION_S=$${GRASP_TEST_MAX_CLOSING_DURATION_S:-20} \
+		-e GRASP_TEST_FORCE_THRESHOLD=$${GRASP_TEST_FORCE_THRESHOLD:-} \
+		-e GRASP_TEST_FORCE_HOLD_TARGET=$${GRASP_TEST_FORCE_HOLD_TARGET:-} \
+		-e GRASP_TEST_FORCE_HOLD_DURATION_S=$${GRASP_TEST_FORCE_HOLD_DURATION_S:-} \
+		prosthesis:latest \
+		bash -lc 'set -e; source /opt/ros/jazzy/setup.bash; if [ -f /prosthesis_ws/install/setup.bash ]; then source /prosthesis_ws/install/setup.bash; echo "Updating MIA hand packages for static grasp test..."; colcon build --packages-up-to mia_hand_ros2_control --cmake-args -DCMAKE_BUILD_TYPE=Release; else echo "Building MIA hand packages for static grasp test..."; colcon build --packages-up-to mia_hand_ros2_control --cmake-args -DCMAKE_BUILD_TYPE=Release; fi; source /prosthesis_ws/install/setup.bash; python3 /prosthesis_ws/scripts/static_grasp_test.sh'
+
+emg-force-grasp: ## EMG force grasp + wrist: collect (if needed) → train → launch (1min auto-stop)
+	@echo "=== EMG Force Grasp + Wrist Controller ==="
+	@echo ""
+	@echo "Env overrides (optional):"
+	@echo "  EMG_DATA_DIR=$${EMG_DATA_DIR:-/prosthesis_ws/data}     Training data directory"
+	@echo "  EMG_MODEL_DIR=$${EMG_MODEL_DIR:-/prosthesis_ws/models}  Model output directory"
+	@echo "  MIA_PORT=$${MIA_PORT:-/dev/ttyUSB0}             Mia hand serial port"
+	@echo "  WRIST_PORT=$${WRIST_PORT:-/dev/ttyUSB1}         Wrist Dynamixel port"
+	@echo "  CONFIG_PATH=$${CONFIG_PATH:-tests/emg_grasp/emg_grasp_test.yaml}"
+	@echo "  FORCE_RETRAIN=$${FORCE_RETRAIN:-false}          Re-train even if model exists"
+	@echo "  LOG_LEVEL=$${LOG_LEVEL:-info}                   ROS 2 log level"
+	@echo "  AUTO_KILL_S=$${AUTO_KILL_S:-60}                 Auto-stop after N seconds"
+	@echo ""
+	@test -f scripts/emg_force_grasp.sh || { echo "Missing scripts/emg_force_grasp.sh"; exit 1; }
+	@mkdir -p build install log data models
+	@# Map serial devices
+	@DEVICE_ARGS=""; \
+	if [ -e "$${MIA_PORT:-/dev/ttyUSB0}" ]; then \
+		DEVICE_ARGS="--device $${MIA_PORT:-/dev/ttyUSB0}:$${MIA_PORT:-/dev/ttyUSB0}"; \
+	fi; \
+	if [ "$${WRIST_ENABLE:-true}" = "true" ] && [ -e "$${WRIST_PORT:-/dev/ttyUSB1}" ]; then \
+		DEVICE_ARGS="$$DEVICE_ARGS --device $${WRIST_PORT:-/dev/ttyUSB1}:$${WRIST_PORT:-/dev/ttyUSB1}"; \
+	fi; \
+	if [ -z "$$DEVICE_ARGS" ]; then \
+		echo "WARNING: No serial devices found. MOCK_HARDWARE=true by default."; \
+		export MOCK_HARDWARE=true; \
+	fi
+	-podman rm -f emg-force-grasp 2>/dev/null
+	podman run --rm -it --name emg-force-grasp \
+		--network host \
+		--userns keep-id \
+		--group-add keep-groups \
+		--device /dev/ttyUSB0:/dev/ttyUSB0 \
+		--device /dev/ttyUSB1:/dev/ttyUSB1 \
+		$$DEVICE_ARGS \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-v $(CURDIR)/tests:/prosthesis_ws/tests:ro \
+		-v $(CURDIR)/build:/prosthesis_ws/build:rw \
+		-v $(CURDIR)/install:/prosthesis_ws/install:rw \
+		-v $(CURDIR)/log:/prosthesis_ws/log:rw \
+		-v $(CURDIR)/data:/prosthesis_ws/data:rw \
+		-v $(CURDIR)/models:/prosthesis_ws/models:rw \
+		-e EMG_DATA_DIR="$${EMG_DATA_DIR:-/prosthesis_ws/data}" \
+		-e EMG_MODEL_DIR="$${EMG_MODEL_DIR:-/prosthesis_ws/models}" \
+		-e MIA_PORT="$${MIA_PORT:-/dev/ttyUSB0}" \
+		-e WRIST_PORT="$${WRIST_PORT:-/dev/ttyUSB1}" \
+		-e CONFIG_PATH="$${CONFIG_PATH:-/prosthesis_ws/tests/emg_grasp/emg_grasp_test.yaml}" \
+		-e WRIST_ENABLE="$${WRIST_ENABLE:-true}" \
+		-e FORCE_RETRAIN="$${FORCE_RETRAIN:-false}" \
+		-e MOCK_HARDWARE="$${MOCK_HARDWARE:-false}" \
+		-e LOG_LEVEL="$${LOG_LEVEL:-info}" \
+		-e AUTO_KILL_S="$${AUTO_KILL_S:-60}" \
+		prosthesis:latest \
+		bash /prosthesis_ws/scripts/emg_force_grasp.sh
+
+emg-grasp-test: ## EMG-driven grasp test: collect → train → launch (set MOCK_HARDWARE=true for CI)
+	@echo "=== EMG-Driven Grasp Test ==="
+	@echo ""
+	@echo "Env overrides (optional):"
+	@echo "  EMG_DEVICE=$${EMG_DEVICE:-<auto-discover>}   MindRove board IP/host"
+	@echo "  EMG_DATA_DIR=$${EMG_DATA_DIR:-/app/data}     Recording output directory"
+	@echo "  EMG_MODEL_DIR=$${EMG_MODEL_DIR:-/app/models}  Trained model directory"
+	@echo "  MIA_PORT=$${MIA_PORT:-/dev/ttyUSB0}           Mia hand serial port"
+	@echo "  CONFIG_PATH=$${CONFIG_PATH:-tests/emg_grasp/emg_grasp_test.yaml}"
+	@echo "  WRIST_ENABLE=$${WRIST_ENABLE:-false}          Enable wrist Dynamixel"
+	@echo "  MOCK_HARDWARE=$${MOCK_HARDWARE:-false}        Skip collect/train, use mock HW"
+	@echo ""
+	@test -f scripts/emg_grasp_test.sh || { echo "Missing scripts/emg_grasp_test.sh"; exit 1; }
+	@test -f $(CURDIR)/tests/emg_grasp/emg_grasp_test.yaml || { echo "Missing tests/emg_grasp/emg_grasp_test.yaml"; exit 1; }
+	@# Determine serial device mapping
+	@if [ "$${MOCK_HARDWARE:-false}" = "true" ]; then \
+		echo "MOCK MODE: no physical device mapping needed"; \
+		DEVICE_ARGS=""; \
+	else \
+		DEV="$${MIA_PORT:-/dev/ttyUSB0}"; \
+		if [ ! -e "$$DEV" ]; then \
+			echo "ERROR: Mia hand device not found at $$DEV"; \
+			echo "  - Connect the USB cable" \
+			echo "  - Or set MIA_PORT=/dev/ttyUSB1" \
+			echo "  - Or use MOCK_HARDWARE=true"; \
+			exit 1; \
+		fi; \
+		echo "Hand device: $$DEV"; \
+		DEVICE_ARGS="--device $$DEV:$$DEV"; \
+	fi
+	-podman rm -f emg-grasp-test 2>/dev/null
+	podman run --rm -it --name emg-grasp-test \
+		--network host \
+		$$DEVICE_ARGS \
+		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
+		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
+		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
+		-v $(CURDIR)/tests:/prosthesis_ws/tests:ro \
+		-e EMG_DEVICE="$${EMG_DEVICE:-}" \
+		-e EMG_DATA_DIR="$${EMG_DATA_DIR:-/app/data}" \
+		-e EMG_MODEL_DIR="$${EMG_MODEL_DIR:-/app/models}" \
+		-e MIA_PORT="$${MIA_PORT:-/dev/ttyUSB0}" \
+		-e CONFIG_PATH="$${CONFIG_PATH:-/prosthesis_ws/tests/emg_grasp/emg_grasp_test.yaml}" \
+		-e WRIST_ENABLE="$${WRIST_ENABLE:-false}" \
+		-e MOCK_HARDWARE="$${MOCK_HARDWARE:-false}" \
+		prosthesis:latest \
+		bash /prosthesis_ws/scripts/emg_grasp_test.sh
+>>>>>>> 1413d1d (aweh maaannn)

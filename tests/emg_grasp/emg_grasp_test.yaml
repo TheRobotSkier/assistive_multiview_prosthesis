@@ -1,0 +1,80 @@
+# EMG-Driven Velocity-Based Force Grasp Test Configuration
+
+# ---- Velocity Profile ----
+closing_velocity_start: 0.3
+closing_velocity_end: 0.1
+decay_steps: 5
+step_interval_s: 0.2
+
+stop_positions:
+  j_thumb_fle: 1.5
+  j_index_fle: 1.5
+  j_mrl_fle:   1.5
+
+force_thresholds:
+  j_thumb_fle: 300
+  j_index_fle: 300
+  j_mrl_fle:   300
+
+relaxed_wait_s: 2
+
+# ---- EMG Parameters ----
+emg_gesture_topic: "/emg/gesture_label"
+emg_confidence_topic: "/emg/confidence"
+emg_proportional_topic: "/emg/proportional"
+
+# Gesture IDs from src/emg_bridge/emg_bridge/config.py:
+# REST=0, POWER=1, OPEN=2, FLEXION=3, EXTENSION=4
+emg_grasp_trigger_gesture: 1
+emg_release_gesture: 2
+emg_grasp_confidence_threshold: 0.7
+gesture_hold_timeout_s: 0.5
+open_safety_hold_s: 0.5
+
+# ---- Wrist Control (bounded velocity) ----
+wrist_control:
+  # Master enable/disable for EMG wrist control
+  enabled: true
+
+  # Gesture IDs for wrist motion (FLEXION=3, EXTENSION=4)
+  flexion_gesture: 3
+  extension_gesture: 4
+
+  # Minimum confidence for wrist motion activation
+  confidence_threshold: 0.55
+
+  # Positive speed (deg/s) for extension direction, informative — actual motion
+  # is governed by step_size_deg and command_rate_hz.
+  positive_speed_deg_s: 30.0
+  negative_speed_deg_s: -30.0
+
+  # Position increment per control tick (deg)
+  step_size_deg: 1.5
+  # Control loop rate (Hz)
+  command_rate_hz: 20.0
+
+  # Wrist angle limits (deg)
+  min_position_deg: -90.0
+  max_position_deg: 90.0
+
+  # Max age of wrist state before motion is halted (seconds)
+  stale_state_timeout_s: 0.5
+
+  # Immediately stop if pipeline state changes while wrist is moving
+  stop_on_mode_change: true
+
+  # Pipeline states that allow wrist motion (by ID)
+  # 0=IDLE, 6=RELEASING
+  wrist_permissive_states: [0, 6]
+
+  # How missing wrist hardware is handled:
+  #   false → disable wrist control with a warning (default)
+  #   true  → raise RuntimeError to fail launch/preflight
+  fail_preflight_on_missing_wrist: false
+
+  # Acceleration passed to the wrist driver position command (deg/s²)
+  wrist_accel_deg_s2: 180.0
+
+# Topic overrides for wrist control
+wrist_state_topic: "/wrist/state"
+wrist_cmd_topic: "/wrist/set_position"

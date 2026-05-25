@@ -1,0 +1,279 @@
+# ── EMG Grasp Test Configuration ─────────────────────────────────────────────
+# Single source of truth for the EMG-driven grasp-test node.
+#
+# Design goals:
+#   • Every tunable constant lives here — no magic numbers in code.
+#   • Flat but namespaced sections so yaml.safe_load gives a plain dict.
+#   • Defaults below are for REAL hardware.  Override with the mock-test
+#     section when running without the physical prosthesis.
+#
+# Validation:
+#   Run `python scripts/validate_emg_grasp_config.py config/emg_grasp_test.yaml`
+#   before launching the node.  The script exits 0 on success, 1 on failure
+#   with an actionable error message.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 1. EMG Gesture & Mode Mapping
+# ═══════════════════════════════════════════════════════════════════════════════
+emg:
+  # Canonical gesture vocabulary used by the EMG classifier.
+  # The pipeline expects exactly these strings on /emg/gesture_name.
+  gesture_names:
+    REST:      0   # relaxed, no contraction
+    POWER:     1   # power / cylindrical grip
+    OPEN:      2   # hand open / extension
+    FLEXION:   3   # wrist flexion
+    EXTENSION: 4   # wrist extension
+
+  # Compatibility aliases — nodes may accept these synonyms but MUST map them
+  # to the canonical names above before doing any logic.
+  gesture_aliases:
+    PINCH: EXTENSION
+    POINT: EXTENSION
+
+  # Which gesture labels (numeric) are interpreted as "grasp" commands.
+  grasp_gestures: [1]          # POWER
+
+  # Which gesture label is interpreted as "release / open".
+  release_gesture: 2           # OPEN
+
+  # Minimum classifier confidence to accept a non-REST gesture.
+  # Below this value the pipeline treats the reading as REST.
+  confidence_threshold: 0.55
+
+  # Confidence must drop below this before a release is accepted.
+  # (Prevents jitter when the hand hovers near the grasp threshold.)
+  release_confidence_threshold: 0.25
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 2. Mode Thresholds
+# ═══════════════════════════════════════════════════════════════════════════════
+modes:
+  # EMG proportional signal (0.0 – 1.0) required to enter each control mode.
+  # These are control-signal thresholds, NOT classifier confidence thresholds.
+  #
+  # Mode hierarchy (highest priority first):
+  #   1. OPEN     – extension signal above threshold → release hand
+  #   2. POWER    – flexion signal above threshold  → close / grasp
+  #   3. FRACTIONAL – any non-zero signal below the mode thresholds
+  #   4. REST     – no signal above deadzone
+  threshold_open:     0.40
+  threshold_power:    0.35
+
+  # Deadzone around zero — signals whose absolute value is below this are
+  # treated as zero (prevents drift / noise-driven motion).
+  deadzone: 0.05
+
+  # Hysteresis band — once a mode is active the signal must drop below
+  # (threshold - hysteresis) before the mode is exited.
+  hysteresis: 0.05
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 3. Safety Timers
+# ═══════════════════════════════════════════════════════════════════════════════
+safety:
+  # How long (seconds) the OPEN gesture must be held continuously before
+  # the hand is actually released.  This prevents accidental drop.
+  open_safety_hold_s: 0.5
+
+  # How long (seconds) the POWER gesture must be held before a toggle
+  # (grasp → hold, or hold → release) is triggered.
+  power_toggle_hold_s: 0.3
+
+  # Minimum time (seconds) between two successive POWER toggles.
+  # Debounces rapid on/off contractions.
+  power_debounce_s: 0.5
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. Force Control
+# ═══════════════════════════════════════════════════════════════════════════════
+# Based on config/static_grasp_test.yaml and prosthesis_config.yaml defaults.
+force:
+  # Target force per finger when in the grasping / holding state.
+  # Units: raw ADC counts (same scale as the Mia Hand force stream).
+  targets:
+    j_thumb_fle: 300
+    j_index_fle: 300
+    j_mrl_fle:   300
+
+  # How quickly the target force may be increased or decreased (ADC / s).
+  # Keeps force changes smooth and avoids sudden motor current spikes.
+  adjustment_rate_up:   100.0   # ADC counts per second
+  adjustment_rate_down: 200.0   # ADC counts per second
+
+  # Minimum and maximum force targets the controller is allowed to set.
+  # Hard safety limits — the controller clamps to this range.
+  target_min: 50.0
+  target_max: 400.0
+
+  # Emergency release threshold.  If ANY finger exceeds this raw value
+  # the controller immediately backs off.
+  emergency_threshold: 500.0
+
+  # Proportional gain for the force-feedback PI controller.
+  kp: 0.01
+
+  # Integral gain for the force-feedback PI controller.
+  ki: 0.001
+
+  # Maximum integral windup (anti-windup).
+  integral_limit: 50.0
+
+  # Maximum position step (radians) the controller may command per tick.
+  max_position_step: 0.05
+
+  # Multiplicative backoff applied to max_position_step during emergency.
+  emergency_backoff_factor: 2.0
+
+  # Moving-average window for raw force readings.
+  filter_window: 5
+
+  # How long force data must be stable (within tolerance of target) before
+  # the state machine transitions to HOLDING.
+  stability_window_s: 1.0
+
+  # Tolerance (raw ADC) around target force that counts as "stable".
+  stability_tolerance: 15.0
+
+  # Tangential force rate-of-change that triggers slip detection.
+  slip_threshold: 30.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 5. Velocity & Ramp Profiles
+# ═══════════════════════════════════════════════════════════════════════════════
+velocity:
+  # Absolute maximum joint velocity (rad/s) the hand is ever allowed to move.
+  max_velocity: 0.5
+
+  # Initial closing velocity (rad/s) when a grasp begins.
+  closing_start: 0.3
+
+  # Final closing velocity (rad/s) after the ramp has completed.
+  closing_end: 0.1
+
+  # Number of discrete steps to decay from closing_start to closing_end.
+  decay_steps: 5
+
+  # Time between velocity step changes (seconds).
+  step_interval_s: 0.2
+
+  # Total ramp duration = decay_steps * step_interval_s
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. Joint Positions
+# ═══════════════════════════════════════════════════════════════════════════════
+positions:
+  # Fully-open starting positions (radians) for each finger.
+  # Used at startup and after an OPEN-release command.
+  open:
+    j_thumb_fle: 0.0
+    j_index_fle: 0.0
+    j_mrl_fle:   0.0
+
+  # Maximum closure positions (radians).  If ANY finger reaches this
+  # during a grasp and no contact has been detected, the hand stops.
+  # (The Mia Hand physical range is roughly 0.0 → 3.0 rad.)
+  max_closure:
+    j_thumb_fle: 1.5
+    j_index_fle: 1.5
+    j_mrl_fle:   1.5
+
+  # Minimum overshoot (radians) — after contact, the controller may
+  # command this much additional closure to build force.
+  min_overshoot: 0.02
+
+  # Maximum overshoot (radians) — hard cap on post-contact closure.
+  max_overshoot: 0.30
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. Wrist Limits & Tuning
+# ═══════════════════════════════════════════════════════════════════════════════
+wrist:
+  # Maximum wrist angular velocity (deg/s).
+  max_velocity: 90.0
+
+  # Minimum and maximum wrist position (degrees) relative to the
+  # neutral (zero) pose.
+  position_min: -45.0
+  position_max:  45.0
+
+  # How quickly the wrist tracks a target pose (proportional gain-ish
+  # scalar — units: deg/s per deg of error).
+  adjustment_speed: 180.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 8. Command Rates & Timeouts
+# ═══════════════════════════════════════════════════════════════════════════════
+command:
+  # Rate at which joint-position commands are published (Hz).
+  joint_rate_hz: 50.0
+
+  # Rate at which the EMG state machine is updated (Hz).
+  # Should be ≥ the classifier output rate (≈ 10 Hz).
+  emg_update_rate_hz: 20.0
+
+  # Maximum age (seconds) of an EMG message before it is considered stale
+  # and the hand is commanded to its safe (open) state.
+  stale_emg_timeout_s: 0.5
+
+  # Maximum age (seconds) of force-sensor data before the force controller
+  # disables itself and the hand is opened.
+  stale_force_timeout_s: 0.5
+
+  # Maximum age (seconds) of joint-state feedback before the velocity
+  # profile is paused (safety hold).
+  stale_joint_timeout_s: 1.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 9. Mock / Real Hardware Toggles
+# ═══════════════════════════════════════════════════════════════════════════════
+hardware:
+  # Set to true to run without the physical Mia Hand.
+  # When mock_hand is true the node publishes commands to ROS topics but
+  # does NOT call the low-level driver services.
+  mock_hand: false
+
+  # Set to true to run without the physical wrist actuator.
+  # Wrist commands are published but the serial service is skipped.
+  mock_wrist: false
+
+  # Set to true to use a synthetic EMG signal generator instead of
+  # the real classifier node.
+  mock_emg: false
+
+  # Serial port for the Mia Hand base (used only when mock_hand == false).
+  mia_serial_port: "/dev/ttyUSB0"
+
+  # Serial port for the wrist servo (used only when mock_wrist == false).
+  wrist_port: "/dev/ttyUSB0"
+
+  # Wrist servo baudrate.
+  wrist_baudrate: 57600
+
+  # Wrist servo Dynamixel ID.
+  wrist_motor_id: 1
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 10. Mock-Test Overrides (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+# When running automated tests or CI without hardware, copy this file and
+# uncomment the block below.  The validator recognises the `mock_overrides`
+# key and warns if it is present but `hardware.mock_*` flags are false,
+# helping you catch mismatched test/production configs.
+# ─────────────────────────────────────────────────────────────────────────────
+# mock_overrides:
+#   force:
+#     targets:
+#       j_thumb_fle: 150   # lower forces when testing on a bench fixture
+#       j_index_fle: 150
+#       j_mrl_fle:   150
+#   positions:
+#     max_closure:
+#       j_thumb_fle: 0.8   # reduced range so the mock joint never saturates
+#       j_index_fle: 0.8
+#       j_mrl_fle:   0.8
+#   hardware:
+#     mock_hand:  true
+#     mock_wrist: true
+#     mock_emg:   true
