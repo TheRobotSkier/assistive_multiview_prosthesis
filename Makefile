@@ -746,3 +746,23 @@ emg-grasp-test: ## EMG-driven grasp test: collect → train → launch (set MOCK
 		-e MOCK_HARDWARE="$${MOCK_HARDWARE:-false}" \
 		prosthesis:latest \
 		bash /prosthesis_ws/scripts/emg_grasp_test.sh
+
+# ── Wrist Test ──────────────────────────────────────────────────────────────
+# Minimal container for testing wrist motor with velocity moves and encoder logging
+
+.PHONY: wrist-test-build wrist-test-run wrist-test
+
+wrist-test-build:
+	$(DOCKER_CMD) build -f docker/Dockerfile.wrist-test -t wrist-test:latest .
+
+wrist-test-run:
+	@mkdir -p logs/wrist
+	$(DOCKER_CMD) run --rm -it \
+		--privileged \
+		--network host \
+		-v $(CURDIR)/logs/wrist:/wrist_ws/logs/wrist \
+		-e WRIST_SERIAL_PORT="$${WRIST_SERIAL_PORT:-/dev/ttyUSB0}" \
+		wrist-test:latest \
+		bash -c "source /opt/ros/jazzy/setup.bash && cd /wrist_ws && colcon build --packages-select wrist_driver && source install/setup.bash && python3 /wrist_test.py --port $${WRIST_SERIAL_PORT:-/dev/ttyUSB0} --output /wrist_ws/logs/wrist/test.log"
+
+wrist-test: wrist-test-build wrist-test-run

@@ -162,26 +162,34 @@ class WristDriverNode(Node):
         try:
             dxl_pos, comm_result = self._read_with_retry(
                 ADDR_PRESENT_POSITION, 'read position')
-            dxl_vel, comm_result_v = self._read_with_retry(
-                ADDR_PRESENT_VELOCITY, 'read velocity')
         except (IndexError, OSError) as exc:
             self.get_logger().warn(
                 f'Dynamixel read failed (communication error): {exc}')
             return
 
-        if (comm_result == COMM_SUCCESS and comm_result_v == COMM_SUCCESS
-                and dxl_pos is not None and dxl_vel is not None):
-            pos_deg = _dx_to_deg(dxl_pos)
-            vel_deg = float(dxl_vel) * 0.229  # Approximate RPM to deg/s
-            msg = Float64MultiArray()
-            msg.data = [pos_deg, vel_deg]
-            self._pub.publish(msg)
-        else:
+        if comm_result != COMM_SUCCESS or dxl_pos is None:
             self.get_logger().warn(
-                f'Dynamixel read failed: pos={self._packet_handler.getTxRxResult(comm_result)}, '
-                f'vel={self._packet_handler.getTxRxResult(comm_result_v)}',
+                f'Dynamixel position read failed: {self._packet_handler.getTxRxResult(comm_result)}',
                 throttle_duration_sec=5.0,
             )
+            return
+
+        # Velocity read is optional - some motors don't support it or fail intermittently
+        dxl_vel = None
+        try:
+            dxl_vel, comm_result_v = self._read_with_retry(
+                ADDR_PRESENT_VELOCITY, 'read velocity')
+        except (IndexError, OSError):
+            pass
+
+        pos_deg = _dx_to_deg(dxl_pos)
+        vel_deg = 0.0
+        if dxl_vel is not None:
+            vel_deg = float(dxl_vel) * 0.229  # Approximate RPM to deg/s
+
+        msg = Float64MultiArray()
+        msg.data = [pos_deg, vel_deg]
+        self._pub.publish(msg)
 
     def destroy_node(self):
         if HAS_DYNAMIXEL and self._port_handler.is_open:

@@ -1,0 +1,31 @@
+# Minimal wrist test container
+# Only includes: ROS2 Jazzy, dynamixel-sdk, wrist_driver package
+FROM docker.io/osrf/ros:jazzy-ros-base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3-pip \
+        usbutils \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+        dynamixel-sdk
+
+WORKDIR /wrist_ws
+
+COPY src/wrist_driver src/wrist_driver
+
+RUN . /opt/ros/jazzy/setup.sh \
+    && apt-get update \
+    && rosdep install --from-paths src/ --ignore-src -r -y \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY scripts/wrist_test.py /wrist_test.py
+
+RUN chmod +x /wrist_test.py
+
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ENV ROS_DOMAIN_ID=0
+
+CMD ["bash"]
