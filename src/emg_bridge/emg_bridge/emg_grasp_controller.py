@@ -16,9 +16,9 @@ Publishers:
 Parameters:
     gesture_rest          (int)   – REST label     (default 0)
     gesture_power         (int)   – POWER label    (default 1)
-    gesture_flexion       (int)   – FLEXION label  (default 2)
+    gesture_flexion       (int)   – FLEXION label  (default 3)
     gesture_extension     (int)   – EXTENSION label(default 4)
-    gesture_open          (int)   – OPEN label     (default 3)
+    gesture_open          (int)   – OPEN label     (default 2)
     open_hold_duration_s  (double)– seconds OPEN must be held (default 1.0)
     open_prop_threshold   (double)– proportional threshold for OPEN safety (default 0.7)
     power_hold_duration_s (double)– seconds POWER must be held (default 1.0)
@@ -62,9 +62,9 @@ class EmgGraspControllerNode(Node):
         # ── Parameters ────────────────────────────────────────────────────
         self.declare_parameter("gesture_rest", 0)
         self.declare_parameter("gesture_power", 1)
-        self.declare_parameter("gesture_flexion", 2)
+        self.declare_parameter("gesture_flexion", 3)
         self.declare_parameter("gesture_extension", 4)
-        self.declare_parameter("gesture_open", 3)
+        self.declare_parameter("gesture_open", 2)
 
         self.declare_parameter("open_hold_duration_s", 1.0)
         self.declare_parameter("open_prop_threshold", 0.7)

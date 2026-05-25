@@ -87,7 +87,7 @@ pipeline_manager:
         confidence_threshold: 0.8
         release_confidence_threshold: 0.8
         grasp_gestures: [1]
-        release_gesture: 3
+        release_gesture: 2
         state_publish_rate_hz: 5.0
         # EMG intent relay
         emg_grasp_intent_topic: "/emg_grasp/intent"
@@ -292,9 +292,9 @@ emg_grasp_controller:
         # Gesture label mapping (must match classifier GESTURE_NAMES)
         gesture_rest: 0
         gesture_power: 1
-        gesture_flexion: 2
+        gesture_flexion: 3
         gesture_extension: 4
-        gesture_open: 3
+        gesture_open: 2
         # Timing
         open_hold_duration_s: 1.0
         open_prop_threshold: 0.7

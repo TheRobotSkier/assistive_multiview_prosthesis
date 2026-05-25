@@ -67,9 +67,9 @@ class StateMachineConfig:
     # Gesture label mapping (defaults match emg_bridge.config GESTURE_NAMES)
     gesture_rest: int = 0
     gesture_power: int = 1
-    gesture_flexion: int = 2   # PINCH in current config
-    gesture_extension: int = 4  # POINT in current config
-    gesture_open: int = 3
+    gesture_flexion: int = 3   # matches classifier: 3=FLEXION
+    gesture_extension: int = 4  # matches classifier: 4=EXTENSION
+    gesture_open: int = 2       # matches classifier: 2=OPEN
 
     # Timing
     open_hold_duration_s: float = 1.0
