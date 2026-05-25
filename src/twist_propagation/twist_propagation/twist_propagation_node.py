@@ -9,7 +9,6 @@ segmentation and then grasp preshaping.
 Internal state machine:
   IDLE                     -- active, running propagation each cycle
   WAITING_FOR_SEGMENTATION -- click published, waiting for segmented cloud
-  WAITING_FOR_PRESHAPING   -- segmented cloud received, preshaping called
 
 Topics
 ------
@@ -43,9 +42,6 @@ Publish:
 Services:
   /twist_propagation/activate    std_srvs/Trigger
   /twist_propagation/deactivate  std_srvs/Trigger
-
-Service clients:
-  /grasp_preshaping/compute_grasp  std_srvs/Trigger
 """
 
 from __future__ import annotations
@@ -457,7 +453,6 @@ def _sample_spherical_shell_clicks(
 class CycleState(enum.Enum):
     IDLE = "IDLE"
     WAITING_FOR_SEGMENTATION = "WAITING_FOR_SEGMENTATION"
-    WAITING_FOR_PRESHAPING = "WAITING_FOR_PRESHAPING"
 
 
 # ---------------------------------------------------------------------------
@@ -498,7 +493,7 @@ class TwistPropagationNode(Node):
         self.declare_parameter("click_positive_topic", "/segmentation/click_positive")
         self.declare_parameter("hand_twist_topic", "/hand_twist")
         self.declare_parameter("hand_twist_input_topic", "/hand_twist")  # external twist source
-        self.declare_parameter("external_twist_max_age_s", 0.5)
+        self.declare_parameter("external_twist_max_age_s", 2.0)
         self.declare_parameter("segmentation_reset_topic", "/segmentation/reset")
 
         # Segmentation retarget policy
@@ -535,14 +530,6 @@ class TwistPropagationNode(Node):
         self.declare_parameter("click_radius_m", 0.03)
         self.declare_parameter("click_min_radius_m", 0.005)
         self.declare_parameter("click_random_seed", 42)
-
-        # Delay between detecting a new segmented cloud and calling the
-        # preshaping service.  Gives the preshaping bridge time to receive
-        # the same cloud via its own subscription before the service call
-        # arrives.  Without this delay the bridge may still hold the previous
-        # (empty/reset) cloud, causing a "PointCloud data pointer is null"
-        # error.
-        self.declare_parameter("preshaping_call_delay_s", 0.15)
 
         # Background warm cache
         self.declare_parameter("background_cycle_enabled", True)
@@ -582,7 +569,6 @@ class TwistPropagationNode(Node):
         self._click_radius = float(self.get_parameter("click_radius_m").value)
         self._click_min_radius = float(self.get_parameter("click_min_radius_m").value)
         self._click_random_seed = int(self.get_parameter("click_random_seed").value)
-        self._preshaping_call_delay = float(self.get_parameter("preshaping_call_delay_s").value)
         self._background_cycle_enabled = bool(self.get_parameter("background_cycle_enabled").value)
         self._external_twist_max_age = float(self.get_parameter("external_twist_max_age_s").value)
 
@@ -626,7 +612,6 @@ class TwistPropagationNode(Node):
         self._seg_cloud_stamp: float = 0.0
         self._seg_cloud_stamp_at_trigger: float = 0.0
         self._seg_trigger_time: float = 0.0
-        self._preshaping_call_timer = None  # one-shot timer for delayed preshaping call
 
         # One-time frame mismatch log flag
         self._frame_mismatch_logged: bool = False
@@ -740,12 +725,6 @@ class TwistPropagationNode(Node):
             Trigger,
             self.get_parameter("deactivate_service").value,
             self._on_deactivate,
-        )
-
-        # ── Service client ─────────────────────────────────────────────────
-        self._compute_client = self.create_client(
-            Trigger,
-            self.get_parameter("compute_grasp_service").value,
         )
 
         # ── Cycle timer ────────────────────────────────────────────────────
@@ -904,7 +883,8 @@ class TwistPropagationNode(Node):
                 return self._external_twist
             else:
                 self.get_logger().info(
-                    f"External twist stale: age={age:.3f}s > max={self._external_twist_max_age:.3f}s"
+                    f"External twist stale: age={age:.3f}s > max={self._external_twist_max_age:.3f}s",
+                    throttle_duration_sec=5.0,
                 )
 
         self._twist_source = "estimated"
@@ -1437,10 +1417,6 @@ class TwistPropagationNode(Node):
     # ── Main cycle callback ────────────────────────────────────────────────
 
     def _cycle_callback(self):
-        # Snapshot state under lock, then decide what to do.
-        # The lock is released before any blocking operations (service calls).
-        should_call_preshaping = False
-
         try:
             with self._lock:
                 active = self._active
@@ -1458,12 +1434,14 @@ class TwistPropagationNode(Node):
                 if state == CycleState.WAITING_FOR_SEGMENTATION:
                     elapsed = time.time() - self._seg_trigger_time
                     if self._seg_cloud_stamp > self._seg_cloud_stamp_at_trigger:
-                        # New segmented cloud arrived -- transition and call preshaping
+                        # New segmented cloud arrived — the pipeline manager
+                        # handles calling preshaping.  Return to IDLE.
                         self.get_logger().info(
-                            "Segmented cloud received, calling preshaping service"
+                            "Segmented cloud received"
                         )
-                        self._cycle_state = CycleState.WAITING_FOR_PRESHAPING
-                        should_call_preshaping = True
+                        self._cycle_state = CycleState.IDLE
+                        self._seg_trigger_time = 0.0
+                        self._current_segmentation_target = None
                     elif elapsed > self._seg_timeout:
                         self.get_logger().warn(
                             f"Segmentation timeout ({elapsed:.1f}s), "
@@ -1478,11 +1456,6 @@ class TwistPropagationNode(Node):
                         )
                     self._publish_status()
 
-                # -- State: WAITING_FOR_PRESHAPING ------------------------------
-                elif state == CycleState.WAITING_FOR_PRESHAPING:
-                    # Just wait -- the future callback will transition back to IDLE
-                    self._publish_status()
-
                 # -- State: IDLE -- run propagation -----------------------------
                 else:
                     self._run_idle_cycle()
@@ -1490,10 +1463,6 @@ class TwistPropagationNode(Node):
                 # Throttled status for active non-IDLE states handled above;
                 # IDLE cycle publishes its own status internally.
                 self._status_counter += 1
-
-            # -- Outside the lock: call preshaping service if needed -------------
-            if should_call_preshaping:
-                self._schedule_preshaping_call()
         except Exception as exc:
             import traceback
             self.get_logger().error(
@@ -1790,61 +1759,6 @@ class TwistPropagationNode(Node):
                 num_predicted_poses=len(positions),
             )
 
-    # ── Preshaping service call ────────────────────────────────────────────
-
-    def _schedule_preshaping_call(self):
-        """Call the preshaping service after a short delay.
-
-        The delay (``preshaping_call_delay_s``) gives the preshaping bridge
-        time to receive the segmented cloud via its own subscription before
-        the service call arrives.  Without this delay the bridge may still
-        hold the previous (empty/reset) cloud.
-        """
-        if self._preshaping_call_delay <= 0.0:
-            self._call_preshaping_service()
-            return
-
-        if self._preshaping_call_timer is not None:
-            self._preshaping_call_timer.cancel()
-        self._preshaping_call_timer = self.create_timer(
-            self._preshaping_call_delay, self._on_preshaping_delay_expired
-        )
-
-    def _on_preshaping_delay_expired(self):
-        """One-shot timer callback: call the preshaping service."""
-        if self._preshaping_call_timer is not None:
-            self._preshaping_call_timer.cancel()
-            self._preshaping_call_timer = None
-        self._call_preshaping_service()
-
-    def _call_preshaping_service(self):
-        """Call the preshaping service.  NOT called under self._lock."""
-        if not self._compute_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn("Preshaping service not available")
-            with self._lock:
-                self._cycle_state = CycleState.IDLE
-            return
-
-        future = self._compute_client.call_async(Trigger.Request())
-        future.add_done_callback(self._on_preshaping_response)
-
-    def _on_preshaping_response(self, future):
-        try:
-            response = future.result()
-            if response.success:
-                self.get_logger().info(
-                    f"Preshaping succeeded: {response.message[:100]}"
-                )
-            else:
-                self.get_logger().warn(
-                    f"Preshaping failed: {response.message[:100]}"
-                )
-        except Exception as exc:
-            self.get_logger().error(f"Preshaping service error: {exc}")
-
-        with self._lock:
-            self._cycle_state = CycleState.IDLE
-            self._seg_trigger_time = 0.0
 
 
 # ---------------------------------------------------------------------------

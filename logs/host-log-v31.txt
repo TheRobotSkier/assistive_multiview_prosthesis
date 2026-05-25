@@ -1,0 +1,432 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-25-21-03-40-551698-KingBob-543
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [965]
+[INFO] [mia_hand_driver_node-2]: process started with pid [966]
+[INFO] [command_bridge_node-3]: process started with pid [967]
+[INFO] [wrist_driver_node-4]: process started with pid [968]
+[INFO] [run_classifier-5]: process started with pid [969]
+[INFO] [emg_grasp_controller-6]: process started with pid [970]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process started with pid [971]
+[INFO] [camera_mount_tf_publisher-8]: process started with pid [972]
+[INFO] [tf_pipeline_diagnostics-9]: process started with pid [973]
+[INFO] [pointcloud_fusion_node-10]: process started with pid [974]
+[INFO] [odom_to_pose_relay-11]: process started with pid [975]
+[INFO] [openvins_odom_tf_relay-12]: process started with pid [976]
+[INFO] [segmentation_ros2_node-13]: process started with pid [977]
+[INFO] [twist_propagation_node-14]: process started with pid [980]
+[INFO] [preshaping_service_bridge_node-15]: process started with pid [981]
+[INFO] [grasp_proximity_controller_node.py-16]: process started with pid [982]
+[INFO] [force_controller_node-17]: process started with pid [985]
+[INFO] [rviz2-18]: process started with pid [986]
+[preshaping_service_bridge_node-15] [INFO] [1779743021.309953625] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-15] [INFO] [1779743021.312053019] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-18] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[mia_hand_driver_node-2] [INFO] [1779743021.903034663] [mia_hand_driver]: /dev/ttyMiaHand serial port opened.
+[emg_grasp_controller-6] [INFO] [1779743022.282958931] [emg_grasp_controller]: EMG grasp controller started — rate=20.0 Hz, stale_timeout=1.0s
+[mia_hand_driver_node-2] [INFO] [1779743022.286380284] [mia_hand_driver]: Mia Hand connected.
+[wrist_driver_node-4] [INFO] [1779743022.443719239] [wrist_driver]: Wrist motor connected on /dev/ttyDynamixel, ID=1
+[grasp_proximity_controller_node.py-16] [INFO] [1779743022.577191012] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[rviz2-18] [INFO] [1779743022.897208853] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779743022.897697779] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-18] [INFO] [1779743023.139098842] [rviz2]: Stereo is NOT SUPPORTED
+[force_controller_node-17] [INFO] [1779743023.320736718] [force_controller]: Force controller started. Target range: [50.0, 200.0] raw units, kp=0.01, ki=0.001, rate=10.0 Hz
+[rviz2-18] [INFO] [1779743023.332458589] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779743023.345013367] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779743023.377129502] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779743023.387862223] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[pipeline_manager_node-1] [INFO] [1779743023.522543233] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1779743023.525190712] [pipeline_manager]: Pipeline manager started — state: IDLE
+[command_bridge_node-3] [INFO] [1779743023.704297401] [command_bridge]: Command bridge started — speed=80%, joint_states → /joint_states
+[rviz2-18] [INFO] [1779743024.014201440] [rviz2]: Stereo is NOT SUPPORTED
+[openvins_odom_tf_relay-12] [WARN] [1779743024.120574440] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(8754637.686, -8390432.085, -27565720.607), cov_trace=2.75e+27, pos_norm=30114979.399m, elapsed=0.0s, actual_imu_frame='arm_imu')
+[tf_pipeline_diagnostics-9] [INFO] [1779743024.210664964] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[rviz2-18] [INFO] [1779743024.234981082] [rviz2]: Stereo is NOT SUPPORTED
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779743024.336805725] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779743024.337495286] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779743024.453624490] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779743024.462028459] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779743024.464897469] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[pipeline_manager_node-1] [INFO] [1779743024.533628750] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pointcloud_fusion_node-10] [INFO] [1779743024.613665464] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-10] [INFO] [1779743024.615200927] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-10] [INFO] [1779743024.706036164] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-10] [WARN] [1779743024.707833850] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [INFO] [1779743024.711221091] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-10] [INFO] [1779743024.713126676] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[run_classifier-5] [2026-05-25 21:03:44.768] [board_logger] [info] incoming json: {
+[run_classifier-5]     "file": "",
+[run_classifier-5]     "file_anc": "",
+[run_classifier-5]     "file_aux": "",
+[run_classifier-5]     "ip_address": "",
+[run_classifier-5]     "ip_address_anc": "",
+[run_classifier-5]     "ip_address_aux": "",
+[run_classifier-5]     "ip_port": 0,
+[run_classifier-5]     "ip_port_anc": 0,
+[run_classifier-5]     "ip_port_aux": 0,
+[run_classifier-5]     "ip_protocol": 0,
+[run_classifier-5]     "mac_address": "",
+[run_classifier-5]     "master_board": -100,
+[run_classifier-5]     "other_info": "",
+[run_classifier-5]     "serial_number": "",
+[run_classifier-5]     "serial_port": "",
+[run_classifier-5]     "timeout": 0
+[run_classifier-5] }
+[run_classifier-5] [2026-05-25 21:03:44.769] [board_logger] [info] Target address is set to : 192.168.4.1::4210
+[camera_mount_tf_publisher-8] [INFO] [1779743024.871656233] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-8] [INFO] [1779743024.873726566] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[twist_propagation_node-14] [INFO] [1779743024.896664911] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-14] [INFO] [1779743025.010330422] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-14] [INFO] [1779743025.012566688] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[segmentation_ros2_node-13] [INFO] [1779743025.064316190] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[command_bridge_node-3] [INFO] [1779743025.684366082] [command_bridge]: Joint position stream activated.
+[pointcloud_fusion_node-10] [WARN] [1779743026.710733330] [pointcloud_fusion]: TF tree connected via 'arm_d435i_arm_depth_optical_frame' — starting point cloud fusion (waited 2.0s since node startup)
+[pointcloud_fusion_node-10] [WARN] [1779743026.774829375] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743034.093225001] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: OK (332 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743034.720280730] [pointcloud_fusion]: Stats: published=45 (dual=0, cam1_only=119) dist_removed=11667526 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:120} last_publish_ago=0.1s
+[tf_pipeline_diagnostics-9] [WARN] [1779743035.188800397] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743036.782106531] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779743038.301156569] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743039.712202516] [mia_hand_driver]: Mia Hand connected.
+[twist_propagation_node-14] [INFO] [1779743040.590620925] [twist_propagation]: External twist stale: age=2.007s > max=2.000s
+[openvins_odom_tf_relay-12] [WARN] [1779743044.088693867] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: OK (425 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743044.707206887] [pointcloud_fusion]: Stats: published=33 (dual=0, cam1_only=69) dist_removed=6789787 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:69} last_publish_ago=5.4s
+[tf_pipeline_diagnostics-9] [WARN] [1779743045.191941885] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[twist_propagation_node-14] [INFO] [1779743045.609850357] [twist_propagation]: External twist stale: age=7.027s > max=2.000s
+[twist_propagation_node-14] [INFO] [1779743050.609900361] [twist_propagation]: External twist stale: age=12.027s > max=2.000s
+[pointcloud_fusion_node-10] [WARN] [1779743051.642429191] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743054.090004590] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: OK (425 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743054.712531824] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:46, head_d435i_head_depth_optical_frame:47} last_publish_ago=15.4s
+[pointcloud_fusion_node-10] [WARN] [1779743054.716382899] [pointcloud_fusion]: Stall diagnostic (no publish for 15s): cam1: fresh (0.06s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.00s); cam2 TF: Lookup would require extrapolation into the past.  Requested time 1779743038.576547 but the earliest data is at time 1779743044.565925, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[twist_propagation_node-14] [INFO] [1779743055.614302403] [twist_propagation]: External twist stale: age=17.027s > max=2.000s
+[tf_pipeline_diagnostics-9] [WARN] [1779743056.211222064] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[twist_propagation_node-14] [INFO] [1779743060.634305038] [twist_propagation]: External twist stale: age=22.050s > max=2.000s
+[pointcloud_fusion_node-10] [WARN] [1779743061.645821836] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743064.092722489] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: OK (425 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743064.713519446] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:149, head_d435i_head_depth_optical_frame:150} last_publish_ago=25.4s
+[pointcloud_fusion_node-10] [WARN] [1779743064.717304712] [pointcloud_fusion]: Stall diagnostic (no publish for 25s): cam1: fresh (0.03s); cam1 TF: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; cam2: fresh (0.00s); cam2 TF: Lookup would require extrapolation into the past.  Requested time 1779743038.576547 but the earliest data is at time 1779743054.666052, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[twist_propagation_node-14] [INFO] [1779743065.655674434] [twist_propagation]: External twist stale: age=27.072s > max=2.000s
+[tf_pipeline_diagnostics-9] [WARN] [1779743066.198418829] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743071.741417984] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743074.088119785] [openvins_odom_tf_relay]: [RELAY-STATUS] 50s elapsed — head: WAITING (0 msgs), arm: OK (996 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779743075.186337986] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779743076.134485275] [pointcloud_fusion]: Stats: published=27 (dual=0, cam1_only=42) dist_removed=1696347 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:80, head_d435i_head_depth_optical_frame:125} last_publish_ago=0.0s
+[pipeline_manager_node-1] [INFO] [1779743080.894117595] [pipeline_manager]: State: IDLE -> TWISTING (EMG: POWER (held 1.0s))
+[twist_propagation_node-14] [INFO] [1779743080.899786462] [twist_propagation]: Activated
+[force_controller_node-17] [INFO] [1779743080.901012776] [force_controller]: Pipeline state: IDLE -> TWISTING
+[pipeline_manager_node-1] [INFO] [1779743080.920971194] [pipeline_manager]: Twist propagation activated
+[pointcloud_fusion_node-10] [WARN] [1779743081.965754481] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779743083.221194999] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.49s) — fresh lookup failed
+[openvins_odom_tf_relay-12] [WARN] [1779743084.090197014] [openvins_odom_tf_relay]: [RELAY-STATUS] 60s elapsed — head: WAITING (0 msgs), arm: OK (2783 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779743085.177172065] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779743085.534429481] [pointcloud_fusion]: Stats: published=48 (dual=0, cam1_only=53) dist_removed=1695033 bbox_removed=2182 bbox_skipped=0 bbox_cache_hits=9 tf_fail={head_d435i_head_depth_optical_frame:53} last_publish_ago=0.5s
+[twist_propagation_node-14] [INFO] [1779743086.387427588] [twist_propagation]: Hit found at (0.282, -0.018, 0.043) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743086.390161957] [twist_propagation]: Published contact state: pos=(0.282, -0.018, 0.043) orient=(0.787, -0.005, -0.617, 0.012) zero_twist
+[twist_propagation_node-14] [INFO] [1779743086.391545968] [twist_propagation]: Hit detected — collision distance: 0.356m
+[pipeline_manager_node-1] [INFO] [1779743086.392512430] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[twist_propagation_node-14] [INFO] [1779743086.395142029] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.282, -0.018, 0.043), r=[0.0050, 0.0300]m
+[force_controller_node-17] [INFO] [1779743086.395332721] [force_controller]: Pipeline state: TWISTING -> SEGMENTING
+[segmentation_ros2_node-13] [INFO] [1779743086.399444151] [segmentation_bridge]: [+] positive click at (0.282, -0.018, 0.043) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743086.434583274] [segmentation_bridge]: Running inference with 1 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743086.470466696] [segmentation_bridge]: ROI crop: 200/26247 points within 0.1m of click centroid
+[segmentation_ros2_node-13] [INFO] [1779743087.275580956] [segmentation_bridge]: Published segmented cloud: 200/26247 points.
+[pipeline_manager_node-1] [INFO] [1779743087.285487256] [pipeline_manager]: Object cloud received but grasp_type is 0 — proceeding anyway
+[twist_propagation_node-14] [INFO] [1779743087.296336667] [twist_propagation]: Segmented cloud received
+[pipeline_manager_node-1] [INFO] [1779743087.315925708] [pipeline_manager]: State: SEGMENTING -> PLANNING (Segmentation complete: object cloud received)
+[preshaping_service_bridge_node-15] [INFO] [1779743087.320094622] [preshaping_service]: Planner called with contact override: target=(0.282,-0.018,0.043) zero_twist=true
+[preshaping_service_bridge_node-15] [WARN] [1779743087.320552779] [preshaping_service]: Could not lookup camera frame 'head_d435i_head_depth_optical_frame' in 'marker_map': Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[preshaping_service_bridge_node-15] [INFO] [1779743087.320687467] [preshaping_service]: Planner called with 1 camera(s): target_frame=marker_map cam0=(0.569,-0.118,0.244)
+[force_controller_node-17] [INFO] [1779743087.323780121] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[preshaping_service_bridge_node-15] [runtime_config] Loaded config from "/prosthesis_ws/config/grasp_preshaping.yaml"
+[twist_propagation_node-14] [INFO] [1779743087.369790417] [twist_propagation]: Hit found at (0.305, -0.016, 0.056) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743087.373529550] [twist_propagation]: Published contact state: pos=(0.305, -0.016, 0.056) orient=(0.792, -0.008, -0.611, 0.007) zero_twist
+[twist_propagation_node-14] [INFO] [1779743087.381051064] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.305, -0.016, 0.056), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743087.381138120] [segmentation_bridge]: [+] positive click at (0.305, -0.016, 0.056) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743087.415483395] [segmentation_bridge]: Running inference with 2 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743087.417993146] [segmentation_bridge]: ROI crop: 323/25917 points within 0.1m of click centroid
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771645682] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771710151] [preshaping_service]:   Pipeline Time: 450 ms
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771718942] [preshaping_service]:   SMC Iterations: 5
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771725786] [preshaping_service]:   Grasp Type: Cylindrical
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771732311] [preshaping_service]:   Combined Score: 0.3848
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771743238] [preshaping_service]:   Alignment Score: 0.6841
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771750986] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771757331] [preshaping_service]:   Contact Count Score: 0.3333
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771763437] [preshaping_service]:   Contact Score: 0.2083
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771770135] [preshaping_service]:   Closure Amount: 0.5500
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771776626] [preshaping_service]:   2nd Best Grasp: Cylindrical
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771782201] [preshaping_service]:   2nd Best Score: 0.2192 (margin: 0.1656)
+[preshaping_service_bridge_node-15] [INFO] [1779743087.771789793] [preshaping_service]: ===========================
+[pipeline_manager_node-1] [INFO] [1779743087.785304708] [pipeline_manager]: State: PLANNING -> APPROACHING (Preshaping: cylindrical grasp, closure=0.5500, combined=0.3848, alignment=0.6841, force_clos)
+[force_controller_node-17] [INFO] [1779743087.799453797] [force_controller]: Pipeline state: PLANNING -> APPROACHING
+[wrist_driver_node-4] [WARN] [1779743088.166035181] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] There is no status packet!, vel=[TxRxResult] Communication success!
+[segmentation_ros2_node-13] [INFO] [1779743088.988708044] [segmentation_bridge]: Published segmented cloud: 323/25917 points.
+[twist_propagation_node-14] [INFO] [1779743089.014715083] [twist_propagation]: Segmented cloud received
+[pointcloud_fusion_node-10] [WARN] [1779743092.367826625] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743094.088400048] [openvins_odom_tf_relay]: [RELAY-STATUS] 70s elapsed — head: WAITING (0 msgs), arm: OK (4463 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743095.174589691] [pointcloud_fusion]: Stats: published=54 (dual=0, cam1_only=50) dist_removed=1385040 bbox_removed=3030 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:58} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779743095.177090249] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779743097.299633507] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743098.735827271] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779743102.639605743] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743104.088256819] [openvins_odom_tf_relay]: [RELAY-STATUS] 80s elapsed — head: WAITING (0 msgs), arm: OK (6221 msgs)
+[twist_propagation_node-14] [INFO] [1779743105.047202471] [twist_propagation]: Hit found at (0.364, -0.057, 0.053) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743105.048879281] [twist_propagation]: Published contact state: pos=(0.364, -0.057, 0.053) orient=(0.772, -0.033, -0.631, 0.065) zero_twist
+[twist_propagation_node-14] [INFO] [1779743105.050662663] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.364, -0.057, 0.053), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743105.051557442] [segmentation_bridge]: [+] positive click at (0.364, -0.057, 0.053) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743105.076587232] [segmentation_bridge]: Running inference with 3 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743105.100958911] [segmentation_bridge]: ROI crop: 433/22778 points within 0.1m of click centroid
+[tf_pipeline_diagnostics-9] [WARN] [1779743105.187270085] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779743105.241655727] [pointcloud_fusion]: Stats: published=58 (dual=0, cam1_only=58) dist_removed=1959169 bbox_removed=1337 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:58} last_publish_ago=0.1s
+[segmentation_ros2_node-13] [INFO] [1779743105.805387598] [segmentation_bridge]: Published segmented cloud: 433/22778 points.
+[twist_propagation_node-14] [INFO] [1779743105.810015839] [twist_propagation]: Segmented cloud received
+[twist_propagation_node-14] [INFO] [1779743106.566178975] [twist_propagation]: Hit found at (0.240, 0.021, -0.054) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743106.567762713] [twist_propagation]: Published contact state: pos=(0.240, 0.021, -0.054) orient=(0.756, -0.013, -0.655, 0.006) zero_twist
+[twist_propagation_node-14] [INFO] [1779743106.571771843] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.240, 0.021, -0.054), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743106.574238244] [segmentation_bridge]: [+] positive click at (0.240, 0.021, -0.054) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743106.597106780] [segmentation_bridge]: Running inference with 4 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743106.599751855] [segmentation_bridge]: ROI crop: 457/22575 points within 0.1m of click centroid
+[segmentation_ros2_node-13] [INFO] [1779743108.310152376] [segmentation_bridge]: Published segmented cloud: 457/22575 points.
+[twist_propagation_node-14] [INFO] [1779743108.322083829] [twist_propagation]: Segmented cloud received
+[pointcloud_fusion_node-10] [WARN] [1779743109.352955862] [pointcloud_fusion]: Using cached transform for palm_frame (age=1.98s) — fresh lookup failed
+[mia_hand_driver_node-2] [INFO] [1779743111.295148797] [mia_hand_driver]: Mia Hand disconnected.
+[twist_propagation_node-14] [INFO] [1779743111.651189554] [twist_propagation]: Hit found at (0.234, -0.098, -0.002) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743111.652876460] [twist_propagation]: Published contact state: pos=(0.234, -0.098, -0.002) orient=(0.766, -0.016, -0.640, 0.051) zero_twist
+[segmentation_ros2_node-13] [INFO] [1779743111.654915071] [segmentation_bridge]: [+] positive click at (0.234, -0.098, -0.002) (cloud frame)
+[twist_propagation_node-14] [INFO] [1779743111.655574179] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.234, -0.098, -0.002), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743111.686556336] [segmentation_bridge]: Running inference with 5 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743111.704309421] [segmentation_bridge]: ROI crop: 11/20682 points within 0.1m of click centroid
+[pointcloud_fusion_node-10] [WARN] [1779743112.756235462] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779743112.760384211] [mia_hand_driver]: Mia Hand connected.
+[segmentation_ros2_node-13] [INFO] [1779743114.037073827] [segmentation_bridge]: Published segmented cloud: 7/20682 points.
+[openvins_odom_tf_relay-12] [WARN] [1779743114.088149661] [openvins_odom_tf_relay]: [RELAY-STATUS] 90s elapsed — head: WAITING (0 msgs), arm: OK (7910 msgs)
+[twist_propagation_node-14] [INFO] [1779743114.096240648] [twist_propagation]: Segmented cloud received
+[pointcloud_fusion_node-10] [INFO] [1779743114.973448953] [pointcloud_fusion]: Stats: published=47 (dual=0, cam1_only=43) dist_removed=1336938 bbox_removed=30052 bbox_skipped=0 bbox_cache_hits=3 tf_fail={head_d435i_head_depth_optical_frame:35} last_publish_ago=0.3s
+[tf_pipeline_diagnostics-9] [WARN] [1779743115.196596698] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743122.844603184] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743124.088422976] [openvins_odom_tf_relay]: [RELAY-STATUS] 100s elapsed — head: WAITING (0 msgs), arm: OK (9618 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743125.130084485] [pointcloud_fusion]: Stats: published=56 (dual=0, cam1_only=61) dist_removed=2163620 bbox_removed=26274 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:59} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779743125.197741179] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743132.998277509] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779743133.454831949] [pointcloud_fusion]: Bbox removal via fresh TF removed 245 points from palm_frame
+[openvins_odom_tf_relay-12] [WARN] [1779743134.089335797] [openvins_odom_tf_relay]: [RELAY-STATUS] 110s elapsed — head: WAITING (0 msgs), arm: OK (11291 msgs)
+[twist_propagation_node-14] [INFO] [1779743134.543605080] [twist_propagation]: Hit found at (0.301, -0.058, 0.043) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743134.546053420] [twist_propagation]: Published contact state: pos=(0.301, -0.058, 0.043) orient=(0.812, -0.009, -0.580, 0.068) zero_twist
+[segmentation_ros2_node-13] [INFO] [1779743134.548188086] [segmentation_bridge]: [+] positive click at (0.301, -0.058, 0.043) (cloud frame)
+[twist_propagation_node-14] [INFO] [1779743134.550161821] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.301, -0.058, 0.043), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743134.570081716] [segmentation_bridge]: Running inference with 6 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743134.576587830] [segmentation_bridge]: ROI crop: 1055/21017 points within 0.1m of click centroid
+[tf_pipeline_diagnostics-9] [WARN] [1779743135.187234264] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779743135.247798414] [pointcloud_fusion]: Stats: published=45 (dual=0, cam1_only=46) dist_removed=1514631 bbox_removed=6156 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:45} last_publish_ago=0.5s
+[segmentation_ros2_node-13] [INFO] [1779743136.418545598] [segmentation_bridge]: Published segmented cloud: 1055/21017 points.
+[twist_propagation_node-14] [INFO] [1779743136.463003400] [twist_propagation]: Segmented cloud received
+[pointcloud_fusion_node-10] [WARN] [1779743136.706920610] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.94s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779743143.072785650] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pipeline_manager_node-1] [INFO] [1779743143.736500278] [pipeline_manager]: State: APPROACHING -> RELEASING (EMG: OPEN)
+[force_controller_node-17] [INFO] [1779743143.738287215] [force_controller]: Pipeline state: APPROACHING -> RELEASING
+[force_controller_node-17] [INFO] [1779743143.738975052] [force_controller]: Deactivating force controller...
+[twist_propagation_node-14] [INFO] [1779743143.746428468] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779743143.750334479] [pipeline_manager]: Twist propagation deactivated
+[pipeline_manager_node-1] [INFO] [1779743144.041683869] [pipeline_manager]: State: RELEASING -> IDLE (Release complete - all fingers open)
+[force_controller_node-17] [INFO] [1779743144.050864656] [force_controller]: Pipeline state: RELEASING -> IDLE
+[openvins_odom_tf_relay-12] [WARN] [1779743144.088640455] [openvins_odom_tf_relay]: [RELAY-STATUS] 120s elapsed — head: WAITING (0 msgs), arm: OK (12936 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779743145.181831606] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779743145.334150902] [pointcloud_fusion]: Stats: published=55 (dual=0, cam1_only=54) dist_removed=2031617 bbox_removed=4472 bbox_skipped=0 bbox_cache_hits=5 tf_fail={head_d435i_head_depth_optical_frame:55} last_publish_ago=0.2s
+[pointcloud_fusion_node-10] [WARN] [1779743147.889386382] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.45s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779743149.081221301] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.2s > 2.0s), skipping
+[pointcloud_fusion_node-10] [WARN] [1779743153.121145652] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743154.088482567] [openvins_odom_tf_relay]: [RELAY-STATUS] 130s elapsed — head: WAITING (0 msgs), arm: OK (14640 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743155.106203186] [pointcloud_fusion]: Stats: published=52 (dual=0, cam1_only=55) dist_removed=2422330 bbox_removed=17903 bbox_skipped=33 bbox_cache_hits=22 tf_fail={head_d435i_head_depth_optical_frame:53} last_publish_ago=0.1s
+[tf_pipeline_diagnostics-9] [WARN] [1779743155.174861286] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743163.218259146] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743164.089175198] [openvins_odom_tf_relay]: [RELAY-STATUS] 140s elapsed — head: WAITING (0 msgs), arm: OK (16345 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743165.088898153] [pointcloud_fusion]: Stats: published=48 (dual=0, cam1_only=53) dist_removed=2064768 bbox_removed=65 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:47} last_publish_ago=1.5s
+[tf_pipeline_diagnostics-9] [WARN] [1779743165.196965885] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743173.340460884] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743174.091524867] [openvins_odom_tf_relay]: [RELAY-STATUS] 150s elapsed — head: WAITING (0 msgs), arm: OK (18021 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779743175.191553691] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779743175.293599276] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [INFO] [1779743175.456245375] [pointcloud_fusion]: Stats: published=51 (dual=0, cam1_only=50) dist_removed=1657106 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:53} last_publish_ago=0.2s
+[mia_hand_driver_node-2] [INFO] [1779743176.762731678] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779743182.296137520] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779743183.348952289] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779743183.753580454] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=1.07s) — fresh lookup failed
+[mia_hand_driver_node-2] [INFO] [1779743183.757983991] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779743184.089318085] [openvins_odom_tf_relay]: [RELAY-STATUS] 160s elapsed — head: WAITING (0 msgs), arm: OK (19630 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779743184.617282776] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.2s > 2.0s), skipping
+[pointcloud_fusion_node-10] [INFO] [1779743185.082234928] [pointcloud_fusion]: Stats: published=43 (dual=0, cam1_only=46) dist_removed=1738862 bbox_removed=0 bbox_skipped=2 bbox_cache_hits=15 tf_fail={head_d435i_head_depth_optical_frame:44} last_publish_ago=0.3s
+[tf_pipeline_diagnostics-9] [WARN] [1779743185.190411702] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779743188.302036585] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743189.741771363] [mia_hand_driver]: Mia Hand connected.
+[pipeline_manager_node-1] [INFO] [1779743189.943850558] [pipeline_manager]: State: IDLE -> TWISTING (EMG: POWER (held 1.0s))
+[force_controller_node-17] [INFO] [1779743189.949491667] [force_controller]: Pipeline state: IDLE -> TWISTING
+[twist_propagation_node-14] [INFO] [1779743189.961420266] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779743189.967810337] [pipeline_manager]: Twist propagation activated
+[pointcloud_fusion_node-10] [WARN] [1779743193.443122766] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[twist_propagation_node-14] [INFO] [1779743193.753789763] [twist_propagation]: Hit found at (0.242, -0.019, -0.046) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743193.756347953] [twist_propagation]: Published contact state: pos=(0.242, -0.019, -0.046) orient=(0.822, 0.017, -0.566, 0.052) zero_twist
+[pipeline_manager_node-1] [INFO] [1779743193.763272445] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[twist_propagation_node-14] [INFO] [1779743193.768507153] [twist_propagation]: Hit detected — collision distance: 0.340m
+[force_controller_node-17] [INFO] [1779743193.770877223] [force_controller]: Pipeline state: TWISTING -> SEGMENTING
+[twist_propagation_node-14] [INFO] [1779743193.777655898] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.242, -0.019, -0.046), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743193.780428626] [segmentation_bridge]: [+] positive click at (0.242, -0.019, -0.046) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743193.806735252] [segmentation_bridge]: Running inference with 7 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743193.823389113] [segmentation_bridge]: ROI crop: 173/23861 points within 0.1m of click centroid
+[openvins_odom_tf_relay-12] [WARN] [1779743194.090948048] [openvins_odom_tf_relay]: [RELAY-STATUS] 170s elapsed — head: WAITING (0 msgs), arm: OK (21243 msgs)
+[pipeline_manager_node-1] [INFO] [1779743194.741675833] [pipeline_manager]: State: SEGMENTING -> PLANNING (Segmentation complete: object cloud received)
+[preshaping_service_bridge_node-15] [INFO] [1779743194.749216933] [preshaping_service]: Planner called with contact override: target=(0.242,-0.019,-0.046) zero_twist=true
+[preshaping_service_bridge_node-15] [WARN] [1779743194.749433891] [preshaping_service]: Could not lookup camera frame 'head_d435i_head_depth_optical_frame' in 'marker_map': Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[preshaping_service_bridge_node-15] [INFO] [1779743194.749487652] [preshaping_service]: Planner called with 1 camera(s): target_frame=marker_map cam0=(0.500,-0.115,0.253)
+[twist_propagation_node-14] [INFO] [1779743194.752120608] [twist_propagation]: Segmented cloud received
+[force_controller_node-17] [INFO] [1779743194.753652564] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[segmentation_ros2_node-13] [INFO] [1779743194.757448271] [segmentation_bridge]: Published segmented cloud: 173/23861 points.
+[tf_pipeline_diagnostics-9] [WARN] [1779743195.199012105] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[preshaping_service_bridge_node-15] [INFO] [1779743195.293188984] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294380539] [preshaping_service]:   Pipeline Time: 543 ms
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294430179] [preshaping_service]:   SMC Iterations: 5
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294440193] [preshaping_service]:   Grasp Type: Lateral
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294447562] [preshaping_service]:   Combined Score: 0.4403
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294463313] [preshaping_service]:   Alignment Score: 0.8917
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294470874] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294478247] [preshaping_service]:   Contact Count Score: 0.5000
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294484903] [preshaping_service]:   Contact Score: 0.2500
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294491277] [preshaping_service]:   Closure Amount: 0.0000
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294497843] [preshaping_service]:   2nd Best Grasp: Pinch
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294504199] [preshaping_service]:   2nd Best Score: 0.4315 (margin: 0.0088)
+[preshaping_service_bridge_node-15] [INFO] [1779743195.294513217] [preshaping_service]: ===========================
+[pipeline_manager_node-1] [INFO] [1779743195.309428155] [pipeline_manager]: State: PLANNING -> APPROACHING (Preshaping: lateral grasp, closure=0.0000, combined=0.4403, alignment=0.8917, force_closure=)
+[force_controller_node-17] [INFO] [1779743195.327246801] [force_controller]: Pipeline state: PLANNING -> APPROACHING
+[pointcloud_fusion_node-10] [INFO] [1779743195.643909118] [pointcloud_fusion]: Stats: published=44 (dual=0, cam1_only=34) dist_removed=860899 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=2 tf_fail={head_d435i_head_depth_optical_frame:46} last_publish_ago=0.6s
+[pointcloud_fusion_node-10] [WARN] [1779743196.931260210] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.68s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779743198.092997412] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.1s > 2.0s), skipping
+[twist_propagation_node-14] [INFO] [1779743198.577494026] [twist_propagation]: Hit found at (0.262, 0.043, -0.053) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743198.578788055] [twist_propagation]: Published contact state: pos=(0.262, 0.043, -0.053) orient=(0.817, -0.041, -0.573, 0.054) zero_twist
+[twist_propagation_node-14] [INFO] [1779743198.581364247] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.262, 0.043, -0.053), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743198.584740854] [segmentation_bridge]: [+] positive click at (0.262, 0.043, -0.053) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743198.608586994] [segmentation_bridge]: Running inference with 8 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743198.627025215] [segmentation_bridge]: ROI crop: 779/23948 points within 0.1m of click centroid
+[segmentation_ros2_node-13] [INFO] [1779743200.671249972] [segmentation_bridge]: Published segmented cloud: 779/23948 points.
+[twist_propagation_node-14] [INFO] [1779743200.714556503] [twist_propagation]: Segmented cloud received
+[pointcloud_fusion_node-10] [WARN] [1779743203.186258470] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (6.6s > 2.0s), skipping
+[pointcloud_fusion_node-10] [WARN] [1779743203.617196612] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779743203.657959082] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter �� skipping
+[openvins_odom_tf_relay-12] [WARN] [1779743204.089890050] [openvins_odom_tf_relay]: [RELAY-STATUS] 180s elapsed — head: WAITING (0 msgs), arm: OK (22857 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743204.928402138] [pointcloud_fusion]: Stats: published=34 (dual=0, cam1_only=32) dist_removed=806010 bbox_removed=410 bbox_skipped=53 bbox_cache_hits=13 tf_fail={arm_d435i_arm_depth_optical_frame:7, head_d435i_head_depth_optical_frame:42} last_publish_ago=0.2s
+[pointcloud_fusion_node-10] [ERROR] [1779743205.071096868] [pointcloud_fusion]: Bbox removal success rate is 74% over 29s (182/246 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[tf_pipeline_diagnostics-9] [WARN] [1779743205.181990886] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743207.834298890] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=1.74s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779743208.206188215] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.2s > 2.0s), skipping
+[pointcloud_fusion_node-10] [WARN] [1779743213.277683605] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (17.4s > 2.0s), skipping
+[pointcloud_fusion_node-10] [WARN] [1779743213.666551982] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743214.095683023] [openvins_odom_tf_relay]: [RELAY-STATUS] 190s elapsed — head: WAITING (0 msgs), arm: OK (24487 msgs)
+[tf_pipeline_diagnostics-9] [WARN] [1779743215.190815756] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [INFO] [1779743215.518760337] [pointcloud_fusion]: Stats: published=52 (dual=0, cam1_only=55) dist_removed=2429662 bbox_removed=50 bbox_skipped=95 bbox_cache_hits=4 tf_fail={arm_d435i_arm_depth_optical_frame:4, head_d435i_head_depth_optical_frame:67} last_publish_ago=0.2s
+[twist_propagation_node-14] [INFO] [1779743221.901789225] [twist_propagation]: Hit found at (0.322, -0.031, 0.034) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743221.904823137] [twist_propagation]: Published contact state: pos=(0.322, -0.031, 0.034) orient=(0.666, -0.014, -0.723, 0.183) zero_twist
+[twist_propagation_node-14] [INFO] [1779743221.906995866] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.322, -0.031, 0.034), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743221.908896128] [segmentation_bridge]: [+] positive click at (0.322, -0.031, 0.034) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743221.937565871] [segmentation_bridge]: Running inference with 9 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743221.949421008] [segmentation_bridge]: ROI crop: 241/18674 points within 0.1m of click centroid
+[pointcloud_fusion_node-10] [WARN] [1779743221.960811959] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.42s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779743223.041252676] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.0s > 2.0s), skipping
+[segmentation_ros2_node-13] [INFO] [1779743223.847094215] [segmentation_bridge]: Published segmented cloud: 241/18674 points.
+[twist_propagation_node-14] [INFO] [1779743223.850955483] [twist_propagation]: Segmented cloud received
+[openvins_odom_tf_relay-12] [WARN] [1779743224.090549590] [openvins_odom_tf_relay]: [RELAY-STATUS] 200s elapsed — head: WAITING (0 msgs), arm: OK (26132 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779743224.226898182] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779743225.110730713] [pointcloud_fusion]: Stats: published=41 (dual=0, cam1_only=39) dist_removed=1520861 bbox_removed=0 bbox_skipped=10 bbox_cache_hits=13 tf_fail={head_d435i_head_depth_optical_frame:41} last_publish_ago=2.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779743225.184766918] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[twist_propagation_node-14] [INFO] [1779743225.586370016] [twist_propagation]: Hit found at (0.337, -0.210, 0.060) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743225.587873363] [twist_propagation]: Published contact state: pos=(0.337, -0.210, 0.060) orient=(0.522, 0.033, -0.848, 0.085) zero_twist
+[twist_propagation_node-14] [INFO] [1779743225.590090993] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.337, -0.210, 0.060), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743225.590513023] [segmentation_bridge]: [+] positive click at (0.337, -0.210, 0.060) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743225.620652935] [segmentation_bridge]: Running inference with 10 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743225.627513960] [segmentation_bridge]: ROI crop: 348/19314 points within 0.1m of click centroid
+[twist_propagation_node-14] [INFO] [1779743227.559808809] [twist_propagation]: Segmented cloud received
+[segmentation_ros2_node-13] [INFO] [1779743227.561681175] [segmentation_bridge]: Published segmented cloud: 348/19314 points.
+[pointcloud_fusion_node-10] [WARN] [1779743228.130135337] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (7.0s > 2.0s), skipping
+[pointcloud_fusion_node-10] [WARN] [1779743230.994731422] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779743231.349136315] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.53s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779743233.480445925] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — cached transform too old (2.8s > 2.0s), skipping
+[openvins_odom_tf_relay-12] [WARN] [1779743234.088254260] [openvins_odom_tf_relay]: [RELAY-STATUS] 210s elapsed — head: WAITING (0 msgs), arm: OK (27719 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779743234.798611632] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [INFO] [1779743235.071115481] [pointcloud_fusion]: Stats: published=43 (dual=0, cam1_only=51) dist_removed=3395236 bbox_removed=0 bbox_skipped=43 bbox_cache_hits=19 tf_fail={arm_d435i_arm_depth_optical_frame:15, head_d435i_head_depth_optical_frame:58} last_publish_ago=0.4s
+[tf_pipeline_diagnostics-9] [WARN] [1779743235.187939554] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [ERROR] [1779743235.281949908] [pointcloud_fusion]: Bbox removal success rate is 47% over 30s (141/300 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[twist_propagation_node-14] [INFO] [1779743239.636822883] [twist_propagation]: Hit found at (-0.214, -0.218, 0.259) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779743239.647702150] [twist_propagation]: Published contact state: pos=(-0.214, -0.218, 0.259) orient=(0.524, 0.034, -0.848, 0.070) zero_twist
+[twist_propagation_node-14] [INFO] [1779743239.652929117] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (-0.214, -0.218, 0.259), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779743239.653132038] [segmentation_bridge]: [+] positive click at (-0.214, -0.218, 0.259) (cloud frame)
+[segmentation_ros2_node-13] [INFO] [1779743239.676918249] [segmentation_bridge]: Running inference with 11 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779743239.679487201] [segmentation_bridge]: ROI crop: 0/7875 points within 0.1m of click centroid
+[mia_hand_driver_node-2] [INFO] [1779743242.308474827] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743243.769974386] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779743244.089665987] [openvins_odom_tf_relay]: [RELAY-STATUS] 220s elapsed — head: WAITING (0 msgs), arm: OK (29364 msgs)
+[mia_hand_driver_node-2] [INFO] [1779743244.306666624] [mia_hand_driver]: Mia Hand disconnected.
+[twist_propagation_node-14] [WARN] [1779743244.674476152] [twist_propagation]: Segmentation timeout (5.0s), returning to IDLE
+[pointcloud_fusion_node-10] [INFO] [1779743244.805554866] [pointcloud_fusion]: Stats: published=82 (dual=0, cam1_only=70) dist_removed=5672381 bbox_removed=233 bbox_skipped=8 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:85} last_publish_ago=0.5s
+[pointcloud_fusion_node-10] [WARN] [1779743244.855424185] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[tf_pipeline_diagnostics-9] [WARN] [1779743245.183106841] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779743246.765454944] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779743252.301976636] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743253.826386475] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779743254.091664081] [openvins_odom_tf_relay]: [RELAY-STATUS] 230s elapsed — head: WAITING (0 msgs), arm: OK (30922 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743254.898198383] [pointcloud_fusion]: Stats: published=64 (dual=0, cam1_only=67) dist_removed=5848133 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:64} last_publish_ago=0.5s
+[tf_pipeline_diagnostics-9] [WARN] [1779743255.197010293] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779743255.314189375] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779743255.555995303] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779743256.829864688] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779743260.311905442] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743261.833745717] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779743264.090840943] [openvins_odom_tf_relay]: [RELAY-STATUS] 240s elapsed — head: WAITING (0 msgs), arm: OK (32390 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743265.038686698] [pointcloud_fusion]: Stats: published=58 (dual=0, cam1_only=57) dist_removed=5095608 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:44} last_publish_ago=0.2s
+[tf_pipeline_diagnostics-9] [WARN] [1779743265.199679372] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743265.557958452] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779743266.297658807] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743268.809590120] [mia_hand_driver]: Mia Hand connected.
+[wrist_driver_node-4] [WARN] [1779743269.499374709] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] Communication success!, vel=[TxRxResult] There is no status packet!
+[mia_hand_driver_node-2] [INFO] [1779743271.295330166] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743273.745641846] [mia_hand_driver]: Mia Hand connected.
+[segmentation_ros2_node-13] [ERROR] [1779743274.074421001] [segmentation_bridge]: Inference request failed: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+[openvins_odom_tf_relay-12] [WARN] [1779743274.089730171] [openvins_odom_tf_relay]: [RELAY-STATUS] 250s elapsed — head: WAITING (0 msgs), arm: OK (33855 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743274.865250707] [pointcloud_fusion]: Stats: published=67 (dual=0, cam1_only=74) dist_removed=6276109 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:76} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779743275.182719459] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743275.818685187] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779743281.329307495] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743282.760788497] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779743284.096080191] [openvins_odom_tf_relay]: [RELAY-STATUS] 260s elapsed — head: WAITING (0 msgs), arm: OK (35352 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743284.967248110] [pointcloud_fusion]: Stats: published=67 (dual=0, cam1_only=76) dist_removed=6256233 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:52} last_publish_ago=0.1s
+[tf_pipeline_diagnostics-9] [WARN] [1779743285.183271547] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743285.849869746] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779743294.092146462] [openvins_odom_tf_relay]: [RELAY-STATUS] 270s elapsed — head: WAITING (0 msgs), arm: OK (36839 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743294.972709868] [pointcloud_fusion]: Stats: published=73 (dual=0, cam1_only=84) dist_removed=7879908 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:92} last_publish_ago=0.0s
+[tf_pipeline_diagnostics-9] [WARN] [1779743295.184762269] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743296.148366663] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[mia_hand_driver_node-2] [INFO] [1779743296.321212405] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779743297.765864139] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779743304.088434622] [openvins_odom_tf_relay]: [RELAY-STATUS] 280s elapsed — head: WAITING (0 msgs), arm: OK (38414 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743304.798360538] [pointcloud_fusion]: Stats: published=76 (dual=0, cam1_only=93) dist_removed=8546591 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:100} last_publish_ago=0.1s
+[tf_pipeline_diagnostics-9] [WARN] [1779743305.189914879] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779743306.167809830] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[twist_propagation_node-14] [INFO] [1779743310.069938730] [twist_propagation]: External twist stale: age=2.009s > max=2.000s
+[openvins_odom_tf_relay-12] [WARN] [1779743314.088730879] [openvins_odom_tf_relay]: [RELAY-STATUS] 290s elapsed — head: WAITING (0 msgs), arm: OK (38851 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743314.709094496] [pointcloud_fusion]: Stats: published=36 (dual=0, cam1_only=39) dist_removed=3639034 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:33} last_publish_ago=6.4s
+[twist_propagation_node-14] [INFO] [1779743315.070902997] [twist_propagation]: External twist stale: age=7.010s > max=2.000s
+[tf_pipeline_diagnostics-9] [WARN] [1779743315.187858024] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[twist_propagation_node-14] [INFO] [1779743320.071886294] [twist_propagation]: External twist stale: age=12.011s > max=2.000s
+[wrist_driver_node-4] [WARN] [1779743323.406389306] [wrist_driver]: Dynamixel read failed: pos=[TxRxResult] Communication success!, vel=[TxRxResult] There is no status packet!
+[openvins_odom_tf_relay-12] [WARN] [1779743324.089161835] [openvins_odom_tf_relay]: [RELAY-STATUS] 300s elapsed — head: WAITING (0 msgs), arm: OK (38851 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743324.707631292] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=16.4s
+[pointcloud_fusion_node-10] [WARN] [1779743324.708990862] [pointcloud_fusion]: Stall diagnostic (no publish for 16s): cam1: stale (17.4s); cam2: stale (17.4s)
+[twist_propagation_node-14] [INFO] [1779743325.092443441] [twist_propagation]: External twist stale: age=17.031s > max=2.000s
+[tf_pipeline_diagnostics-9] [WARN] [1779743326.207103745] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[twist_propagation_node-14] [INFO] [1779743330.113700202] [twist_propagation]: External twist stale: age=22.051s > max=2.000s
+[openvins_odom_tf_relay-12] [WARN] [1779743334.087772115] [openvins_odom_tf_relay]: [RELAY-STATUS] 310s elapsed — head: WAITING (0 msgs), arm: OK (38851 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779743334.711246009] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=26.4s
+[pointcloud_fusion_node-10] [WARN] [1779743334.713627731] [pointcloud_fusion]: Stall diagnostic (no publish for 26s): cam1: stale (27.4s); cam2: stale (27.4s)
+[twist_propagation_node-14] [INFO] [1779743335.131787243] [twist_propagation]: External twist stale: age=27.070s > max=2.000s
+[tf_pipeline_diagnostics-9] [WARN] [1779743336.205557305] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[twist_propagation_node-14] [INFO] [1779743340.151169269] [twist_propagation]: External twist stale: age=32.090s > max=2.000s
+[mia_hand_driver_node-2] [INFO] [1779743341.303514507] [mia_hand_driver]: Mia Hand disconnected.

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import os
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -67,6 +68,7 @@ class WristDriverNode(Node):
         self.declare_parameter('motor_id', 1)
         self.declare_parameter('protocol_version', 2.0)
         self.declare_parameter('publish_rate_hz', 20.0)
+        self.declare_parameter('write_retries', 2)
 
         if not HAS_DYNAMIXEL:
             self.get_logger().error(
@@ -78,6 +80,7 @@ class WristDriverNode(Node):
         self._motor_id = self.get_parameter('motor_id').value
         protocol = self.get_parameter('protocol_version').value
         rate = self.get_parameter('publish_rate_hz').value
+        self._write_retries = self.get_parameter('write_retries').value
 
         self._port_handler = PortHandler(port)
         self._packet_handler = PacketHandler(protocol)
@@ -103,6 +106,23 @@ class WristDriverNode(Node):
             Float64MultiArray, '/wrist/set_position', self._on_position_cmd, 10)
         self.create_timer(1.0 / rate, self._publish_state)
 
+    def _write_with_retry(self, address: int, value: int, label: str) -> bool:
+        """Write a 4-byte value to the Dynamixel with automatic retries.
+
+        Returns True if the write succeeded (possibly after retries).
+        """
+        for attempt in range(self._write_retries + 1):
+            dxl_comm_result, dxl_error = self._packet_handler.write4ByteTxRx(
+                self._port_handler, self._motor_id, address, value)
+            if dxl_comm_result == COMM_SUCCESS:
+                return True
+            if attempt < self._write_retries:
+                time.sleep(0.01)
+        self.get_logger().warn(
+            f'Failed to {label} after {self._write_retries + 1} attempts: '
+            f'{self._packet_handler.getTxRxResult(dxl_comm_result)}')
+        return False
+
     def _on_position_cmd(self, msg: Float64MultiArray):
         if len(msg.data) < 1:
             return
@@ -111,31 +131,46 @@ class WristDriverNode(Node):
 
         try:
             dxl_pos = _deg_to_dx(target_deg)
-            dxl_comm_result, dxl_error = self._packet_handler.write4ByteTxRx(
-                self._port_handler, self._motor_id, ADDR_GOAL_POSITION, dxl_pos)
-            if dxl_comm_result != COMM_SUCCESS:
-                self.get_logger().warn(f'Failed to set position: {self._packet_handler.getTxRxResult(dxl_comm_result)}')
+            self._write_with_retry(ADDR_GOAL_POSITION, dxl_pos, 'set position')
 
             if accel > 0:
                 accel_val = int(accel)
-                self._packet_handler.write4ByteTxRx(
-                    self._port_handler, self._motor_id, ADDR_PROFILE_ACCELERATION, accel_val)
+                self._write_with_retry(
+                    ADDR_PROFILE_ACCELERATION, accel_val, 'set acceleration')
         except (IndexError, OSError) as exc:
             self.get_logger().warn(
                 f'Dynamixel write failed (communication error): {exc}')
 
+    def _read_with_retry(self, address: int, label: str):
+        """Read a 4-byte value from the Dynamixel with one retry.
+
+        Returns (value, comm_result) or (None, comm_result) on failure.
+        """
+        for attempt in range(2):
+            try:
+                value, comm_result, _ = self._packet_handler.read4ByteTxRx(
+                    self._port_handler, self._motor_id, address)
+                if comm_result == COMM_SUCCESS:
+                    return value, comm_result
+            except (IndexError, OSError):
+                pass
+            if attempt == 0:
+                time.sleep(0.005)
+        return None, comm_result
+
     def _publish_state(self):
         try:
-            dxl_pos, comm_result, _ = self._packet_handler.read4ByteTxRx(
-                self._port_handler, self._motor_id, ADDR_PRESENT_POSITION)
-            dxl_vel, comm_result_v, _ = self._packet_handler.read4ByteTxRx(
-                self._port_handler, self._motor_id, ADDR_PRESENT_VELOCITY)
+            dxl_pos, comm_result = self._read_with_retry(
+                ADDR_PRESENT_POSITION, 'read position')
+            dxl_vel, comm_result_v = self._read_with_retry(
+                ADDR_PRESENT_VELOCITY, 'read velocity')
         except (IndexError, OSError) as exc:
             self.get_logger().warn(
                 f'Dynamixel read failed (communication error): {exc}')
             return
 
-        if comm_result == COMM_SUCCESS and comm_result_v == COMM_SUCCESS:
+        if (comm_result == COMM_SUCCESS and comm_result_v == COMM_SUCCESS
+                and dxl_pos is not None and dxl_vel is not None):
             pos_deg = _dx_to_deg(dxl_pos)
             vel_deg = float(dxl_vel) * 0.229  # Approximate RPM to deg/s
             msg = Float64MultiArray()
