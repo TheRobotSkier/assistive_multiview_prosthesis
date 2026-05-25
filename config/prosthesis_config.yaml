@@ -139,7 +139,7 @@ proximity_controller:
         # Offset from tracked pose origin (camera) to grasp contact point
         # (fingertips), expressed in the pose's local frame.
         # Same value as twist_propagation's propagation_origin_offset.
-        grasp_contact_offset: [0.1543, -0.1485, 0.1352]
+        grasp_contact_offset: [0.1543, -0.1485, -0.1352]
 
 preshaping_service:
     ros__parameters:

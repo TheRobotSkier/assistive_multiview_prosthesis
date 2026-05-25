@@ -639,9 +639,11 @@ class PipelineManagerNode(Node):
             else:
                 self.get_logger().warn(f'Preshaping failed: {response.message}')
                 self._transition(State.IDLE, f'Preshaping failed: {response.message[:60]}')
+                self._deactivate_twist_propagation()
         except Exception as e:
             self.get_logger().error(f'Preshaping service error: {e}')
             self._transition(State.IDLE, f'Preshaping error: {e}')
+            self._deactivate_twist_propagation()
 
     # ── Publishing ────────────────────────────────────────────────────────
     def _publish_state(self):

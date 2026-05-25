@@ -229,9 +229,15 @@ class GraspProximityControllerNode(Node):
     # ── Control loop ──────────────────────────────────────────────────────────
 
     def _control_loop(self) -> None:
-        # Do not publish joint commands during GRASPING/HOLDING/VOLITIONAL —
-        # the force controller owns the joint topics in those states.
-        if self._pipeline_state in (5, 6, 7):  # GRASPING, HOLDING, VOLITIONAL
+        # Only run the proximity control loop during APPROACHING (state 4).
+        # In GRASPING/HOLDING/VOLITIONAL the force controller owns the joints.
+        # In all other states (IDLE, TWISTING, etc.) there is no plan to execute.
+        if self._pipeline_state != 4:  # not APPROACHING
+            # Clear near zone signal when leaving APPROACHING (but not when
+            # transitioning to GRASPING — the pipeline manager handles that).
+            if self._is_near and self._pipeline_state not in (5,):
+                self._is_near = False
+                self._near_zone_pub.publish(Bool(data=False))
             return
 
         if (self._planned_closures is None
