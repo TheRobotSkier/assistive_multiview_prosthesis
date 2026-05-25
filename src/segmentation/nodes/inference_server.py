@@ -63,7 +63,7 @@ def _gpu_memory_info() -> dict:
     return {
         "gpu_memory_allocated_mb": round(torch.cuda.memory_allocated() / 1e6, 1),
         "gpu_memory_reserved_mb": round(torch.cuda.memory_reserved() / 1e6, 1),
-        "gpu_memory_total_mb": round(torch.cuda.get_device_properties(0).total_mem / 1e6, 1),
+        "gpu_memory_total_mb": round(torch.cuda.get_device_properties(0).total_memory / 1e6, 1),
     }
 
 

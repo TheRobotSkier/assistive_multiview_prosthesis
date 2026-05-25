@@ -130,7 +130,7 @@ COPY nodes/inference_server.py /nodes/inference_server.py
 # Downloaded at runtime by the entrypoint script if not present.
 # Pre-create dir with world-writable permissions (userns_mode: keep-id maps non-root).
 RUN mkdir -p /weights && chmod 777 /weights
-ARG DOWNLOAD_WEIGHTS=1
+ARG DOWNLOAD_WEIGHTS=0
 RUN if [ "${DOWNLOAD_WEIGHTS}" = "1" ]; then \
         wget -q \
           https://omnomnom.vision.rwth-aachen.de/data/3d_inter_obj_seg/scannet_official/weights/weights_exp14_14.pth \
