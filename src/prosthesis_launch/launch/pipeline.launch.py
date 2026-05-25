@@ -417,12 +417,12 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "mia_serial_port",
-                default_value=os.environ.get("MIA_SERIAL_PORT", "/dev/ttyUSB0"),
+                default_value=os.environ.get("MIA_SERIAL_PORT", "/dev/ttyMiaHand"),
                 description="Mia Hand serial port device",
             ),
             DeclareLaunchArgument(
                 "wrist_serial_port",
-                default_value=os.environ.get("WRIST_SERIAL_PORT", "/dev/ttyUSB1"),
+                default_value=os.environ.get("WRIST_SERIAL_PORT", "/dev/ttyDynamixel"),
                 description="Wrist Dynamixel serial port device",
             ),
             DeclareLaunchArgument(

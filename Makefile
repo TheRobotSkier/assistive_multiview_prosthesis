@@ -142,8 +142,14 @@ $(TONIGHT_TARGETS): dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -lc 'make $@'
 
 # ── Launch proxies (from host) ─────────────────────────────────────────────
-run: dev
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run'
+run: up-hw
+	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
+	echo "[host] Detected: MIA=$$DETECTED_MIA_PORT  WRIST=$$DETECTED_WRIST_PORT" && \
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec \
+		-e MIA_SERIAL_PORT="$$DETECTED_MIA_PORT" \
+		-e WRIST_SERIAL_PORT="$$DETECTED_WRIST_PORT" \
+		prosthesis /bin/bash -lc 'make setup-usb' && \
+	$(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run'
 
 camera-test: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make camera-test'

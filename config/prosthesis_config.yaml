@@ -464,8 +464,8 @@ _reference:
 
         # ── Hardware ──────────────────────────────────────────────────────────
         hardware:
-            mia_serial_port: "/dev/ttyUSB0"
-            wrist_port: "/dev/ttyUSB1"
+            mia_serial_port: "/dev/ttyMiaHand"
+            wrist_port: "/dev/ttyDynamixel"
             wrist_baudrate: 57600
             wrist_motor_id: 1
             haptic_bt_addr1: "84:2E:14:09:E1:4E"

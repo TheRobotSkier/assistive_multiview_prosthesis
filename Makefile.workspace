@@ -26,7 +26,7 @@ TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates source
+.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates source
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -90,10 +90,13 @@ camera-test: ## Build + launch visual pipeline (no hardware)
 	colcon build --packages-select prosthesis_launch sensor_fusion_bringup --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
 
+setup-usb: ## Detect USB devices by VID:PID and create stable symlinks
+	@bash /prosthesis_ws/scripts/setup_usb_devices.sh
+
 run: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
-	colcon build --packages-select prosthesis_launch sensor_fusion_bringup emg_bridge force_controller pipeline_manager twist_propagation --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
 
 digital-twin: ## Launch digital twin with real cameras

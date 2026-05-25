@@ -1,25 +1,19 @@
-# Hardware overlay — adds USB device mappings to the prosthesis service.
+# Hardware overlay — convenience alias for starting with segmentation.
 #
 # Usage:  make up-hw
 # Behind the scenes:
-#   podman-compose -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis
+#   podman-compose -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis segmentation-cpu
 #
-# Only map devices that are actually connected.  Podman will refuse to start
-# the container if a mapped device does not exist on the host.
-# Uncomment the wrist line when the Dynamixel is connected.
+# The base docker-compose.yml already sets privileged: true, which exposes
+# all host devices (including USB serial ports) to the container.
+# Device identification and symlink creation is handled by:
+#   scripts/setup_usb_devices.sh  (run inside the container before launch)
 #
-# The entrypoint script (docker/entrypoint.sh) runs as root before dropping
-# privileges.  It uses MIA_SERIAL_PORT / WRIST_SERIAL_PORT to:
-#   1. Fix device ownership (userns keep-id maps devices to nobody:nogroup)
-#   2. Create persistent symlinks (/dev/ttyMiaHand, /dev/ttyDynamixel)
-#   3. Set low_latency for responsive serial communication
+# No device mappings or group settings are needed here.
 
 services:
     prosthesis:
-        environment:
-            - MIA_SERIAL_PORT=/dev/ttyMiaHand
-            - WRIST_SERIAL_PORT=/dev/ttyDynamixel
-        # group_add: "keep-groups" preserves the host user's group memberships
-        # (e.g. dialout) so the container user can access serial devices.
+        # No additional configuration needed — privileged mode in the base
+        # compose already provides full device access.
         group_add:
             - "keep-groups"

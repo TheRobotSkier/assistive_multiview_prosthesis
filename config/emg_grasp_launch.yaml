@@ -22,11 +22,11 @@ emg_model_dir: "/prosthesis_ws/models"
 emg_device: ""
 
 # Serial port for the Mia Hand (e.g. /dev/ttyUSB0).
-mia_port: "/dev/ttyUSB0"
+mia_port: "/dev/ttyMiaHand"
 
 # Serial port for the wrist Dynamixel motor (e.g. /dev/ttyUSB1).
 # Only used when wrist_enable is true.
-wrist_port: "/dev/ttyUSB1"
+wrist_port: "/dev/ttyDynamixel"
 
 # Enable the wrist Dynamixel driver.
 # Set to "true" to include wrist control.

@@ -1,0 +1,318 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-05-25-15-58-12-378458-KingBob-2970
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [3392]
+[INFO] [mia_hand_driver_node-2]: process started with pid [3393]
+[INFO] [command_bridge_node-3]: process started with pid [3394]
+[INFO] [wrist_driver_node-4]: process started with pid [3395]
+[INFO] [run_classifier-5]: process started with pid [3396]
+[INFO] [emg_grasp_controller-6]: process started with pid [3397]
+[INFO] [openvins_realsense_tf_bridge_node-7]: process started with pid [3398]
+[INFO] [camera_mount_tf_publisher-8]: process started with pid [3399]
+[INFO] [tf_pipeline_diagnostics-9]: process started with pid [3400]
+[INFO] [pointcloud_fusion_node-10]: process started with pid [3401]
+[INFO] [odom_to_pose_relay-11]: process started with pid [3402]
+[INFO] [openvins_odom_tf_relay-12]: process started with pid [3403]
+[INFO] [segmentation_ros2_node-13]: process started with pid [3404]
+[INFO] [twist_propagation_node-14]: process started with pid [3409]
+[INFO] [preshaping_service_bridge_node-15]: process started with pid [3410]
+[INFO] [grasp_proximity_controller_node.py-16]: process started with pid [3411]
+[INFO] [force_controller_node-17]: process started with pid [3412]
+[INFO] [rviz2-18]: process started with pid [3413]
+[preshaping_service_bridge_node-15] [INFO] [1779724692.819088459] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-15] [INFO] [1779724692.824559162] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-18] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[mia_hand_driver_node-2] [INFO] [1779724693.263402200] [mia_hand_driver]: /dev/ttyMiaHand serial port opened.
+[rviz2-18] [INFO] [1779724693.511205420] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779724693.511447626] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[mia_hand_driver_node-2] [INFO] [1779724693.668010022] [mia_hand_driver]: Mia Hand connected.
+[rviz2-18] [INFO] [1779724693.747827521] [rviz2]: Stereo is NOT SUPPORTED
+[wrist_driver_node-4] [INFO] [1779724693.862357208] [wrist_driver]: Wrist motor connected on /dev/ttyDynamixel, ID=1
+[rviz2-18] [INFO] [1779724693.909169972] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779724693.925313032] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[emg_grasp_controller-6] [INFO] [1779724693.937785985] [emg_grasp_controller]: EMG grasp controller started — rate=20.0 Hz, stale_timeout=1.0s
+[rviz2-18] [INFO] [1779724693.961702774] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-18]
+[rviz2-18] [INFO] [1779724693.967209264] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-18]
+[grasp_proximity_controller_node.py-16] [INFO] [1779724693.980789499] [proximity_controller]: GraspProximityController started — enter_thresh=0.080 m, exit_thresh=0.100 m, partial_factor=0.3
+[rviz2-18] [INFO] [1779724694.384266596] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-18] [INFO] [1779724694.532947798] [rviz2]: Stereo is NOT SUPPORTED
+[command_bridge_node-3] [INFO] [1779724694.827458336] [command_bridge]: Command bridge started — speed=80%, joint_states → /joint_states
+[pipeline_manager_node-1] [INFO] [1779724695.298163613] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1779724695.300718026] [pipeline_manager]: Pipeline manager started — state: IDLE
+[camera_mount_tf_publisher-8] [INFO] [1779724695.484186922] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-8] [INFO] [1779724695.487397343] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[force_controller_node-17] [INFO] [1779724695.604340195] [force_controller]: Force controller started. Target range: [50.0, 200.0] raw units, kp=0.01, ki=0.001, rate=10.0 Hz
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779724695.670054980] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779724695.670720995] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779724695.772534526] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779724695.775066075] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-7] [INFO] [1779724695.776230345] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[pointcloud_fusion_node-10] [INFO] [1779724695.927134725] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-10] [INFO] [1779724695.930240061] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-10] [INFO] [1779724695.968626852] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-10] [WARN] [1779724695.972434679] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [INFO] [1779724695.974558263] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-10] [INFO] [1779724695.976385414] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[tf_pipeline_diagnostics-9] [INFO] [1779724696.044759677] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[segmentation_ros2_node-13] [INFO] [1779724696.231839108] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[twist_propagation_node-14] [INFO] [1779724696.243222614] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[run_classifier-5] usage: run_classifier [-h] [--model-dir MODEL_DIR] [--threshold THRESHOLD]
+[run_classifier-5]                       [--smooth SMOOTH]
+[run_classifier-5] run_classifier: error: unrecognized arguments: -r __node:=emg_bridge
+[run_classifier-5] ROS 2 bridge active — publishing on /emg/* topics.
+[pipeline_manager_node-1] [INFO] [1779724696.306829214] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[twist_propagation_node-14] [INFO] [1779724696.358690363] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz
+[twist_propagation_node-14] [INFO] [1779724696.360697977] [twist_propagation]: External twist source: /hand_twist (max_age=0.5s)
+[ERROR] [run_classifier-5]: process has died [pid 3396, exit code 2, cmd '/prosthesis_ws/install/emg_bridge/lib/emg_bridge/run_classifier --model-dir /app/models --ros-args -r __node:=emg_bridge'].
+[command_bridge_node-3] [INFO] [1779724696.794822591] [command_bridge]: Joint position stream activated.
+[pointcloud_fusion_node-10] [WARN] [1779724697.975394383] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [WARN] [1779724699.977723625] [pointcloud_fusion]: TF wait gate: not connected after 4s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[openvins_odom_tf_relay-12] [WARN] [1779724705.789494997] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724705.971883083] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-10] [WARN] [1779724705.972664917] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779724705.975442054] [pointcloud_fusion]: TF wait gate: not connected after 10s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724708.019135814] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779724715.758124757] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724715.973777676] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-10] [WARN] [1779724715.974772295] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779724715.977184404] [pointcloud_fusion]: TF wait gate: not connected after 20s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724718.025552016] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779724725.756285083] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724725.971238370] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.0s
+[pointcloud_fusion_node-10] [WARN] [1779724725.971974303] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779724725.974590883] [pointcloud_fusion]: TF wait gate: not connected after 30s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724728.026637217] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779724735.757106918] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724735.970326188] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=40.0s
+[pointcloud_fusion_node-10] [WARN] [1779724735.970954484] [pointcloud_fusion]: Stall diagnostic (no publish for 40s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779724735.974191644] [pointcloud_fusion]: TF wait gate: not connected after 40s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724738.019145871] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779724745.756586555] [openvins_odom_tf_relay]: [RELAY-STATUS] 50s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724745.972588295] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=50.0s
+[pointcloud_fusion_node-10] [WARN] [1779724745.973720158] [pointcloud_fusion]: Stall diagnostic (no publish for 50s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779724745.976617240] [pointcloud_fusion]: TF wait gate: not connected after 50s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724748.027233448] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779724755.759785250] [openvins_odom_tf_relay]: [RELAY-STATUS] 60s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724755.971179921] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=60.0s
+[pointcloud_fusion_node-10] [WARN] [1779724755.972399142] [pointcloud_fusion]: Stall diagnostic (no publish for 60s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-10] [WARN] [1779724755.974505743] [pointcloud_fusion]: TF wait gate: not connected after 60s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724758.014135834] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779724765.759916492] [openvins_odom_tf_relay]: [RELAY-STATUS] 70s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724765.971151808] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=70.0s
+[pointcloud_fusion_node-10] [WARN] [1779724765.974222173] [pointcloud_fusion]: Stall diagnostic (no publish for 70s): cam1: fresh (0.03s); cam1 TF: "marker_map" passed to lookupTransform argument target_frame does not exist. ; cam2: fresh (0.04s); cam2 TF: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [WARN] [1779724765.977125081] [pointcloud_fusion]: TF wait gate: not connected after 70s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724768.016797937] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779724772.681000277] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779724774.072603298] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779724775.756518035] [openvins_odom_tf_relay]: [RELAY-STATUS] 80s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724775.972015093] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=80.0s
+[pointcloud_fusion_node-10] [WARN] [1779724775.973794165] [pointcloud_fusion]: Stall diagnostic (no publish for 80s): cam1: fresh (0.05s); cam1 TF: "marker_map" passed to lookupTransform argument target_frame does not exist. ; cam2: fresh (0.08s); cam2 TF: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [WARN] [1779724775.976317063] [pointcloud_fusion]: TF wait gate: not connected after 80s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724778.025158890] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779724785.757564623] [openvins_odom_tf_relay]: [RELAY-STATUS] 90s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779724785.973343687] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=90.0s
+[pointcloud_fusion_node-10] [WARN] [1779724785.975864583] [pointcloud_fusion]: Stall diagnostic (no publish for 90s): cam1: fresh (0.05s); cam1 TF: "marker_map" passed to lookupTransform argument target_frame does not exist. ; cam2: fresh (0.02s); cam2 TF: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-10] [WARN] [1779724785.978846587] [pointcloud_fusion]: TF wait gate: not connected after 90s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-9] [WARN] [1779724788.030877723] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779724789.251316142] [openvins_odom_tf_relay]: head: OpenVINS initialized (covariance), publishing TF marker_map -> head_imu (p=(-0.075, 0.025, 0.222), cov_trace=2.91e-02, pos_norm=0.236m, elapsed=93.5s, actual_imu_frame='head_imu')
+[pointcloud_fusion_node-10] [WARN] [1779724789.974869082] [pointcloud_fusion]: TF tree connected via 'head_d435i_head_depth_optical_frame' — starting point cloud fusion (waited 94.0s since node startup)
+[pointcloud_fusion_node-10] [WARN] [1779724790.108204437] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779724790.128681285] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779724790.760029481] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[mia_hand_driver_node-2] [INFO] [1779724792.679014938] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779724794.109826213] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779724795.155120365] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[mia_hand_driver_node-2] [INFO] [1779724795.692328096] [mia_hand_driver]: Mia Hand disconnected.
+[openvins_odom_tf_relay-12] [WARN] [1779724795.766039836] [openvins_odom_tf_relay]: [RELAY-STATUS] 100s elapsed — head: OK (923 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779724795.855889811] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-10] [INFO] [1779724796.205410231] [pointcloud_fusion]: Stats: published=4 (dual=0, cam1_only=32) dist_removed=0 bbox_removed=0 bbox_skipped=49 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:37} last_publish_ago=0.2s
+[tf_pipeline_diagnostics-9] [WARN] [1779724797.008830973] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):OK | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[mia_hand_driver_node-2] [INFO] [1779724797.094680885] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779724800.436694666] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779724800.516804425] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779724800.880726531] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[mia_hand_driver_node-2] [INFO] [1779724803.673768853] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779724805.103181991] [mia_hand_driver]: Mia Hand connected.
+[openvins_odom_tf_relay-12] [WARN] [1779724805.756422369] [openvins_odom_tf_relay]: [RELAY-STATUS] 110s elapsed — head: OK (2579 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-10] [WARN] [1779724805.932434366] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-10] [WARN] [1779724806.367903171] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [INFO] [1779724806.718681532] [pointcloud_fusion]: Stats: published=55 (dual=0, cam1_only=55) dist_removed=0 bbox_removed=0 bbox_skipped=110 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:56, head_d435i_head_depth_optical_frame:5} last_publish_ago=1.3s
+[tf_pipeline_diagnostics-9] [WARN] [1779724807.018783524] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):OK | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779724810.536981908] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Could not find a connection between 'marker_map' and 'arm_d435i_arm_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779724811.013189479] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — no cached transform available, skipping
+[openvins_odom_tf_relay-12] [WARN] [1779724811.125932130] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.074, 0.079, 0.202), cov_trace=2.25e-02, pos_norm=0.230m, elapsed=115.4s, actual_imu_frame='arm_imu')
+[pointcloud_fusion_node-10] [WARN] [1779724811.374912969] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[wrist_driver_node-4] Traceback (most recent call last):
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/wrist_driver/wrist_driver_node", line 33, in <module>
+[wrist_driver_node-4]     sys.exit(load_entry_point('wrist-driver==0.1.0', 'console_scripts', 'wrist_driver_node')())
+[wrist_driver_node-4]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/python3.12/site-packages/wrist_driver/wrist_driver_node.py", line 148, in main
+[wrist_driver_node-4]     rclpy.spin(node)
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[wrist_driver_node-4]     executor.spin_once()
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[wrist_driver_node-4]     self._spin_once_impl(timeout_sec)
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[wrist_driver_node-4]     raise handler.exception()
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[wrist_driver_node-4]     result = coro.send(None)
+[wrist_driver_node-4]              ^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 592, in handler
+[wrist_driver_node-4]     await call_coroutine()
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 454, in _execute
+[wrist_driver_node-4]     await await_or_execute(tmr.callback)
+[wrist_driver_node-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 115, in await_or_execute
+[wrist_driver_node-4]     return callback(*args)
+[wrist_driver_node-4]            ^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/python3.12/site-packages/wrist_driver/wrist_driver_node.py", line 124, in _publish_state
+[wrist_driver_node-4]     dxl_pos, comm_result, _ = self._packet_handler.read4ByteTxRx(
+[wrist_driver_node-4]                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/usr/local/lib/python3.12/dist-packages/dynamixel_sdk/protocol2_packet_handler.py", line 662, in read4ByteTxRx
+[wrist_driver_node-4]     DXL_MAKEWORD(data[2], data[3])) if (result == COMM_SUCCESS) else 0
+[wrist_driver_node-4]                  ~~~~^^^
+[wrist_driver_node-4] IndexError: list index out of range
+[ERROR] [wrist_driver_node-4]: process has died [pid 3395, exit code 1, cmd '/prosthesis_ws/install/wrist_driver/lib/wrist_driver/wrist_driver_node --ros-args -r __node:=wrist_driver --params-file /tmp/launch_params_csf25fp4'].
+[tf_pipeline_diagnostics-9] [INFO] [1779724816.011030229] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-10] [WARN] [1779724816.084902040] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-10] [WARN] [1779724816.478932167] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [INFO] [1779724816.652710967] [pointcloud_fusion]: Stats: published=46 (dual=0, cam1_only=38) dist_removed=0 bbox_removed=0 bbox_skipped=78 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:67, head_d435i_head_depth_optical_frame:25} last_publish_ago=0.1s
+[mia_hand_driver_node-2] [INFO] [1779724816.698233158] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [ERROR] [1779724817.063260645] [pointcloud_fusion]: Bbox removal success rate is 0% over 27s (0/248 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[mia_hand_driver_node-2] [INFO] [1779724818.118117281] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779724820.622053234] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779724810.579143 but the earliest data is at time 1779724810.757639, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[mia_hand_driver_node-2] [INFO] [1779724820.689644330] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779724821.151689158] [pointcloud_fusion]: Cannot transform to d435i_arm_bottom_screw_frame_8_cm_cam_mount for bbox removal — no cached transform available, skipping
+[pointcloud_fusion_node-10] [WARN] [1779724821.523404998] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[mia_hand_driver_node-2] [INFO] [1779724823.140988428] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779724825.677624249] [mia_hand_driver]: Mia Hand disconnected.
+[tf_pipeline_diagnostics-9] [INFO] [1779724826.013346995] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-10] [INFO] [1779724826.093297959] [pointcloud_fusion]: Stats: published=42 (dual=0, cam1_only=34) dist_removed=0 bbox_removed=0 bbox_skipped=85 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:50, head_d435i_head_depth_optical_frame:20} last_publish_ago=0.0s
+[mia_hand_driver_node-2] [INFO] [1779724827.134336922] [mia_hand_driver]: Mia Hand connected.
+[tf_pipeline_diagnostics-9] [INFO] [1779724836.007885785] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-10] [INFO] [1779724837.184331871] [pointcloud_fusion]: Stats: published=39 (dual=36, cam1_only=7) dist_removed=2244519 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={arm_d435i_arm_depth_optical_frame:11, head_d435i_head_depth_optical_frame:9} last_publish_ago=0.1s
+[pointcloud_fusion_node-10] [WARN] [1779724838.353057843] [pointcloud_fusion]: TF transform failed for arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779724826.976842 but the earliest data is at time 1779724827.823674, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-10] [WARN] [1779724839.047214253] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.29s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779724839.188975616] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779724839.885459655] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.1s > 2.0s), skipping
+[pointcloud_fusion_node-10] [WARN] [1779724844.947621808] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (7.0s > 2.0s), skipping
+[mia_hand_driver_node-2] [INFO] [1779724845.677485270] [mia_hand_driver]: Mia Hand disconnected.
+[tf_pipeline_diagnostics-9] [INFO] [1779724846.005376967] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-10] [INFO] [1779724846.092954921] [pointcloud_fusion]: Stats: published=35 (dual=32, cam1_only=9) dist_removed=5151586 bbox_removed=0 bbox_skipped=48 bbox_cache_hits=8 tf_fail={arm_d435i_arm_depth_optical_frame:32, head_d435i_head_depth_optical_frame:25} last_publish_ago=0.0s
+[pointcloud_fusion_node-10] [ERROR] [1779724846.093964439] [pointcloud_fusion]: Bbox removal success rate is 43% over 29s (95/220 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[mia_hand_driver_node-2] [INFO] [1779724847.133158527] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779724847.691232172] [mia_hand_driver]: Mia Hand disconnected.
+[pointcloud_fusion_node-10] [WARN] [1779724848.707451330] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.24s) — fresh lookup failed
+[mia_hand_driver_node-2] [INFO] [1779724849.097626489] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779724850.693102509] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779724852.099862140] [mia_hand_driver]: Mia Hand connected.
+[tf_pipeline_diagnostics-9] [INFO] [1779724856.009295904] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-10] [INFO] [1779724856.163914740] [pointcloud_fusion]: Stats: published=61 (dual=72, cam1_only=9) dist_removed=13086015 bbox_removed=0 bbox_skipped=19 bbox_cache_hits=1 last_publish_ago=0.0s
+[mia_hand_driver_node-2] [INFO] [1779724856.681621317] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779724858.093583174] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779724859.244111495] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.60s) — fresh lookup failed
+[mia_hand_driver_node-2] [INFO] [1779724859.683646377] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779724861.154119399] [mia_hand_driver]: Mia Hand connected.
+[mia_hand_driver_node-2] [INFO] [1779724864.683025696] [mia_hand_driver]: Mia Hand disconnected.
+[tf_pipeline_diagnostics-9] [INFO] [1779724866.004026400] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[mia_hand_driver_node-2] [INFO] [1779724866.096153647] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [INFO] [1779724866.444494170] [pointcloud_fusion]: Stats: published=62 (dual=84, cam1_only=8) dist_removed=15826993 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=2 last_publish_ago=0.3s
+[mia_hand_driver_node-2] [INFO] [1779724866.693439675] [mia_hand_driver]: Mia Hand disconnected.
+[mia_hand_driver_node-2] [INFO] [1779724868.092679201] [mia_hand_driver]: Mia Hand connected.
+[pointcloud_fusion_node-10] [WARN] [1779724870.549793983] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Lookup would require extrapolation into the past.  Requested time 1779724860.976590 but the earliest data is at time 1779724861.289997, when looking up transform from frame [head_d435i_head_depth_optical_frame] to frame [marker_map]
+[pointcloud_fusion_node-10] [WARN] [1779724870.677059510] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.96s) — fresh lookup failed
+[pointcloud_fusion_node-10] [WARN] [1779724871.498618764] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.1s > 2.0s), skipping
+[twist_propagation_node-14] [INFO] [1779724871.849748922] [twist_propagation]: Activated
+[twist_propagation_node-14] [ERROR] [1779724871.941693105] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [ERROR] [1779724872.026530627] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [ERROR] [1779724872.104232352] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [ERROR] [1779724872.168450781] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [ERROR] [1779724872.229785200] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [ERROR] [1779724872.301834788] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [ERROR] [1779724872.429799678] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [ERROR] [1779724872.498791389] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[twist_propagation_node-14] [ERROR] [1779724872.553426187] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]
+[mia_hand_driver_node-2] [INFO] [1779724872.678994940] [mia_hand_driver]: Mia Hand disconnected.
+[twist_propagation_node-14] [ERROR] [1779724872.762102789] [twist_propagation]: EXCEPTION in _cycle_callback: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14] Traceback (most recent call last):
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1480, in _cycle_callback
+[twist_propagation_node-14]     self._run_idle_cycle()
+[twist_propagation_node-14]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1776, in _run_idle_cycle
+[twist_propagation_node-14]     self._collision_distance_pub.publish(Float64(data=-1.0))
+[twist_propagation_node-14]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-14] AttributeError: 'TwistPropagationNode' object has no attribute '_collision_distance_pub'
+[twist_propagation_node-14]

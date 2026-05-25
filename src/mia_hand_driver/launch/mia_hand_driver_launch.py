@@ -9,7 +9,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     serial_port_arg = DeclareLaunchArgument(
         'serial_port',
-        default_value = os.environ.get('MIA_SERIAL_PORT', '/dev/ttyUSB0'),
+        default_value = os.environ.get('MIA_SERIAL_PORT', '/dev/ttyMiaHand'),
         description = 'Mia Hand serial port device.'
     )
 

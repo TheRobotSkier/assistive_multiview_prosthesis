@@ -243,10 +243,10 @@ hardware:
   mock_emg: false
 
   # Serial port for the Mia Hand base (used only when mock_hand == false).
-  mia_serial_port: "/dev/ttyUSB0"
+  mia_serial_port: "/dev/ttyMiaHand"
 
   # Serial port for the wrist servo (used only when mock_wrist == false).
-  wrist_port: "/dev/ttyUSB1"
+  wrist_port: "/dev/ttyDynamixel"
 
   # Wrist servo baudrate.
   wrist_baudrate: 57600
