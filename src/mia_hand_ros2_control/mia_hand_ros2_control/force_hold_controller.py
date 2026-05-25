@@ -125,8 +125,8 @@ def should_enter_force_hold(  # noqa: D103
     efforts: List[float],
     thresholds: List[float],
 ) -> bool:
-    """Return True when *any* finger crosses its force threshold."""
-    return any(e >= t for e, t in zip(efforts, thresholds))
+    """Return True when *all* fingers have crossed their force threshold."""
+    return all(e >= t for e, t in zip(efforts, thresholds))
 
 
 def check_stop_conditions(

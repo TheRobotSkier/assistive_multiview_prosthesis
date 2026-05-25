@@ -72,9 +72,9 @@ class StateMachineConfig:
     gesture_open: int = 3
 
     # Timing
-    open_hold_duration_s: float = 0.5
+    open_hold_duration_s: float = 1.0
     open_proportional_threshold: float = 0.7
-    power_hold_duration_s: float = 0.5
+    power_hold_duration_s: float = 1.0
     power_rearm_duration_s: float = 0.3
     stale_timeout_s: float = 1.0
 

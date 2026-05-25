@@ -114,13 +114,13 @@ class TestStopConditions:
         assert "FORCE CONTACT" in reason  # force takes priority
 
     def test_should_enter_hold_true(self, thresholds):
-        assert should_enter_force_hold([200, 310, 200], thresholds) is True
+        assert should_enter_force_hold([350, 350, 350], thresholds) is True
 
     def test_should_enter_hold_false(self, thresholds):
-        assert should_enter_force_hold([200, 290, 200], thresholds) is False
+        assert should_enter_force_hold([350, 350, 200], thresholds) is False
 
     def test_should_enter_hold_exact(self, thresholds):
-        assert should_enter_force_hold([300, 200, 200], thresholds) is True
+        assert should_enter_force_hold([300, 300, 300], thresholds) is True
 
 
 # ── Target force ───────────────────────────────────────────────────────────────

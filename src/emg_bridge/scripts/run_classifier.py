@@ -74,7 +74,7 @@ def _conf_bar(val: float, width: int = 15) -> str:
 
 # ── Display ───────────────────────────────────────────────────────────────────
 
-_DISPLAY_LINES = 7   # how many lines the display occupies (for refresh)
+_DISPLAY_LINES = 8   # how many lines the display occupies (for refresh)
 _first_draw = True
 
 
@@ -86,6 +86,7 @@ def _draw(
     gesture_names: list[str],
     frame_count: int,
     fps: float,
+    mode: str,
 ) -> None:
     global _first_draw
     if not _first_draw:
@@ -101,6 +102,9 @@ def _draw(
         + (_dim(gesture) if rest_active else _green(_bold(gesture)))
         + f"  {_dim(f'(frame {frame_count})')}"
         + "\n"
+    )
+    sys.stdout.write(
+        f"  {_bold('Mode')}     : {_cyan(mode)}\n"
     )
     sys.stdout.write(
         f"  {_bold('Confidence')}: {_conf_bar(confidence)}\n"
@@ -234,8 +238,14 @@ def main() -> None:
             last_time = now
             fps = float(np.mean(fps_history))
 
+            # Fetch current mode from ROS state (if available)
+            mode = "NOT_GRASPING"
+            if _ros_state is not None:
+                with _ros_state.lock:
+                    mode = _ros_state.mode
+
             frame_count += 1
-            _draw(smoothed_label, confidence, prop_val, probs, gesture_names, frame_count, fps)
+            _draw(smoothed_label, confidence, prop_val, probs, gesture_names, frame_count, fps, mode)
 
     except KeyboardInterrupt:
         print(f"\n\n{_yellow('Stopped.')}")

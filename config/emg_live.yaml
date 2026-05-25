@@ -23,4 +23,4 @@ emg_adapter:
   # strong proportional signal and a sustained hold so that spurious classifier
   # flickers cannot accidentally open the hand during grasp.
   open_min_control: 0.7
-  open_min_hold_s: 0.5
+  open_min_hold_s: 1.0

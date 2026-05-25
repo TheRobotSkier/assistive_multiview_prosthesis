@@ -99,7 +99,7 @@ def test_configured_aliases() -> bool:
     sig = adapter.update_raw(gesture_name="OPEN", confidence=0.9, proportional=0.8)
     ok &= _assert_equal(sig.normalized_gesture, "NEUTRAL", "OPEN not held → neutral")
     ok &= _assert_false(sig.is_valid, "OPEN not held invalid with aliases")
-    time.sleep(0.55)
+    time.sleep(1.05)
     sig = adapter.get_signal()
     ok &= _assert_equal(sig.normalized_gesture, "OPEN", "OPEN held with aliases")
     ok &= _assert_true(sig.is_valid, "OPEN held valid with aliases")
@@ -147,7 +147,7 @@ def test_open_safety() -> bool:
     ok = True
     adapter = EmgGraspAdapter(
         open_min_control=0.7,
-        open_min_hold_s=0.5,
+        open_min_hold_s=1.0,
         stale_timeout_s=2.0,  # keep data alive across the sleep below
     )
 
@@ -164,11 +164,11 @@ def test_open_safety() -> bool:
     _print_pass("OPEN not held → neutral")
 
     # After hold duration passes → OPEN valid
-    time.sleep(0.55)
+    time.sleep(1.05)
     sig = adapter.get_signal()
     ok &= _assert_equal(sig.normalized_gesture, "OPEN", "OPEN held+control → OPEN")
     ok &= _assert_true(sig.is_valid, "OPEN held valid")
-    ok &= _assert_true(sig.hold_duration >= 0.5, "OPEN hold duration >= 0.5")
+    ok &= _assert_true(sig.hold_duration >= 1.0, "OPEN hold duration >= 1.0")
     _print_pass("OPEN held+control → valid")
 
     return ok

@@ -28,9 +28,9 @@ def default_cfg() -> StateMachineConfig:
         gesture_flexion=2,
         gesture_extension=4,
         gesture_open=3,
-        open_hold_duration_s=0.5,
+        open_hold_duration_s=1.0,
         open_proportional_threshold=0.7,
-        power_hold_duration_s=0.5,
+        power_hold_duration_s=1.0,
         power_rearm_duration_s=0.3,
         stale_timeout_s=1.0,
         force_adjust_step=1.0,
@@ -89,7 +89,7 @@ class TestOpenPreemption:
     def test_open_from_not_grasping_after_hold(self, sm: EmgGraspStateMachine) -> None:
         t = 0.0
         sm.update(_input(gesture=3, proportional=0.8, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=3, proportional=0.8, timestamp=t))
         # Already in NOT_GRASPING, so no reset needed
         assert IntentType.RESET_HAND not in _intent_types(intents)
@@ -98,14 +98,14 @@ class TestOpenPreemption:
         # Enter CONTROL_GRASP via POWER hold
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
         # Now OPEN with high proportional held long enough
         t += 0.1
         sm.update(_input(gesture=3, proportional=0.8, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=3, proportional=0.8, timestamp=t))
         assert sm.mode == Mode.NOT_GRASPING
         assert IntentType.RESET_HAND in _intent_types(intents)
@@ -114,7 +114,7 @@ class TestOpenPreemption:
         # Enter CONTROL_GRASP
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -123,14 +123,14 @@ class TestOpenPreemption:
         sm.update(_input(gesture=0, timestamp=t))  # release
         t += 0.4
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_WRIST
 
         # OPEN safety
         t += 0.1
         sm.update(_input(gesture=3, proportional=0.8, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=3, proportional=0.8, timestamp=t))
         assert sm.mode == Mode.NOT_GRASPING
         assert IntentType.RESET_HAND in _intent_types(intents)
@@ -139,14 +139,14 @@ class TestOpenPreemption:
         # Enter CONTROL_GRASP
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
         # OPEN held but proportional too low
         t += 0.1
         sm.update(_input(gesture=3, proportional=0.3, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=3, proportional=0.3, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
         assert IntentType.RESET_HAND not in _intent_types(intents)
@@ -155,14 +155,14 @@ class TestOpenPreemption:
         # In CONTROL_GRASP, both POWER and OPEN could be active
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
         # Simultaneous OPEN (higher priority)
         t += 0.1
         sm.update(_input(gesture=3, proportional=0.8, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=3, proportional=0.8, timestamp=t))
         assert sm.mode == Mode.NOT_GRASPING
         assert IntentType.RESET_HAND in _intent_types(intents)
@@ -175,7 +175,7 @@ class TestOpenPreemption:
 def test_power_hold_enters_control_grasp(sm: EmgGraspStateMachine) -> None:
     t = 0.0
     sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-    t += 0.6
+    t += 1.1
     intents = sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
     assert sm.mode == Mode.CONTROL_GRASP
     assert IntentType.ENTER_FORCE_HOLD in _intent_types(intents)
@@ -197,7 +197,7 @@ class TestPowerToggleGraspWrist:
         # Enter CONTROL_GRASP
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -208,7 +208,7 @@ class TestPowerToggleGraspWrist:
 
         # Hold POWER again
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_WRIST
         assert IntentType.STOP_ALL in _intent_types(intents)
@@ -217,7 +217,7 @@ class TestPowerToggleGraspWrist:
         # Enter CONTROL_GRASP
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -226,7 +226,7 @@ class TestPowerToggleGraspWrist:
         sm.update(_input(gesture=0, timestamp=t))
         t += 0.4
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_WRIST
 
@@ -235,7 +235,7 @@ class TestPowerToggleGraspWrist:
         sm.update(_input(gesture=0, timestamp=t))
         t += 0.4
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
         assert IntentType.ENTER_FORCE_HOLD in _intent_types(intents)
@@ -259,7 +259,7 @@ class TestFlexionExtensionRouting:
     def test_flexion_in_control_grasp(self, sm: EmgGraspStateMachine) -> None:
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -271,7 +271,7 @@ class TestFlexionExtensionRouting:
     def test_extension_in_control_grasp(self, sm: EmgGraspStateMachine) -> None:
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -283,7 +283,7 @@ class TestFlexionExtensionRouting:
     def test_flexion_in_control_wrist(self, sm: EmgGraspStateMachine) -> None:
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -292,7 +292,7 @@ class TestFlexionExtensionRouting:
         sm.update(_input(gesture=0, timestamp=t))
         t += 0.4
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_WRIST
 
@@ -304,7 +304,7 @@ class TestFlexionExtensionRouting:
     def test_extension_in_control_wrist(self, sm: EmgGraspStateMachine) -> None:
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -313,7 +313,7 @@ class TestFlexionExtensionRouting:
         sm.update(_input(gesture=0, timestamp=t))
         t += 0.4
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_WRIST
 
@@ -330,7 +330,7 @@ class TestFlexionExtensionRouting:
         # CONTROL_GRASP
         t += 0.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -343,7 +343,7 @@ class TestFlexionExtensionRouting:
         sm.update(_input(gesture=0, timestamp=t))
         t += 0.4
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_WRIST
 
@@ -360,7 +360,7 @@ class TestStaleEmg:
         # in CONTROL_GRASP as stop (and stays in mode)
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -377,7 +377,7 @@ class TestPowerDebounce:
     def test_single_toggle_per_hold(self, sm: EmgGraspStateMachine) -> None:
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
         assert IntentType.ENTER_FORCE_HOLD in _intent_types(intents)
@@ -392,7 +392,7 @@ class TestPowerDebounce:
     def test_rearm_after_release(self, sm: EmgGraspStateMachine) -> None:
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -403,7 +403,7 @@ class TestPowerDebounce:
         # Re-assert POWER before rearm duration — should NOT toggle
         t += 0.1  # < power_rearm_duration_s (0.3)
         intents = sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP  # still grasp, no toggle
         assert len(intents) == 0
@@ -411,7 +411,7 @@ class TestPowerDebounce:
     def test_rearm_complete_allows_second_toggle(self, sm: EmgGraspStateMachine) -> None:
         t = 0.0
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_GRASP
 
@@ -422,7 +422,7 @@ class TestPowerDebounce:
 
         # Re-assert POWER — should toggle to CONTROL_WRIST
         sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
-        t += 0.6
+        t += 1.1
         intents = sm.update(_input(gesture=1, proportional=1.0, timestamp=t))
         assert sm.mode == Mode.CONTROL_WRIST
         assert IntentType.STOP_ALL in _intent_types(intents)
@@ -451,7 +451,7 @@ def test_custom_gesture_labels() -> None:
     sm = EmgGraspStateMachine(cfg)
     t = 0.0
     sm.update(_input(gesture=20, proportional=1.0, timestamp=t))
-    t += 0.6
+    t += 1.1
     intents = sm.update(_input(gesture=20, proportional=1.0, timestamp=t))
     assert sm.mode == Mode.CONTROL_GRASP
     assert IntentType.ENTER_FORCE_HOLD in _intent_types(intents)
@@ -459,7 +459,7 @@ def test_custom_gesture_labels() -> None:
     # OPEN safety with custom label
     t += 0.1
     sm.update(_input(gesture=50, proportional=0.8, timestamp=t))
-    t += 0.6
+    t += 1.1
     intents = sm.update(_input(gesture=50, proportional=0.8, timestamp=t))
     assert sm.mode == Mode.NOT_GRASPING
     assert IntentType.RESET_HAND in _intent_types(intents)

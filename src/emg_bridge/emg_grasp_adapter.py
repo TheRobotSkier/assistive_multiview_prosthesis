@@ -91,7 +91,7 @@ class EmgGraspAdapter:
         confidence_threshold: float = 0.55,
         stale_timeout_s: float = 0.5,
         open_min_control: float = 0.7,
-        open_min_hold_s: float = 0.5,
+        open_min_hold_s: float = 1.0,
         node: Optional[Node] = None,
     ):
         """

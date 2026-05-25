@@ -520,11 +520,7 @@ class EmgForceController(Node):
 
         # —— Check for force threshold  (enters force-hold) ——
         if should_enter_force_hold(self._efforts, self._config.force_thresholds):
-            self._stop_reason = check_stop_conditions(
-                self._positions, self._efforts,
-                self._config.stop_positions,
-                self._config.force_thresholds,
-            )
+            self._stop_reason = "All fingers made force contact"
             self.get_logger().info(
                 f"Force hold entry: {self._stop_reason}  "
                 f"efforts={[f'{e:.0f}' for e in self._efforts]}"
@@ -533,13 +529,14 @@ class EmgForceController(Node):
             return
 
         # —— Check for position limits ——
-        stop = check_stop_conditions(
-            self._positions, self._efforts,
-            self._config.stop_positions,
-            self._config.force_thresholds,
+        all_at_limit = all(
+            p >= s for p, s in zip(self._positions, self._config.stop_positions)
         )
-        if stop is not None:
-            self.get_logger().warn(f"Stop position reached: {stop}")
+        if all_at_limit:
+            self.get_logger().warn(
+                f"All fingers reached stop positions  "
+                f"positions={[f'{p:.2f}' for p in self._positions]}"
+            )
             self._on_enter_force_hold()  # treat as hold  (nothing to grasp)
             return
 
