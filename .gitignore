@@ -68,3 +68,6 @@ rosbags/
 
 # Worktrees
 .worktrees/
+
+
+#logs/
