@@ -1,0 +1,21 @@
+config/prosthesis_config.yaml
+  s_d4d4e8d9a58f06::t_8df5f71d53216d 50-51,53-54,57-58,60-61,65-86,466,468-469,473-490
+src/force_controller/force_controller/force_controller_node.py
+  s_d4d4e8d9a58f06::t_8df5f71d53216d 2-29,34-36,73-97,100-227,229,236-237,247-262,267-268,276,284-300,306-307,317-318,320-321,324-326,331,334,341-352,386-387,389-390,400-403,415,420,424,446-448,453,456,459-461,467-471,473,479,484,486-487,489-491,503,505,509-536,541-542,544-549,560-566,577,582,590,595,599,601,612-616,618-619,621,623-630,632-650,652,654-672,674-677,689-714,719,722-724,727-734
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "19720ea2b5ac60b9f8dd2eea450ba873624eed5c",
+  "prompts": {},
+  "sessions": {
+    "s_d4d4e8d9a58f06": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19eb13592ffe1QUvvjmyhh9HOp",
+        "model": "deepseek-v4-flash"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
