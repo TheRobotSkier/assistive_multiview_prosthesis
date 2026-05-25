@@ -16,7 +16,7 @@ config_path: "/prosthesis_ws/tests/emg_grasp/emg_grasp_test.yaml"
 
 # Directory containing the trained EMG classifier model files.
 # Must contain: classifier.pkl  (and optionally proportional calibration).
-emg_model_dir: "/app/models"
+emg_model_dir: "/prosthesis_ws/models"
 
 # EMG device path (reserved for future use — BoardReader auto-discovers).
 emg_device: ""

@@ -7,15 +7,10 @@ It simply delegates to scripts/collect_data.py.
 
 import runpy
 import sys
-import os
-
-# Add scripts dir to path so collect_data can be found
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 
 def main():
-    # Execute the collect_data script
-    runpy.run_module("collect_data", run_name="__main__")
+    runpy.run_module("scripts.collect_data", run_name="__main__")
 
 
 if __name__ == "__main__":

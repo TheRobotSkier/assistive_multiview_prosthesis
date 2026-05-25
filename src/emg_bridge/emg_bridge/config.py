@@ -17,11 +17,11 @@ FILTER_ORDER: int = 4             # Butterworth filter order
 
 # ── Gestures ──────────────────────────────────────────────────────────────────
 GESTURE_NAMES: list[str] = [
-    "REST",       # 0 – relaxed, no contraction
-    "POWER",      # 1 – power / cylindrical grip
-    "PINCH",      # 2 – lateral pinch
-    "OPEN",       # 3 – hand open / extension
-    "POINT",      # 4 – index point / hook
+    "REST",        # 0 – relaxed, no contraction
+    "POWER",       # 1 – power / cylindrical grip
+    "OPEN",        # 2 – hand open / extension
+    "FLEXION",     # 3 – wrist flexion
+    "EXTENSION",   # 4 – wrist extension
 ]
 N_GESTURES: int = len(GESTURE_NAMES)
 REST_LABEL: int = 0
@@ -31,6 +31,6 @@ CONFIDENCE_THRESHOLD: float = 0.55   # below → output REST
 PREDICTION_SMOOTHING_FRAMES: int = 5  # majority-vote over last N predictions
 
 # ── Data recording ────────────────────────────────────────────────────────────
-DEFAULT_RECORD_DURATION_S: float = 5.0   # seconds per gesture per rep
+DEFAULT_RECORD_DURATION_S: float = 8.0   # seconds per gesture per rep
 DEFAULT_REPS: int = 3                    # repetitions per gesture
 WARMUP_DURATION_S: float = 2.0          # board warm-up before first recording

@@ -111,7 +111,7 @@ def _launch_setup(context, *args, **kwargs):
             ]),
             launch_arguments={
                 "serial_port": mia_port,
-                "controller": "",  # empty = individual per-finger controllers
+                "controller": "group_pos_ff_controller",
                 "use_mock_hardware": "true" if mock_hardware else "false",
                 "rviz2_gui": "false",
                 "robot_ns": "mia_hand",
@@ -126,31 +126,44 @@ def _launch_setup(context, *args, **kwargs):
     #   /emg/confidence     (std_msgs/Float32, latched)
     #   /emg/proportional   (std_msgs/Float32, latched)
     nodes.append(
-        Node(
-            package="emg_bridge",
-            executable="run_classifier",
+        ExecuteProcess(
+            cmd=[
+                "ros2",
+                "run",
+                "emg_bridge",
+                "run_classifier",
+                "--model-dir",
+                emg_model_dir,
+            ],
             name="emg_bridge",
-            arguments=["--model-dir", emg_model_dir],
             output="screen",
+            sigkill_timeout="5",
+            sigterm_timeout="3",
         )
     )
 
-    # ── 3. EMG grasp controller ────────────────────────────────────────────────
-    # State machine that subscribes to EMG gestures and /joint_states,
-    # publishes velocity commands to /group_vel_ff_controller/commands and
-    # position commands to /group_pos_ff_controller/commands.
+    # ── 3. EMG force-grasp bridge ──────────────────────────────────────────────
+    # Owns the actual bridge between the live EMG classifier and hardware:
+    # three-mode state machine, ros2_control hand switching, force hold, and
+    # bounded wrist position increments.
+    bridge_script = os.environ.get(
+        "EMG_FORCE_GRASP_BRIDGE",
+        "/prosthesis_ws/scripts/emg_force_grasp_bridge.py",
+    )
+    if not os.path.exists(bridge_script):
+        raise FileNotFoundError(f"EMG force-grasp bridge not found: {bridge_script}")
     nodes.append(
         ExecuteProcess(
             cmd=[
                 "python3",
-                os.path.join(_TESTS_ROOT, "emg_grasp_node.py"),
+                bridge_script,
                 "--ros-args",
                 "--log-level", log_level,
                 "-p", f"config_path:={config_path}",
             ],
             output="screen",
-            sigkill_timeout=5,
-            sigterm_timeout=3,
+            sigkill_timeout="5",
+            sigterm_timeout="3",
         )
     )
 
@@ -208,17 +221,18 @@ def _launch_setup(context, *args, **kwargs):
     # ── 6. Status publisher ────────────────────────────────────────────────────
     # Publishes system status on /emg/system_status for external monitoring
     # (e.g. the Makefile rule or a dashboard).
-    status_script = os.path.join(_TESTS_ROOT, "emg_status_publisher.py")
-    nodes.append(
-        ExecuteProcess(
-            cmd=[
-                "python3", status_script,
-                "--ros-args", "--log-level", "warn",
-            ],
-            name="emg_status_publisher",
-            output="screen",
+    status_script = "/prosthesis_ws/tests/emg_grasp/emg_status_publisher.py"
+    if os.path.exists(status_script):
+        nodes.append(
+            ExecuteProcess(
+                cmd=[
+                    "python3", status_script,
+                    "--ros-args", "--log-level", "warn",
+                ],
+                name="emg_status_publisher",
+                output="screen",
+            )
         )
-    )
 
     # ── 7. Cleanup on shutdown ─────────────────────────────────────────────────
     nodes.append(
@@ -253,7 +267,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "emg_model_dir",
-            default_value=_DEFAULTS.get("emg_model_dir", "/app/models"),
+            default_value=_DEFAULTS.get("emg_model_dir", "/prosthesis_ws/models"),
             description="Directory containing trained EMG classifier models.",
         ),
         DeclareLaunchArgument(

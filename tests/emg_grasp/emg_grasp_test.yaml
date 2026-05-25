@@ -23,20 +23,22 @@ emg_gesture_topic: "/emg/gesture_label"
 emg_confidence_topic: "/emg/confidence"
 emg_proportional_topic: "/emg/proportional"
 
-# Gesture IDs: REST=0, POWER=1, PINCH=2, OPEN=3, POINT=4
+# Gesture IDs from src/emg_bridge/emg_bridge/config.py:
+# REST=0, POWER=1, OPEN=2, FLEXION=3, EXTENSION=4
 emg_grasp_trigger_gesture: 1
-emg_release_gesture: 3
+emg_release_gesture: 2
 emg_grasp_confidence_threshold: 0.7
-gesture_hold_timeout_s: 1.0
+gesture_hold_timeout_s: 0.5
+open_safety_hold_s: 0.5
 
 # ---- Wrist Control (bounded velocity) ----
 wrist_control:
   # Master enable/disable for EMG wrist control
-  enabled: false
+  enabled: true
 
-  # Gesture IDs for wrist motion (FLEXION=5, EXTENSION=6)
-  flexion_gesture: 5
-  extension_gesture: 6
+  # Gesture IDs for wrist motion (FLEXION=3, EXTENSION=4)
+  flexion_gesture: 3
+  extension_gesture: 4
 
   # Minimum confidence for wrist motion activation
   confidence_threshold: 0.55
