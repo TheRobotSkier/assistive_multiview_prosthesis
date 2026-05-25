@@ -64,8 +64,8 @@ wrist_control:
   stop_on_mode_change: true
 
   # Pipeline states that allow wrist motion (by ID)
-  # 0=IDLE, 6=RELEASING
-  wrist_permissive_states: [0, 6]
+  # 0=IDLE, 8=RELEASING
+  wrist_permissive_states: [0, 8]
 
   # How missing wrist hardware is handled:
   #   false → disable wrist control with a warning (default)
