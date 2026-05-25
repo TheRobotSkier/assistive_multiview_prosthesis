@@ -61,7 +61,7 @@ class WristDriverNode(Node):
     def __init__(self):
         super().__init__('wrist_driver')
 
-        self.declare_parameter('port', '/dev/ttyUSB0')
+        self.declare_parameter('port', '/dev/ttyUSB1')
         self.declare_parameter('baudrate', 57600)
         self.declare_parameter('motor_id', 1)
         self.declare_parameter('protocol_version', 2.0)

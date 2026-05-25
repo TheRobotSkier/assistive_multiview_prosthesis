@@ -11,10 +11,10 @@
 services:
   prosthesis:
     devices:
-      # Mia Hand (FTDI serial — always required)
+      # MIA Hand (FTDI FT232 0403:6001) — connected to host ttyUSB0
       - /dev/ttyUSB0:/dev/ttyUSB0
-      # Wrist Dynamixel — uncomment when connected
-      # - /dev/ttyUSB1:/dev/ttyUSB1
+      # Wrist Dynamixel (FTDI FT232H 0403:6014) — connected to host ttyUSB1
+      - /dev/ttyUSB1:/dev/ttyUSB1
     # group_add: "keep-groups" preserves the host user's group memberships
     # (e.g. dialout) so the container user can access serial devices.
     group_add:

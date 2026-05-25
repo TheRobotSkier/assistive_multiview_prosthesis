@@ -31,7 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Python dependencies ──────────────────────────────────────────────────────
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
         dynamixel-sdk \
-        requests
+        requests \
+        scikit-learn \
+        mindrove
 
 # ── User setup ───────────────────────────────────────────────────────────────
 # The osrf/ros:jazzy-desktop image already has a 'ubuntu' user with UID 1000.
@@ -71,6 +73,9 @@ ENV ROS_DOMAIN_ID=0
 ENV LD_LIBRARY_PATH="/prosthesis_ws/install/grasp_preshaping/lib:${LD_LIBRARY_PATH}"
 ENV GRASP_CONFIG_PATH="/prosthesis_ws/config/grasp_preshaping.yaml"
 ENV GRASP_PRESHAPING_HOME="/prosthesis_ws/src/grasp_preshaping"
+
+# Ensure /app/data exists for EMG training data (owned by prosthesis)
+RUN mkdir -p /app/data && chown -R prosthesis:prosthesis /app
 
 USER prosthesis
 

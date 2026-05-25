@@ -86,6 +86,7 @@ def _launch_setup(context, *args, **kwargs):
     mounts_config = LaunchConfiguration("mounts_config").perform(context)
     mounts_link_frame = LaunchConfiguration("mounts_link_frame").perform(context)
     tf_diagnostics = LaunchConfiguration("tf_diagnostics").perform(context)
+    model_dir = LaunchConfiguration("model_dir").perform(context)
 
     nodes = []
 
@@ -139,13 +140,23 @@ def _launch_setup(context, *args, **kwargs):
         )
 
     if _as_bool(context, "emg"):
-        nodes.append(
-            Node(
-                package="emg_bridge",
-                executable="run_classifier",
-                name="emg_bridge",
-                output="screen",
-            )
+        nodes.extend(
+            [
+                Node(
+                    package="emg_bridge",
+                    executable="run_classifier",
+                    name="emg_bridge",
+                    arguments=["--model-dir", model_dir],
+                    output="screen",
+                ),
+                Node(
+                    package="emg_bridge",
+                    executable="emg_grasp_controller",
+                    name="emg_grasp_controller",
+                    parameters=[_node_params(config, "emg_grasp_controller")],
+                    output="screen",
+                ),
+            ]
         )
 
     if _as_bool(context, "haptic"):
@@ -411,7 +422,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "wrist_serial_port",
-                default_value=os.environ.get("WRIST_SERIAL_PORT", "/dev/ttyUSB0"),
+                default_value=os.environ.get("WRIST_SERIAL_PORT", "/dev/ttyUSB1"),
                 description="Wrist Dynamixel serial port device",
             ),
             DeclareLaunchArgument(
@@ -464,6 +475,11 @@ def generate_launch_description():
                 default_value="0.1",
                 description="ROI crop radius (m) for pre-inference point cloud filtering. "
                             "Set <=0 to disable.",
+            ),
+            DeclareLaunchArgument(
+                "model_dir",
+                default_value="/app/models",
+                description="Directory containing trained EMG classifier models.",
             ),
             DeclareLaunchArgument(
                 "tf_diagnostics",

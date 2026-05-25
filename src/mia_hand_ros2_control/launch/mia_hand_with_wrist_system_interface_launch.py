@@ -173,13 +173,13 @@ def generate_launch_description():
     serial_port_arg = DeclareLaunchArgument(
         'serial_port',
         default_value = '/dev/ttyUSB0',
-        description = 'Serial port to which Mia Hand is connected.'
+        description = 'Serial port to which Mia Hand is connected.',
     )
 
     wrist_port_arg = DeclareLaunchArgument(
         'wrist_port',
         default_value = '/dev/ttyUSB1',
-        description = 'Serial port to which the wrist Dynamixel motor is connected.'
+        description = 'Serial port to which the wrist Dynamixel motor is connected.',
     )
 
     rviz2_gui_arg = DeclareLaunchArgument(

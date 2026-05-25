@@ -33,6 +33,7 @@ class EmgState:
     name: str = "REST"
     confidence: float = 0.0
     proportional: float = 0.0
+    mode: str = "NOT_GRASPING"
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -44,7 +45,12 @@ class EmgRosBridgeNode(Node):
         self._pub_name  = self.create_publisher(String,  '/emg/gesture_name',  _LATCHED_QOS)
         self._pub_conf  = self.create_publisher(Float32, '/emg/confidence',    _LATCHED_QOS)
         self._pub_prop  = self.create_publisher(Float32, '/emg/proportional',  _LATCHED_QOS)
+        self.create_subscription(String, '/emg_grasp/mode', self._on_mode, _LATCHED_QOS)
         self.create_timer(0.05, self._publish)   # 20 Hz
+
+    def _on_mode(self, msg: String) -> None:
+        with self._state.lock:
+            self._state.mode = msg.data
 
     def _publish(self):
         with self._state.lock:

@@ -789,6 +789,11 @@ class TwistPropagationNode(Node):
             self._current_segmentation_target = None
         # Clear visualization markers
         self._clear_all_markers()
+        # Reset hit detection
+        reset_bool = Bool()
+        reset_bool.data = False
+        self._hit_detected_pub.publish(reset_bool)
+        self._hit_detected = False
         self.get_logger().info("Deactivated")
         resp.success = True
         resp.message = "twist_propagation deactivated"
@@ -1701,6 +1706,19 @@ class TwistPropagationNode(Node):
                 # the contact pose before segmentation even starts.
                 self._publish_contact_state(hit_x, hit_y, hit_z)
 
+                # Publish collision distance and hit_detected for pipeline manager.
+                collision_dist = math.sqrt(
+                    (hit_x - px_cloud)**2 + (hit_y - py_cloud)**2 + (hit_z - pz_cloud)**2)
+                self._collision_distance_pub.publish(Float64(data=collision_dist))
+                if not self._hit_detected:
+                    hit_msg = Bool()
+                    hit_msg.data = True
+                    self._hit_detected_pub.publish(hit_msg)
+                    self._hit_detected = True
+                    self.get_logger().info(
+                        f"Hit detected — collision distance: {collision_dist:.3f}m"
+                    )
+
                 # Publish click cluster (original hit + synthetic clicks)
                 rng = np.random.default_rng(self._click_random_seed)
                 synthetic = _sample_spherical_shell_clicks(
@@ -1753,6 +1771,9 @@ class TwistPropagationNode(Node):
         else:
             # No hit -- publish -1.0 sentinel to invalidate any stale hit time
             self._hit_time_pub.publish(Float64(data=-1.0))
+
+            # No hit -- publish -1.0 sentinel for collision distance
+            self._collision_distance_pub.publish(Float64(data=-1.0))
 
             # No hit -- publish status with twist info
             self._publish_status(

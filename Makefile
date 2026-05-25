@@ -54,7 +54,6 @@ COMPOSE_SEGMENTATION_CPU := -f docker-compose.yml
 COMPOSE_SEGMENTATION_CUDA := -f docker-compose.yml -f docker-compose.segmentation.cuda.yml
 COMPOSE_SEGMENTATION_CUDA_PODMAN := -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml
 
-<<<<<<< HEAD
 # Select the correct GPU runtime compose override based on the detected backend.
 # DOCKER_CMD is always set correctly (by explicit selection or auto-detect),
 # unlike CONTAINER_BACKEND which is only set when explicitly provided.
@@ -64,10 +63,7 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config
-=======
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cpu build-segmentation-cuda build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force
->>>>>>> 1413d1d (aweh maaannn)
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -83,6 +79,9 @@ build-segmentation-cuda:
 build-segmentation-cpu:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build segmentation-cpu
 
+build-segmentation:
+	cd $(COMPOSE_DIR) && SEGMENTATION_CPU_ONLY=1 $(COMPOSE) build segmentation
+
 build-jazzy-rviz:
 	$(DOCKER_CMD) build -f docker/Dockerfile.jazzy-rviz -t localhost/ros2-jazzy-rviz:latest .
 
@@ -96,16 +95,15 @@ dev:
 	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis
 
 dev-shell: dev
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash
 
 # Segmentation services (explicit backend variants)
 # Use the appropriate compose override based on detected backend for CUDA GPU support.
 segmentation-cuda:
-ifeq ($(DOCKER_CMD),podman)
-	@test -f /var/run/cdi/nvidia.yaml || { echo "Regenerating NVIDIA CDI spec..."; sudo nvidia-ctk cdi generate --output=/var/run/cdi/nvidia.yaml; }
-	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_CUDA_RUNTIME) up -d segmentation-cuda
+ifeq ($(CONTAINER_BACKEND),podman)
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA_PODMAN) up -d segmentation-cuda
 else
-	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_CUDA_RUNTIME) --profile segmentation-cuda up -d segmentation-cuda
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA) --profile segmentation-cuda up -d segmentation-cuda
 endif
 
 segmentation-cpu:
@@ -123,12 +121,7 @@ down-segmentation:
 
 # ── Run ────────────────────────────────────────────────────────────────────
 up:
-ifeq ($(DOCKER_CMD),podman)
-	@test -f /var/run/cdi/nvidia.yaml || { echo "Regenerating NVIDIA CDI spec..."; sudo nvidia-ctk cdi generate --output=/var/run/cdi/nvidia.yaml; }
-	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_CUDA_RUNTIME) up -d prosthesis segmentation-cuda
-else
-	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_CUDA_RUNTIME) --profile segmentation-cuda up -d prosthesis segmentation-cuda
-endif
+	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis segmentation-cuda
 
 up-prosthesis: dev
 
@@ -146,7 +139,20 @@ TONIGHT_TARGETS := tonight tonight-build tonight-clean tonight-raw-check tonight
 tonight-segmentation-check tonight-grasp-check: segmentation
 
 $(TONIGHT_TARGETS): dev
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make $@'
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -lc 'make $@'
+
+# ── Launch proxies (from host) ─────────────────────────────────────────────
+run: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run'
+
+camera-test: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make camera-test'
+
+collect-data: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make collect-data'
+
+train: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make train'
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:
@@ -154,7 +160,7 @@ test:
 
 # ── Shell into running container ──────────────────────────────────────────
 shell:
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash
 
 # ── Cleanup ───────────────────────────────────────────────────────────────
 down:
@@ -164,7 +170,7 @@ clean:
 	cd $(COMPOSE_DIR) && $(COMPOSE) down --rmi local --volumes
 
 clean-volumes:
-	-$(DOCKER_CMD) volume rm prosthesis-build prosthesis-install prosthesis-log 2>/dev/null || true
+	-$(DOCKER_CMD) volume rm prosthesis-build prosthesis-install prosthesis-log segmentation-weights 2>/dev/null || true
 	@echo "Named volumes removed. Next 'make dev' will trigger a fresh build."
 
 logs:
@@ -201,7 +207,7 @@ validate-segmentation-config:
 	@grep -q "profiles:" docker/docker-compose.yml && grep -q "segmentation-cuda" docker/docker-compose.yml || { echo "FAIL: segmentation-cuda profile missing"; exit 1; }
 	@cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA) --profile segmentation-cuda config >/dev/null || { echo "FAIL: CUDA compose config invalid"; exit 1; }
 	@echo "CUDA config OK"
-ifeq ($(DOCKER_CMD),podman)
+ifeq ($(CONTAINER_BACKEND),podman)
 	@echo "--- CUDA config (Podman) ---"
 	@cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA_PODMAN) --profile segmentation-cuda config >/dev/null || { echo "FAIL: Podman CUDA compose config invalid"; exit 1; }
 	@echo "Podman CUDA config OK"
@@ -467,6 +473,36 @@ rviz-openvins-kill:
 	-podman rm rviz-openvins 2>/dev/null
 	@echo "Phase 2 RViz stopped."
 
+# ── Trajectory Prediction RViz (twist_propagation visualisation) ────────────────
+rviz-twist-propagation:
+	@echo "Launching Trajectory Prediction RViz (twist_propagation visualisation)"
+	@test -f rviz/twist_propagation.rviz || { echo "Missing rviz/twist_propagation.rviz"; exit 1; }
+	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+	xhost +
+	podman run --rm -d --name rviz-twist-propagation \
+		--network host \
+		--ipc host \
+		--device /dev/dri \
+		--userns=keep-id \
+		-e DISPLAY=$(DISPLAY) \
+		-e XAUTHORITY=/tmp/.xauth \
+		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+		-e ROS_DOMAIN_ID=0 \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauth:ro \
+		-v $(CURDIR)/rviz/twist_propagation.rviz:/rviz_config.rviz:ro \
+		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+		localhost/rviz-robotlab \
+		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3
+	@echo "Trajectory Prediction RViz started. Kill with: make rviz-twist-propagation-kill"
+
+rviz-twist-propagation-kill:
+	-podman kill rviz-twist-propagation 2>/dev/null
+	-podman rm rviz-twist-propagation 2>/dev/null
+	@echo "Trajectory Prediction RViz stopped."
+
 # ── Jetson IMU dead reckoning test ────────────────────────────────────────────
 # Use jetson-imu-test-single or jetson-imu-test-dual depending on how many
 # cameras are connected. The Jetson container is the same in both cases;
@@ -540,8 +576,6 @@ rviz-imu-test-kill:
 	-podman kill rviz-imu-test 2>/dev/null
 	-podman rm rviz-imu-test 2>/dev/null
 	@echo "IMU test RViz stopped."
-<<<<<<< HEAD
-=======
 
 # ── Grasp Test ──────────────────────────────────────────────────────────────
 up-grasp-test:
@@ -701,4 +735,3 @@ emg-grasp-test: ## EMG-driven grasp test: collect → train → launch (set MOCK
 		-e MOCK_HARDWARE="$${MOCK_HARDWARE:-false}" \
 		prosthesis:latest \
 		bash /prosthesis_ws/scripts/emg_grasp_test.sh
->>>>>>> 1413d1d (aweh maaannn)

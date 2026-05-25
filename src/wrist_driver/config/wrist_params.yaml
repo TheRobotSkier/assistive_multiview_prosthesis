@@ -4,7 +4,7 @@
 wrist_driver:
   ros__parameters:
     # Serial port for the Dynamixel servo
-    port: "/dev/ttyUSB0"
+    port: "/dev/ttyUSB1"
     # Communication baudrate
     baudrate: 57600
     # Dynamixel motor ID

@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
-"""Thin entry point for the EMG training script.
+"""Entry point for `ros2 run emg_bridge train`.
 
-This wrapper exists so that `ros2 run emg_bridge train` works.
-It simply delegates to scripts/train.py.
+Delegates to emg_bridge.scripts.train (no path resolution needed).
 """
 
-import runpy
-import sys
-
-
-def main():
-    runpy.run_module("scripts.train", run_name="__main__")
+from emg_bridge.scripts.train import main
 
 
 if __name__ == "__main__":

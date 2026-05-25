@@ -26,7 +26,7 @@ TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates source
+.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates source
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -84,11 +84,17 @@ pipeline: ## Launch full hardware pipeline
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch pipeline.launch.py
 
-camera-test: ## Temp to test visual piline untill segmentation
+camera-test: ## Build + launch visual pipeline (no hardware)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
 	colcon build --packages-select prosthesis_launch sensor_fusion_bringup --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
+
+run: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --packages-select prosthesis_launch sensor_fusion_bringup emg_bridge force_controller pipeline_manager twist_propagation --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
 
 digital-twin: ## Launch digital twin with real cameras
 	@$(ROS_SETUP) && \
@@ -101,6 +107,16 @@ digital-twin-mock: ## Launch digital twin without cameras
 grasp-test: ## Launch legacy grasp test mode
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch grasp_test.launch.py
+
+# ── EMG utilities ────────────────────────────────────────────────────────────
+
+collect-data: ## Record EMG training data (wearing armband, guided prompts)
+	@$(ROS_SETUP) && \
+	ros2 run emg_bridge collect_data --output-dir /app/data
+
+train: ## Train classifier from recorded data
+	@$(ROS_SETUP) && \
+	ros2 run emg_bridge train --data-dir /app/data --model-dir /app/models
 
 twist-test: ## Launch safe Jetson twist/fusion pipeline with TF bridge
 	@$(ROS_SETUP) && \

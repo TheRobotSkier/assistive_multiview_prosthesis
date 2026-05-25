@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
-"""Thin entry point for the EMG data collection script.
+"""Entry point for `ros2 run emg_bridge collect_data`.
 
-This wrapper exists so that `ros2 run emg_bridge collect_data` works.
-It simply delegates to scripts/collect_data.py.
+Delegates to emg_bridge.scripts.collect_data (no path resolution needed).
 """
 
-import runpy
-import sys
-
-
-def main():
-    runpy.run_module("scripts.collect_data", run_name="__main__")
+from emg_bridge.scripts.collect_data import main
 
 
 if __name__ == "__main__":

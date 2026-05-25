@@ -79,12 +79,26 @@ pipeline_manager:
         twist_deactivate_service: "/twist_propagation/deactivate"
         pipeline_state_topic: "/pipeline/state"
         pipeline_state_name_topic: "/pipeline/state_name"
+        # Twist stop-distance monitoring
+        collision_distance_topic: "/twist_propagation/collision_distance"
+        twist_hit_detected_topic: "/twist_propagation/hit_detected"
+        twist_stop_distance_m: 0.20
         # Tuning
         confidence_threshold: 0.8
         release_confidence_threshold: 0.8
         grasp_gestures: [1]
         release_gesture: 3
         state_publish_rate_hz: 5.0
+        # EMG intent relay
+        emg_grasp_intent_topic: "/emg_grasp/intent"
+        wrist_cmd_topic: "/wrist/set_position"
+        wrist_velocity_scale: 45.0
+        # Volitional mode control
+        volitional_force_adjust_step: 1.0
+        volitional_wrist_velocity_scale: 45.0
+        volitional_entry_delay_s: 0.5
+        # Live config path (empty = disable polling)
+        emg_live_config_path: "/prosthesis_ws/config/emg_live.yaml"
 
 proximity_controller:
     ros__parameters:
@@ -271,6 +285,33 @@ twist_propagation:
         preshaping_call_delay_s: 0.15
         background_cycle_enabled: true
 
+# EMG Grasp Controller — state machine gesture interpreter
+# Launched when emg:=true (default).
+emg_grasp_controller:
+    ros__parameters:
+        # Gesture label mapping (must match classifier GESTURE_NAMES)
+        gesture_rest: 0
+        gesture_power: 1
+        gesture_flexion: 2
+        gesture_extension: 4
+        gesture_open: 3
+        # Timing
+        open_hold_duration_s: 1.0
+        open_prop_threshold: 0.7
+        power_hold_duration_s: 1.0
+        power_rearm_duration_s: 0.3
+        stale_timeout_s: 1.0
+        # Control scaling
+        force_adjust_step: 1.0
+        wrist_velocity_scale: 1.0
+        update_rate_hz: 20.0
+        # Topic names (must match classifier output)
+        emg_gesture_topic: "/emg/gesture_label"
+        emg_confidence_topic: "/emg/confidence"
+        emg_proportional_topic: "/emg/proportional"
+        intent_topic: "/emg_grasp/intent"
+        mode_topic: "/emg_grasp/mode"
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)
 # Wrapped under a dummy node to satisfy ROS 2 --params-file parser.
@@ -424,7 +465,7 @@ _reference:
         # ── Hardware ──────────────────────────────────────────────────────────
         hardware:
             mia_serial_port: "/dev/ttyUSB0"
-            wrist_port: "/dev/ttyUSB0"
+            wrist_port: "/dev/ttyUSB1"
             wrist_baudrate: 57600
             wrist_motor_id: 1
             haptic_bt_addr1: "84:2E:14:09:E1:4E"

@@ -68,7 +68,7 @@ from rclpy.qos import QoSProfile, DurabilityPolicy
 
 from mia_hand_msgs.msg import ForceData, ForceControllerStatus
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray, Int32
+from std_msgs.msg import Float64, Float64MultiArray, Int32
 from std_srvs.srv import SetBool
 
 
@@ -116,6 +116,8 @@ class ForceControllerNode(Node):
         self.declare_parameter("stale_data_timeout_s", 0.5)
         self.declare_parameter("emergency_backoff_factor", 2.0)
         self.declare_parameter("force_filter_window", 5)
+        self.declare_parameter("manual_adjust_topic", "/force_controller/manual_adjust")
+        self.declare_parameter("manual_adjust_step", 10.0)
 
         # Topic / service name parameters
         self.declare_parameter("force_data_topic", "data_streams/fingers/forces/data")
@@ -126,6 +128,8 @@ class ForceControllerNode(Node):
         self.declare_parameter("index_cmd_topic", "/index_pos_ff_controller/commands")
         self.declare_parameter("mrl_cmd_topic", "/mrl_pos_ff_controller/commands")
         self.declare_parameter("force_status_topic", "/force_controller/status")
+        self.declare_parameter("joint_position_limits", [3.14, 3.14, 3.14])
+        self.declare_parameter("joint_position_min", [0.0, 0.0, 0.0])
 
         self._target_min = self.get_parameter("target_force_min").value
         self._target_max = self.get_parameter("target_force_max").value
@@ -153,6 +157,10 @@ class ForceControllerNode(Node):
         self._index_cmd_topic = self.get_parameter("index_cmd_topic").value
         self._mrl_cmd_topic = self.get_parameter("mrl_cmd_topic").value
         self._force_status_topic = self.get_parameter("force_status_topic").value
+        self._joint_pos_limits = list(self.get_parameter("joint_position_limits").value)
+        self._joint_pos_min = list(self.get_parameter("joint_position_min").value)
+        self._manual_adjust_topic = self.get_parameter("manual_adjust_topic").value
+        self._manual_adjust_step = self.get_parameter("manual_adjust_step").value
 
         # ── Internal state ────────────────────────────────────────────────
         self._pipeline_state: int = STATE_IDLE
@@ -187,6 +195,10 @@ class ForceControllerNode(Node):
         self._force_stable: bool = False
         self._slip_detected: bool = False
 
+        # Manual force target adjustment (from volitional mode)
+        self._manual_adjust_offset: float = 0.0
+        self._target_base: float = self._target_mid  # stored for clarity
+
         # ── Service clients ───────────────────────────────────────────────
         self._stream_switch = self.create_client(
             SetBool, self._stream_switch_service
@@ -209,6 +221,14 @@ class ForceControllerNode(Node):
             JointState,
             self._joint_states_topic,
             self._on_joint_states,
+            10,
+        )
+
+        # Manual force target adjustment (from volitional mode)
+        self.create_subscription(
+            Float64,
+            self._manual_adjust_topic,
+            self._on_manual_adjust,
             10,
         )
 
@@ -305,6 +325,24 @@ class ForceControllerNode(Node):
                 pass
         self._joint_pos_received = True
 
+    def _on_manual_adjust(self, msg: Float64) -> None:
+        """Adjust the target force midpoint by a delta.
+
+        Positive values increase target force (tighten grasp).
+        Negative values decrease target force (loosen grasp).
+        The cumulative offset is clamped so target stays in [min, min+2*step].
+        """
+        self._manual_adjust_offset += msg.data
+        # Clamp offset so effective target never exceeds reasonable bounds
+        max_offset = self._target_max - self._target_base
+        min_offset = self._target_min - self._target_base
+        self._manual_adjust_offset = max(min_offset, min(max_offset, self._manual_adjust_offset))
+        self.get_logger().info(
+            f"Manual adjust: delta={msg.data:.1f}, cumulative_offset="
+            f"{self._manual_adjust_offset:.1f}, effective_target="
+            f"{self._target_base + self._manual_adjust_offset:.1f}"
+        )
+
     # ── Controller lifecycle ───────────────────────────────────────────────
 
     def _activate_controller(self) -> None:
@@ -388,6 +426,21 @@ class ForceControllerNode(Node):
             self._publish_status()
             return
 
+        if not self._joint_pos_received:
+            self.get_logger().warn(
+                "Control tick skipped: valid joint feedback not available."
+            )
+            status = ForceControllerStatus()
+            status.active = False
+            status.current_normal_forces = self._normal_forces
+            status.current_tangential_forces = self._tangential_forces
+            status.force_errors = [0.0, 0.0, 0.0]
+            status.force_stable = self._force_stable
+            status.slip_detected = self._slip_detected
+            status.state = STATE_NAMES.get(self._pipeline_state, "UNKNOWN")
+            self._status_pub.publish(status)
+            return
+
         # Check for stale force data (no data for >2 seconds)
         now = time.monotonic()
         if self._force_data_received and (now - self._last_force_time) > self._stale_timeout:
@@ -431,7 +484,7 @@ class ForceControllerNode(Node):
 
         for i in range(3):
             # Compute error: positive = need more force (close more)
-            error = self._target_mid - self._normal_forces[i]
+            error = self._target_base + self._manual_adjust_offset - self._normal_forces[i]
             force_errors[i] = error
 
             # Update integral with anti-windup
@@ -452,6 +505,13 @@ class ForceControllerNode(Node):
 
             # Closing = positive position direction
             new_positions[i] = self._joint_pos[i] + adjustment
+
+        # Clamp to joint limits
+        for i in range(3):
+            new_positions[i] = max(
+                self._joint_pos_min[i],
+                min(self._joint_pos_limits[i], new_positions[i]),
+            )
 
         # Publish position commands
         self._publish_position_commands(new_positions)
@@ -489,9 +549,13 @@ class ForceControllerNode(Node):
 
     def _publish_position_commands(self, positions: list[float]) -> None:
         """Publish position commands to the three ForwardCommandController topics."""
-        for pub, pos in zip(
+        for i, (pub, pos) in enumerate(zip(
             [self._thumb_pub, self._index_pub, self._mrl_pub], positions
-        ):
+        )):
+            assert self._joint_pos_min[i] <= pos <= self._joint_pos_limits[i], (
+                f"Position for joint {i} out of bounds: {pos} not in "
+                f"[{self._joint_pos_min[i]}, {self._joint_pos_limits[i]}]"
+            )
             msg = Float64MultiArray()
             msg.data = [pos]
             pub.publish(msg)

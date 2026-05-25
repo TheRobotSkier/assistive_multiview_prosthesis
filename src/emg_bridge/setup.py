@@ -20,6 +20,9 @@ setup(
     entry_points={
         'console_scripts': [
             'run_classifier = emg_bridge.run_classifier_entry:main',
+            'collect_data = emg_bridge.collect_data_entry:main',
+            'train = emg_bridge.train_entry:main',
+            'emg_grasp_controller = emg_bridge.emg_grasp_controller:main',
         ],
     },
 )
