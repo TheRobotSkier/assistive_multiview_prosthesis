@@ -1,0 +1,19 @@
+plan_fix_v36.md
+  s_ec7d6bf98f703f::t_3c2e3a71e3ab67 1-275
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "fce656ba246a64dbb48bd51b1c099b39d7138f02",
+  "prompts": {},
+  "sessions": {
+    "s_ec7d6bf98f703f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e6175-694b-7ef3-b270-7a4b36f6b989",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
