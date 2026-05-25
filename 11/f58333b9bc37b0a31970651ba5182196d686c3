@@ -1,0 +1,23 @@
+src/haptic_band/haptic_bridge/haptic_controller_node.py
+  s_7cc8dcf4bd4480::t_bb326a28f81ec1 25-32
+src/force_controller/force_controller/force_controller_node.py
+  s_7cc8dcf4bd4480::t_2d4894b0c43b31 77-84,88,94
+tests/emg_grasp/emg_grasp_test.yaml
+  s_7cc8dcf4bd4480::t_2e31de2a0afaf0 67-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "11f58333b9bc37b0a31970651ba5182196d686c3",
+  "prompts": {},
+  "sessions": {
+    "s_7cc8dcf4bd4480": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19f74f573ffeJxW0dw8k9W4yuZ",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
