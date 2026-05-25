@@ -12,8 +12,8 @@ States:
   VOLITIONAL  User-in-the-loop EMG control (force adjust or wrist control)
   RELEASING   Opening hand to release object
 
-Transitions:
-  IDLE -> TWISTING          (EMG POWER/PINCH/POINT)
+  Transitions:
+  IDLE -> TWISTING          (EMG POWER/FLEXION/EXTENSION)
   TWISTING -> SEGMENTING    (twist hit detected -> segmentation triggered)
   SEGMENTING -> PLANNING    (object cloud received)
   PLANNING -> APPROACHING   (preshaping complete)
@@ -25,7 +25,7 @@ Transitions:
   ANY -> IDLE               (abort, emergency stop, failure)
 
 EMG Gesture Contract:
-  POWER/PINCH/POINT (in grasp_gestures) -> Enter TWISTING from IDLE
+  POWER/FLEXION/EXTENSION (in grasp_gestures) -> Enter TWISTING from IDLE
   OPEN -> Release from any active state
   REST (in abort_gestures) -> Abort/cancel from any active state
   In VOLITIONAL:
@@ -77,9 +77,9 @@ STATE_NAMES = {s: s.name for s in State}
 # Gesture labels from EMG (must match config.py GESTURE_NAMES)
 GESTURE_REST = 0
 GESTURE_POWER = 1
-GESTURE_PINCH = 2
-GESTURE_OPEN = 3
-GESTURE_POINT = 4
+GESTURE_OPEN = 2
+GESTURE_FLEXION = 3
+GESTURE_EXTENSION = 4
 
 
 @dataclass
@@ -97,7 +97,7 @@ class PipelineManagerNode(Node):
         # ── Parameters ────────────────────────────────────────────────────
         self.declare_parameter('confidence_threshold', 0.55)
         self.declare_parameter('release_confidence_threshold', 0.25)
-        self.declare_parameter('grasp_gestures', [GESTURE_POWER, GESTURE_PINCH, GESTURE_POINT])
+        self.declare_parameter('grasp_gestures', [GESTURE_POWER, GESTURE_FLEXION, GESTURE_EXTENSION])
         self.declare_parameter('release_gesture', GESTURE_OPEN)
         self.declare_parameter('state_publish_rate_hz', 5.0)
 
@@ -401,8 +401,8 @@ class PipelineManagerNode(Node):
                     self.get_logger().info('VOLITIONAL: switched to FORCE mode')
                 return
 
-            # POINT (EXTENSION alias) – decrease force / wrist negative
-            if gesture == GESTURE_POINT:
+            # EXTENSION – decrease force / wrist negative
+            if gesture == GESTURE_EXTENSION:
                 if self._emg_volitional_mode == "force":
                     self._manual_adjust_pub.publish(Float64(data=-self._volitional_force_step))
                     self.get_logger().debug('VOLITIONAL: force -', throttle_duration_sec=0.5)
@@ -415,8 +415,8 @@ class PipelineManagerNode(Node):
                     self.get_logger().debug('VOLITIONAL: wrist -', throttle_duration_sec=0.5)
                 return
 
-            # PINCH (FLEXION alias) – increase force / wrist positive
-            if gesture == GESTURE_PINCH:
+            # FLEXION – increase force / wrist positive
+            if gesture == GESTURE_FLEXION:
                 if self._emg_volitional_mode == "force":
                     self._manual_adjust_pub.publish(Float64(data=self._volitional_force_step))
                     self.get_logger().debug('VOLITIONAL: force +', throttle_duration_sec=0.5)
