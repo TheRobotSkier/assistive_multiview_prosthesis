@@ -22,9 +22,14 @@ _MIN_THRESHOLD = 5.0                           # % below which motor is silenced
 
 # Pipeline state integer codes (match pipeline_manager/State)
 _IDLE = 0
-_GRASPING = 4
-_HOLDING = 5
-_RELEASING = 6
+_TWISTING = 1
+_SEGMENTING = 2
+_PLANNING = 3
+_APPROACHING = 4
+_GRASPING = 5
+_HOLDING = 6
+_VOLITIONAL = 7
+_RELEASING = 8
 
 
 def _circ_dist(a: float, b: float) -> float:
