@@ -1,0 +1,28 @@
+src/pointcloud_fusion/pointcloud_fusion/pointcloud_fusion_node.py
+  s_14430be63187a9::t_dac9ede88b0a9c 254-260
+  s_14430be63187a9::t_43e0f489be2952 501-516
+  s_14430be63187a9::t_e2f47d497d5df9 651-732
+  s_14430be63187a9::t_b02f6fc2f2997f 1123-1124
+  s_14430be63187a9::t_839e389bcf4d99 551-555
+  s_14430be63187a9::t_b2f78ca58be135 281-285
+  s_14430be63187a9::t_0224b19d19e324 363-364
+  s_14430be63187a9::t_6f2a56dfbf41fa 32
+  s_14430be63187a9::t_818856105ea0a9 406-408,414-415
+  s_14430be63187a9::t_5201debe5215a9 1059-1066,1074
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "ea84348407f417ea47e88316e87d2287fcab145a",
+  "prompts": {},
+  "sessions": {
+    "s_14430be63187a9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1a5c0128cffe1r7WEnoiYrSuMC",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
