@@ -1,0 +1,27 @@
+src/wrist_driver/wrist_driver/wrist_driver_node.py
+  s_b8ee25ea47f647::t_0de1b8dd18aaef 67-71
+  s_b8ee25ea47f647::t_329213c3763c50 126-130,135-140
+  s_b8ee25ea47f647::t_3a190bc9c88e00 144
+src/grasp_preshaping/src/c_api.rs
+  s_b8ee25ea47f647::t_2d84ca1b5ff079 110
+  s_b8ee25ea47f647::t_12333540584c09 175
+  s_b8ee25ea47f647::t_dc2a2ed1b4e39b 605
+config/prosthesis_config.yaml
+  s_b8ee25ea47f647::t_ac8273209e27e1 16-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "95d62441d848e95bf7321eb83ce5d42336ac457d",
+  "prompts": {},
+  "sessions": {
+    "s_b8ee25ea47f647": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19e6959d6ffeDBgT6z0iJIDgHM",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
