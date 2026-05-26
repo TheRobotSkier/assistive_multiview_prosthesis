@@ -369,6 +369,13 @@ public:
   bool execute_grasp(
       char grasp_id, int32_t close_percent, int32_t spe_for_percent);
 
+  /**
+   * \brief Set ACK read timeout for serial commands.
+   *
+   * @param ms Timeout in milliseconds.
+   */
+  void set_ack_timeout_ms(int ms) { ack_timeout_ms_ = ms; }
+
 private:
 
   /**
@@ -377,8 +384,8 @@ private:
    * This function is necessary for accessing all the non-static members through
    * the static factory function #create().
    *
-   * @return true, if object initialization was successful, false if not. 
-   */ 
+   * @return true, if object initialization was successful, false if not.
+   */
   bool init();
 
   /**
@@ -397,13 +404,6 @@ private:
    *         received from the hand before a pre-defined timeout.
    */
   bool send_command(const std::string& cmd);
-
-  /**
-   * \brief Set ACK read timeout for serial commands.
-   *
-   * @param ms Timeout in milliseconds.
-   */
-  void set_ack_timeout_ms(int ms) { ack_timeout_ms_ = ms; }
 
   LibSerial::SerialPort serial_port_;  //!< Mia Hand serial port object.
 

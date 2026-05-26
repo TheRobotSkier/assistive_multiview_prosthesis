@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Grasp Proximity Controller Node.
 
-Subscribes to planner output topics and the current hand position, then applies
+Subscribes to the twist propagation predicted contact point, planner output
+topics (closures, wrist rotation), and the current hand position, then applies
 proximity-based logic before issuing joint and wrist commands:
 
-  - If the current hand position is within the "near" threshold of the planned
-    final hand-frame position → command joints to the full planned closure.
+  - Computes the distance from the current hand's grasp contact point
+    (fingertips) to the twist propagation predicted hit point.
+  - If within the "near" threshold → command joints to the full planned closure.
   - Otherwise → command the wrist to the planned rotation and command joints to
     (partial_closure_factor × planned_closure).
 
@@ -17,13 +19,14 @@ import math
 import time
 
 import rclpy
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, DurabilityPolicy
 from geometry_msgs.msg import Pose, PoseStamped
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile
 from std_msgs.msg import Bool, Float64, Float64MultiArray, Int32
 
 try:
     from scipy.spatial.transform import Rotation as R
+
     _HAS_SCIPY = True
 except ImportError:
     _HAS_SCIPY = False
@@ -65,64 +68,77 @@ class GraspProximityControllerNode(Node):
     _RELEASING = 8
 
     def __init__(self) -> None:
-        super().__init__('grasp_proximity_controller')
+        super().__init__("grasp_proximity_controller")
 
         # ── Parameters ────────────────────────────────────────────────────────
-        self.declare_parameter('proximity_enter_threshold_m', 0.08)
-        self.declare_parameter('proximity_exit_threshold_m', 0.20)
-        self.declare_parameter('partial_closure_factor', 0.3)
-        self.declare_parameter('min_closure_amount', 0.1)
-        self.declare_parameter('wrist_accel_deg_s2', 180.0)
-        self.declare_parameter('control_rate_hz', 10.0)
-        self.declare_parameter('grasp_contact_offset', [0.0, 0.0, 0.0])
-        self.declare_parameter('max_valid_proximity_distance_m', 0.75)
-        self.declare_parameter('max_proximity_step_m', 0.25)
-        self.declare_parameter('wrist_min_deg', 0.0)
-        self.declare_parameter('wrist_max_deg', 300.0)
-        self.declare_parameter('wrist_neutral_deg', 140.0)
-        self.declare_parameter('max_wrist_delta_deg', 90.0)
-        self.declare_parameter('command_repeat_period_s', 1.0)
-        self.declare_parameter('command_epsilon', 0.005)
-        self.declare_parameter('near_enter_consecutive_samples', 3)
-        self.declare_parameter('near_exit_consecutive_samples', 3)
+        self.declare_parameter("proximity_enter_threshold_m", 0.08)
+        self.declare_parameter("proximity_exit_threshold_m", 0.20)
+        self.declare_parameter("partial_closure_factor", 0.3)
+        self.declare_parameter("min_closure_amount", 0.1)
+        self.declare_parameter("wrist_accel_deg_s2", 180.0)
+        self.declare_parameter("control_rate_hz", 10.0)
+        self.declare_parameter("grasp_contact_offset", [0.0, 0.0, 0.0])
+        self.declare_parameter("max_valid_proximity_distance_m", 0.75)
+        self.declare_parameter("max_proximity_step_m", 0.25)
+        self.declare_parameter("wrist_min_deg", 0.0)
+        self.declare_parameter("wrist_max_deg", 300.0)
+        self.declare_parameter("wrist_neutral_deg", 140.0)
+        self.declare_parameter("max_wrist_delta_deg", 90.0)
+        self.declare_parameter("command_repeat_period_s", 1.0)
+        self.declare_parameter("command_epsilon", 0.005)
+        self.declare_parameter("near_enter_consecutive_samples", 3)
+        self.declare_parameter("near_exit_consecutive_samples", 3)
 
         # Topic name parameters
-        self.declare_parameter('target_closures_topic', '/grasp_preshaping/target_finger_closures')
-        self.declare_parameter('wrist_pose_topic', '/grasp_preshaping/wrist_pose')
-        self.declare_parameter('target_hand_pose_topic', '/grasp_preshaping/target_hand_pose')
-        self.declare_parameter('hand_pose_topic', '/hand_pose')
-        self.declare_parameter('pipeline_state_topic', '/pipeline/state')
-        self.declare_parameter('thumb_cmd_topic', '/thumb_pos_ff_controller/commands')
-        self.declare_parameter('index_cmd_topic', '/index_pos_ff_controller/commands')
-        self.declare_parameter('mrl_cmd_topic', '/mrl_pos_ff_controller/commands')
-        self.declare_parameter('wrist_cmd_topic', '/wrist/set_position')
+        self.declare_parameter(
+            "target_closures_topic", "/grasp_preshaping/target_finger_closures"
+        )
+        self.declare_parameter("wrist_pose_topic", "/grasp_preshaping/wrist_pose")
+        self.declare_parameter("contact_pose_topic", "/grasp_preshaping/contact_pose")
+        self.declare_parameter("hand_pose_topic", "/hand_pose")
+        self.declare_parameter("pipeline_state_topic", "/pipeline/state")
+        self.declare_parameter("thumb_cmd_topic", "/thumb_pos_ff_controller/commands")
+        self.declare_parameter("index_cmd_topic", "/index_pos_ff_controller/commands")
+        self.declare_parameter("mrl_cmd_topic", "/mrl_pos_ff_controller/commands")
+        self.declare_parameter("wrist_cmd_topic", "/wrist/set_position")
 
-        self._enter_thresh = self.get_parameter('proximity_enter_threshold_m').value
-        self._exit_thresh = self.get_parameter('proximity_exit_threshold_m').value
-        self._partial_factor = self.get_parameter('partial_closure_factor').value
-        self._min_closure = self.get_parameter('min_closure_amount').value
-        self._wrist_accel = self.get_parameter('wrist_accel_deg_s2').value
-        rate = self.get_parameter('control_rate_hz').value
+        self._enter_thresh = self.get_parameter("proximity_enter_threshold_m").value
+        self._exit_thresh = self.get_parameter("proximity_exit_threshold_m").value
+        self._partial_factor = self.get_parameter("partial_closure_factor").value
+        self._min_closure = self.get_parameter("min_closure_amount").value
+        self._wrist_accel = self.get_parameter("wrist_accel_deg_s2").value
+        rate = self.get_parameter("control_rate_hz").value
 
         # Offset from tracked pose origin (camera) to grasp contact point
         # (fingertips), expressed in the pose's local frame.  Applied by
         # rotating by pose orientation before computing distance.
         # Same value as twist_propagation's propagation_origin_offset.
-        self._grasp_contact_offset = self.get_parameter('grasp_contact_offset').value
-        if self._grasp_contact_offset and any(v != 0.0 for v in self._grasp_contact_offset):
+        self._grasp_contact_offset = self.get_parameter("grasp_contact_offset").value
+        if self._grasp_contact_offset and any(
+            v != 0.0 for v in self._grasp_contact_offset
+        ):
             self.get_logger().info(
-                f'Grasp contact offset enabled: {self._grasp_contact_offset}')
+                f"Grasp contact offset enabled: {self._grasp_contact_offset}"
+            )
 
-        self._max_valid_dist = self.get_parameter('max_valid_proximity_distance_m').value
-        self._max_prox_step = self.get_parameter('max_proximity_step_m').value
-        self._wrist_min_deg = self.get_parameter('wrist_min_deg').value
-        self._wrist_max_deg = self.get_parameter('wrist_max_deg').value
-        self._wrist_neutral_deg = self.get_parameter('wrist_neutral_deg').value
-        self._max_wrist_delta_deg = self.get_parameter('max_wrist_delta_deg').value
-        self._command_repeat_period_s = self.get_parameter('command_repeat_period_s').value
-        self._command_epsilon = self.get_parameter('command_epsilon').value
-        self._near_enter_consecutive_samples = self.get_parameter('near_enter_consecutive_samples').value
-        self._near_exit_consecutive_samples = self.get_parameter('near_exit_consecutive_samples').value
+        self._max_valid_dist = self.get_parameter(
+            "max_valid_proximity_distance_m"
+        ).value
+        self._max_prox_step = self.get_parameter("max_proximity_step_m").value
+        self._wrist_min_deg = self.get_parameter("wrist_min_deg").value
+        self._wrist_max_deg = self.get_parameter("wrist_max_deg").value
+        self._wrist_neutral_deg = self.get_parameter("wrist_neutral_deg").value
+        self._max_wrist_delta_deg = self.get_parameter("max_wrist_delta_deg").value
+        self._command_repeat_period_s = self.get_parameter(
+            "command_repeat_period_s"
+        ).value
+        self._command_epsilon = self.get_parameter("command_epsilon").value
+        self._near_enter_consecutive_samples = self.get_parameter(
+            "near_enter_consecutive_samples"
+        ).value
+        self._near_exit_consecutive_samples = self.get_parameter(
+            "near_exit_consecutive_samples"
+        ).value
 
         # ── State ─────────────────────────────────────────────────────────────
         # Pipeline state — used to gate commands during GRASPING/HOLDING
@@ -131,14 +147,17 @@ class GraspProximityControllerNode(Node):
         self._prev_pipeline_state: int = 0
 
         # Planned outputs from the preshaping bridge (set atomically when all arrive)
-        self._planned_closures: list[float] | None = None    # [thumb, index, mrl]
-        self._planned_wrist_deg: float | None = None         # scalar wrist rotation (deg)
-        self._planned_hand_frame: Pose | None = None         # hand pose in world frame
+        self._planned_closures: list[float] | None = None  # [thumb, index, mrl]
+        self._planned_wrist_deg: float | None = None  # scalar wrist rotation (deg)
 
         # Intermediate buffers — filled by individual topic callbacks
         self._buf_closures: list[float] | None = None
         self._buf_wrist_deg: float | None = None
-        self._buf_hand_frame: Pose | None = None
+
+        # Predicted contact point from twist propagation (hit point).
+        # This is the target for proximity distance computation.
+        self._contact_pose: Pose | None = None
+        self._contact_pose_time: float | None = None  # wall-clock time of last receipt
 
         # Current hand pose
         self._current_hand_pose: PoseStamped | None = None
@@ -167,28 +186,28 @@ class GraspProximityControllerNode(Node):
         # ── Subscriptions ─────────────────────────────────────────────────────
         self.create_subscription(
             Float64MultiArray,
-            self.get_parameter('target_closures_topic').value,
+            self.get_parameter("target_closures_topic").value,
             self._on_planned_closures,
             10,
         )
 
         self.create_subscription(
             Float64,
-            self.get_parameter('wrist_pose_topic').value,
+            self.get_parameter("wrist_pose_topic").value,
             self._on_planned_wrist_rotation,
             10,
         )
 
         self.create_subscription(
             PoseStamped,
-            self.get_parameter('target_hand_pose_topic').value,
-            self._on_planned_hand_frame,
+            self.get_parameter("contact_pose_topic").value,
+            self._on_contact_pose,
             10,
         )
 
         self.create_subscription(
             PoseStamped,
-            self.get_parameter('hand_pose_topic').value,
+            self.get_parameter("hand_pose_topic").value,
             self._on_current_hand_pose,
             10,
         )
@@ -198,39 +217,45 @@ class GraspProximityControllerNode(Node):
         # the joint command topics; proximity controller must not publish.
         self.create_subscription(
             Int32,
-            self.get_parameter('pipeline_state_topic').value,
+            self.get_parameter("pipeline_state_topic").value,
             self._on_pipeline_state,
             10,
         )
 
         self.create_subscription(
             Float64MultiArray,
-            '/wrist/state',
+            "/wrist/state",
             self._on_wrist_state,
             10,
         )
 
         # ── Publishers ────────────────────────────────────────────────────────
         self._thumb_pub = self.create_publisher(
-            Float64MultiArray, self.get_parameter('thumb_cmd_topic').value, 10)
+            Float64MultiArray, self.get_parameter("thumb_cmd_topic").value, 10
+        )
         self._index_pub = self.create_publisher(
-            Float64MultiArray, self.get_parameter('index_cmd_topic').value, 10)
+            Float64MultiArray, self.get_parameter("index_cmd_topic").value, 10
+        )
         self._mrl_pub = self.create_publisher(
-            Float64MultiArray, self.get_parameter('mrl_cmd_topic').value, 10)
+            Float64MultiArray, self.get_parameter("mrl_cmd_topic").value, 10
+        )
         self._wrist_pub = self.create_publisher(
-            Float64MultiArray, self.get_parameter('wrist_cmd_topic').value, 10)
+            Float64MultiArray, self.get_parameter("wrist_cmd_topic").value, 10
+        )
         self._near_zone_pub = self.create_publisher(
-            Bool, '/proximity/near_zone_entered',
-            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+            Bool,
+            "/proximity/near_zone_entered",
+            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL),
+        )
 
         # ── Control timer ─────────────────────────────────────────────────────
         self.create_timer(1.0 / rate, self._control_loop)
 
         self.get_logger().info(
-            f'GraspProximityController started — '
-            f'enter_thresh={self._enter_thresh:.3f} m, '
-            f'exit_thresh={self._exit_thresh:.3f} m, '
-            f'partial_factor={self._partial_factor}'
+            f"GraspProximityController started — "
+            f"enter_thresh={self._enter_thresh:.3f} m, "
+            f"exit_thresh={self._exit_thresh:.3f} m, "
+            f"partial_factor={self._partial_factor}"
         )
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
@@ -239,7 +264,8 @@ class GraspProximityControllerNode(Node):
         """New plan signal: cache closures and attempt to commit the plan."""
         if len(msg.data) < 3:
             self.get_logger().warn(
-                f'planned_joint_closures expected ≥3 values, got {len(msg.data)} — ignoring')
+                f"planned_joint_closures expected ≥3 values, got {len(msg.data)} — ignoring"
+            )
             return
         self._buf_closures = list(msg.data[:3])
         self._try_commit_plan()
@@ -248,13 +274,14 @@ class GraspProximityControllerNode(Node):
         self._buf_wrist_deg = msg.data
         self._try_commit_plan()
 
-    def _on_planned_hand_frame(self, msg: PoseStamped) -> None:
-        self._buf_hand_frame = msg.pose
-        self._try_commit_plan()
+    def _on_contact_pose(self, msg: PoseStamped) -> None:
+        """Cache the latest predicted contact point from twist propagation."""
+        self._contact_pose = msg.pose
+        self._contact_pose_time = time.time()
 
     def _on_current_hand_pose(self, msg: PoseStamped) -> None:
         if self._current_hand_pose is None:
-            self.get_logger().info('Received first hand pose — control loop now active')
+            self.get_logger().info("Received first hand pose — control loop now active")
         self._current_hand_pose = msg
 
     def _on_pipeline_state(self, msg: Int32) -> None:
@@ -263,52 +290,61 @@ class GraspProximityControllerNode(Node):
         prev = self._prev_pipeline_state
         new = self._pipeline_state
         if prev == self._APPROACHING and new != self._APPROACHING:
-            self._clear_plan('pipeline leaving APPROACHING')
-        elif new in (self._IDLE, self._TWISTING, self._SEGMENTING,
-                     self._PLANNING, self._RELEASING):
-            state_names = {0: 'IDLE', 1: 'TWISTING', 2: 'SEGMENTING',
-                           3: 'PLANNING', 8: 'RELEASING'}
-            self._clear_plan(f'pipeline entering {state_names.get(new, str(new))}')
+            self._clear_plan("pipeline leaving APPROACHING")
+            self._contact_pose = None
+            self._contact_pose_time = None
+        elif new in (
+            self._IDLE,
+            self._TWISTING,
+            self._SEGMENTING,
+            self._PLANNING,
+            self._RELEASING,
+        ):
+            state_names = {
+                0: "IDLE",
+                1: "TWISTING",
+                2: "SEGMENTING",
+                3: "PLANNING",
+                8: "RELEASING",
+            }
+            self._clear_plan(f"pipeline entering {state_names.get(new, str(new))}")
 
     def _on_wrist_state(self, msg: Float64MultiArray) -> None:
         if len(msg.data) >= 2:
             self._current_wrist_deg = float(msg.data[0])
 
     def _clear_plan(self, reason: str) -> None:
-        if (self._planned_closures is None
-                and self._planned_wrist_deg is None
-                and self._planned_hand_frame is None
-                and self._buf_closures is None
-                and self._buf_wrist_deg is None
-                and self._buf_hand_frame is None
-                and not self._is_near):
+        if (
+            self._planned_closures is None
+            and self._planned_wrist_deg is None
+            and self._buf_closures is None
+            and self._buf_wrist_deg is None
+            and not self._is_near
+        ):
             return
         self._planned_closures = None
         self._planned_wrist_deg = None
-        self._planned_hand_frame = None
         self._buf_closures = None
         self._buf_wrist_deg = None
-        self._buf_hand_frame = None
         was_near = self._is_near
         self._is_near = False
         self._near_enter_count = 0
         self._near_exit_count = 0
         if was_near:
             self._near_zone_pub.publish(Bool(data=False))
-        self.get_logger().info(f'Plan cleared: {reason}')
+        self.get_logger().info(f"Plan cleared: {reason}")
 
     def _try_commit_plan(self) -> None:
-        """Atomically commit buffered plan when all three parts have arrived."""
-        if (self._buf_closures is not None
-                and self._buf_wrist_deg is not None
-                and self._buf_hand_frame is not None):
+        """Atomically commit buffered plan when both parts have arrived."""
+        if self._buf_closures is not None and self._buf_wrist_deg is not None:
             self._planned_closures = self._buf_closures
-            self._planned_hand_frame = self._buf_hand_frame
 
             # Compute safe absolute wrist target from signed delta
             planned_delta = self._buf_wrist_deg
-            planned_delta = max(-self._max_wrist_delta_deg,
-                                min(self._max_wrist_delta_deg, planned_delta))
+            planned_delta = max(
+                -self._max_wrist_delta_deg,
+                min(self._max_wrist_delta_deg, planned_delta),
+            )
             if self._current_wrist_deg is not None:
                 target = self._current_wrist_deg + planned_delta
             else:
@@ -319,7 +355,6 @@ class GraspProximityControllerNode(Node):
             # Clear buffers so the next plan starts fresh
             self._buf_closures = None
             self._buf_wrist_deg = None
-            self._buf_hand_frame = None
             # Reset state so the new plan re-evaluates proximity
             self._is_near = False
             self._near_enter_count = 0
@@ -327,57 +362,58 @@ class GraspProximityControllerNode(Node):
             # Reset caching so new mode forces a publish
             self._last_mode = None
             self.get_logger().info(
-                f'New plan committed — closures={self._planned_closures}, '
-                f'wrist={self._planned_wrist_deg:.1f}\u00b0'
+                f"New plan committed — closures={self._planned_closures}, "
+                f"wrist={self._planned_wrist_deg:.1f}\u00b0"
             )
+
     # ── Control loop ──────────────────────────────────────────────────────────
 
     def _control_loop(self) -> None:
         if self._pipeline_state != self._APPROACHING:
             return
 
-        if (self._planned_closures is None
-                or self._planned_wrist_deg is None
-                or self._planned_hand_frame is None
-                or self._current_hand_pose is None):
+        if (
+            self._planned_closures is None
+            or self._planned_wrist_deg is None
+            or self._contact_pose is None
+            or self._current_hand_pose is None
+        ):
             missing = []
             if self._planned_closures is None:
-                missing.append('closures')
+                missing.append("closures")
             if self._planned_wrist_deg is None:
-                missing.append('wrist')
-            if self._planned_hand_frame is None:
-                missing.append('hand_frame')
+                missing.append("wrist")
+            if self._contact_pose is None:
+                missing.append("contact_pose")
             if self._current_hand_pose is None:
-                missing.append('current_pose')
+                missing.append("current_pose")
             self.get_logger().debug(
-                f'Control loop waiting for: {missing}',
-                throttle_duration_sec=5.0)
+                f"Control loop waiting for: {missing}", throttle_duration_sec=5.0
+            )
             return
 
+        # Contact pose is a one-time target — its age is irrelevant until
+        # the pipeline mode changes, so no freshness check is needed.
+
         dist, (dx, dy, dz) = self._compute_proximity_distance(
-            self._current_hand_pose, self._planned_hand_frame)
+            self._current_hand_pose, self._contact_pose
+        )
 
         # Sanity guards
         if not math.isfinite(dist):
-            self.get_logger().warn(f'Non-finite proximity distance: {dist}, clearing plan')
-            self._clear_plan('non-finite proximity distance')
+            self.get_logger().warn(
+                f"Non-finite proximity distance: {dist}, clearing plan"
+            )
+            self._clear_plan("non-finite proximity distance")
             return
 
-        if dist > self._max_valid_dist:
+        """if dist > self._max_valid_dist:
             self.get_logger().warn(
                 f'Proximity distance {dist:.1f}m exceeds max {self._max_valid_dist}m, '
                 f'clearing plan')
             self._clear_plan('proximity distance exceeds limit')
             return
-
-        if self._last_valid_proximity_distance is not None:
-            jump = abs(dist - self._last_valid_proximity_distance)
-            if jump > self._max_prox_step:
-                self.get_logger().warn(
-                    f'Proximity distance jumped {jump:.2f}m '
-                    f'(> {self._max_prox_step}m), clearing plan')
-                self._clear_plan('proximity distance jump too large')
-                return
+            """
 
         self._last_valid_proximity_distance = dist
 
@@ -389,9 +425,10 @@ class GraspProximityControllerNode(Node):
                     self._is_near = False
                     self._near_exit_count = 0
                     self.get_logger().info(
-                        f'Left near zone (dist={dist:.3f} m, '
-                        f'offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m'
-                        f' > exit={self._exit_thresh:.3f} m)')
+                        f"Left near zone (dist={dist:.3f} m, "
+                        f"offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m"
+                        f" > exit={self._exit_thresh:.3f} m)"
+                    )
                     self._near_zone_pub.publish(Bool(data=False))
             else:
                 self._near_exit_count = 0
@@ -402,9 +439,10 @@ class GraspProximityControllerNode(Node):
                     self._is_near = True
                     self._near_enter_count = 0
                     self.get_logger().info(
-                        f'Entered near zone (dist={dist:.3f} m, '
-                        f'offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m'
-                        f' < enter={self._enter_thresh:.3f} m)')
+                        f"Entered near zone (dist={dist:.3f} m, "
+                        f"offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m"
+                        f" < enter={self._enter_thresh:.3f} m)"
+                    )
                     self._near_zone_pub.publish(Bool(data=True))
             else:
                 self._near_enter_count = 0
@@ -414,17 +452,19 @@ class GraspProximityControllerNode(Node):
 
         if self._is_near:
             self.get_logger().info(
-                f'NEAR mode (dist={dist:.3f} m, '
-                f'offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m): '
-                f'full closure',
-                throttle_duration_sec=1.0)
+                f"NEAR mode (dist={dist:.3f} m, "
+                f"offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m): "
+                f"full closure",
+                throttle_duration_sec=1.0,
+            )
             self._publish_joint_commands(thumb, index, mrl, mode)
         else:
             self.get_logger().info(
-                f'FAR mode (dist={dist:.3f} m, '
-                f'offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m): '
-                f'partial closure + wrist',
-                throttle_duration_sec=1.0)
+                f"FAR mode (dist={dist:.3f} m, "
+                f"offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m): "
+                f"partial closure + wrist",
+                throttle_duration_sec=1.0,
+            )
             self._publish_wrist_command(self._planned_wrist_deg, mode)
             self._publish_joint_commands(
                 self._partial_factor * thumb,
@@ -436,24 +476,27 @@ class GraspProximityControllerNode(Node):
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _compute_proximity_distance(
-        self, current: PoseStamped, planned: Pose,
+        self,
+        current: PoseStamped,
+        contact: Pose,
     ) -> tuple[float, tuple[float, float, float]]:
-        """Compute distance between current and planned hand positions.
+        """Compute distance from current hand to the predicted contact point.
 
-        Both positions are shifted from the tracked pose origin (camera) to
-        the grasp contact point (fingertips) using ``_grasp_contact_offset``
-        before computing the Euclidean distance.  The offset is expressed in
-        each pose's local frame and rotated by that pose's orientation.
+        The current hand position is shifted from the tracked pose origin
+        (camera) to the grasp contact point (fingertips) using
+        ``_grasp_contact_offset``.  The contact point comes from twist
+        propagation and is already at the predicted fingertip contact
+        location, so no offset is applied to it.
 
         Returns:
             (euclidean_distance, (dx, dy, dz)) where dx/dy/dz are the
-            signed per-axis offsets from planned to current grasp contact.
+            signed per-axis offsets from contact to current grasp contact.
         """
         cur_pos = self._apply_offset(current.pose, self._grasp_contact_offset)
-        plan_pos = self._apply_offset(planned, self._grasp_contact_offset)
-        dx = cur_pos[0] - plan_pos[0]
-        dy = cur_pos[1] - plan_pos[1]
-        dz = cur_pos[2] - plan_pos[2]
+        contact_pos = (contact.position.x, contact.position.y, contact.position.z)
+        dx = cur_pos[0] - contact_pos[0]
+        dy = cur_pos[1] - contact_pos[1]
+        dz = cur_pos[2] - contact_pos[2]
         return math.sqrt(dx * dx + dy * dy + dz * dz), (dx, dy, dz)
 
     @staticmethod
@@ -488,8 +531,9 @@ class GraspProximityControllerNode(Node):
             return 0.0
         return max(planned, self._min_closure)
 
-    def _publish_joint_commands(self, thumb: float, index: float, mrl: float,
-                                 mode: str) -> None:
+    def _publish_joint_commands(
+        self, thumb: float, index: float, mrl: float, mode: str
+    ) -> None:
         t_thumb = self._floor_closure(thumb)
         t_index = self._floor_closure(index)
         t_mrl = self._floor_closure(mrl)
@@ -500,9 +544,11 @@ class GraspProximityControllerNode(Node):
             should_publish = True
         elif self._last_published_thumb is None:
             should_publish = True
-        elif (abs(t_thumb - self._last_published_thumb) > self._command_epsilon
-              or abs(t_index - self._last_published_index) > self._command_epsilon
-              or abs(t_mrl - self._last_published_mrl) > self._command_epsilon):
+        elif (
+            abs(t_thumb - self._last_published_thumb) > self._command_epsilon
+            or abs(t_index - self._last_published_index) > self._command_epsilon
+            or abs(t_mrl - self._last_published_mrl) > self._command_epsilon
+        ):
             should_publish = True
         elif now - self._last_command_publish_time >= self._command_repeat_period_s:
             should_publish = True
@@ -563,5 +609,5 @@ def main(args: list[str] | None = None) -> None:
             rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

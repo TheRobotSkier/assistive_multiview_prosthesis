@@ -66,20 +66,20 @@ force_controller:
         manual_adjust_topic: "/force_controller/manual_adjust"
         # Force target
         target_force_min: 50.0
-        target_force_max: 200.0
+        target_force_max: 340.0
         update_rate_hz: 20.0
         # Stability detection
         stability_window: 1.0
         stability_tolerance: 30.0
         slip_threshold: 100.0
-        max_force_emergency: 500.0
-        stale_data_timeout_s: 0.5
+        max_force_emergency: 400.0
+        stale_data_timeout_s: 1.0
         force_filter_window: 5
         # Manual volitional adjustment
-        manual_adjust_step: 10.0
+        manual_adjust_step: 5.0
         # Velocity ramp (closing phase)
-        closing_velocity_start: 0.3
-        closing_velocity_end: 0.1
+        closing_velocity_start: 1.0
+        closing_velocity_end: 0.25
         decay_steps: 5
         step_interval_s: 0.2
         stop_positions: [1.5, 1.5, 1.5]
@@ -90,8 +90,8 @@ force_controller:
         hold_deadzone: 20.0
         hold_max_velocity: 0.08
         hold_min_overshoot: 20.0
-        hold_max_overshoot: 150.0
-        emergency_backoff_velocity: -0.1
+        hold_max_overshoot: 20.0
+        emergency_backoff_velocity: -0.5
         force_adjust_rate_up: 15.0
         force_adjust_rate_down: 30.0
         # Joint limits
@@ -135,7 +135,7 @@ proximity_controller:
         # Topic names
         target_closures_topic: "/grasp_preshaping/target_finger_closures"
         wrist_pose_topic: "/grasp_preshaping/wrist_pose"
-        target_hand_pose_topic: "/grasp_preshaping/target_hand_pose"
+        contact_pose_topic: "/grasp_preshaping/contact_pose"
         hand_pose_topic: "/hand_pose"
         pipeline_state_topic: "/pipeline/state"
         thumb_cmd_topic: "/thumb_pos_ff_controller/commands"
@@ -143,8 +143,8 @@ proximity_controller:
         mrl_cmd_topic: "/mrl_pos_ff_controller/commands"
         wrist_cmd_topic: "/wrist/set_position"
         # Tuning
-        proximity_enter_threshold_m: 0.08
-        proximity_exit_threshold_m: 0.20
+        proximity_enter_threshold_m: 0.20
+        proximity_exit_threshold_m: 0.35
         partial_closure_factor: 0.3
         min_closure_amount: 0.1
         wrist_accel_deg_s2: 180.0
@@ -152,7 +152,7 @@ proximity_controller:
         # Offset from tracked pose origin (camera) to grasp contact point
         # (fingertips), expressed in the pose's local frame.
         # Same value as twist_propagation's propagation_origin_offset.
-        grasp_contact_offset: [0.1543, -0.1485, -0.1352]
+        grasp_contact_offset: [0.1543, -0.1485, 0.1352]
         max_valid_proximity_distance_m: 0.75
         max_proximity_step_m: 0.25
         wrist_min_deg: 5.0
