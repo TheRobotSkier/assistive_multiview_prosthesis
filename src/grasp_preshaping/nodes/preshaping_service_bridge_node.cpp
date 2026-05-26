@@ -63,7 +63,9 @@ public:
     rust_api_version_fn_(nullptr),
     min_closure_amount_(declare_parameter<double>("min_closure_amount", 0.1)),
     preshaping_closure_fraction_(declare_parameter<double>("preshaping_closure_fraction", 0.3)),
-    publish_initial_commands_(declare_parameter<bool>("publish_initial_commands", true))
+    publish_initial_commands_(declare_parameter<bool>("publish_initial_commands", true)),
+    contact_override_max_age_s_(declare_parameter<double>("contact_override_max_age_s", 2.0)),
+    max_wrist_delta_deg_(declare_parameter<double>("max_wrist_delta_deg", 90.0))
   {
     // TF2 buffer and listener for camera pose lookups
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
@@ -281,6 +283,7 @@ private:
     geometry_msgs::msg::TwistStamped twist;
     sensor_msgs::msg::PointCloud2 cloud;
     bool used_contact_override = false;
+    double contact_age_s = 0.0;
     {
       std::lock_guard<std::mutex> lock(input_mutex_);
       if (!has_pose_) {
@@ -316,23 +319,29 @@ private:
       twist = latest_twist_;
       cloud = latest_cloud_;
 
-      // Prefer contact-state override when available and fresh (<2 s old).
+      // Prefer contact-state override when available and fresh.
       // Published by twist propagation immediately at hit detection.
+      contact_age_s = (this->now() - contact_pose_received_time_).seconds();
       used_contact_override =
         has_contact_pose_ && has_contact_twist_ &&
-        (this->now() - contact_pose_received_time_) < rclcpp::Duration(2, 0);
+        (this->now() - contact_pose_received_time_) < rclcpp::Duration::from_seconds(contact_override_max_age_s_);
       if (used_contact_override) {
         pose = latest_contact_pose_;
         twist = latest_contact_twist_;
+      } else {
+        RCLCPP_WARN(
+          get_logger(),
+          "Contact override rejected: age=%.1fs (max=%.1fs), has_pose=%d, has_twist=%d",
+          contact_age_s, contact_override_max_age_s_, has_contact_pose_, has_contact_twist_);
       }
     }
 
     if (used_contact_override) {
       RCLCPP_INFO(
         get_logger(),
-        "Planner called with contact override: target=(%.3f,%.3f,%.3f)"
+        "Planner called with contact override: age=%.1fs target=(%.3f,%.3f,%.3f)"
         " zero_twist=true",
-        pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+        contact_age_s, pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
     }
 
     GraspComputeRequestFFI request{};
@@ -539,7 +548,10 @@ private:
     // ── Publish wrist rotation in degrees (always, for proximity controller) ──
     {
       std_msgs::msg::Float64 wrist_msg;
-      wrist_msg.data = ffi_response.wrist_rotation_deg;
+      double delta = ffi_response.wrist_rotation_deg;
+      // Clamp signed delta
+      delta = std::max(-max_wrist_delta_deg_, std::min(max_wrist_delta_deg_, delta));
+      wrist_msg.data = delta;
       wrist_pose_pub_->publish(wrist_msg);
     }
 
@@ -626,6 +638,8 @@ private:
   const double min_closure_amount_;
   const double preshaping_closure_fraction_;
   const bool publish_initial_commands_;
+  const double contact_override_max_age_s_;
+  const double max_wrist_delta_deg_;
 
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
