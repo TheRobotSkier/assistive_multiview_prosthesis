@@ -393,7 +393,6 @@ class PipelineManagerNode(Node):
             if self._state not in (State.IDLE, State.RELEASING):
                 if held_long_enough and high_confidence and not self._gesture_action_fired:
                     self._transition(State.RELEASING, 'EMG: OPEN')
-                    self._deactivate_twist_propagation()
                     self._publish_finger_command(self._thumb_cmd_pub, self._release_open_position[0])
                     self._publish_finger_command(self._index_cmd_pub, self._release_open_position[1])
                     self._publish_finger_command(self._mrl_cmd_pub, self._release_open_position[2])
@@ -631,7 +630,6 @@ class PipelineManagerNode(Node):
         """
         if not self._compute_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn('Preshaping service not available')
-            self._deactivate_twist_propagation()
             self._transition(State.IDLE, 'Preshaping service unavailable')
             return
 
