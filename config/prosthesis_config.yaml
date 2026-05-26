@@ -13,6 +13,11 @@
 # ROS2 Node Parameter Sections (loaded by launch files)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+wrist_driver:
+    ros__parameters:
+        min_position_deg: 5.0
+        max_position_deg: 300.0
+
 haptic_controller:
     ros__parameters:
         # Topic names

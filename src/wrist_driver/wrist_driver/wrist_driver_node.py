@@ -49,11 +49,6 @@ DXL_POSITION_RANGE = 4095.0
 DXL_ANGLE_RANGE = 360.0
 
 
-def _deg_to_dx(deg: float) -> int:
-    """Convert degrees to Dynamixel position units."""
-    return int((deg % 360.0) / DXL_ANGLE_RANGE * DXL_POSITION_RANGE)
-
-
 def _dx_to_deg(dx: int) -> float:
     """Convert Dynamixel position units to degrees."""
     return float(dx) / DXL_POSITION_RANGE * DXL_ANGLE_RANGE
@@ -69,6 +64,11 @@ class WristDriverNode(Node):
         self.declare_parameter('protocol_version', 2.0)
         self.declare_parameter('publish_rate_hz', 20.0)
         self.declare_parameter('write_retries', 2)
+        self.declare_parameter('min_position_deg', 5.0)
+        self.declare_parameter('max_position_deg', 300.0)
+
+        self._min_pos_deg = self.get_parameter('min_position_deg').value
+        self._max_pos_deg = self.get_parameter('max_position_deg').value
 
         if not HAS_DYNAMIXEL:
             self.get_logger().error(
@@ -123,14 +123,25 @@ class WristDriverNode(Node):
             f'{self._packet_handler.getTxRxResult(dxl_comm_result)}')
         return False
 
+    def _deg_to_dx(self, deg: float) -> int:
+        """Convert degrees to Dynamixel position units, clamped to safe range."""
+        clamped = max(self._min_pos_deg, min(self._max_pos_deg, deg))
+        return int(clamped / DXL_ANGLE_RANGE * DXL_POSITION_RANGE)
+
     def _on_position_cmd(self, msg: Float64MultiArray):
         if len(msg.data) < 1:
             return
         target_deg = msg.data[0]
+
+        if target_deg < self._min_pos_deg or target_deg > self._max_pos_deg:
+            self.get_logger().warn(
+                f'Wrist command {target_deg:.1f}° outside bounds '
+                f'[{self._min_pos_deg}, {self._max_pos_deg}] — clamping',
+                throttle_duration_sec=2.0)
         accel = msg.data[1] if len(msg.data) > 1 else 0.0
 
         try:
-            dxl_pos = _deg_to_dx(target_deg)
+            dxl_pos = self._deg_to_dx(target_deg)
             self._write_with_retry(ADDR_GOAL_POSITION, dxl_pos, 'set position')
 
             if accel > 0:
