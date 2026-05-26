@@ -14,6 +14,7 @@ Usage (inside the Docker container):
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from collections import deque
@@ -149,7 +150,8 @@ def _print_compact(
     print(
         f"[emg] {prev_name} -> {curr_name} "
         f"(conf={confidence * 100:.0f}%, prop={proportional:.2f}, mode={mode}) "
-        f"{prob_parts}"
+        f"{prob_parts}",
+        flush=True,
     )
 
 
@@ -163,13 +165,24 @@ def _print_status(
 ) -> None:
     """Print a periodic heartbeat status line."""
     name = gesture_names[label] if label < len(gesture_names) else f"G{label}"
-    print(f"[emg] status: {name} (conf={confidence * 100:.0f}%, prop={proportional:.2f}, {fps:.1f} Hz, frame={frame_count})")
+    print(
+        f"[emg] status: {name} (conf={confidence * 100:.0f}%, prop={proportional:.2f}, {fps:.1f} Hz, frame={frame_count})",
+        flush=True,
+    )
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     global _first_draw
+
+    # Keep EMG output visible in ROS launch/docker logs immediately.
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+        sys.stderr.reconfigure(line_buffering=True)
+    except AttributeError:
+        pass
+    os.environ.setdefault("PYTHONUNBUFFERED", "1")
 
     parser = argparse.ArgumentParser(description="Real-time EMG gesture classifier")
     parser.add_argument("--model-dir", type=Path, default=Path("/app/models"),
@@ -178,15 +191,21 @@ def main() -> None:
                         help=f"Confidence threshold (default: {CONFIDENCE_THRESHOLD})")
     parser.add_argument("--smooth", type=int, default=PREDICTION_SMOOTHING_FRAMES,
                         help=f"Smoothing window in frames (default: {PREDICTION_SMOOTHING_FRAMES})")
-    args = parser.parse_args()
+    parser.add_argument("--quiet", action="store_true",
+                        help="Disable live terminal UI; print compact status lines for logs")
+    args, _ros_args = parser.parse_known_args()
 
-    print()
-    print(_bold("=" * 52))
-    print(_bold("    EMG Classifier — Live"))
-    print(_bold("=" * 52))
+    if not args.quiet:
+        print()
+        print(_bold("=" * 52))
+        print(_bold("    EMG Classifier — Live"))
+        print(_bold("=" * 52))
+    else:
+        print("[emg] classifier starting", flush=True)
 
     # ── Load models ───────────────────────────────────────────────────────────
-    print(f"{_cyan('Loading classifier from')} {args.model_dir} …")
+    if not args.quiet:
+        print(f"{_cyan('Loading classifier from')} {args.model_dir} …")
     model_path = args.model_dir / "classifier.pkl"
     if not model_path.exists():
         print(_red(
@@ -208,17 +227,22 @@ def main() -> None:
         print(_yellow("No proportional calibration found — using fallback normalisation."))
 
     gesture_names = GESTURE_NAMES
-    print(_green("Models loaded.\n"))
+    if not args.quiet:
+        print(_green("Models loaded.\n"))
 
     # ── Connect ───────────────────────────────────────────────────────────────
-    print(_cyan("Connecting to MindRove WiFi board …"))
+    if not args.quiet:
+        print(_cyan("Connecting to MindRove WiFi board …"))
     try:
         reader = BoardReader()
         reader.connect()
     except Exception as exc:
         print(_red(f"Failed to connect: {exc}"))
         sys.exit(1)
-    print(_green(f"Connected!  {reader.sampling_rate} Hz  {N_CHANNELS} channels\n"))
+    if not args.quiet:
+        print(_green(f"Connected!  {reader.sampling_rate} Hz  {N_CHANNELS} channels\n"))
+    else:
+        print(f"[emg] connected {reader.sampling_rate}Hz {N_CHANNELS}ch", flush=True)
 
     # ── Inference loop ────────────────────────────────────────────────────────
     filt = OnlineFilter(N_CHANNELS)
@@ -226,24 +250,30 @@ def main() -> None:
     smoother = PredictionSmoother(args.smooth)
 
     # Boot the ring buffer: wait until we have at least one full window
-    print(_cyan("Filling buffer …"))
+    if not args.quiet:
+        print(_cyan("Filling buffer …"))
     while not ring.is_full():
         chunk = reader.read(WINDOW_STEP)
         filtered = filt.process(chunk)
         ring.push(filtered)
-    print(_green("Ready.\n"))
+    if not args.quiet:
+        print(_green("Ready.\n"))
+    else:
+        print("[emg] ready", flush=True)
 
-    interactive = sys.stdout.isatty()
+    interactive = False
     _first_draw = True
     frame_count = 0
     last_time = time.monotonic()
     fps_history: deque[float] = deque(maxlen=20)
     prev_label = -1
     last_status_time = time.monotonic()
-    _STATUS_INTERVAL = 5.0  # seconds between heartbeat status lines
+    _STATUS_INTERVAL = 2.0  # seconds between compact log status lines
 
     if interactive:
         print("\n" * _DISPLAY_LINES)  # reserve display area
+    else:
+        print("[emg] logging compact classifier status every 2s and on gesture changes", flush=True)
 
     try:
         while True:
@@ -304,10 +334,13 @@ def main() -> None:
         if interactive:
             print(f"\n\n{_yellow('Stopped.')}")
         else:
-            print("[emg] Stopped.")
+            print("[emg] stopped", flush=True)
     finally:
         reader.disconnect()
-        print(_green("Session released. Bye!"))
+        if interactive:
+            print(_green("Session released. Bye!"))
+        else:
+            print("[emg] session released", flush=True)
 
 
 if __name__ == "__main__":

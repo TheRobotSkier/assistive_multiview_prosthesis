@@ -90,6 +90,9 @@ class GraspProximityControllerNode(Node):
         self.declare_parameter("wrist_max_deg", 300.0)
         self.declare_parameter("wrist_neutral_deg", 140.0)
         self.declare_parameter("max_wrist_delta_deg", 90.0)
+        self.declare_parameter("wrist_plan_is_relative", True)
+        self.declare_parameter("wrist_plan_relative_frame", "hardware")
+        self.declare_parameter("wrist_manual_override_timeout_s", 1.0)
         self.declare_parameter("command_repeat_period_s", 1.0)
         self.declare_parameter("command_epsilon", 0.005)
         self.declare_parameter("near_enter_consecutive_samples", 3)
@@ -139,6 +142,11 @@ class GraspProximityControllerNode(Node):
         self._wrist_max_deg = self.get_parameter("wrist_max_deg").value
         self._wrist_neutral_deg = self.get_parameter("wrist_neutral_deg").value
         self._max_wrist_delta_deg = self.get_parameter("max_wrist_delta_deg").value
+        self._wrist_plan_is_relative = bool(self.get_parameter("wrist_plan_is_relative").value)
+        self._wrist_plan_relative_frame = str(self.get_parameter("wrist_plan_relative_frame").value)
+        self._wrist_manual_override_timeout_s = float(
+            self.get_parameter("wrist_manual_override_timeout_s").value
+        )
         self._command_repeat_period_s = self.get_parameter(
             "command_repeat_period_s"
         ).value
@@ -192,6 +200,7 @@ class GraspProximityControllerNode(Node):
         self._last_published_index: float | None = None
         self._last_published_mrl: float | None = None
         self._last_published_wrist: float | None = None
+        self._last_manual_wrist_command_time: float = 0.0
         self._last_command_publish_time: float = 0.0
         self._last_mode: str | None = None
 
@@ -245,6 +254,14 @@ class GraspProximityControllerNode(Node):
             10,
         )
 
+        wrist_cmd_topic = self.get_parameter("wrist_cmd_topic").value
+        self.create_subscription(
+            Float64MultiArray,
+            wrist_cmd_topic,
+            self._on_manual_wrist_command,
+            10,
+        )
+
         # ── Publishers ────────────────────────────────────────────────────────
         self._thumb_pub = self.create_publisher(
             Float64MultiArray, self.get_parameter("thumb_cmd_topic").value, 10
@@ -256,7 +273,7 @@ class GraspProximityControllerNode(Node):
             Float64MultiArray, self.get_parameter("mrl_cmd_topic").value, 10
         )
         self._wrist_pub = self.create_publisher(
-            Float64MultiArray, self.get_parameter("wrist_cmd_topic").value, 10
+            Float64MultiArray, wrist_cmd_topic, 10
         )
         self._near_zone_pub = self.create_publisher(
             Bool,
@@ -272,6 +289,8 @@ class GraspProximityControllerNode(Node):
             f"enter_thresh={self._enter_thresh:.3f} m, "
             f"exit_thresh={self._exit_thresh:.3f} m, "
             f"partial_factor={self._partial_factor}, "
+            f"wrist_plan={'relative' if self._wrist_plan_is_relative else 'absolute'} "
+            f"base={self._wrist_plan_relative_frame}, "
             f"TF: {self._map_frame} → {self._grasp_contact_frame}"
         )
 
@@ -326,6 +345,11 @@ class GraspProximityControllerNode(Node):
             }
             self._clear_plan(f"pipeline entering {state_names.get(new, str(new))}")
 
+    def _on_manual_wrist_command(self, msg: Float64MultiArray) -> None:
+        if len(msg.data) >= 1 and self._pipeline_state == self._APPROACHING:
+            self._last_manual_wrist_command_time = time.time()
+            self._last_published_wrist = float(msg.data[0])
+
     def _on_wrist_state(self, msg: Float64MultiArray) -> None:
         if len(msg.data) >= 2:
             self._current_wrist_deg = float(msg.data[0])
@@ -356,16 +380,31 @@ class GraspProximityControllerNode(Node):
         if self._buf_closures is not None and self._buf_wrist_deg is not None:
             self._planned_closures = self._buf_closures
 
-            # Compute safe absolute wrist target from signed delta
-            planned_delta = self._buf_wrist_deg
-            planned_delta = max(
-                -self._max_wrist_delta_deg,
-                min(self._max_wrist_delta_deg, planned_delta),
-            )
-            if self._current_wrist_deg is not None:
-                target = self._current_wrist_deg + planned_delta
+            # Compute safe wrist target. The planner publishes a signed delta in
+            # degrees (see preshaping_service_bridge_node.cpp); treat it as
+            # relative, not absolute. Using the live hardware wrist as base can
+            # compound repeated plans if the previous preshape already moved the
+            # wrist, so default to the configured neutral/base angle.
+            planned_value = self._buf_wrist_deg
+            if self._wrist_plan_is_relative:
+                planned_delta = max(
+                    -self._max_wrist_delta_deg,
+                    min(self._max_wrist_delta_deg, planned_value),
+                )
+                if self._wrist_plan_relative_frame == "hardware" and self._current_wrist_deg is not None:
+                    base = self._current_wrist_deg
+                else:
+                    base = self._wrist_neutral_deg
+                target = base + planned_delta
+                self.get_logger().info(
+                    f"Wrist plan interpreted as relative: base={base:.1f}°, "
+                    f"delta={planned_delta:+.1f}° -> target={target:.1f}°"
+                )
             else:
-                target = self._wrist_neutral_deg + planned_delta
+                target = planned_value
+                self.get_logger().info(
+                    f"Wrist plan interpreted as absolute: target={target:.1f}°"
+                )
             target = max(self._wrist_min_deg, min(self._wrist_max_deg, target))
             self._planned_wrist_deg = target
 
@@ -486,7 +525,8 @@ class GraspProximityControllerNode(Node):
                 f"partial closure + wrist",
                 throttle_duration_sec=1.0,
             )
-            self._publish_wrist_command(self._planned_wrist_deg, mode)
+            if time.time() - self._last_manual_wrist_command_time > self._wrist_manual_override_timeout_s:
+                self._publish_wrist_command(self._planned_wrist_deg, mode)
             self._publish_joint_commands(
                 self._partial_factor * thumb,
                 self._partial_factor * index,

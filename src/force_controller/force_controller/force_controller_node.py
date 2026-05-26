@@ -122,7 +122,8 @@ class ForceControllerNode(Node):
 
         # ── Parameters ────────────────────────────────────────────────────
         self.declare_parameter("target_force_min", 50.0)
-        self.declare_parameter("target_force_max", 200.0)
+        self.declare_parameter("target_force_max", 340.0)
+        self.declare_parameter("target_force_default", 300.0)
         self.declare_parameter("update_rate_hz", 20.0)
 
         self.declare_parameter("stability_window", 1.0)
@@ -159,10 +160,19 @@ class ForceControllerNode(Node):
         self.declare_parameter("force_status_topic", "/force_controller/status")
         self.declare_parameter("joint_position_limits", [3.14, 3.14, 3.14])
         self.declare_parameter("joint_position_min", [0.0, 0.0, 0.0])
+        self.declare_parameter("use_controller_manager", True)
+        self.declare_parameter("finger_cmd_topics", [
+            "/thumb_pos_ff_controller/commands",
+            "/index_pos_ff_controller/commands",
+            "/mrl_pos_ff_controller/commands",
+        ])
 
         self._target_min = self.get_parameter("target_force_min").value
         self._target_max = self.get_parameter("target_force_max").value
-        self._target_mid = (self._target_min + self._target_max) / 2.0
+        self._target_default = max(
+            self._target_min,
+            min(self._target_max, self.get_parameter("target_force_default").value),
+        )
 
         self._stability_window = self.get_parameter("stability_window").value
         self._stability_tol = self.get_parameter("stability_tolerance").value
@@ -201,6 +211,18 @@ class ForceControllerNode(Node):
         self._manual_adjust_topic = self.get_parameter("manual_adjust_topic").value
         self._manual_adjust_step = self.get_parameter("manual_adjust_step").value
 
+        self._use_cm = self.get_parameter("use_controller_manager").value
+        self._finger_cmd_topics = list(self.get_parameter("finger_cmd_topics").value)
+        if len(self._finger_cmd_topics) != FINGER_COUNT:
+            self.get_logger().warn(
+                f"finger_cmd_topics must have {FINGER_COUNT} entries; using defaults."
+            )
+            self._finger_cmd_topics = [
+                "/thumb_pos_ff_controller/commands",
+                "/index_pos_ff_controller/commands",
+                "/mrl_pos_ff_controller/commands",
+            ]
+
         # ── Internal state ────────────────────────────────────────────────
         self._pipeline_state: int = STATE_IDLE
         self._controller_active: bool = False
@@ -228,7 +250,7 @@ class ForceControllerNode(Node):
         self._force_stable: bool = False
         self._slip_detected: bool = False
 
-        self._target_forces: list[float] = [self._target_mid] * FINGER_COUNT
+        self._target_forces: list[float] = [self._target_default] * FINGER_COUNT
 
         self._ramp: list[float] = _velocity_ramp(
             self._closing_start, self._closing_end, self._decay_steps
@@ -242,15 +264,27 @@ class ForceControllerNode(Node):
         self._last_pos_cmd: Optional[list[float]] = None
         self._settling_timer: Optional[object] = None
 
+        # Integrated position tracker for command_bridge mode.
+        # In command_bridge mode, velocity→position integration uses this
+        # instead of self._positions (from /joint_states) to avoid stalls
+        # caused by feedback latency.
+        self._integrated_positions: list[float] = list(self._open_positions)
+
         # ── Service clients ───────────────────────────────────────────────
         self._stream_switch = self.create_client(
             SetBool, self._stream_switch_service
         )
-        self._cm_client = ControllerManagerClient(self)
-        if not self._cm_client.wait_for_services(timeout_sec=10.0):
-            self.get_logger().warn(
-                "controller_manager services not available at startup; "
-                "will retry when needed."
+        self._cm_client: ControllerManagerClient | None = None
+        if self._use_cm:
+            self._cm_client = ControllerManagerClient(self)
+            if not self._cm_client.wait_for_services(timeout_sec=10.0):
+                self.get_logger().warn(
+                    "controller_manager services not available at startup; "
+                    "will retry when needed."
+                )
+        else:
+            self.get_logger().info(
+                "Running without controller_manager — using per-finger position commands."
             )
 
         # ── Subscriptions ─────────────────────────────────────────────────
@@ -289,13 +323,18 @@ class ForceControllerNode(Node):
         self._status_pub = self.create_publisher(
             ForceControllerStatus, self._force_status_topic, 10
         )
+        # Per-finger position publishers (for command_bridge mode)
+        self._finger_pubs: list = [
+            self.create_publisher(Float64MultiArray, topic, 10)
+            for topic in self._finger_cmd_topics
+        ]
 
         # ── Control timer ─────────────────────────────────────────────────
         self.create_timer(self._dt, self._control_tick)
 
         self.get_logger().info(
             f"Force controller started (velocity-based). "
-            f"Target range: [{self._target_min}, {self._target_max}] raw, "
+            f"Target default={self._target_default} raw, range=[{self._target_min}, {self._target_max}] raw, "
             f"rate={rate_hz} Hz, close_vel={self._closing_start}\u2192{self._closing_end} rad/s, "
             f"hold_deadzone={self._hold_deadzone}, hold_max_v={self._hold_max_velocity}"
         )
@@ -378,7 +417,7 @@ class ForceControllerNode(Node):
         self._force_stable = False
         self._slip_detected = False
         self._stable_since = None
-        self._target_forces = [self._target_mid] * FINGER_COUNT
+        self._target_forces = [self._target_default] * FINGER_COUNT
 
         if not self._joint_pos_received:
             self.get_logger().warn("No joint feedback yet; force controller may malfunction.")
@@ -406,6 +445,9 @@ class ForceControllerNode(Node):
         self._publish_velocity([0.0] * FINGER_COUNT, force=True)
         self._publish_position(self._open_positions, force=True)
 
+        # Initialize integrated positions from current hardware state
+        self._integrated_positions = list(self._positions)
+
         # Use a one-shot timer instead of blocking sleep to keep the
         # executor responsive during the settling period.
         self._settling_timer = self.create_timer(
@@ -420,28 +462,31 @@ class ForceControllerNode(Node):
             self.destroy_timer(self._settling_timer)
             self._settling_timer = None
 
-        try:
-            if not self._cm_client.services_ready():
-                self.get_logger().warn(
-                    "controller_manager services not ready at switch time; "
-                    "waiting up to 5s..."
-                )
-                if not self._cm_client.wait_for_services(timeout_sec=5.0):
-                    raise RuntimeError(
-                        "controller_manager services not available after waiting"
+        if self._use_cm:
+            try:
+                if not self._cm_client.services_ready():
+                    self.get_logger().warn(
+                        "controller_manager services not ready at switch time; "
+                        "waiting up to 5s..."
                     )
-            self._cm_client.switch_controllers(
-                ["group_vel_ff_controller"], _competitors(["group_vel_ff_controller"])
-            )
-        except Exception as exc:
-            self.get_logger().error(f"Failed to switch to velocity controller: {exc}")
-            self._controller_active = False
-            return
+                    if not self._cm_client.wait_for_services(timeout_sec=5.0):
+                        raise RuntimeError(
+                            "controller_manager services not available after waiting"
+                        )
+                self._cm_client.switch_controllers(
+                    ["group_vel_ff_controller"], _competitors(["group_vel_ff_controller"])
+                )
+            except Exception as exc:
+                self.get_logger().error(f"Failed to switch to velocity controller: {exc}")
+                self._controller_active = False
+                return
 
         self._ramp_idx = 0
         self._ramp_last_advance = time.monotonic()
         self._hand_phase = "CLOSING"
         self._phase_entry_time = time.monotonic()
+        # Snap integrated positions to actual hardware positions at phase start
+        self._integrated_positions = list(self._positions)
         self.get_logger().info("Hand CLOSING: velocity ramp active")
 
     def _on_leave_active_states(self) -> None:
@@ -450,6 +495,7 @@ class ForceControllerNode(Node):
         self._force_stable = False
         self._stable_since = None
         self._hand_phase = "IDLE"
+        self._integrated_positions = list(self._open_positions)
         # Cancel any pending settling timer
         if getattr(self, "_settling_timer", None) is not None:
             self.destroy_timer(self._settling_timer)
@@ -464,27 +510,29 @@ class ForceControllerNode(Node):
         self._slip_detected = False
         self._stable_since = None
         self._hand_phase = "IDLE"
+        self._integrated_positions = list(self._open_positions)
         # Cancel any pending settling timer
         if getattr(self, "_settling_timer", None) is not None:
             self.destroy_timer(self._settling_timer)
             self._settling_timer = None
         self._publish_velocity([0.0] * FINGER_COUNT, force=True)
 
-        try:
-            if not self._cm_client.services_ready():
-                self.get_logger().warn(
-                    "controller_manager services not ready at reset time; "
-                    "waiting up to 5s..."
-                )
-                if not self._cm_client.wait_for_services(timeout_sec=5.0):
-                    raise RuntimeError(
-                        "controller_manager services not available after waiting"
+        if self._use_cm:
+            try:
+                if not self._cm_client.services_ready():
+                    self.get_logger().warn(
+                        "controller_manager services not ready at reset time; "
+                        "waiting up to 5s..."
                     )
-            self._cm_client.switch_controllers(
-                ["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"])
-            )
-        except Exception as exc:
-            self.get_logger().error(f"Failed to switch to position controller: {exc}")
+                    if not self._cm_client.wait_for_services(timeout_sec=5.0):
+                        raise RuntimeError(
+                            "controller_manager services not available after waiting"
+                        )
+                self._cm_client.switch_controllers(
+                    ["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"])
+                )
+            except Exception as exc:
+                self.get_logger().error(f"Failed to switch to position controller: {exc}")
 
         self._publish_position(self._open_positions, force=True)
 
@@ -579,6 +627,8 @@ class ForceControllerNode(Node):
                 f"Forces: [{', '.join(f'{f:.0f}' for f in self._normal_forces)}]")
             self._hand_phase = "FORCE_HOLD"
             self._phase_entry_time = time.monotonic()
+            # Snap integrated positions to actual hardware positions at contact
+            self._integrated_positions = list(self._positions)
             self._publish_velocity([0.0] * FINGER_COUNT, force=True)
             return
 
@@ -670,13 +720,30 @@ class ForceControllerNode(Node):
     # ── Publishers ─────────────────────────────────────────────────────────
 
     def _publish_velocity(self, velocities: list[float], force: bool = False) -> None:
-        if not force and self._last_vel_cmd is not None:
+        # In command_bridge mode, skip de-duplication: each tick must publish
+        # a position command because command_bridge applies one-shot position
+        # targets, not continuous velocity.
+        if self._use_cm and not force and self._last_vel_cmd is not None:
             if all(math.isclose(a, b, abs_tol=1e-4) for a, b in zip(velocities, self._last_vel_cmd)):
                 return
-        msg = Float64MultiArray()
-        msg.data = [float(v) for v in velocities]
-        self._vel_pub.publish(msg)
-        self._last_vel_cmd = list(msg.data)
+        self._last_vel_cmd = list(velocities)
+
+        if self._use_cm:
+            # ros2_control mode: publish velocity directly
+            msg = Float64MultiArray()
+            msg.data = [float(v) for v in velocities]
+            self._vel_pub.publish(msg)
+        else:
+            # command_bridge mode: integrate velocity → position using
+            # internal tracker (not /joint_states) to avoid feedback latency stalls.
+            for i in range(FINGER_COUNT):
+                new_pos = self._integrated_positions[i] + velocities[i] * self._dt
+                new_pos = max(self._joint_pos_min[i], min(self._joint_pos_limits[i], new_pos))
+                self._integrated_positions[i] = new_pos
+                msg = Float64MultiArray()
+                msg.data = [float(new_pos)]
+                self._finger_pubs[i].publish(msg)
+
         self.get_logger().debug(
             f"Vel cmd: [{', '.join(f'{v:+.4f}' for v in velocities)}]")
 
@@ -686,10 +753,19 @@ class ForceControllerNode(Node):
                 return
         for i in range(FINGER_COUNT):
             positions[i] = max(self._joint_pos_min[i], min(self._joint_pos_limits[i], positions[i]))
-        msg = Float64MultiArray()
-        msg.data = [float(p) for p in positions]
-        self._pos_pub.publish(msg)
-        self._last_pos_cmd = list(msg.data)
+        self._last_pos_cmd = list(positions)
+
+        if self._use_cm:
+            # ros2_control mode: publish to group position topic
+            msg = Float64MultiArray()
+            msg.data = [float(p) for p in positions]
+            self._pos_pub.publish(msg)
+        else:
+            # command_bridge mode: publish per-finger position topics
+            for i in range(FINGER_COUNT):
+                msg = Float64MultiArray()
+                msg.data = [float(positions[i])]
+                self._finger_pubs[i].publish(msg)
 
     def _publish_status(self) -> None:
         force_errors = [
@@ -710,7 +786,8 @@ class ForceControllerNode(Node):
     def destroy_node(self) -> bool:
         try:
             self._publish_velocity([0.0] * FINGER_COUNT, force=True)
-            if self._cm_client.services_ready():
+            if self._use_cm and self._cm_client is not None \
+                    and self._cm_client.services_ready():
                 self._cm_client.switch_controllers(
                     ["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"])
                 )

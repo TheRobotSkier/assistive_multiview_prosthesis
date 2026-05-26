@@ -141,15 +141,21 @@ def main() -> None:
                         help=f"Confidence threshold (default: {CONFIDENCE_THRESHOLD})")
     parser.add_argument("--smooth", type=int, default=PREDICTION_SMOOTHING_FRAMES,
                         help=f"Smoothing window in frames (default: {PREDICTION_SMOOTHING_FRAMES})")
-    args = parser.parse_args()
+    parser.add_argument("--quiet", action="store_true",
+                        help="Disable live terminal UI; print compact status lines for logs")
+    args, _ros_args = parser.parse_known_args()
 
-    print()
-    print(_bold("=" * 52))
-    print(_bold("    EMG Classifier — Live"))
-    print(_bold("=" * 52))
+    if not args.quiet:
+        print()
+        print(_bold("=" * 52))
+        print(_bold("    EMG Classifier — Live"))
+        print(_bold("=" * 52))
+    else:
+        print("[emg] classifier starting", flush=True)
 
     # ── Load models ───────────────────────────────────────────────────────────
-    print(f"{_cyan('Loading classifier from')} {args.model_dir} …")
+    if not args.quiet:
+        print(f"{_cyan('Loading classifier from')} {args.model_dir} …")
     model_path = args.model_dir / "classifier.pkl"
     if not model_path.exists():
         print(_red(
@@ -171,17 +177,22 @@ def main() -> None:
         print(_yellow("No proportional calibration found — using fallback normalisation."))
 
     gesture_names = GESTURE_NAMES
-    print(_green("Models loaded.\n"))
+    if not args.quiet:
+        print(_green("Models loaded.\n"))
 
     # ── Connect ───────────────────────────────────────────────────────────────
-    print(_cyan("Connecting to MindRove WiFi board …"))
+    if not args.quiet:
+        print(_cyan("Connecting to MindRove WiFi board …"))
     try:
         reader = BoardReader()
         reader.connect()
     except Exception as exc:
         print(_red(f"Failed to connect: {exc}"))
         sys.exit(1)
-    print(_green(f"Connected!  {reader.sampling_rate} Hz  {N_CHANNELS} channels\n"))
+    if not args.quiet:
+        print(_green(f"Connected!  {reader.sampling_rate} Hz  {N_CHANNELS} channels\n"))
+    else:
+        print(f"[emg] connected {reader.sampling_rate}Hz {N_CHANNELS}ch", flush=True)
 
     # ── Inference loop ────────────────────────────────────────────────────────
     filt = OnlineFilter(N_CHANNELS)
@@ -189,19 +200,27 @@ def main() -> None:
     smoother = PredictionSmoother(args.smooth)
 
     # Boot the ring buffer: wait until we have at least one full window
-    print(_cyan("Filling buffer …"))
+    if not args.quiet:
+        print(_cyan("Filling buffer …"))
     while not ring.is_full():
         chunk = reader.read(WINDOW_STEP)
         filtered = filt.process(chunk)
         ring.push(filtered)
-    print(_green("Ready.\n"))
+    if not args.quiet:
+        print(_green("Ready.\n"))
+    else:
+        print("[emg] ready", flush=True)
 
     _first_draw = True
     frame_count = 0
     last_time = time.monotonic()
     fps_history: deque[float] = deque(maxlen=20)
 
-    print("\n" * _DISPLAY_LINES)  # reserve display area
+    last_status_log = 0.0
+    last_status_key = None
+
+    if not args.quiet:
+        print("\n" * _DISPLAY_LINES)  # reserve display area
 
     try:
         while True:
@@ -245,13 +264,30 @@ def main() -> None:
                     mode = _ros_state.mode
 
             frame_count += 1
-            _draw(smoothed_label, confidence, prop_val, probs, gesture_names, frame_count, fps, mode)
+            if args.quiet:
+                name = gesture_names[smoothed_label] if smoothed_label < len(gesture_names) else f"G{smoothed_label}"
+                status_key = (smoothed_label, mode)
+                if status_key != last_status_key or (now - last_status_log) >= 2.0:
+                    print(
+                        f"[emg] {name} conf={confidence * 100:.0f}% prop={prop_val:.2f} mode={mode}",
+                        flush=True,
+                    )
+                    last_status_log = now
+                    last_status_key = status_key
+            else:
+                _draw(smoothed_label, confidence, prop_val, probs, gesture_names, frame_count, fps, mode)
 
     except KeyboardInterrupt:
-        print(f"\n\n{_yellow('Stopped.')}")
+        if not args.quiet:
+            print(f"\n\n{_yellow('Stopped.')}")
+        else:
+            print("[emg] stopped", flush=True)
     finally:
         reader.disconnect()
-        print(_green("Session released. Bye!"))
+        if not args.quiet:
+            print(_green("Session released. Bye!"))
+        else:
+            print("[emg] session released", flush=True)
 
 
 if __name__ == "__main__":

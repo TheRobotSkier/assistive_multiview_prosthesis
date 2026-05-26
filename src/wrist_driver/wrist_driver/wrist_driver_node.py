@@ -66,9 +66,16 @@ class WristDriverNode(Node):
         self.declare_parameter('write_retries', 2)
         self.declare_parameter('min_position_deg', 5.0)
         self.declare_parameter('max_position_deg', 300.0)
+        self.declare_parameter('default_profile_velocity', 120)
+        self.declare_parameter('default_profile_acceleration', 180)
+        self.declare_parameter('log_commands', True)
 
         self._min_pos_deg = self.get_parameter('min_position_deg').value
         self._max_pos_deg = self.get_parameter('max_position_deg').value
+        self._default_profile_velocity = int(self.get_parameter('default_profile_velocity').value)
+        self._default_profile_acceleration = int(self.get_parameter('default_profile_acceleration').value)
+        self._log_commands = bool(self.get_parameter('log_commands').value)
+        self._last_cmd_log_time = 0.0
 
         if not HAS_DYNAMIXEL:
             self.get_logger().error(
@@ -99,7 +106,11 @@ class WristDriverNode(Node):
         if dxl_comm_result != COMM_SUCCESS:
             self.get_logger().error(f'Failed to enable torque: {self._packet_handler.getTxRxResult(dxl_comm_result)}')
             return
-        self.get_logger().info(f'Wrist motor connected on {port}, ID={self._motor_id}')
+        self._write_with_retry(ADDR_PROFILE_VELOCITY, self._default_profile_velocity, 'set default profile velocity')
+        self._write_with_retry(ADDR_PROFILE_ACCELERATION, self._default_profile_acceleration, 'set default profile acceleration')
+        self.get_logger().info(
+            f'Wrist motor connected on {port}, ID={self._motor_id}, '
+            f'limits=[{self._min_pos_deg:.1f}, {self._max_pos_deg:.1f}] deg')
 
         self._pub = self.create_publisher(Float64MultiArray, '/wrist/state', 10)
         self.create_subscription(
@@ -141,13 +152,20 @@ class WristDriverNode(Node):
         accel = msg.data[1] if len(msg.data) > 1 else 0.0
 
         try:
+            target_deg = max(self._min_pos_deg, min(self._max_pos_deg, float(target_deg)))
+            accel_val = int(accel) if accel > 0 else self._default_profile_acceleration
+            velocity_val = self._default_profile_velocity
             dxl_pos = self._deg_to_dx(target_deg)
-            self._write_with_retry(ADDR_GOAL_POSITION, dxl_pos, 'set position')
-
-            if accel > 0:
-                accel_val = int(accel)
-                self._write_with_retry(
-                    ADDR_PROFILE_ACCELERATION, accel_val, 'set acceleration')
+            self._write_with_retry(ADDR_PROFILE_ACCELERATION, accel_val, 'set acceleration')
+            self._write_with_retry(ADDR_PROFILE_VELOCITY, velocity_val, 'set velocity')
+            ok = self._write_with_retry(ADDR_GOAL_POSITION, dxl_pos, 'set position')
+            if self._log_commands and ok:
+                now = time.monotonic()
+                if now - self._last_cmd_log_time >= 0.25:
+                    self.get_logger().info(
+                        f'Wrist command applied: target={target_deg:.1f} deg, '
+                        f'dxl={dxl_pos}, accel={accel_val}, vel={velocity_val}')
+                    self._last_cmd_log_time = now
         except (IndexError, OSError) as exc:
             self.get_logger().warn(
                 f'Dynamixel write failed (communication error): {exc}')

@@ -1,0 +1,269 @@
+[pipeline_manager_node-1] [INFO] [1779767557.085212472] [pipeline_manager]: State: IDLE -> TWISTING (EMG: POWER (held 1.0s))
+[force_controller_node-17] [INFO] [1779767557.087620987] [force_controller]: Pipeline state: IDLE -> TWISTING
+[twist_propagation_node-14] [INFO] [1779767557.089011398] [twist_propagation]: Activated
+[pipeline_manager_node-1] [INFO] [1779767557.091916061] [pipeline_manager]: Twist propagation activated
+[openvins_odom_tf_relay-12] [WARN] [1779767557.821954227] [openvins_odom_tf_relay]: arm odom pose jumped 2.643m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767558.120737393] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779767558.224620421] [pointcloud_fusion]: Stats: published=34 (dual=0, cam1_only=59) dist_removed=2796751 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:67} last_publish_ago=0.4s
+[openvins_odom_tf_relay-12] [WARN] [1779767559.826239286] [openvins_odom_tf_relay]: arm odom pose jumped 2.662m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-10] [WARN] [1779767560.062671631] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779767561.849547040] [openvins_odom_tf_relay]: arm odom pose jumped 2.577m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767563.853482948] [openvins_odom_tf_relay]: arm odom pose jumped 2.674m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-10] [WARN] [1779767564.671743216] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779767564.977623517] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.88s) — fresh lookup failed
+[openvins_odom_tf_relay-12] [WARN] [1779767565.855091941] [openvins_odom_tf_relay]: arm odom pose jumped 2.687m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-9] [WARN] [1779767566.480378271] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779767567.857339253] [openvins_odom_tf_relay]: arm odom pose jumped 2.672m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767568.121503733] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779767568.380616544] [pointcloud_fusion]: Stats: published=57 (dual=0, cam1_only=48) dist_removed=1898474 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=6 tf_fail={arm_d435i_arm_depth_optical_frame:22, head_d435i_head_depth_optical_frame:70} last_publish_ago=0.1s
+[openvins_odom_tf_relay-12] [WARN] [1779767569.857644531] [openvins_odom_tf_relay]: arm odom pose jumped 2.663m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-10] [WARN] [1779767570.358878326] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779767571.866759095] [openvins_odom_tf_relay]: arm odom pose jumped 2.626m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767573.867418944] [openvins_odom_tf_relay]: arm odom pose jumped 2.684m (> 0.5m) — suppressing TF
+[twist_propagation_node-14] [INFO] [1779767575.101212935] [twist_propagation]: Hit found at (0.303, 0.103, 0.042) in frame 'marker_map'
+[twist_propagation_node-14] [INFO] [1779767575.103123164] [twist_propagation]: Published contact state: pos=(0.303, 0.103, 0.042) orient=(0.837, -0.023, -0.502, 0.215) zero_twist
+[twist_propagation_node-14] [INFO] [1779767575.105135756] [twist_propagation]: Hit detected — collision distance: 0.385m
+[pipeline_manager_node-1] [INFO] [1779767575.105357127] [pipeline_manager]: State: TWISTING -> SEGMENTING (Twist: collision hit detected)
+[twist_propagation_node-14] [INFO] [1779767575.107331918] [twist_propagation]: Published click cluster: 1 clicks (1 original + 0 synthetic) around hit (0.303, 0.103, 0.042), r=[0.0050, 0.0300]m
+[segmentation_ros2_node-13] [INFO] [1779767575.108004497] [segmentation_bridge]: [+] positive click at (0.303, 0.103, 0.042) (cloud frame)
+[force_controller_node-17] [INFO] [1779767575.108217665] [force_controller]: Pipeline state: TWISTING -> SEGMENTING
+[segmentation_ros2_node-13] [INFO] [1779767575.146860980] [segmentation_bridge]: Running inference with 1 positive, 0 negative clicks
+[segmentation_ros2_node-13] [INFO] [1779767575.175562715] [segmentation_bridge]: ROI crop: 909/28588 points within 0.1m of click centroid
+[openvins_odom_tf_relay-12] [WARN] [1779767575.868081693] [openvins_odom_tf_relay]: arm odom pose jumped 2.580m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-9] [WARN] [1779767576.471108827] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pipeline_manager_node-1] [INFO] [1779767576.778424536] [pipeline_manager]: Object cloud received but grasp_type is 0 — proceeding anyway
+[pipeline_manager_node-1] [INFO] [1779767576.780515416] [pipeline_manager]: State: SEGMENTING -> PLANNING (Segmentation complete: object cloud received)
+[preshaping_service_bridge_node-15] [INFO] [1779767576.782886266] [preshaping_service]: Planner called with contact override: age=1.7s target=(0.303,0.103,0.042) zero_twist=true
+[preshaping_service_bridge_node-15] [WARN] [1779767576.783172997] [preshaping_service]: Could not lookup camera frame 'head_d435i_head_depth_optical_frame' in 'marker_map': Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[preshaping_service_bridge_node-15] [INFO] [1779767576.784404182] [preshaping_service]: Planner called with 1 camera(s): target_frame=marker_map cam0=(0.681,0.096,0.445)
+[segmentation_ros2_node-13] [INFO] [1779767576.784811971] [segmentation_bridge]: Published segmented cloud: 909/28588 points.
+[force_controller_node-17] [INFO] [1779767576.785136065] [force_controller]: Pipeline state: SEGMENTING -> PLANNING
+[preshaping_service_bridge_node-15] [runtime_config] Loaded config from "/prosthesis_ws/config/grasp_preshaping.yaml"
+[twist_propagation_node-14] [INFO] [1779767576.849199234] [twist_propagation]: Segmented cloud received
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176689538] [preshaping_service]: === Preshaping Result ===
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176817062] [preshaping_service]:   Pipeline Time: 388 ms
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176828347] [preshaping_service]:   SMC Iterations: 5
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176836424] [preshaping_service]:   Grasp Type: Lateral
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176843023] [preshaping_service]:   Combined Score: 0.3958
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176856414] [preshaping_service]:   Alignment Score: 0.9997
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176862809] [preshaping_service]:   Force Closure Score: 0.0000
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176870071] [preshaping_service]:   Contact Count Score: 0.5000
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176876584] [preshaping_service]:   Contact Score: 0.1250
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176883977] [preshaping_service]:   Closure Amount: 0.4500
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176890216] [preshaping_service]:   2nd Best Grasp: Lateral
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176895451] [preshaping_service]:   2nd Best Score: 0.3954 (margin: 0.0004)
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176904116] [preshaping_service]: ===========================
+[preshaping_service_bridge_node-15] [INFO] [1779767577.176911002] [preshaping_service]: Overriding to cylindrical grasp with 10% initial closure (planner: Lateral, closure=0.4500)
+[grasp_proximity_controller_node.py-16] [INFO] [1779767577.178809723] [proximity_controller]: New plan committed — closures=[0.1, 0.1, 0.1], wrist=300.0°
+[pipeline_manager_node-1] [INFO] [1779767577.180631077] [pipeline_manager]: State: PLANNING -> APPROACHING (Preshaping: lateral grasp, closure=0.4500, combined=0.3958, alignment=0.9997, force_closure=)
+[force_controller_node-17] [INFO] [1779767577.185483487] [force_controller]: Pipeline state: PLANNING -> APPROACHING
+[grasp_proximity_controller_node.py-16] [INFO] [1779767577.224979815] [proximity_controller]: FAR mode (dist=0.360 m, offset=[+0.308, +0.053, +0.180] m): partial closure + wrist
+[twist_propagation_node-14] [INFO] [1779767577.229858678] [twist_propagation]: Deactivated
+[pipeline_manager_node-1] [INFO] [1779767577.252545965] [pipeline_manager]: Twist propagation deactivated
+[openvins_odom_tf_relay-12] [WARN] [1779767577.869947073] [openvins_odom_tf_relay]: arm odom pose jumped 2.614m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-10] [INFO] [1779767578.085525745] [pointcloud_fusion]: Stats: published=59 (dual=0, cam1_only=55) dist_removed=2458729 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:57} last_publish_ago=0.1s
+[openvins_odom_tf_relay-12] [WARN] [1779767578.121575728] [openvins_odom_tf_relay]: [RELAY-STATUS] 50s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[grasp_proximity_controller_node.py-16] [INFO] [1779767578.229319804] [proximity_controller]: FAR mode (dist=0.370 m, offset=[+0.317, +0.053, +0.183] m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779767579.325103240] [proximity_controller]: FAR mode (dist=0.363 m, offset=[+0.306, +0.053, +0.188] m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779767579.872123415] [openvins_odom_tf_relay]: arm odom pose jumped 2.613m (> 0.5m) — suppressing TF
+[grasp_proximity_controller_node.py-16] [INFO] [1779767580.332045244] [proximity_controller]: FAR mode (dist=0.359 m, offset=[+0.294, +0.054, +0.199] m): partial closure + wrist
+[pointcloud_fusion_node-10] [WARN] [1779767580.451923998] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[grasp_proximity_controller_node.py-16] [INFO] [1779767581.425905484] [proximity_controller]: FAR mode (dist=0.306 m, offset=[+0.230, +0.044, +0.197] m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779767581.875343250] [openvins_odom_tf_relay]: arm odom pose jumped 2.549m (> 0.5m) — suppressing TF
+[grasp_proximity_controller_node.py-16] [INFO] [1779767582.426195115] [proximity_controller]: FAR mode (dist=0.279 m, offset=[+0.195, +0.043, +0.195] m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779767583.428437641] [proximity_controller]: FAR mode (dist=0.262 m, offset=[+0.163, +0.032, +0.202] m): partial closure + wrist
+[openvins_odom_tf_relay-12] [WARN] [1779767583.881362036] [openvins_odom_tf_relay]: arm odom pose jumped 2.498m (> 0.5m) — suppressing TF
+[grasp_proximity_controller_node.py-16] [INFO] [1779767584.529873003] [proximity_controller]: FAR mode (dist=0.223 m, offset=[+0.126, +0.013, +0.183] m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779767585.530091405] [proximity_controller]: FAR mode (dist=0.103 m, offset=[+0.012, -0.047, +0.091] m): partial closure + wrist
+[grasp_proximity_controller_node.py-16] [INFO] [1779767585.826179778] [proximity_controller]: Entered near zone (dist=0.084 m, offset=[-0.007, -0.052, +0.066] m < enter=0.100 m)
+[grasp_proximity_controller_node.py-16] [INFO] [1779767585.827573390] [proximity_controller]: NEAR mode (dist=0.084 m, offset=[-0.007, -0.052, +0.066] m): full closure
+[pipeline_manager_node-1] [INFO] [1779767585.851505852] [pipeline_manager]: State: APPROACHING -> GRASPING (Proximity: near zone entered)
+[force_controller_node-17] [INFO] [1779767585.853017898] [force_controller]: Pipeline state: APPROACHING -> GRASPING
+[force_controller_node-17] [INFO] [1779767585.858041832] [force_controller]: Activating velocity-based force controller...
+[grasp_proximity_controller_node.py-16] [INFO] [1779767585.858729502] [proximity_controller]: Plan cleared: pipeline leaving APPROACHING
+[openvins_odom_tf_relay-12] [WARN] [1779767585.883720757] [openvins_odom_tf_relay]: arm odom pose jumped 2.331m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767585.951330432] [force_controller]: Force streaming activated.
+[force_controller_node-17] [INFO] [1779767586.370789694] [force_controller]: Hand CLOSING: velocity ramp active
+[tf_pipeline_diagnostics-9] [WARN] [1779767586.479465556] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[force_controller_node-17] [INFO] [1779767586.592358203] [force_controller]: CLOSING ramp step 1/5: vel=1.000 rad/s, positions=[0.000, 0.000, 0.000], forces=[211, 214, 261]
+[force_controller_node-17] [INFO] [1779767586.794525557] [force_controller]: CLOSING ramp step 2/5: vel=0.812 rad/s, positions=[0.030, 0.050, 0.030], forces=[210, 214, 261]
+[force_controller_node-17] [INFO] [1779767587.043029114] [force_controller]: CLOSING ramp step 3/5: vel=0.625 rad/s, positions=[0.080, 0.110, 0.090], forces=[208, 214, 260]
+[force_controller_node-17] [INFO] [1779767587.245716224] [force_controller]: CLOSING ramp step 4/5: vel=0.438 rad/s, positions=[0.090, 0.110, 0.090], forces=[208, 214, 261]
+[force_controller_node-17] [INFO] [1779767587.494744445] [force_controller]: CLOSING ramp step 5/5: vel=0.250 rad/s, positions=[0.130, 0.150, 0.130], forces=[209, 216, 262]
+[openvins_odom_tf_relay-12] [WARN] [1779767587.886227582] [openvins_odom_tf_relay]: arm odom pose jumped 2.319m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767588.122844975] [openvins_odom_tf_relay]: [RELAY-STATUS] 60s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[force_controller_node-17] [INFO] [1779767588.243195856] [force_controller]: CONTACT detected: j_mrl_fle force 320 >= 300 — switching to FORCE_HOLD. Positions: [0.260, 0.260, 0.210] Forces: [258, 223, 320]
+[force_controller_node-17] [INFO] [1779767588.293660533] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[258, 223, 320] vel=[-0.0800, -0.0800, -0.0800] stable=False
+[pointcloud_fusion_node-10] [INFO] [1779767588.359132338] [pointcloud_fusion]: Stats: published=53 (dual=0, cam1_only=61) dist_removed=2582858 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:61} last_publish_ago=0.2s
+[force_controller_node-17] [INFO] [1779767589.342317287] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[216, 217, 268] vel=[-0.0800, -0.0800, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767589.888551013] [openvins_odom_tf_relay]: arm odom pose jumped 2.331m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767590.344676785] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 215, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767590.909957354] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[force_controller_node-17] [INFO] [1779767591.396543235] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 215, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767591.906312614] [openvins_odom_tf_relay]: arm odom pose jumped 2.319m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767592.442612421] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[212, 216, 261] vel=[+0.0000, -0.0800, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767593.449437612] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 215, 262] vel=[+0.0000, -0.0800, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767593.907469285] [openvins_odom_tf_relay]: arm odom pose jumped 2.322m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767594.491901537] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767595.498323905] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767595.908143892] [openvins_odom_tf_relay]: arm odom pose jumped 2.315m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-9] [WARN] [1779767596.469397064] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[force_controller_node-17] [INFO] [1779767596.542232887] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 262] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767597.545423951] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767597.915911209] [openvins_odom_tf_relay]: arm odom pose jumped 2.322m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767598.122736123] [openvins_odom_tf_relay]: [RELAY-STATUS] 70s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779767598.199482831] [pointcloud_fusion]: Stats: published=49 (dual=0, cam1_only=49) dist_removed=1741966 bbox_removed=19251 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:55} last_publish_ago=0.2s
+[force_controller_node-17] [INFO] [1779767598.550004133] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 213, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767599.593517400] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767599.949755820] [openvins_odom_tf_relay]: arm odom pose jumped 2.328m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767600.643307878] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767600.997794488] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[force_controller_node-17] [INFO] [1779767601.647304564] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 215, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767601.950183478] [openvins_odom_tf_relay]: arm odom pose jumped 2.328m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767602.694700290] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767603.697717136] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 213, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767603.963661985] [openvins_odom_tf_relay]: arm odom pose jumped 2.332m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767604.697915287] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 215, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767605.742932980] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767605.970061791] [openvins_odom_tf_relay]: arm odom pose jumped 2.336m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-9] [WARN] [1779767606.484875344] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[force_controller_node-17] [INFO] [1779767606.745176937] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767607.808832286] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767607.970716128] [openvins_odom_tf_relay]: arm odom pose jumped 2.342m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-10] [INFO] [1779767607.992855680] [pointcloud_fusion]: Stats: published=55 (dual=0, cam1_only=57) dist_removed=1848609 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:58} last_publish_ago=0.2s
+[openvins_odom_tf_relay-12] [WARN] [1779767608.123371259] [openvins_odom_tf_relay]: [RELAY-STATUS] 80s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[force_controller_node-17] [INFO] [1779767608.842663017] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767609.847693367] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767609.973370540] [openvins_odom_tf_relay]: arm odom pose jumped 2.345m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767610.892634308] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767611.019656302] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[force_controller_node-17] [INFO] [1779767611.942972058] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767611.977531263] [openvins_odom_tf_relay]: arm odom pose jumped 2.346m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767612.997468196] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767613.979898108] [openvins_odom_tf_relay]: arm odom pose jumped 2.354m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767614.045477077] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 213, 259] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767614.321009074] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[pointcloud_fusion_node-10] [WARN] [1779767614.547621877] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.59s) — fresh lookup failed
+[force_controller_node-17] [INFO] [1779767615.096406077] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 213, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767615.982739226] [openvins_odom_tf_relay]: arm odom pose jumped 2.355m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767616.142388719] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[tf_pipeline_diagnostics-9] [WARN] [1779767616.466195607] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[force_controller_node-17] [INFO] [1779767617.193403010] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767617.984866554] [openvins_odom_tf_relay]: arm odom pose jumped 2.360m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767618.130206084] [openvins_odom_tf_relay]: [RELAY-STATUS] 90s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[force_controller_node-17] [INFO] [1779767618.197441802] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 213, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [INFO] [1779767618.339469219] [pointcloud_fusion]: Stats: published=58 (dual=0, cam1_only=51) dist_removed=1508388 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=9 tf_fail={arm_d435i_arm_depth_optical_frame:10, head_d435i_head_depth_optical_frame:60} last_publish_ago=0.0s
+[force_controller_node-17] [INFO] [1779767619.242064963] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767620.014622953] [openvins_odom_tf_relay]: arm odom pose jumped 2.363m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767620.295843757] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767621.150170092] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[force_controller_node-17] [INFO] [1779767621.342709303] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767622.018714571] [openvins_odom_tf_relay]: arm odom pose jumped 2.364m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767622.345849264] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 215, 262] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767623.395557701] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767624.020666037] [openvins_odom_tf_relay]: arm odom pose jumped 2.364m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767624.442633642] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767625.445660458] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767626.020882875] [openvins_odom_tf_relay]: arm odom pose jumped 2.369m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-9] [WARN] [1779767626.492182719] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[force_controller_node-17] [INFO] [1779767626.496653309] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767627.546456578] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767628.023146678] [openvins_odom_tf_relay]: arm odom pose jumped 2.377m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767628.120952200] [openvins_odom_tf_relay]: [RELAY-STATUS] 100s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779767628.375068180] [pointcloud_fusion]: Stats: published=57 (dual=0, cam1_only=56) dist_removed=1731091 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:60} last_publish_ago=0.2s
+[force_controller_node-17] [INFO] [1779767628.592804295] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767629.593795515] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767630.026072402] [openvins_odom_tf_relay]: arm odom pose jumped 2.380m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767630.594082470] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767631.408775908] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[force_controller_node-17] [INFO] [1779767631.596560429] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767632.026483894] [openvins_odom_tf_relay]: arm odom pose jumped 2.467m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767632.601022431] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 213, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767633.645185399] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 213, 259] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767634.030135099] [openvins_odom_tf_relay]: arm odom pose jumped 2.561m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767634.651915887] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767635.692937916] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[212, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767636.031196817] [openvins_odom_tf_relay]: arm odom pose jumped 2.594m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-9] [WARN] [1779767636.476357130] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[force_controller_node-17] [INFO] [1779767636.742290047] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767637.749522022] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767638.032843414] [openvins_odom_tf_relay]: arm odom pose jumped 2.603m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767638.122576485] [openvins_odom_tf_relay]: [RELAY-STATUS] 110s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[force_controller_node-17] [INFO] [1779767638.793000839] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 214, 259] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [INFO] [1779767638.929094213] [pointcloud_fusion]: Stats: published=57 (dual=0, cam1_only=60) dist_removed=2554148 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:64} last_publish_ago=0.1s
+[force_controller_node-17] [INFO] [1779767639.793175722] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767639.872877867] [pointcloud_fusion]: Using cached transform for palm_frame (age=0.45s) — fresh lookup failed
+[openvins_odom_tf_relay-12] [WARN] [1779767640.036914792] [openvins_odom_tf_relay]: arm odom pose jumped 2.615m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767640.796182933] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[227, 215, 261] vel=[-0.0800, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767641.444124410] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[pointcloud_fusion_node-10] [WARN] [1779767641.541803879] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (2.3s > 2.0s), skipping
+[force_controller_node-17] [INFO] [1779767641.841869400] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[211, 213, 259] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767642.038714186] [openvins_odom_tf_relay]: arm odom pose jumped 2.616m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767642.844267932] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767643.845433654] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767644.039160569] [openvins_odom_tf_relay]: arm odom pose jumped 2.612m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767644.891924254] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767645.896924568] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 215, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767646.052928559] [openvins_odom_tf_relay]: arm odom pose jumped 2.614m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-9] [WARN] [1779767646.483608733] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779767646.736953926] [pointcloud_fusion]: Cannot transform to palm_frame for bbox removal — cached transform too old (7.3s > 2.0s), skipping
+[force_controller_node-17] [INFO] [1779767646.943309891] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767647.955606889] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767648.065790616] [openvins_odom_tf_relay]: arm odom pose jumped 2.612m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767648.127851949] [openvins_odom_tf_relay]: [RELAY-STATUS] 120s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[pointcloud_fusion_node-10] [INFO] [1779767648.442042440] [pointcloud_fusion]: Stats: published=53 (dual=0, cam1_only=56) dist_removed=3329980 bbox_removed=31 bbox_skipped=86 bbox_cache_hits=17 tf_fail={arm_d435i_arm_depth_optical_frame:2, head_d435i_head_depth_optical_frame:66} last_publish_ago=0.0s
+[pointcloud_fusion_node-10] [ERROR] [1779767648.656539604] [pointcloud_fusion]: Bbox removal success rate is 74% over 30s (266/361 attempts). Fused cloud quality is degraded — hand/arm may not be filtered. Check TF tree connectivity for pruning box frames.
+[force_controller_node-17] [INFO] [1779767648.992994991] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767650.048416824] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767650.069244187] [openvins_odom_tf_relay]: arm odom pose jumped 2.615m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767651.094711003] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767651.581443509] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779767652.075921394] [openvins_odom_tf_relay]: arm odom pose jumped 2.619m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767652.141628419] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767653.154265003] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767654.076839704] [openvins_odom_tf_relay]: arm odom pose jumped 2.630m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767654.192722008] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767655.203139853] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767656.092069547] [openvins_odom_tf_relay]: arm odom pose jumped 2.631m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767656.245871639] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767656.464221981] [pointcloud_fusion]: Cannot look up arm_d435i_arm_depth_frame in marker_map for distance filter — skipping
+[tf_pipeline_diagnostics-9] [WARN] [1779767656.472444482] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-10] [WARN] [1779767656.925618664] [pointcloud_fusion]: Using cached transform for d435i_arm_bottom_screw_frame_8_cm_cam_mount (age=0.48s) — fresh lookup failed
+[force_controller_node-17] [INFO] [1779767657.247158871] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 213, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767658.096235692] [openvins_odom_tf_relay]: arm odom pose jumped 2.632m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-12] [WARN] [1779767658.121106326] [openvins_odom_tf_relay]: [RELAY-STATUS] 130s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[force_controller_node-17] [INFO] [1779767658.249119910] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 213, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [INFO] [1779767658.502318838] [pointcloud_fusion]: Stats: published=65 (dual=0, cam1_only=58) dist_removed=3087586 bbox_removed=0 bbox_skipped=29 bbox_cache_hits=16 tf_fail={arm_d435i_arm_depth_optical_frame:14, head_d435i_head_depth_optical_frame:73} last_publish_ago=0.4s
+[force_controller_node-17] [INFO] [1779767659.252505729] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 213, 259] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767660.103655796] [openvins_odom_tf_relay]: arm odom pose jumped 2.634m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767660.293751289] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767661.344409001] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 215, 262] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[pointcloud_fusion_node-10] [WARN] [1779767661.868491411] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[openvins_odom_tf_relay-12] [WARN] [1779767662.107195475] [openvins_odom_tf_relay]: arm odom pose jumped 2.640m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767662.391725589] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767663.397020373] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767664.112003772] [openvins_odom_tf_relay]: arm odom pose jumped 2.637m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767664.443073119] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767665.445110795] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767666.128469027] [openvins_odom_tf_relay]: arm odom pose jumped 2.639m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-9] [WARN] [1779767666.482792886] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[force_controller_node-17] [INFO] [1779767666.496627967] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 215, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767667.549564496] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767668.122209337] [openvins_odom_tf_relay]: [RELAY-STATUS] 140s elapsed — head: WAITING (0 msgs), arm: OK (156 msgs)
+[openvins_odom_tf_relay-12] [WARN] [1779767668.131490510] [openvins_odom_tf_relay]: arm odom pose jumped 2.642m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-10] [INFO] [1779767668.143135543] [pointcloud_fusion]: Stats: published=60 (dual=0, cam1_only=65) dist_removed=3982800 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 tf_fail={head_d435i_head_depth_optical_frame:61} last_publish_ago=0.3s
+[force_controller_node-17] [INFO] [1779767668.594229152] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767669.646955365] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[210, 214, 261] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767670.134522864] [openvins_odom_tf_relay]: arm odom pose jumped 2.699m (> 0.5m) — suppressing TF
+[force_controller_node-17] [INFO] [1779767670.692374711] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[213, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767671.695255926] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[215, 214, 260] vel=[+0.0000, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767672.135530928] [openvins_odom_tf_relay]: arm odom pose jumped 3.239m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-10] [WARN] [1779767672.141716025] [pointcloud_fusion]: TF transform failed for head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.
+[force_controller_node-17] [INFO] [1779767672.699299942] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[215, 214, 261] vel=[-0.0800, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767672.768221890] [openvins_odom_tf_relay]: arm odom pose norm 2.01m exceeds max 2.0m — suppressing TF
+[force_controller_node-17] [INFO] [1779767673.750582795] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[217, 214, 261] vel=[-0.0800, +0.0000, -0.0800] stable=False
+[openvins_odom_tf_relay-12] [WARN] [1779767674.770005035] [openvins_odom_tf_relay]: arm odom pose norm 7.41m exceeds max 2.0m — suppressing TF
+[force_controller_node-17] [INFO] [1779767674.793673651] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[218, 214, 260] vel=[-0.0800, +0.0000, -0.0800] stable=False
+[force_controller_node-17] [INFO] [1779767675.842651687] [force_controller]: FORCE_HOLD: targets=[195, 195, 195] forces=[218, 213, 260] vel=[-0.0800, +0.0000, -0.0800] stable=False
+[tf_pipeline_diagnostics-9] [WARN] [1779767676.481999870] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-12] [WARN] [1779767676.773215270] [openvins_odom_tf_relay]: arm odom pose norm 21.11m exceeds max 2.0m — suppressing TF

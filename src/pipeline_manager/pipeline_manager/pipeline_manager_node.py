@@ -46,7 +46,7 @@ import yaml
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from sensor_msgs.msg import JointState, PointCloud2
-from std_msgs.msg import Bool, Float32, Float64, Float64MultiArray, Int32, String
+from std_msgs.msg import Bool, Empty, Float32, Float64, Float64MultiArray, Int32, String
 from std_srvs.srv import Trigger
 from mia_hand_msgs.msg import ForceControllerStatus
 
@@ -74,6 +74,14 @@ GESTURE_POWER = 1
 GESTURE_OPEN = 2
 GESTURE_FLEXION = 3
 GESTURE_EXTENSION = 4
+
+GESTURE_NAMES = {
+    GESTURE_REST: 'REST',
+    GESTURE_POWER: 'POWER',
+    GESTURE_OPEN: 'OPEN',
+    GESTURE_FLEXION: 'FLEXION',
+    GESTURE_EXTENSION: 'EXTENSION',
+}
 
 
 @dataclass
@@ -108,7 +116,14 @@ class PipelineManagerNode(Node):
 
         # EMG parameters
         self.declare_parameter('wrist_cmd_topic', '/wrist/set_position')
+        self.declare_parameter('wrist_state_topic', '/wrist/state')
         self.declare_parameter('wrist_velocity_scale', 45.0)   # deg/s per unit proportional
+        self.declare_parameter('wrist_accel_deg_s2', 180.0)
+        self.declare_parameter('wrist_command_period_s', 0.1)
+        self.declare_parameter('wrist_min_command_delta_deg', 1.0)
+        self.declare_parameter('wrist_min_deg', 5.0)
+        self.declare_parameter('wrist_max_deg', 300.0)
+        self.declare_parameter('wrist_neutral_deg', 140.0)
 
         # Twist stop-distance & hit-detected parameters
         self.declare_parameter('twist_stop_distance_m', 0.20)
@@ -116,7 +131,7 @@ class PipelineManagerNode(Node):
         self.declare_parameter('collision_distance_topic', '/twist_propagation/collision_distance')
 
         # Volitional mode parameters
-        self.declare_parameter('volitional_force_adjust_step', 1.0)
+        self.declare_parameter('volitional_force_adjust_step', 5.0)
         self.declare_parameter('volitional_wrist_velocity_scale', 45.0)
         self.declare_parameter('volitional_entry_delay_s', 0.5)
 
@@ -131,6 +146,7 @@ class PipelineManagerNode(Node):
         self.declare_parameter('twist_deactivate_service', '/twist_propagation/deactivate')
         self.declare_parameter('pipeline_state_topic', '/pipeline/state')
         self.declare_parameter('pipeline_state_name_topic', '/pipeline/state_name')
+        self.declare_parameter('segmentation_reset_topic', '/segmentation/reset')
 
         self._release_gesture = self.get_parameter('release_gesture').value
         self._gesture_hold_timeout_s = self.get_parameter('gesture_hold_timeout_s').value
@@ -141,6 +157,12 @@ class PipelineManagerNode(Node):
         self._release_debounce_frames = self.get_parameter('release_debounce_frames').value
         self._emg_live_config_path = self.get_parameter('emg_live_config_path').value
         self._wrist_velocity_scale = self.get_parameter('wrist_velocity_scale').value
+        self._wrist_accel = float(self.get_parameter('wrist_accel_deg_s2').value)
+        self._wrist_command_period_s = float(self.get_parameter('wrist_command_period_s').value)
+        self._wrist_min_command_delta_deg = float(self.get_parameter('wrist_min_command_delta_deg').value)
+        self._wrist_min_deg = float(self.get_parameter('wrist_min_deg').value)
+        self._wrist_max_deg = float(self.get_parameter('wrist_max_deg').value)
+        self._wrist_neutral_deg = float(self.get_parameter('wrist_neutral_deg').value)
         self._twist_stop_distance = self.get_parameter('twist_stop_distance_m').value
         self._volitional_force_step = self.get_parameter('volitional_force_adjust_step').value
         self._volitional_wrist_scale = self.get_parameter('volitional_wrist_velocity_scale').value
@@ -167,10 +189,13 @@ class PipelineManagerNode(Node):
 
         # EMG wrist relay state — initialized from hardware on first state msg
         self._emg_wrist_target_deg: Optional[float] = None
+        self._last_wrist_cmd_time: float = 0.0
+        self._last_wrist_cmd_target: Optional[float] = None
 
         # Volitional mode tracking
         self._emg_volitional_mode: str = "force"  # "force" or "wrist"
         self._volitional_entry_time: Optional[float] = None
+        self._force_controller_state: str = "IDLE"
 
         # Twist hit tracking
         self._twist_distance_to_hit: float = -1.0  # -1 = no active hit
@@ -194,6 +219,11 @@ class PipelineManagerNode(Node):
         self._wrist_cmd_pub = self.create_publisher(
             Float64MultiArray,
             self.get_parameter('wrist_cmd_topic').value,
+            10,
+        )
+        self._segmentation_reset_pub = self.create_publisher(
+            Empty,
+            self.get_parameter('segmentation_reset_topic').value,
             10,
         )
 
@@ -232,7 +262,7 @@ class PipelineManagerNode(Node):
             self._on_collision_distance, 10)
         # Subscribe to wrist state to initialize target from hardware position
         self.create_subscription(
-            Float64MultiArray, '/wrist/state', self._on_wrist_state, 10)
+            Float64MultiArray, self.get_parameter('wrist_state_topic').value, self._on_wrist_state, 10)
 
         # ── Service clients ───────────────────────────────────────────────
         self._compute_client = self.create_client(
@@ -300,12 +330,18 @@ class PipelineManagerNode(Node):
     def _ensure_wrist_target(self) -> float:
         """Return the wrist target, initializing from hardware if needed."""
         if self._emg_wrist_target_deg is None:
-            self._emg_wrist_target_deg = 0.0
+            self._emg_wrist_target_deg = self._wrist_neutral_deg
         return self._emg_wrist_target_deg
 
     def _set_wrist_target(self, deg: float):
         """Set wrist target, clamped to [0, 359]."""
-        self._emg_wrist_target_deg = max(0.0, min(359.0, deg))
+        self._emg_wrist_target_deg = max(self._wrist_min_deg, min(self._wrist_max_deg, deg))
+
+    def _force_control_available(self) -> bool:
+        """True once force controller is holding/regulating the grasp."""
+        return self._state in (State.HOLDING, State.VOLITIONAL) or (
+            self._state == State.GRASPING and self._force_controller_state == "FORCE_HOLD"
+        )
 
     # ── Callbacks ─────────────────────────────────────────────────────────
 
@@ -315,6 +351,8 @@ class PipelineManagerNode(Node):
         GRASPING -> HOLDING on stable force.
         HOLDING -> VOLITIONAL on sustained stable force (debounced).
         """
+        self._force_controller_state = msg.state
+
         if self._state == State.GRASPING and msg.force_stable and msg.active:
             self._transition(State.HOLDING, 'Force stable \u2014 grip secured')
             self._volitional_entry_time = time.monotonic()
@@ -396,8 +434,13 @@ class PipelineManagerNode(Node):
                     self._publish_finger_command(self._thumb_cmd_pub, self._release_open_position[0])
                     self._publish_finger_command(self._index_cmd_pub, self._release_open_position[1])
                     self._publish_finger_command(self._mrl_cmd_pub, self._release_open_position[2])
+                    self._reset_segmentation('EMG: OPEN reset')
                     self._schedule_release_complete()
                     self._volitional_entry_time = None
+                    self._gesture_action_fired = True
+            elif self._state == State.IDLE:
+                if held_long_enough and high_confidence and not self._gesture_action_fired:
+                    self._reset_segmentation('EMG: OPEN reset while IDLE')
                     self._gesture_action_fired = True
             return
 
@@ -409,37 +452,56 @@ class PipelineManagerNode(Node):
                 self._gesture_action_fired = True
             return
 
-        # ── POWER: toggle mode in VOLITIONAL ──────────────────────────────
-        if gesture == GESTURE_POWER and self._state == State.VOLITIONAL:
-            if held_long_enough and high_confidence and not self._gesture_action_fired:
+        # ── FLEXION/EXTENSION wrist trim during APPROACHING ──────────────
+        if self._state == State.APPROACHING and gesture in (GESTURE_EXTENSION, GESTURE_FLEXION):
+            # Fast manual trim while approaching. Do not require POWER/mode toggle here;
+            # proximity may also publish planned wrist commands, so publish on each EMG
+            # callback to let the operator override/trim the preshape target.
+            prop = max(self._latest_proportional, 0.25)
+            delta = self._wrist_velocity_scale * 0.1 * prop
+            if gesture == GESTURE_EXTENSION:
+                self._publish_wrist_delta(-delta, 'approach -')
+            else:
+                self._publish_wrist_delta(delta, 'approach +')
+            return
+
+        # ── POWER: toggle force/wrist mode as soon as FORCE_HOLD is active ─
+        if gesture == GESTURE_POWER and self._force_control_available():
+            # No hold/conf gate here: classifier already applies confidence threshold,
+            # and we need this responsive while grasp is holding.
+            if not self._gesture_action_fired:
+                if self._state == State.HOLDING:
+                    self._transition(State.VOLITIONAL, 'EMG: entering volitional control')
                 if self._emg_volitional_mode == "force":
                     self._emg_volitional_mode = "wrist"
-                    self.get_logger().info('VOLITIONAL: switched to WRIST mode')
+                    self._ensure_wrist_target()
+                    self._publish_wrist_delta(0.0, 'mode-toggle')
+                    self.get_logger().info(
+                        f'VOLITIONAL: mode=WRIST target={self._emg_wrist_target_deg:.1f} deg')
                 else:
                     self._emg_volitional_mode = "force"
-                    self.get_logger().info('VOLITIONAL: switched to FORCE mode')
+                    self.get_logger().info('VOLITIONAL: mode=FORCE')
                 self._gesture_action_fired = True
             return
 
-        # ── Continuous gestures in VOLITIONAL (proportional, no hold) ─────
-        if self._state == State.VOLITIONAL:
-            prop = self._latest_proportional
+        # ── Continuous gestures once FORCE_HOLD is active (proportional) ───
+        if self._force_control_available():
+            prop = max(self._latest_proportional, 0.25)
+            if self._state == State.HOLDING and gesture in (GESTURE_EXTENSION, GESTURE_FLEXION):
+                self._transition(State.VOLITIONAL, 'EMG: volitional adjustment')
 
             # EXTENSION — decrease force / wrist negative
             if gesture == GESTURE_EXTENSION:
                 if prop <= 0.0:
                     return
                 if self._emg_volitional_mode == "force":
-                    self._manual_adjust_pub.publish(
-                        Float64(data=-self._volitional_force_step * prop))
-                    self.get_logger().debug('VOLITIONAL: force -', throttle_duration_sec=0.5)
+                    delta_force = self._volitional_force_step * prop
+                    self._manual_adjust_pub.publish(Float64(data=-delta_force))
+                    self.get_logger().info(
+                        f'VOLITIONAL: force -{delta_force:.2f}', throttle_duration_sec=0.5)
                 else:
                     delta = self._volitional_wrist_scale * 0.1 * prop
-                    self._set_wrist_target(self._ensure_wrist_target() - delta)
-                    cmd = Float64MultiArray()
-                    cmd.data = [self._emg_wrist_target_deg, 180.0]
-                    self._wrist_cmd_pub.publish(cmd)
-                    self.get_logger().debug('VOLITIONAL: wrist -', throttle_duration_sec=0.5)
+                    self._publish_wrist_delta(-delta, '-')
                 return
 
             # FLEXION — increase force / wrist positive
@@ -447,21 +509,43 @@ class PipelineManagerNode(Node):
                 if prop <= 0.0:
                     return
                 if self._emg_volitional_mode == "force":
-                    self._manual_adjust_pub.publish(
-                        Float64(data=self._volitional_force_step * prop))
-                    self.get_logger().debug('VOLITIONAL: force +', throttle_duration_sec=0.5)
+                    delta_force = self._volitional_force_step * prop
+                    self._manual_adjust_pub.publish(Float64(data=delta_force))
+                    self.get_logger().info(
+                        f'VOLITIONAL: force +{delta_force:.2f}', throttle_duration_sec=0.5)
                 else:
                     delta = self._volitional_wrist_scale * 0.1 * prop
-                    self._set_wrist_target(self._ensure_wrist_target() + delta)
-                    cmd = Float64MultiArray()
-                    cmd.data = [self._emg_wrist_target_deg, 180.0]
-                    self._wrist_cmd_pub.publish(cmd)
-                    self.get_logger().debug('VOLITIONAL: wrist +', throttle_duration_sec=0.5)
+                    self._publish_wrist_delta(delta, '+')
                 return
 
-            return  # Other gestures ignored in VOLITIONAL
+            return  # Other gestures ignored in HOLDING/VOLITIONAL
 
         # ── All other gestures (REST, etc.) — ignored ────────────────────
+
+    def _publish_wrist_delta(self, delta_deg: float, direction: str):
+        """Publish an absolute wrist target after applying a small delta."""
+        current = self._ensure_wrist_target()
+        if abs(delta_deg) < self._wrist_min_command_delta_deg and direction not in ('mode-toggle', 'repeat'):
+            delta_deg = self._wrist_min_command_delta_deg if delta_deg >= 0.0 else -self._wrist_min_command_delta_deg
+        self._set_wrist_target(current + delta_deg)
+        cmd = Float64MultiArray()
+        cmd.data = [self._emg_wrist_target_deg, self._wrist_accel]
+        self._wrist_cmd_pub.publish(cmd)
+        self._last_wrist_cmd_time = time.monotonic()
+        self._last_wrist_cmd_target = self._emg_wrist_target_deg
+        self.get_logger().info(
+            f'Wrist command target={self._emg_wrist_target_deg:.1f} deg '
+            f'({direction}, delta={delta_deg:+.2f}, accel={self._wrist_accel:.0f}, state={self._state.name})',
+            throttle_duration_sec=0.5,
+        )
+
+    def _reset_segmentation(self, reason: str):
+        """Clear segmentation clicks/state so the next grasp can segment again."""
+        for _ in range(3):
+            self._segmentation_reset_pub.publish(Empty())
+        self._twist_distance_to_hit = -1.0
+        self._segmenting_start_time = None
+        self.get_logger().info(f'Segmentation reset published ({reason})')
 
     def _publish_finger_command(self, publisher, position: float):
         """Publish a single-joint position command as Float64MultiArray."""
@@ -523,11 +607,16 @@ class PipelineManagerNode(Node):
                 pass
 
     def _on_wrist_state(self, msg: Float64MultiArray):
-        """Track wrist position from hardware to initialize target on first msg."""
-        if len(msg.data) >= 1 and self._emg_wrist_target_deg is None:
-            self._emg_wrist_target_deg = msg.data[0]
-            self.get_logger().info(
-                f'Wrist target initialized from hardware: {self._emg_wrist_target_deg:.1f} deg')
+        """Track wrist position from hardware to initialize/refresh target."""
+        if len(msg.data) >= 1:
+            pos = max(self._wrist_min_deg, min(self._wrist_max_deg, float(msg.data[0])))
+            if self._emg_wrist_target_deg is None:
+                self._emg_wrist_target_deg = pos
+                self.get_logger().info(
+                    f'Wrist target initialized from hardware: {self._emg_wrist_target_deg:.1f} deg')
+            elif time.monotonic() - self._last_wrist_cmd_time > 1.0:
+                # Keep target synced when EMG is not actively commanding wrist motion.
+                self._emg_wrist_target_deg = pos
 
     def _on_twist_hit_detected(self, msg: Bool):
         """Transition TWISTING -> SEGMENTING when a collision hit is detected."""

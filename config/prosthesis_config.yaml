@@ -17,6 +17,9 @@ wrist_driver:
     ros__parameters:
         min_position_deg: 5.0
         max_position_deg: 300.0
+        default_profile_velocity: 120
+        default_profile_acceleration: 180
+        log_commands: true
 
 haptic_controller:
     ros__parameters:
@@ -55,6 +58,12 @@ mia_hand_driver:
 
 force_controller:
     ros__parameters:
+        # Mode: set use_controller_manager to false when running without
+        # ros2_control (e.g. production pipeline using command_bridge).
+        use_controller_manager: false
+        # Per-finger position command topics (used when use_controller_manager is false).
+        # Must match the topics command_bridge subscribes to.
+        finger_cmd_topics: ["/thumb_pos_ff_controller/commands", "/index_pos_ff_controller/commands", "/mrl_pos_ff_controller/commands"]
         # Topic / service names
         force_data_topic: "data_streams/fingers/forces/data"
         force_stream_switch_service: "data_streams/fingers/forces/switch"
@@ -67,6 +76,7 @@ force_controller:
         # Force target
         target_force_min: 50.0
         target_force_max: 340.0
+        target_force_default: 300.0
         update_rate_hz: 20.0
         # Stability detection
         stability_window: 1.0
@@ -122,9 +132,16 @@ pipeline_manager:
         # EMG intent relay
         emg_grasp_intent_topic: "/emg_grasp/intent"
         wrist_cmd_topic: "/wrist/set_position"
+        wrist_state_topic: "/wrist/state"
         wrist_velocity_scale: 45.0
+        wrist_accel_deg_s2: 180.0
+        wrist_command_period_s: 0.1
+        wrist_min_command_delta_deg: 1.0
+        wrist_min_deg: 5.0
+        wrist_max_deg: 300.0
+        wrist_neutral_deg: 140.0
         # Volitional mode control
-        volitional_force_adjust_step: 1.0
+        volitional_force_adjust_step: 5.0
         volitional_wrist_velocity_scale: 45.0
         volitional_entry_delay_s: 0.5
         # Live config path (empty = disable polling)
@@ -190,6 +207,9 @@ proximity_controller:
         wrist_max_deg: 300.0
         wrist_neutral_deg: 140.0
         max_wrist_delta_deg: 90.0
+        wrist_plan_is_relative: true
+        wrist_plan_relative_frame: "hardware"
+        wrist_manual_override_timeout_s: 1.0
         command_repeat_period_s: 1.0
         command_epsilon: 0.005
         near_enter_consecutive_samples: 3

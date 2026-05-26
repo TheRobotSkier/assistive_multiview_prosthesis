@@ -141,6 +141,7 @@ def _launch_setup(context, *args, **kwargs):
                         "port": wrist_serial_port,
                         "baudrate": hardware.get("wrist_baudrate", 57600),
                         "motor_id": hardware.get("wrist_motor_id", 1),
+                        **_node_params(config, "wrist_driver"),
                     }
                 ],
                 output="screen",
