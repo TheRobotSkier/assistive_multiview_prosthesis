@@ -271,6 +271,13 @@ class PipelineManagerNode(Node):
         self.get_logger().info(
             f'State: {old.name} -> {new_state.name} ({reason})')
         self._publish_state()
+
+        if new_state in (State.IDLE, State.RELEASING) and old not in (State.IDLE, State.RELEASING):
+            self._deactivate_twist_propagation()
+
+        if old in (State.SEGMENTING, State.PLANNING):
+            self._segmenting_start_time = None
+
         return True
 
     def _can_transition(self, new_state: State) -> bool:
@@ -624,6 +631,7 @@ class PipelineManagerNode(Node):
         """
         if not self._compute_client.wait_for_service(timeout_sec=1.0):
             self.get_logger().warn('Preshaping service not available')
+            self._deactivate_twist_propagation()
             self._transition(State.IDLE, 'Preshaping service unavailable')
             return
 
@@ -639,11 +647,9 @@ class PipelineManagerNode(Node):
             else:
                 self.get_logger().warn(f'Preshaping failed: {response.message}')
                 self._transition(State.IDLE, f'Preshaping failed: {response.message[:60]}')
-                self._deactivate_twist_propagation()
         except Exception as e:
             self.get_logger().error(f'Preshaping service error: {e}')
             self._transition(State.IDLE, f'Preshaping error: {e}')
-            self._deactivate_twist_propagation()
 
     # ── Publishing ────────────────────────────────────────────────────────
     def _publish_state(self):
