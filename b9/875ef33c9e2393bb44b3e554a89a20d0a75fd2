@@ -1,0 +1,24 @@
+src/camera/camera/openvins_odom_tf_relay.py
+  s_fc62bf03367054::t_0ee3b676c6e5ae 156-157
+  s_fc62bf03367054::t_818e5ba0497d44 252-253
+  s_fc62bf03367054::t_a10dcbb2c7b4ed 191-192
+  s_fc62bf03367054::t_66acb4ab5a34f0 374-402
+config/prosthesis_config.yaml
+  s_fc62bf03367054::t_33548b9faf9f8f 236-237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "b9875ef33c9e2393bb44b3e554a89a20d0a75fd2",
+  "prompts": {},
+  "sessions": {
+    "s_fc62bf03367054": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19e69dc47ffeYF2Z4sWnqhORcL",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
