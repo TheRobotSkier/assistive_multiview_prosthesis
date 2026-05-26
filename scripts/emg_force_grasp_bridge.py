@@ -6,9 +6,7 @@ from __future__ import annotations
 import json
 import math
 import os
-import re
 import signal
-import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
@@ -21,6 +19,8 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float32, Float64MultiArray, Int32, String
+
+from force_controller.controller_manager_client import ControllerManagerClient
 
 
 FINGER_JOINTS = ["j_thumb_fle", "j_index_fle", "j_mrl_fle"]
@@ -203,119 +203,9 @@ def _load_config(path: str) -> RuntimeConfig:
     return cfg
 
 
-def _ros(*args: str, timeout: float = 10.0, check: bool = True) -> str:
-    cmd = ["ros2"] + list(args)
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    if check and result.returncode != 0:
-        raise RuntimeError(
-            f"{' '.join(cmd)} failed: {result.stderr.strip() or result.stdout.strip()}"
-        )
-    return result.stdout
-
-
-def _wait_for_controller_manager(timeout_s: float = 20.0) -> bool:
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        result = subprocess.run(
-            ["ros2", "service", "list"],
-            capture_output=True,
-            text=True,
-            timeout=3,
-        )
-        if "/controller_manager/list_controllers" in result.stdout:
-            return True
-        time.sleep(0.25)
-    return False
-
-
-def _controller_states() -> dict[str, str]:
-    out = _ros(
-        "service",
-        "call",
-        "/controller_manager/list_controllers",
-        "controller_manager_msgs/srv/ListControllers",
-        "{}",
-        timeout=5,
-        check=False,
-    )
-    return {name: state for name, state in re.findall(r"name='([^']+)'.*?state='([^']+)'", out)}
-
-
-def _ensure_controller_loaded(ctrl: str) -> None:
-    states = _controller_states()
-    if ctrl in states:
-        return
-    req = f"{{name: '{ctrl}'}}"
-    out = _ros(
-        "service",
-        "call",
-        "/controller_manager/load_controller",
-        "controller_manager_msgs/srv/LoadController",
-        req,
-        timeout=10,
-        check=False,
-    )
-    if "ok=True" not in out:
-        raise RuntimeError(f"Failed to load {ctrl}: {out.strip()}")
-    out = _ros(
-        "service",
-        "call",
-        "/controller_manager/configure_controller",
-        "controller_manager_msgs/srv/ConfigureController",
-        req,
-        timeout=10,
-        check=False,
-    )
-    if "ok=True" not in out:
-        raise RuntimeError(f"Failed to configure {ctrl}: {out.strip()}")
-
-
 def _competitors(active: list[str]) -> list[str]:
     active_set = set(active)
     return [c for c in POSITION_CONTROLLERS + VELOCITY_CONTROLLERS if c not in active_set]
-
-
-def _switch_controllers(activate: list[str], deactivate: list[str]) -> None:
-    if not _wait_for_controller_manager(timeout_s=5):
-        raise RuntimeError("controller_manager service is not available")
-
-    states = _controller_states()
-    activate = [ctrl for ctrl in activate if states.get(ctrl) != "active"]
-    deactivate = [ctrl for ctrl in deactivate if states.get(ctrl) == "active"]
-    if not activate and not deactivate:
-        return
-    for ctrl in activate:
-        _ensure_controller_loaded(ctrl)
-    req = (
-        "{"
-        f"activate_controllers: [{', '.join(repr(c) for c in activate)}], "
-        f"deactivate_controllers: [{', '.join(repr(c) for c in deactivate)}], "
-        "strictness: 2, activate_asap: true, timeout: {sec: 10, nanosec: 0}"
-        "}"
-    )
-    out = _ros(
-        "service",
-        "call",
-        "/controller_manager/switch_controller",
-        "controller_manager_msgs/srv/SwitchController",
-        req,
-        timeout=15,
-        check=False,
-    )
-    if "ok=True" not in out:
-        req = req.replace("strictness: 2", "strictness: 1")
-        out = _ros(
-            "service",
-            "call",
-            "/controller_manager/switch_controller",
-            "controller_manager_msgs/srv/SwitchController",
-            req,
-            timeout=15,
-            check=False,
-        )
-        if "ok=True" not in out:
-            raise RuntimeError(f"Controller switch failed: {out.strip()}")
-
 
 def _velocity_ramp(start: float, end: float, steps: int) -> list[float]:
     if steps <= 1:
@@ -394,10 +284,12 @@ class EmgForceGraspBridge(Node):
         self._last_wrist_cmd: Optional[list[float]] = None
         self._wrist_state_time = 0.0
         self._got_wrist_state = False
+        self._settling_timer: Optional[object] = None
 
-        if not _wait_for_controller_manager(timeout_s=30):
+        self._cm_client = ControllerManagerClient(self)
+        if not self._cm_client.wait_for_services(timeout_sec=30):
             raise RuntimeError("controller_manager did not become available")
-        _switch_controllers(["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"]))
+        self._cm_client.switch_controllers(["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"]))
         self._publish_position(self._cfg.open_positions, force=True)
 
         rate = max(self._cfg.control_rate_hz, 1.0)
@@ -539,9 +431,24 @@ class EmgForceGraspBridge(Node):
             return
         self._publish_velocity([0.0] * FINGER_COUNT, force=True)
         self._publish_position(self._cfg.open_positions, force=True)
-        time.sleep(self._cfg.relaxed_wait_s)
+
+        # Use a one-shot timer instead of blocking sleep to keep the
+        # executor responsive during the settling period.
+        self._settling_timer = self.create_timer(
+            self._cfg.relaxed_wait_s, self._finish_start_grasp
+        )
+        self._settling_timer  # suppress unused warning
+
+    def _finish_start_grasp(self) -> None:
+        """Called after the settling delay to perform the actual controller switch."""
+        if self._settling_timer is not None:
+            self.destroy_timer(self._settling_timer)
+            self._settling_timer = None
+
         try:
-            _switch_controllers(["group_vel_ff_controller"], _competitors(["group_vel_ff_controller"]))
+            self._cm_client.switch_controllers(
+                ["group_vel_ff_controller"], _competitors(["group_vel_ff_controller"])
+            )
         except Exception as exc:
             self._fault(f"Failed to switch to velocity controller: {exc}")
             return
@@ -553,8 +460,14 @@ class EmgForceGraspBridge(Node):
         self.get_logger().info(f"Hand release/reset: {reason}")
         self._hand_phase = HandPhase.RELEASING
         self._publish_velocity([0.0] * FINGER_COUNT, force=True)
+        # Cancel any pending settling timer
+        if self._settling_timer is not None:
+            self.destroy_timer(self._settling_timer)
+            self._settling_timer = None
         try:
-            _switch_controllers(["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"]))
+            self._cm_client.switch_controllers(
+                ["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"])
+            )
         except Exception as exc:
             self.get_logger().error(f"Failed to switch to position controller during release: {exc}")
         self._publish_position(self._cfg.open_positions, force=True)
@@ -705,7 +618,10 @@ class EmgForceGraspBridge(Node):
     def destroy_node(self) -> bool:
         try:
             self._publish_velocity([0.0] * FINGER_COUNT, force=True)
-            _switch_controllers(["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"]))
+            if self._cm_client.services_ready():
+                self._cm_client.switch_controllers(
+                    ["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"])
+                )
             self._publish_position(self._cfg.open_positions, force=True)
         except Exception:
             pass
