@@ -37,14 +37,14 @@ mock_switch_req.STRICT = 2
 mock_switch_req.BEST_EFFORT = 1
 
 mock_controller_manager_msgs_srv.ListControllers = MagicMock()
-mock_controller_manager_msgs_srv.ListControllersRequest = mock_list_req
-mock_controller_manager_msgs_srv.ListControllersResponse = mock_list_resp
+mock_controller_manager_msgs_srv.ListControllers_Request = mock_list_req
+mock_controller_manager_msgs_srv.ListControllers_Response = mock_list_resp
 mock_controller_manager_msgs_srv.LoadController = MagicMock()
-mock_controller_manager_msgs_srv.LoadControllerRequest = mock_load_req
-mock_controller_manager_msgs_srv.LoadControllerResponse = mock_load_resp
+mock_controller_manager_msgs_srv.LoadController_Request = mock_load_req
+mock_controller_manager_msgs_srv.LoadController_Response = mock_load_resp
 mock_controller_manager_msgs_srv.SwitchController = MagicMock()
-mock_controller_manager_msgs_srv.SwitchControllerRequest = mock_switch_req
-mock_controller_manager_msgs_srv.SwitchControllerResponse = mock_switch_resp
+mock_controller_manager_msgs_srv.SwitchController_Request = mock_switch_req
+mock_controller_manager_msgs_srv.SwitchController_Response = mock_switch_resp
 
 mock_controller_manager_msgs.srv = mock_controller_manager_msgs_srv
 
@@ -86,7 +86,7 @@ def _make_controller_state(name: str, state: str) -> MagicMock:
 
 
 def _make_list_response(controllers: list[tuple[str, str]]) -> MagicMock:
-    """Create a mock ListControllersResponse with given (name, state) pairs."""
+    """Create a mock ListControllers_Response with given (name, state) pairs."""
     resp = MagicMock()
     resp.controller = [_make_controller_state(n, s) for n, s in controllers]
     return resp

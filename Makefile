@@ -633,7 +633,7 @@ test-static-grasp:
 	podman run --rm -it --name mia-static-grasp \
 		--network host \
 		--userns keep-id \
-		--device $${MIA_PORT:-/dev/ttyUSB0}:/dev/ttyUSB0 \
+		--device $${MIA_PORT:-/dev/ttyUSB1}:/dev/ttyUSB1 \
 		-v $(CURDIR)/src:/prosthesis_ws/src:ro \
 		-v $(CURDIR)/scripts:/prosthesis_ws/scripts:ro \
 		-v $(CURDIR)/config:/prosthesis_ws/config:ro \
@@ -697,8 +697,8 @@ emg-force-grasp: ## EMG force grasp + wrist: collect (if needed) → train → l
 		-v $(CURDIR)/models:/prosthesis_ws/models:rw \
 		-e EMG_DATA_DIR="$${EMG_DATA_DIR:-/prosthesis_ws/data}" \
 		-e EMG_MODEL_DIR="$${EMG_MODEL_DIR:-/prosthesis_ws/models}" \
-		-e MIA_PORT="$${MIA_PORT:-/dev/ttyUSB0}" \
-		-e WRIST_PORT="$${WRIST_PORT:-/dev/ttyUSB1}" \
+		-e MIA_PORT="$${MIA_PORT:-/dev/ttyUSB1}" \
+		-e WRIST_PORT="$${WRIST_PORT:-/dev/ttyUSB0}" \
 		-e CONFIG_PATH="$${CONFIG_PATH:-/prosthesis_ws/tests/emg_grasp/emg_grasp_test.yaml}" \
 		-e WRIST_ENABLE="$${WRIST_ENABLE:-true}" \
 		-e FORCE_RETRAIN="$${FORCE_RETRAIN:-false}" \
@@ -715,7 +715,7 @@ emg-grasp-test: ## EMG-driven grasp test: collect → train → launch (set MOCK
 	@echo "  EMG_DEVICE=$${EMG_DEVICE:-<auto-discover>}   MindRove board IP/host"
 	@echo "  EMG_DATA_DIR=$${EMG_DATA_DIR:-/app/data}     Recording output directory"
 	@echo "  EMG_MODEL_DIR=$${EMG_MODEL_DIR:-/app/models}  Trained model directory"
-	@echo "  MIA_PORT=$${MIA_PORT:-/dev/ttyUSB0}           Mia hand serial port"
+	@echo "  MIA_PORT=$${MIA_PORT:-/dev/ttyUSB1}           Mia hand serial port"
 	@echo "  CONFIG_PATH=$${CONFIG_PATH:-tests/emg_grasp/emg_grasp_test.yaml}"
 	@echo "  WRIST_ENABLE=$${WRIST_ENABLE:-false}          Enable wrist Dynamixel"
 	@echo "  MOCK_HARDWARE=$${MOCK_HARDWARE:-false}        Skip collect/train, use mock HW"

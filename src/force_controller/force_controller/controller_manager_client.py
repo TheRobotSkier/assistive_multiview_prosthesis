@@ -29,12 +29,11 @@ from typing import Optional
 from controller_manager_msgs.msg import ControllerState
 from controller_manager_msgs.srv import (
     ListControllers,
-    ListControllersRequest,
-    ListControllersResponse,
+    ListControllers_Request,
     LoadController,
-    LoadControllerRequest,
+    LoadController_Request,
     SwitchController,
-    SwitchControllerRequest,
+    SwitchController_Request,
 )
 from rclpy.node import Node
 
@@ -49,8 +48,8 @@ class ControllerManagerClient:
     """
 
     # Strictness constants matching controller_manager_msgs/SwitchController
-    STRICT = SwitchControllerRequest.STRICT          # 2
-    BEST_EFFORT = SwitchControllerRequest.BEST_EFFORT  # 1
+    STRICT = SwitchController_Request.STRICT          # 2
+    BEST_EFFORT = SwitchController_Request.BEST_EFFORT  # 1
 
     def __init__(self, node: Node, service_ns: str = "/controller_manager") -> None:
         self._node = node
@@ -96,7 +95,7 @@ class ControllerManagerClient:
 
         Example: ``{"group_pos_ff_controller": "active", ...}``
         """
-        response = self._call_service(self._list_cli, ListControllersRequest())
+        response = self._call_service(self._list_cli, ListControllers_Request())
         return {entry.name: entry.state for entry in response.controller}
 
     # ── Controller lifecycle ─────────────────────────────────────────────
@@ -111,7 +110,7 @@ class ControllerManagerClient:
             return  # already loaded (any state)
 
         self._log.info(f"Loading controller '{name}'...")
-        req = LoadControllerRequest()
+        req = LoadController_Request()
         req.name = name
         response = self._call_service(self._load_cli, req)
         if not response.ok:
@@ -168,7 +167,7 @@ class ControllerManagerClient:
         timeout_sec: float,
     ) -> bool:
         """Execute a single switch_controller service call."""
-        req = SwitchControllerRequest()
+        req = SwitchController_Request()
         req.start_controllers = activate
         req.stop_controllers = deactivate
         req.strictness = strictness

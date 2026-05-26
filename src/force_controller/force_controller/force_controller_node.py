@@ -247,6 +247,11 @@ class ForceControllerNode(Node):
             SetBool, self._stream_switch_service
         )
         self._cm_client = ControllerManagerClient(self)
+        if not self._cm_client.wait_for_services(timeout_sec=10.0):
+            self.get_logger().warn(
+                "controller_manager services not available at startup; "
+                "will retry when needed."
+            )
 
         # ── Subscriptions ─────────────────────────────────────────────────
         self.create_subscription(
@@ -416,6 +421,15 @@ class ForceControllerNode(Node):
             self._settling_timer = None
 
         try:
+            if not self._cm_client.services_ready():
+                self.get_logger().warn(
+                    "controller_manager services not ready at switch time; "
+                    "waiting up to 5s..."
+                )
+                if not self._cm_client.wait_for_services(timeout_sec=5.0):
+                    raise RuntimeError(
+                        "controller_manager services not available after waiting"
+                    )
             self._cm_client.switch_controllers(
                 ["group_vel_ff_controller"], _competitors(["group_vel_ff_controller"])
             )
@@ -457,6 +471,15 @@ class ForceControllerNode(Node):
         self._publish_velocity([0.0] * FINGER_COUNT, force=True)
 
         try:
+            if not self._cm_client.services_ready():
+                self.get_logger().warn(
+                    "controller_manager services not ready at reset time; "
+                    "waiting up to 5s..."
+                )
+                if not self._cm_client.wait_for_services(timeout_sec=5.0):
+                    raise RuntimeError(
+                        "controller_manager services not available after waiting"
+                    )
             self._cm_client.switch_controllers(
                 ["group_pos_ff_controller"], _competitors(["group_pos_ff_controller"])
             )
@@ -488,9 +511,16 @@ class ForceControllerNode(Node):
             self._publish_status()
             return
         if not self._controller_active:
+            self.get_logger().debug(
+                f"Control tick: inactive (phase={self._hand_phase}, "
+                f"pipeline={STATE_NAMES.get(self._pipeline_state, '?')})",
+                throttle_duration_sec=5.0)
             self._publish_status()
             return
         if not self._joint_pos_received:
+            self.get_logger().warn(
+                "Control tick: no joint positions yet",
+                throttle_duration_sec=5.0)
             self._publish_status()
             return
 
@@ -500,6 +530,9 @@ class ForceControllerNode(Node):
             self._publish_status()
             return
         if not self._force_data_received:
+            self.get_logger().debug(
+                "Control tick: waiting for force data",
+                throttle_duration_sec=5.0)
             self._publish_status()
             return
 
@@ -540,7 +573,10 @@ class ForceControllerNode(Node):
     def _run_closing(self) -> None:
         contact = self._first_contact_reason()
         if contact:
-            self.get_logger().info(f"Force hold entry: {contact}")
+            self.get_logger().info(
+                f"CONTACT detected: {contact} — switching to FORCE_HOLD. "
+                f"Positions: [{', '.join(f'{p:.3f}' for p in self._positions)}] "
+                f"Forces: [{', '.join(f'{f:.0f}' for f in self._normal_forces)}]")
             self._hand_phase = "FORCE_HOLD"
             self._phase_entry_time = time.monotonic()
             self._publish_velocity([0.0] * FINGER_COUNT, force=True)
@@ -552,8 +588,18 @@ class ForceControllerNode(Node):
                 vel = self._ramp[self._ramp_idx]
                 self._ramp_idx += 1
                 self._ramp_last_advance = now
+                self.get_logger().info(
+                    f"CLOSING ramp step {self._ramp_idx}/{len(self._ramp)}: "
+                    f"vel={vel:.3f} rad/s, "
+                    f"positions=[{', '.join(f'{p:.3f}' for p in self._positions)}], "
+                    f"forces=[{', '.join(f'{f:.0f}' for f in self._normal_forces)}]")
                 self._publish_velocity([vel] * FINGER_COUNT)
         else:
+            self.get_logger().debug(
+                f"CLOSING steady: vel={self._closing_end:.3f} rad/s, "
+                f"positions=[{', '.join(f'{p:.3f}' for p in self._positions)}], "
+                f"forces=[{', '.join(f'{f:.0f}' for f in self._normal_forces)}]",
+                throttle_duration_sec=1.0)
             self._publish_velocity([self._closing_end] * FINGER_COUNT)
 
     def _run_force_hold(self) -> None:
@@ -573,6 +619,12 @@ class ForceControllerNode(Node):
             for i in range(FINGER_COUNT):
                 if self._normal_forces[i] < self._target_forces[i]:
                     velocities[i] = max(velocities[i], self._hold_max_velocity)
+        self.get_logger().info(
+            f"FORCE_HOLD: targets=[{', '.join(f'{t:.0f}' for t in self._target_forces)}] "
+            f"forces=[{', '.join(f'{f:.0f}' for f in self._normal_forces)}] "
+            f"vel=[{', '.join(f'{v:+.4f}' for v in velocities)}] "
+            f"stable={self._force_stable}",
+            throttle_duration_sec=1.0)
         self._publish_velocity(velocities)
 
     def _first_contact_reason(self) -> Optional[str]:
@@ -595,11 +647,23 @@ class ForceControllerNode(Node):
         if all_within:
             if self._stable_since is None:
                 self._stable_since = now
+                self.get_logger().info(
+                    f"Stability check: all forces within tolerance, "
+                    f"errors=[{', '.join(f'{e:.1f}' for e in force_errors)}] "
+                    f"(tol={self._stability_tol:.1f}), timing window...")
             elif (now - self._stable_since) >= self._stability_window:
                 if not self._force_stable:
-                    self.get_logger().info("Forces stabilized.")
+                    self.get_logger().info(
+                        f"Forces STABILIZED after {now - self._stable_since:.1f}s "
+                        f"(window={self._stability_window:.1f}s). "
+                        f"Final forces=[{', '.join(f'{f:.0f}' for f in self._normal_forces)}] "
+                        f"targets=[{', '.join(f'{t:.0f}' for t in self._target_forces)}]")
                 self._force_stable = True
         else:
+            if self._stable_since is not None:
+                self.get_logger().debug(
+                    f"Stability reset: errors=[{', '.join(f'{e:.1f}' for e in force_errors)}] "
+                    f"exceed tol={self._stability_tol:.1f}")
             self._stable_since = None
             self._force_stable = False
 
@@ -613,6 +677,8 @@ class ForceControllerNode(Node):
         msg.data = [float(v) for v in velocities]
         self._vel_pub.publish(msg)
         self._last_vel_cmd = list(msg.data)
+        self.get_logger().debug(
+            f"Vel cmd: [{', '.join(f'{v:+.4f}' for v in velocities)}]")
 
     def _publish_position(self, positions: list[float], force: bool = False) -> None:
         if not force and self._last_pos_cmd is not None:

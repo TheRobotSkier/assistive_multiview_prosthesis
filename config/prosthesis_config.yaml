@@ -170,15 +170,19 @@ proximity_controller:
         mrl_cmd_topic: "/mrl_pos_ff_controller/commands"
         wrist_cmd_topic: "/wrist/set_position"
         # Tuning
-        proximity_enter_threshold_m: 0.20
-        proximity_exit_threshold_m: 0.35
+        proximity_enter_threshold_m: 0.10
+        proximity_exit_threshold_m: 0.20
         partial_closure_factor: 0.3
         min_closure_amount: 0.1
         wrist_accel_deg_s2: 180.0
         control_rate_hz: 10.0
+        # TF frame parameters for grasp contact position lookup
+        grasp_contact_frame: "grasp_contact_frame"
+        map_frame: "marker_map"
         # Offset from tracked pose origin (camera) to grasp contact point
         # (fingertips), expressed in the pose's local frame.
-        # Same value as twist_propagation's propagation_origin_offset.
+        # DEPRECATED: No longer used by proximity controller — TF lookup
+        # replaces the hardcoded offset.  Kept for reference only.
         grasp_contact_offset: [0.1543, -0.1485, 0.1352]
         max_valid_proximity_distance_m: 0.75
         max_proximity_step_m: 0.25

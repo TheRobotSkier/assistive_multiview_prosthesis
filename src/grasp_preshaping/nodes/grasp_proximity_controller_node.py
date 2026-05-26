@@ -2,11 +2,14 @@
 """Grasp Proximity Controller Node.
 
 Subscribes to the twist propagation predicted contact point, planner output
-topics (closures, wrist rotation), and the current hand position, then applies
-proximity-based logic before issuing joint and wrist commands:
+topics (closures, wrist rotation), and uses TF2 to get the current grasp
+contact frame position, then applies proximity-based logic before issuing
+joint and wrist commands:
 
-  - Computes the distance from the current hand's grasp contact point
-    (fingertips) to the twist propagation predicted hit point.
+  - Looks up ``marker_map → grasp_contact_frame`` via TF2 to get the current
+    fingertip position in real time.
+  - Computes the distance from the fingertips to the twist propagation
+    predicted hit point (on the object surface).
   - If within the "near" threshold → command joints to the full planned closure.
   - Otherwise → command the wrist to the planned rotation and command joints to
     (partial_closure_factor × planned_closure).
@@ -19,10 +22,13 @@ import math
 import time
 
 import rclpy
+import rclpy.time
+import tf2_ros
 from geometry_msgs.msg import Pose, PoseStamped
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 from std_msgs.msg import Bool, Float64, Float64MultiArray, Int32
+from tf2_ros import Buffer, TransformListener
 
 try:
     from scipy.spatial.transform import Rotation as R
@@ -89,6 +95,10 @@ class GraspProximityControllerNode(Node):
         self.declare_parameter("near_enter_consecutive_samples", 3)
         self.declare_parameter("near_exit_consecutive_samples", 3)
 
+        # TF frame parameters for grasp contact position lookup
+        self.declare_parameter("grasp_contact_frame", "grasp_contact_frame")
+        self.declare_parameter("map_frame", "marker_map")
+
         # Topic name parameters
         self.declare_parameter(
             "target_closures_topic", "/grasp_preshaping/target_finger_closures"
@@ -139,6 +149,12 @@ class GraspProximityControllerNode(Node):
         self._near_exit_consecutive_samples = self.get_parameter(
             "near_exit_consecutive_samples"
         ).value
+
+        # ── TF2 ────────────────────────────────────────────────────────────
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
+        self._grasp_contact_frame = self.get_parameter("grasp_contact_frame").value
+        self._map_frame = self.get_parameter("map_frame").value
 
         # ── State ─────────────────────────────────────────────────────────────
         # Pipeline state — used to gate commands during GRASPING/HOLDING
@@ -255,7 +271,8 @@ class GraspProximityControllerNode(Node):
             f"GraspProximityController started — "
             f"enter_thresh={self._enter_thresh:.3f} m, "
             f"exit_thresh={self._exit_thresh:.3f} m, "
-            f"partial_factor={self._partial_factor}"
+            f"partial_factor={self._partial_factor}, "
+            f"TF: {self._map_frame} → {self._grasp_contact_frame}"
         )
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
@@ -395,9 +412,13 @@ class GraspProximityControllerNode(Node):
         # Contact pose is a one-time target — its age is irrelevant until
         # the pipeline mode changes, so no freshness check is needed.
 
-        dist, (dx, dy, dz) = self._compute_proximity_distance(
+        result = self._compute_proximity_distance(
             self._current_hand_pose, self._contact_pose
         )
+        if result is None:
+            # TF lookup failed — skip this control cycle
+            return
+        dist, (dx, dy, dz) = result
 
         # Sanity guards
         if not math.isfinite(dist):
@@ -479,24 +500,40 @@ class GraspProximityControllerNode(Node):
         self,
         current: PoseStamped,
         contact: Pose,
-    ) -> tuple[float, tuple[float, float, float]]:
-        """Compute distance from current hand to the predicted contact point.
+    ) -> tuple[float, tuple[float, float, float]] | None:
+        """Compute distance from current grasp contact to the predicted hit point.
 
-        The current hand position is shifted from the tracked pose origin
-        (camera) to the grasp contact point (fingertips) using
-        ``_grasp_contact_offset``.  The contact point comes from twist
-        propagation and is already at the predicted fingertip contact
-        location, so no offset is applied to it.
+        Uses TF2 to look up the ``map_frame → grasp_contact_frame`` transform,
+        giving the exact current fingertip position in ``marker_map``.  The
+        contact point comes from twist propagation (object surface hit point)
+        and is also in ``marker_map``.  No hardcoded offset is needed.
 
         Returns:
-            (euclidean_distance, (dx, dy, dz)) where dx/dy/dz are the
-            signed per-axis offsets from contact to current grasp contact.
+            (euclidean_distance, (dx, dy, dz)) on success, or *None* if the
+            TF lookup fails (caller should skip the control cycle).
         """
-        cur_pos = self._apply_offset(current.pose, self._grasp_contact_offset)
-        contact_pos = (contact.position.x, contact.position.y, contact.position.z)
-        dx = cur_pos[0] - contact_pos[0]
-        dy = cur_pos[1] - contact_pos[1]
-        dz = cur_pos[2] - contact_pos[2]
+        try:
+            transform = self._tf_buffer.lookup_transform(
+                self._map_frame,
+                self._grasp_contact_frame,
+                rclpy.time.Time(),
+            )
+        except (
+            tf2_ros.LookupException,
+            tf2_ros.ConnectivityException,
+            tf2_ros.ExtrapolationException,
+        ) as exc:
+            self.get_logger().warn(
+                f"TF lookup {self._map_frame} → {self._grasp_contact_frame} "
+                f"failed: {exc}",
+                throttle_duration_sec=2.0,
+            )
+            return None
+
+        t = transform.transform.translation
+        dx = t.x - contact.position.x
+        dy = t.y - contact.position.y
+        dz = t.z - contact.position.z
         return math.sqrt(dx * dx + dy * dy + dz * dz), (dx, dy, dz)
 
     @staticmethod
