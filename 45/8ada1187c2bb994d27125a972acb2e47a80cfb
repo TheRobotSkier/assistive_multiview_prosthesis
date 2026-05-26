@@ -1,0 +1,30 @@
+config/prosthesis_config.yaml
+  s_49be02aac4126b::t_f05685b72064f8 42-49
+src/mia_hand_driver/src/mia_hand_driver/cpp_driver.cpp
+  s_49be02aac4126b::t_8bdb478ec1b874 1322,1345-1381
+src/mia_hand_driver/src/mia_hand_driver/ros_driver.cpp
+  s_49be02aac4126b::t_247681b907c224 43-44
+src/mia_hand_driver/include/mia_hand_driver/cpp_driver.hpp
+  s_49be02aac4126b::t_e6d388a49a870b 401-407,414
+src/command_bridge/command_bridge/command_bridge_node.py
+  s_49be02aac4126b::t_096289dac08685 148-149,151-155,157,160-162,167,176,182,186,204,208-211,213-223
+  s_49be02aac4126b::t_be07eb5cc65442 156,171-175,177-181,183,192,205,212
+  s_49be02aac4126b::t_ce13a7855d7cf7 129-136
+  s_49be02aac4126b::t_808bffa74cd257 75-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "458ada1187c2bb994d27125a972acb2e47a80cfb",
+  "prompts": {},
+  "sessions": {
+    "s_49be02aac4126b": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19e691c7effekYuwEAuE6Mch0n",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
