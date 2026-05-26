@@ -46,7 +46,7 @@ quality:
 correction:
   enabled: true
   enable_periodic_marker_correction: true
-  periodic_correction_interval_s: 1.0
+  periodic_correction_interval_s: 0.2
   reanchor_cooldown_s: 1.0
   max_periodic_translation_correction_m: 0.10
   max_periodic_rotation_correction_deg: 5.0
