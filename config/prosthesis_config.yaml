@@ -140,6 +140,16 @@ proximity_controller:
         # (fingertips), expressed in the pose's local frame.
         # Same value as twist_propagation's propagation_origin_offset.
         grasp_contact_offset: [0.1543, -0.1485, -0.1352]
+        max_valid_proximity_distance_m: 0.75
+        max_proximity_step_m: 0.25
+        wrist_min_deg: 5.0
+        wrist_max_deg: 300.0
+        wrist_neutral_deg: 140.0
+        max_wrist_delta_deg: 90.0
+        command_repeat_period_s: 1.0
+        command_epsilon: 0.005
+        near_enter_consecutive_samples: 3
+        near_exit_consecutive_samples: 3
 
 preshaping_service:
     ros__parameters:
@@ -450,7 +460,7 @@ _reference:
         # ── Proximity Execution ──────────────────────────────────────────────
         execution:
             proximity_enter_threshold_m: 0.08
-            proximity_exit_threshold_m: 0.10
+            proximity_exit_threshold_m: 0.20
             partial_closure_factor: 0.3
             min_closure_amount: 0.1
             wrist_accel_deg_s2: 180.0
