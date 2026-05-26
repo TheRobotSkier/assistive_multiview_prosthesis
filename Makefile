@@ -63,7 +63,7 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -152,6 +152,15 @@ run: up-hw
 		-e WRIST_SERIAL_PORT="$$DETECTED_WRIST_PORT" \
 		prosthesis /bin/bash -lc 'make setup-usb' && \
 	$(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run'
+
+run-emg-grasp: up-hw
+	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
+	echo "[host] Detected: MIA=$$DETECTED_MIA_PORT  WRIST=$$DETECTED_WRIST_PORT" && \
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec \
+		-e MIA_SERIAL_PORT="$$DETECTED_MIA_PORT" \
+		-e WRIST_SERIAL_PORT="$$DETECTED_WRIST_PORT" \
+		prosthesis /bin/bash -lc 'make setup-usb' && \
+	$(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-emg-grasp'
 
 camera-test: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make camera-test'
