@@ -63,7 +63,7 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis
+.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -79,7 +79,11 @@ help:
 	@echo ""
 	@echo "  Test 1 — Software Verification:"
 	@echo "    make test1-tier-a           Run Tier A (latency + occlusion, host)"
-	@echo "    make test1-tier-b           Run Tier B (full ROS pipeline, Docker)"
+	@echo "    make test1-mock             Start mock ROS system (Docker, background)"
+	@echo "    make test1-mock-check       Check if mock system is ready"
+	@echo "    make test1-mock-stop        Stop mock system"
+	@echo "    make test1-tier-b           Run Tier B (full ROS pipeline, needs mock)"
+	@echo "    make test1-rebuild          Rebuild ROS packages in container"
 	@echo "    make test1-analysis         Generate figures from results (host)"
 	@echo ""
 	@echo "  Testing:"
@@ -682,25 +686,65 @@ test1-tier-a:
 	GRASP_PRESHAPING_HOME=src/grasp_preshaping \
 	python3 tests/test1_software_verification/run.py
 
+test1-mock: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec -d \
+		-e CYCLONEDDS_URI=/prosthesis_ws/config/cyclonedds_local.xml \
+		prosthesis /bin/bash -c '\
+		source /opt/ros/jazzy/setup.bash && \
+		source /prosthesis_ws/install/setup.bash && \
+		ros2 launch prosthesis_launch mock.launch.py use_rviz:=false'
+	@echo "Mock system starting... wait ~10s for topics to appear."
+	@echo "Check readiness:  make test1-mock-check"
+
+test1-mock-stop: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -c '\
+		kill $$(pgrep -f "mock.launch.py" | grep -v $$$$) 2>/dev/null; \
+		pkill pipeline_manager 2>/dev/null; \
+		pkill preshaping_serv 2>/dev/null; \
+		pkill twist_propagati 2>/dev/null; \
+		pkill segmentation_ro 2>/dev/null; \
+		pkill mock_cloud_pub 2>/dev/null; \
+		pkill force_controlle 2>/dev/null; \
+		pkill grasp_proximity 2>/dev/null; \
+		pkill static_transfor 2>/dev/null; \
+		exit 0'
+	@echo "Mock system stopped."
+
+test1-mock-check: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec \
+		-e CYCLONEDDS_URI=/prosthesis_ws/config/cyclonedds_local.xml \
+		prosthesis /bin/bash -c '\
+		source /opt/ros/jazzy/setup.bash && \
+		source /prosthesis_ws/install/setup.bash && \
+		ros2 topic list 2>/dev/null | grep -E "grasp_preshaping|pipeline" || \
+		echo "Mock not ready yet. Wait and retry."'
+
 test1-tier-b: dev
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -lc 'make test1-tier-b-internal'
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec \
+		-e CYCLONEDDS_URI=/prosthesis_ws/config/cyclonedds_local.xml \
+		prosthesis /bin/bash -c '\
+		source /opt/ros/jazzy/setup.bash && \
+		source /prosthesis_ws/install/setup.bash && \
+		if ! ros2 topic list 2>/dev/null | grep -q /grasp_preshaping/grasp_type; then \
+			echo "ERROR: Mock system not running. Start it first:"; \
+			echo "  make test1-mock"; \
+			exit 1; \
+		fi; \
+		python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py'
+
+test1-rebuild: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -c '\
+		source /opt/ros/jazzy/setup.bash && \
+		source /prosthesis_ws/install/setup.bash && \
+		cd /prosthesis_ws && \
+		colcon build --packages-select pipeline_manager twist_propagation prosthesis_launch'
+	@echo "Rebuilt pipeline_manager, twist_propagation, prosthesis_launch."
+	@echo "Restart the mock (make test1-mock-stop && make test1-mock) to pick up changes."
 
 test1-analysis:
 	GRASP_PRESHAPING_LIB_PATH=src/grasp_preshaping/lib/libgrasp_preshaping.so \
 	GRASP_PRESHAPING_HOME=src/grasp_preshaping \
 	python3 tests/test1_software_verification/plot_results.py
-
-# ── Internal targets (called from inside container) ────────────────────────
-
-# Runs Tier B inside the prosthesis container. Requires mock.launch.py running.
-test1-tier-b-internal:
-	@echo "=== Test 1 Tier B: Full ROS Pipeline Latency ==="
-	@if ! ros2 topic list 2>/dev/null | grep -q /grasp_preshaping/grasp_type; then \
-		echo "ERROR: Mock system not running. Start it first:"; \
-		echo "  ros2 launch prosthesis_launch mock.launch.py"; \
-		exit 1; \
-	fi
-	python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py
 
 # ── Static Grasp Test ──────────────────────────────────────────────────────
 

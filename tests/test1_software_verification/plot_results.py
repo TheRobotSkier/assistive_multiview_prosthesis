@@ -6,7 +6,7 @@ Reads CSV files from results/ and produces PDF figures in figures/.
 Usage:
     python plot_results.py
     python plot_results.py --format png     # PNG instead of PDF
-    python plot_results.py --dpi 300        # higher resolution
+    python plot_results.py --dpi 600        # higher resolution
 """
 
 import argparse
@@ -43,7 +43,7 @@ COLORS = {
     "grid": "#bdc3c7",         # Light grid
 }
 
-def _save_fig(fig, name: str, fmt: str = "pdf", dpi: int = 150):
+def _save_fig(fig, name: str, fmt: str = "png", dpi: int = 300):
     """Save a matplotlib figure with project styling."""
     import matplotlib
     matplotlib.use("Agg")
@@ -991,7 +991,7 @@ def plot_synthetic_setup(fmt: str, dpi: int):
 # Figure 11: Per-stage latency waterfall chart
 # ---------------------------------------------------------------------------
 
-def plot_per_stage_waterfall(fmt: str = "pdf", dpi: int = 150):
+def plot_per_stage_waterfall(fmt: str = "png", dpi: int = 300):
     """Waterfall chart showing cumulative latency from EMG to command."""
     import matplotlib
     matplotlib.use("Agg")
@@ -1483,10 +1483,10 @@ def plot_score_vs_samples(fmt: str, dpi: int):
 
 def main():
     parser = argparse.ArgumentParser(description="Generate Test 1 figures")
-    parser.add_argument("--format", default="pdf", choices=["pdf", "png"],
-                        help="Output format (default: pdf)")
-    parser.add_argument("--dpi", type=int, default=150,
-                        help="Resolution for raster formats (default: 150)")
+    parser.add_argument("--format", default="png", choices=["pdf", "png"],
+                        help="Output format (default: png)")
+    parser.add_argument("--dpi", type=int, default=300,
+                        help="Resolution for raster formats (default: 300)")
     args = parser.parse_args()
 
     os.makedirs(FIGURES_DIR, exist_ok=True)

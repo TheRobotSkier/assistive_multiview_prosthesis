@@ -17,6 +17,7 @@ import os
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
+from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, Command
 
 
@@ -32,6 +33,12 @@ if not os.path.isfile(DEFAULT_CONFIG):
 
 
 def generate_launch_description():
+    rviz_arg = DeclareLaunchArgument(
+        "use_rviz",
+        default_value="true",
+        description="Launch RViz (set false for headless testing)",
+    )
+
     config_arg = DeclareLaunchArgument(
         "config_file",
         default_value=DEFAULT_CONFIG,
@@ -116,6 +123,7 @@ def generate_launch_description():
         name="rviz2",
         arguments=["-d", rviz_config],
         output="screen",
+        condition=IfCondition(LaunchConfiguration("use_rviz")),
     )
 
     # Static TF: camera_color_optical_frame → world (identity)
@@ -138,6 +146,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             config_arg,
+            rviz_arg,
             camera_tf,
             mock_cloud,
             mock_emg,

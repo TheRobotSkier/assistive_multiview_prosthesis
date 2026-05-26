@@ -1,0 +1,7 @@
+<CycloneDDS>
+  <Domain Id="0">
+    <General>
+      <AllowMulticast>true</AllowMulticast>
+    </General>
+  </Domain>
+</CycloneDDS>

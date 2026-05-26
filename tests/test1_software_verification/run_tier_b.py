@@ -84,9 +84,10 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
     import numpy as np
     import rclpy
     from rclpy.node import Node
+    from rclpy.qos import QoSProfile, DurabilityPolicy
     from geometry_msgs.msg import PoseStamped, TwistStamped, Vector3
     from sensor_msgs.msg import PointCloud2, PointField
-    from std_msgs.msg import Header, Int32, Float64MultiArray
+    from std_msgs.msg import Header, Int32, Float32, Float64MultiArray, Bool
     from std_srvs.srv import Trigger
 
     print("=" * 60)
@@ -126,6 +127,22 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
         TwistStamped, "/hand_twist", 10)
     emg_pub = node.create_publisher(
         Int32, "/emg/gesture_label", 10)
+    emg_conf_pub = node.create_publisher(
+        Float32, "/emg/confidence", 10)
+    hit_pub = node.create_publisher(
+        Bool, "/twist_propagation/hit_detected",
+        QoSProfile(depth=10, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+
+    # ── State monitoring ─────────────────────────────────────────────────
+    pipeline_state = {"value": None}
+    state_received = threading.Event()
+
+    def on_pipeline_state(msg: Int32):
+        pipeline_state["value"] = msg.data
+        state_received.set()
+
+    node.create_subscription(Int32, "/pipeline/state",
+                             on_pipeline_state, 10)
 
     # ── Service client ──────────────────────────────────────────────────
     compute_client = node.create_client(
@@ -149,14 +166,30 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
     node.create_subscription(Int32, "/grasp_preshaping/grasp_type",
                              on_grasp_type, 10)
 
-    # Wait for publishers to connect
+    # Wait for publishers to connect and pipeline to be ready
     print("\nWaiting for publishers to establish connections...")
     time.sleep(1.5)
+
+    # Publish initial confidence so EMG gestures are accepted
+    conf_msg = Float32()
+    conf_msg.data = 1.0
+    for _ in range(5):
+        emg_conf_pub.publish(conf_msg)
+        time.sleep(0.1)
 
     # Spin in a background thread for callback processing
     spin_thread = threading.Thread(
         target=lambda: rclpy.spin(node), daemon=True)
     spin_thread.start()
+
+    # Reset pipeline to IDLE (in case it's in a stale state from a prior run)
+    open_gesture = Int32()
+    open_gesture.data = 2  # GESTURE_OPEN
+    for _ in range(20):
+        emg_pub.publish(open_gesture)
+        emg_conf_pub.publish(conf_msg)
+        time.sleep(0.1)
+    time.sleep(0.5)
 
     rows = []
 
@@ -207,20 +240,22 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
 
         # ── Run repetitions ─────────────────────────────────────────────
         for rep in range(repetitions):
-            # Publish input data (ensure preshaping bridge has latest)
-            now = node.get_clock().now().to_msg()
-            cloud_msg.header.stamp = now
-            cloud_pub.publish(cloud_msg)
-            pose_msg.header.stamp = now
-            pose_pub.publish(pose_msg)
-            twist_msg.header.stamp = now
-            twist_pub.publish(twist_msg)
-
-            # Allow messages to propagate
-            time.sleep(0.1)
-
             # ── Method A: Full EMG path ──────────────────────────────────
             if method in ("emg", "both"):
+                # 1. Publish pose/twist (available for twist propagation)
+                now = node.get_clock().now().to_msg()
+                pose_msg.header.stamp = now
+                pose_pub.publish(pose_msg)
+                twist_msg.header.stamp = now
+                twist_pub.publish(twist_msg)
+                time.sleep(0.1)
+
+                # 2. Ensure high confidence so EMG gestures are accepted
+                for _ in range(3):
+                    emg_conf_pub.publish(conf_msg)
+                    time.sleep(0.05)
+
+                # 3. Send POWER gesture and hold for > gesture_hold_timeout_s
                 with lock:
                     emg_result.clear()
                     emg_result["t_start"] = time.perf_counter()
@@ -230,12 +265,32 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
                     emg_result["n_cloud_points"] = len(cloud_points)
                     emg_received.clear()
 
-                # Inject EMG gesture (POWER = 1)
-                emg_msg = Int32()
-                emg_msg.data = 1  # GESTURE_POWER
-                emg_pub.publish(emg_msg)
+                emg_power = Int32()
+                emg_power.data = 1  # GESTURE_POWER
+                # Hold POWER for 1.5s (> gesture_hold_timeout_s=1.0)
+                for _ in range(15):
+                    emg_pub.publish(emg_power)
+                    emg_conf_pub.publish(conf_msg)
+                    time.sleep(0.1)
 
-                # Wait for grasp_type output
+                # 4. Wait for TWISTING state, then trigger hit detection
+                state_received.clear()
+                if state_received.wait(timeout=3.0) and pipeline_state["value"] == 1:
+                    # State 1 = TWISTING — publish hit detection
+                    hit_msg = Bool()
+                    hit_msg.data = True
+                    hit_pub.publish(hit_msg)
+                    time.sleep(0.2)
+
+                    # 5. Wait for SEGMENTING state, then publish cloud
+                    state_received.clear()
+                    if state_received.wait(timeout=3.0) and pipeline_state["value"] == 2:
+                        # State 2 = SEGMENTING — publish cloud with fresh timestamp
+                        now = node.get_clock().now().to_msg()
+                        cloud_msg.header.stamp = now
+                        cloud_pub.publish(cloud_msg)
+
+                # 6. Wait for grasp_type output (end of pipeline)
                 if emg_received.wait(timeout=15.0):
                     row = {
                         "object": obj_name,
@@ -264,8 +319,11 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
 
                 # Reset pipeline manager to IDLE by sending OPEN gesture
                 open_msg = Int32()
-                open_msg.data = 3  # GESTURE_OPEN
-                emg_pub.publish(open_msg)
+                open_msg.data = 2  # GESTURE_OPEN
+                for _ in range(15):
+                    emg_pub.publish(open_msg)
+                    emg_conf_pub.publish(conf_msg)
+                    time.sleep(0.1)
                 time.sleep(0.5)
 
             # ── Method B: Direct service call ────────────────────────────
