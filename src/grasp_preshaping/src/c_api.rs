@@ -107,7 +107,7 @@ pub struct GraspComputeResponseFFI {
     pub wrist_qy: f64,
     pub wrist_qz: f64,
     pub wrist_qw: f64,
-    /// Wrist rotation angle in degrees [0, 360).
+    /// Wrist rotation angle in degrees (signed delta from current position).
     pub wrist_rotation_deg: f64,
 }
 
@@ -172,7 +172,7 @@ struct ComputeOutput {
     target_position: [f64; 3],
     /// Wrist orientation quaternion [qx, qy, qz, qw].
     wrist_quaternion: [f64; 4],
-    /// Wrist rotation angle in degrees [0, 360).
+    /// Wrist rotation angle in degrees (signed delta from current position).
     wrist_rotation_deg: f64,
 }
 
@@ -602,7 +602,7 @@ fn compute_from_request(request: &GraspComputeRequestFFI) -> Result<ComputeOutpu
     let uq = nalgebra::UnitQuaternion::from_rotation_matrix(&rot3);
     let q = uq.quaternion();
     let wrist_quaternion = [q.i, q.j, q.k, q.w];
-    let wrist_rotation_deg = particles[best_idx].wrist_rotation.to_degrees().rem_euclid(360.0);
+    let wrist_rotation_deg = particles[best_idx].wrist_rotation.to_degrees();
     let pipeline_time_ms = pipeline_start.elapsed().as_millis() as u32;
     let (second_best_combined_score, second_best_grasp_type) = match second_best {
         Some(grasp) => (grasp.combined, grasp.grasp_type.to_ffi()),
