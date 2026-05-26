@@ -72,6 +72,8 @@ class CommandBridgeNode(Node):
         self.declare_parameter("joint_states_topic", "/joint_states")
         self.declare_parameter("joint_stream_switch", "data_streams/joints/positions/switch")
         self.declare_parameter("default_speed_percent", 80)
+        self.declare_parameter("command_epsilon", 0.005)
+        self.declare_parameter("min_command_interval_s", 0.20)
 
         speed_pct = self.get_parameter("default_speed_percent").value
 
@@ -124,6 +126,14 @@ class CommandBridgeNode(Node):
         self._speed_pct = speed_pct
         self._stream_activated = False
 
+        # Per-finger command coalescing state
+        self._command_epsilon = self.get_parameter("command_epsilon").value
+        self._min_interval_s = self.get_parameter("min_command_interval_s").value
+        self._last_sent_targets: dict[str, float] = {}
+        self._latest_targets: dict[str, float] = {}
+        self._in_flight: dict[str, bool] = {}
+        self._last_send_time: dict[str, float] = {}
+
         # ── Activate joint position stream ────────────────────────────────
         # Retry periodically until the driver is available.
         self._activate_timer = self.create_timer(2.0, self._try_activate_stream)
@@ -135,30 +145,51 @@ class CommandBridgeNode(Node):
 
     # ── Command forwarding ────────────────────────────────────────────────
 
-    def _on_cmd(
-        self, msg: Float64MultiArray, srv_client: rclpy.client.Client, finger: str
+    def _try_send(
+        self, srv_client: rclpy.client.Client, finger: str
     ) -> None:
-        """Forward a position command to the corresponding trajectory service."""
-        if not msg.data:
-            self.get_logger().warn(f"Empty command on {finger} — ignoring")
+        """Attempt to send the latest target for *finger* to the driver.
+
+        No-ops when a call is already in flight, the service is not ready,
+        or the latest target hasn't changed beyond epsilon within the
+        minimum interval.
+        """
+        if self._in_flight.get(finger, False):
             return
 
-        target_angle = float(msg.data[0])
+        target = self._latest_targets.get(finger)
+        if target is None:
+            return
 
         if not srv_client.service_is_ready():
             self.get_logger().warn(
                 f"Service for {finger} not ready — dropping command "
-                f"(angle={target_angle:.4f} rad)"
+                f"(angle={target:.4f} rad)"
             )
             return
 
+        last_sent = self._last_sent_targets.get(finger)
+        now = time.time()
+        last_time = self._last_send_time.get(finger, 0.0)
+        if (
+            last_sent is not None
+            and abs(target - last_sent) <= self._command_epsilon
+            and (now - last_time) < self._min_interval_s
+        ):
+            return
+
+        self._in_flight[finger] = True
+        self._last_sent_targets[finger] = target
+        self._last_send_time[finger] = now
+
         req = SetJointTraj.Request()
-        req.target_angle = target_angle
+        req.target_angle = target
         req.spe_for_percent = self._speed_pct
 
         future = srv_client.call_async(req)
 
         def on_response(fut: object) -> None:
+            self._in_flight[finger] = False
             try:
                 result = fut.result()
                 if not result.success:
@@ -170,7 +201,26 @@ class CommandBridgeNode(Node):
                     f"Service call failed for {finger}: {exc}"
                 )
 
+            self._try_send(srv_client, finger)
+
         future.add_done_callback(on_response)
+
+    def _on_cmd(
+        self, msg: Float64MultiArray, srv_client: rclpy.client.Client, finger: str
+    ) -> None:
+        """Forward a position command to the corresponding trajectory service.
+
+        Coalesces commands per-finger: skips duplicates within epsilon,
+        avoids stacking parallel service calls for the same finger, and
+        enforces a minimum send interval.
+        """
+        if not msg.data:
+            self.get_logger().warn(f"Empty command on {finger} — ignoring")
+            return
+
+        target_angle = float(msg.data[0])
+        self._latest_targets[finger] = target_angle
+        self._try_send(srv_client, finger)
 
     # ── Joint state translation ───────────────────────────────────────────
 

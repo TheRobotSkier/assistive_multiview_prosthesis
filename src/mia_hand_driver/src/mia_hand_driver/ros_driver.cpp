@@ -40,6 +40,8 @@ bool RosDriver::init(std::shared_ptr<rclcpp::Node>& node)
   if (nullptr != mia_hand_)
   {
     std::string serial_port = node_->declare_parameter("serial_port", "/dev/ttyUSB0");
+    int ack_timeout_ms = node_->declare_parameter("ack_timeout_ms", 50);
+    mia_hand_->set_ack_timeout_ms(ack_timeout_ms);
 
     init_topics();
     init_srvs();
