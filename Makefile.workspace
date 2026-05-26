@@ -102,6 +102,13 @@ run: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
 	$(ROS_WORKSPACE_SETUP) && \
 	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
 
+run-emg-grasp: ## Build + launch EMG-triggered grasp pipeline (no perception)
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
+	ros2 launch prosthesis_launch simple_emg_grasp.launch.py
+
 digital-twin: ## Launch digital twin with real cameras
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch digital_twin.launch.py camera:=true gui:=true

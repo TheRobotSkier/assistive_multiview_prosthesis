@@ -130,6 +130,33 @@ pipeline_manager:
         # Live config path (empty = disable polling)
         emg_live_config_path: "/prosthesis_ws/config/emg_live.yaml"
 
+simple_pipeline_manager:
+    ros__parameters:
+        # Topic / service names
+        emg_gesture_topic: "/emg/gesture_label"
+        emg_confidence_topic: "/emg/confidence"
+        emg_proportional_topic: "/emg/proportional"
+        force_status_topic: "/force_controller/status"
+        pipeline_state_topic: "/pipeline/state"
+        pipeline_state_name_topic: "/pipeline/state_name"
+        wrist_cmd_topic: "/wrist/set_position"
+        # Tuning
+        gesture_hold_timeout_s: 1.0
+        gesture_confidence_threshold: 0.7
+        release_gesture: 2
+        state_publish_rate_hz: 5.0
+        # Default wrist preshape applied on IDLE -> GRASPING
+        default_wrist_preshape_deg: 180.0
+        wrist_preshape_accel_deg_s2: 180.0
+        wrist_preshape_delay_s: 0.5
+        # Volitional mode control
+        volitional_force_adjust_step: 1.0
+        volitional_wrist_velocity_scale: 45.0
+        volitional_entry_delay_s: 0.5
+        wrist_velocity_scale: 45.0
+        # Live config path (empty = disable polling)
+        emg_live_config_path: "/prosthesis_ws/config/emg_live.yaml"
+
 proximity_controller:
     ros__parameters:
         # Topic names

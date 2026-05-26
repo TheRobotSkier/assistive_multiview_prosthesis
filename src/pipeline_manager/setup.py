@@ -20,6 +20,7 @@ setup(
     entry_points={
         'console_scripts': [
             'pipeline_manager_node = pipeline_manager.pipeline_manager_node:main',
+            'simple_pipeline_manager_node = pipeline_manager.simple_pipeline_manager_node:main',
             'mock_cloud_publisher = pipeline_manager.mock_cloud_publisher:main',
             'hand_trajectory_publisher = pipeline_manager.hand_trajectory_publisher:main',
         ],
