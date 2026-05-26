@@ -11,6 +11,10 @@ frames:
   detected_camera_frame: head_d435i_head_color_optical_frame
   imu_frame: imu
 
+  # Corrected camera frame published under the ArUco-corrected IMU TF branch.
+  # Used by pointcloud_to_frame_node to transform clouds through the corrected pose.
+  corrected_camera_frame: head_cam0_corrected
+
 # OpenVINS/Kalibr camera-IMU calibration.
 # This gives the node camera intrinsics, distortion, and T_cam_imu.
 calibration:

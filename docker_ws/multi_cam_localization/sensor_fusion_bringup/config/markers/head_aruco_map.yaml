@@ -12,6 +12,10 @@ frames:
   # Must match the Phase 2 OpenVINS launch marker_target_frame / imu_frame_id.
   imu_frame: head_imu
 
+  # Corrected camera frame published under the ArUco-corrected IMU TF branch.
+  # Used by pointcloud_to_frame_node to transform clouds through the corrected pose.
+  corrected_camera_frame: head_cam0_corrected
+
 # OpenVINS/Kalibr camera-IMU calibration.
 # This gives the node camera intrinsics, distortion, and T_cam_imu.
 calibration:

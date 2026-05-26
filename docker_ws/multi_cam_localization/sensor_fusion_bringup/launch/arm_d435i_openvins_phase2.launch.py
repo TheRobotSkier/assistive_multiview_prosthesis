@@ -123,7 +123,7 @@ def generate_launch_description():
             {"input_topic": "/arm/d435i_arm/depth/color/points"},
             {"output_topic": "/arm/d435i_arm/points_marker_map"},
             {"target_frame": "marker_map"},
-            {"camera_pose_frame": "arm_cam0"},
+            {"camera_pose_frame": "arm_cam0_corrected"},
             {"camera_color_optical_frame": "arm_d435i_arm_color_optical_frame"},
             {"marker_map_locked_topic": "/ov_msckf_arm/marker_map_locked"},
             {"require_marker_map_locked": ParameterValue(LaunchConfiguration("pointcloud_require_marker_map_locked"), value_type=bool)},

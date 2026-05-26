@@ -655,8 +655,25 @@ class ArucoMarkerPoseNode(Node):
         self.detected_camera_frame = self.config["frames"].get("detected_camera_frame", self.camera_frame)
         self.imu_frame = self.config["frames"].get("imu_frame", "imu")
 
+        # Corrected camera frame for pointcloud alignment. If set, the node
+        # publishes a TF from {imu_frame}_openvins_corrected to this frame so
+        # that pointcloud_to_frame_node can use the ArUco-corrected camera pose
+        # instead of the raw OpenVINS branch.
+        self.corrected_camera_frame = self.config["frames"].get("corrected_camera_frame", "")
+        self.publish_corrected_camera_tf = bool(self.corrected_camera_frame)
+        self.T_imu_cam: Optional[np.ndarray] = None
+        self.corrected_imu_frame: str = ""
+        if self.publish_corrected_camera_tf:
+            self.corrected_imu_frame = f"{self.imu_frame}_openvins_corrected"
+
         calib_path = self.config["calibration"]["kalibr_imucam_chain"]
         self.K, self.D, self.T_cam_imu, self.timeshift_cam_imu = load_kalibr_imucam(calib_path)
+
+        # Compute T_imu_cam after Kalibr load. T_cam_imu maps IMU frame into
+        # camera optical frame; the inverse maps camera optical into IMU frame,
+        # which is what the TF {imu}_corrected -> {cam}_corrected needs.
+        if self.publish_corrected_camera_tf:
+            self.T_imu_cam = T_inv(self.T_cam_imu)
 
         topics_cfg = self.config.get("topics", {})
         self.image_topic = topics_cfg.get("image", "/head/d435i_head/color/image_raw")
@@ -867,6 +884,12 @@ class ArucoMarkerPoseNode(Node):
         if self.dynamic_markers:
             self.get_logger().info(f"Dynamic marker observation topic: {self.dynamic_observation_topic}")
         self.get_logger().info(f"Kalibr timeshift_cam_imu: {self.timeshift_cam_imu:.6f} s")
+        if self.publish_corrected_camera_tf:
+            self.get_logger().info(
+                f"Corrected camera TF: {self.corrected_imu_frame} -> {self.corrected_camera_frame}"
+            )
+        else:
+            self.get_logger().info("Corrected camera TF: disabled (no corrected_camera_frame in config)")
         if self.marker_detection_rate_hz > 0.0:
             self.get_logger().info(f"Marker detection rate limit: {self.marker_detection_rate_hz:.2f} Hz")
         else:
@@ -1960,6 +1983,16 @@ class ArucoMarkerPoseNode(Node):
         self.fill_corrected_twist(out, msg, T_global_imu, stamp_to_sec(msg.header.stamp))
         self.corrected_odom_pub.publish(out)
         self.publish_tf(msg.header.stamp, self.map_frame, out.child_frame_id, T_map_imu_corrected)
+
+        # Publish corrected camera frame so pointcloud_to_frame_node can look up
+        # marker_map -> {cam}0_corrected through the ArUco-corrected branch.
+        if self.publish_corrected_camera_tf:
+            self.publish_tf(
+                msg.header.stamp,
+                self.corrected_imu_frame,
+                self.corrected_camera_frame,
+                self.T_imu_cam,
+            )
 
     def corrected_pose_covariance_diag(self, msg: Odometry) -> np.ndarray:
         P_ov_diag = pose_covariance_diag(msg, self.default_pose_cov_diag)
