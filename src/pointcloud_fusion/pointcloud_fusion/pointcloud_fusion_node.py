@@ -202,6 +202,69 @@ def _voxel_sample_xyz(
     return sample.astype(np.float32)
 
 
+def _voxel_sample_xyzrgb(
+    xyz: np.ndarray,
+    rgb_packed: np.ndarray,
+    voxel_size: float,
+    max_points: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Downsample XYZ + RGB for registration and cap to max_points.
+
+    Returns (xyz_sample, rgb_sample) with matching lengths.
+    """
+    if len(xyz) == 0:
+        return (
+            np.zeros((0, 3), dtype=np.float32),
+            np.zeros(0, dtype=np.uint32),
+        )
+    finite = np.isfinite(xyz).all(axis=1)
+    s_xyz = xyz[finite].astype(np.float32)
+    s_rgb = rgb_packed[finite].copy()
+    if len(s_xyz) == 0:
+        return s_xyz, s_rgb
+    if voxel_size > 0.0:
+        s_xyz, s_rgb = _voxel_downsample(s_xyz, s_rgb, voxel_size)
+    if max_points > 0 and len(s_xyz) > max_points:
+        rng = np.random.default_rng()
+        keep = rng.choice(len(s_xyz), max_points, replace=False)
+        s_xyz = s_xyz[keep]
+        s_rgb = s_rgb[keep]
+    return s_xyz.astype(np.float32), s_rgb
+
+
+def _rgb_to_lab(rgb_packed: np.ndarray) -> np.ndarray:
+    """Convert packed 0x00RRGGBB to approximate Lab (N,3) float32.
+
+    Uses a fast sRGB→linear→XYZ→Lab approximation suitable for
+    perceptual color distance without needing a full colour-science lib.
+    """
+    r = ((rgb_packed >> 16) & 0xFF).astype(np.float32) / 255.0
+    g = ((rgb_packed >> 8) & 0xFF).astype(np.float32) / 255.0
+    b = (rgb_packed & 0xFF).astype(np.float32) / 255.0
+    # sRGB -> linear
+    r = np.where(r > 0.04045, ((r + 0.055) / 1.055) ** 2.4, r / 12.92)
+    g = np.where(g > 0.04045, ((g + 0.055) / 1.055) ** 2.4, g / 12.92)
+    b = np.where(b > 0.04045, ((b + 0.055) / 1.055) ** 2.4, b / 12.92)
+    # linear -> XYZ (D65)
+    x = 0.4124564 * r + 0.3575761 * g + 0.1804375 * b
+    y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b
+    z = 0.0193339 * r + 0.1191920 * g + 0.9503041 * b
+    # XYZ -> Lab
+    xn, yn, zn = 0.95047, 1.0, 1.08883
+    x /= xn
+    y /= yn
+    z /= zn
+    eps = 0.008856
+    kappa = 903.3
+    fx = np.where(x > eps, np.cbrt(x), (kappa * x + 16.0) / 116.0)
+    fy = np.where(y > eps, np.cbrt(y), (kappa * y + 16.0) / 116.0)
+    fz = np.where(z > eps, np.cbrt(z), (kappa * z + 16.0) / 116.0)
+    L = 116.0 * fy - 16.0
+    a = 500.0 * (fx - fy)
+    b_out = 200.0 * (fy - fz)
+    return np.column_stack([L, a, b_out]).astype(np.float32)
+
+
 def _estimate_rigid_transform(src: np.ndarray, tgt: np.ndarray):
     """Return R,t that maps src onto tgt using Kabsch/SVD."""
     if len(src) < 3 or len(tgt) < 3 or len(src) != len(tgt):
@@ -329,19 +392,23 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("global_max_iterations", 250)
         self.declare_parameter("global_candidate_count", 120)
         self.declare_parameter("global_correspondence_distance_m", 0.08)
-        self.declare_parameter("global_min_correspondences", 80)
-        self.declare_parameter("global_min_fitness", 0.12)
-        self.declare_parameter("global_max_correction_m", 1.5)
-        self.declare_parameter("global_max_correction_deg", 180.0)
-        self.declare_parameter("icp_max_iterations", 50)
+        self.declare_parameter("global_min_correspondences", 30)
+        self.declare_parameter("global_min_fitness", 0.08)
+        self.declare_parameter("global_max_correction_m", 0.5)
+        self.declare_parameter("global_max_correction_deg", 30.0)
+        self.declare_parameter("icp_max_iterations", 20)
         self.declare_parameter("icp_correspondence_distance_m", 0.05)
-        self.declare_parameter("icp_min_correspondences", 80)
-        self.declare_parameter("icp_min_fitness", 0.18)
-        self.declare_parameter("icp_max_rmse_m", 0.06)
-        self.declare_parameter("icp_max_correction_m", 1.5)
-        self.declare_parameter("icp_max_correction_deg", 180.0)
+        self.declare_parameter("icp_min_correspondences", 30)
+        self.declare_parameter("icp_min_fitness", 0.10)
+        self.declare_parameter("icp_max_rmse_m", 0.10)
+        self.declare_parameter("icp_max_correction_m", 0.5)
+        self.declare_parameter("icp_max_correction_deg", 30.0)
         self.declare_parameter("icp_convergence_translation_m", 0.001)
         self.declare_parameter("icp_convergence_rotation_deg", 0.2)
+
+        # ── Color-guided registration parameters ─────────────────────────
+        self.declare_parameter("color_weight", 0.0005)
+        self.declare_parameter("color_inlier_threshold", 50.0)
 
         # ── RANSAC alignment parameters ─────────────────────────────────
         # Disabled by default for live operation: TF already places both
@@ -455,6 +522,10 @@ class PointCloudFusionNode(Node):
         )
         self._icp_conv_rotation_rad = np.deg2rad(
             float(self.get_parameter("icp_convergence_rotation_deg").value)
+        )
+        self._color_weight = float(self.get_parameter("color_weight").value)
+        self._color_inlier_threshold = float(
+            self.get_parameter("color_inlier_threshold").value
         )
 
         # ── Load pruning boxes from camera_mounts.yaml or fall back to params ─
@@ -619,7 +690,9 @@ class PointCloudFusionNode(Node):
             f"max_points={self._registration_max_points}, "
             f"global_iter={self._global_max_iter}, "
             f"global_candidates={self._global_candidate_count}, "
-            f"icp_iter={self._icp_max_iter})"
+            f"icp_iter={self._icp_max_iter}, "
+            f"color_weight={self._color_weight}, "
+            f"color_inlier_threshold={self._color_inlier_threshold})"
             if self._enable_quality_registration
             else "quality_registration=OFF"
         )
@@ -806,11 +879,11 @@ class PointCloudFusionNode(Node):
         ransac_used = False
         registration_result = None
         if self._enable_quality_registration and len(transformed) == 2:
-            head_xyz, _ = _parse_cloud(transformed[0])
+            head_xyz, head_rgb = _parse_cloud(transformed[0])
             arm_xyz, arm_rgb = _parse_cloud(transformed[1])
             if len(head_xyz) >= 3 and len(arm_xyz) >= 3:
                 aligned_arm, registration_result = self._quality_register(
-                    head_xyz, arm_xyz
+                    head_xyz, arm_xyz, head_rgb, arm_rgb
                 )
                 if registration_result["used"]:
                     transformed[1] = _build_cloud(
@@ -994,13 +1067,21 @@ class PointCloudFusionNode(Node):
 
     # ── Quality registration alignment ───────────────────────────────────
 
-    def _quality_register(self, target_xyz: np.ndarray, source_xyz: np.ndarray):
+    def _quality_register(
+        self,
+        target_xyz: np.ndarray,
+        source_xyz: np.ndarray,
+        target_rgb: np.ndarray,
+        source_rgb: np.ndarray,
+    ):
         """Coarse global alignment followed by ICP refinement.
 
         The input clouds are already transformed into target_frame by TF.  This
         method treats TF/OpenVINS as a rough initial guess, then estimates an
         additional source->target correction from voxelized samples.  It returns
         the full-resolution source cloud after applying the accepted correction.
+
+        RGB data is used to improve correspondence quality when available.
         """
         result = {
             "used": False,
@@ -1009,12 +1090,44 @@ class PointCloudFusionNode(Node):
             "fitness": 0.0,
             "rmse": 0.0,
         }
-        target_sample = _voxel_sample_xyz(
-            target_xyz, self._registration_voxel_size, self._registration_max_points
+        has_color = (
+            target_rgb is not None
+            and source_rgb is not None
+            and len(target_rgb) == len(target_xyz)
+            and len(source_rgb) == len(source_xyz)
+            and np.any(target_rgb != 0)
+            and np.any(source_rgb != 0)
         )
-        source_sample = _voxel_sample_xyz(
-            source_xyz, self._registration_voxel_size, self._registration_max_points
-        )
+
+        if has_color:
+            target_sample, target_sample_rgb = _voxel_sample_xyzrgb(
+                target_xyz,
+                target_rgb,
+                self._registration_voxel_size,
+                self._registration_max_points,
+            )
+            source_sample, source_sample_rgb = _voxel_sample_xyzrgb(
+                source_xyz,
+                source_rgb,
+                self._registration_voxel_size,
+                self._registration_max_points,
+            )
+            target_lab = _rgb_to_lab(target_sample_rgb)
+            source_lab = _rgb_to_lab(source_sample_rgb)
+        else:
+            target_sample = _voxel_sample_xyz(
+                target_xyz,
+                self._registration_voxel_size,
+                self._registration_max_points,
+            )
+            source_sample = _voxel_sample_xyz(
+                source_xyz,
+                self._registration_voxel_size,
+                self._registration_max_points,
+            )
+            target_lab = None
+            source_lab = None
+
         min_needed = max(3, min(self._global_min_corr, self._icp_min_corr))
         if len(target_sample) < min_needed or len(source_sample) < min_needed:
             self.get_logger().warn(
@@ -1024,12 +1137,42 @@ class PointCloudFusionNode(Node):
             )
             return source_xyz, result
 
+        # Log initial cloud separation for diagnostics
+        tgt_centroid = np.mean(target_sample, axis=0)
+        src_centroid = np.mean(source_sample, axis=0)
+        initial_offset = float(np.linalg.norm(tgt_centroid - src_centroid))
+        self.get_logger().info(
+            f"Registration input: target={len(target_sample)} "
+            f"source={len(source_sample)} pts, "
+            f"centroid_offset={initial_offset:.3f}m, "
+            f"color={has_color}",
+            throttle_duration_sec=5.0,
+        )
+
         R_total = np.eye(3, dtype=np.float64)
         t_total = np.zeros(3, dtype=np.float64)
 
-        global_fit = self._coarse_global_align(target_sample, source_sample)
+        # ── Coarse global alignment ──────────────────────────────────────
+        # Always use the combined XYZ+colour-weighted tree approach.
+        # Colour helps steer correspondences away from false matches
+        # (e.g. a red point matching a blue one), but spatial position is
+        # the primary signal.  The pure colour-only path was removed because
+        # it produced false matches with large rotations when OpenVINS
+        # jumped and similarly-coloured points existed on different surfaces.
+        global_fit = self._coarse_global_align(
+            target_sample,
+            source_sample,
+            target_lab=target_lab if has_color else None,
+            source_lab=source_lab if has_color else None,
+        )
+
         if global_fit is not None:
             Rg, tg, g_fitness, g_rmse = global_fit
+            self.get_logger().info(
+                f"Coarse global: fitness={g_fitness:.3f} rmse={g_rmse:.4f} "
+                f"trans={np.linalg.norm(tg):.4f}m",
+                throttle_duration_sec=5.0,
+            )
             if self._registration_transform_allowed(
                 Rg, tg, self._global_max_correction, self._global_max_correction_rad
             ):
@@ -1042,22 +1185,54 @@ class PointCloudFusionNode(Node):
                     "Global registration rejected: correction exceeds configured bounds",
                     throttle_duration_sec=2.0,
                 )
+        else:
+            self.get_logger().warn(
+                f"Coarse global alignment found no acceptable hypothesis "
+                f"(offset={initial_offset:.2f}m)",
+                throttle_duration_sec=5.0,
+            )
 
-        icp_fit = self._icp_refine(target_sample, source_sample, R_total, t_total)
-        if icp_fit is not None:
-            Ri, ti, i_fitness, i_rmse = icp_fit
-            if self._registration_transform_allowed(
-                Ri, ti, self._icp_max_correction, self._icp_max_correction_rad
-            ):
-                R_total, t_total = Ri, ti
-                result["icp_used"] = True
-                result["fitness"] = i_fitness
-                result["rmse"] = i_rmse
+        # ── ICP refinement ───────────────────────────────────────────────
+        # Only run ICP if coarse gave us a reasonable starting point.
+        # ICP from identity when clouds are meters apart is pointless.
+        if result["global_used"] or initial_offset < 0.15:
+            icp_fit = self._icp_refine(
+                target_sample,
+                source_sample,
+                R_total,
+                t_total,
+                target_lab=target_lab if has_color else None,
+                source_lab=source_lab if has_color else None,
+            )
+            if icp_fit is not None:
+                Ri, ti, i_fitness, i_rmse = icp_fit
+                self.get_logger().info(
+                    f"ICP refine: fitness={i_fitness:.3f} rmse={i_rmse:.4f} "
+                    f"trans={np.linalg.norm(ti):.4f}m",
+                    throttle_duration_sec=5.0,
+                )
+                if self._registration_transform_allowed(
+                    Ri, ti, self._icp_max_correction, self._icp_max_correction_rad
+                ):
+                    R_total, t_total = Ri, ti
+                    result["icp_used"] = True
+                    result["fitness"] = i_fitness
+                    result["rmse"] = i_rmse
+                else:
+                    self.get_logger().warn(
+                        "ICP registration rejected: correction exceeds configured bounds",
+                        throttle_duration_sec=2.0,
+                    )
             else:
                 self.get_logger().warn(
-                    "ICP registration rejected: correction exceeds configured bounds",
-                    throttle_duration_sec=2.0,
+                    "ICP refinement failed to converge",
+                    throttle_duration_sec=5.0,
                 )
+        else:
+            self.get_logger().info(
+                "Skipping ICP: no coarse result and clouds too far apart",
+                throttle_duration_sec=5.0,
+            )
 
         result["used"] = result["global_used"] or result["icp_used"]
         if not result["used"]:
@@ -1065,6 +1240,26 @@ class PointCloudFusionNode(Node):
                 "Registration skipped: no acceptable global/ICP correction found",
                 throttle_duration_sec=3.0,
             )
+            return source_xyz, result
+
+        # ── Sanity check: centroid must get closer ─────────────────────────
+        # If the registration moves the source centroid farther from the
+        # target centroid, the correction is physically wrong (e.g. the
+        # color-only correspondence found a false match with a large rotation).
+        src_centroid = np.mean(source_xyz, axis=0).astype(np.float64)
+        tgt_centroid = np.mean(target_xyz, axis=0).astype(np.float64)
+        new_src_centroid = (src_centroid @ R_total.T) + t_total
+        before_dist = float(np.linalg.norm(tgt_centroid - src_centroid))
+        after_dist = float(np.linalg.norm(tgt_centroid - new_src_centroid))
+        if after_dist > before_dist * 1.1:  # allow 10% tolerance
+            self.get_logger().warn(
+                f"Registration rejected: centroid moved farther apart "
+                f"({before_dist:.3f}m -> {after_dist:.3f}m)",
+                throttle_duration_sec=3.0,
+            )
+            result["used"] = False
+            result["global_used"] = False
+            result["icp_used"] = False
             return source_xyz, result
 
         aligned = (source_xyz.astype(np.float64) @ R_total.T) + t_total
@@ -1077,18 +1272,38 @@ class PointCloudFusionNode(Node):
         )
         return aligned.astype(np.float32), result
 
-    def _coarse_global_align(
-        self, target_sample: np.ndarray, source_sample: np.ndarray
+    # NOTE: _coarse_color_only is currently unused (see _quality_register).
+    # It was removed from the active path because pure colour-based
+    # correspondence produced false matches with large rotations when
+    # OpenVINS jumped.  Kept for potential future use if a better
+    # colour-only strategy is designed.
+    def _coarse_color_only(
+        self,
+        target_sample: np.ndarray,
+        source_sample: np.ndarray,
+        target_lab: np.ndarray,
+        source_lab: np.ndarray,
     ):
-        """RANSAC-style coarse alignment on voxelized samples.
+        """Coarse alignment using pure color correspondence in Lab space.
 
-        Keep scoring bounded: evaluating every hypothesis against every
-        registration point is too slow in Python.  Hypotheses are generated
-        from the full samples, then scored against a capped deterministic
-        subset before the best candidate is checked against thresholds.
+        This is designed for the case where the two clouds are far apart
+        spatially (e.g. OpenVINS jumped 2+ metres) so spatial nearest-neighbour
+        correspondences are meaningless.  Instead we find correspondences based
+        solely on color similarity, estimate a rigid transform from those, and
+        score it.
+
+        The algorithm:
+        1. Build a KD-tree on target Lab colors.
+        2. For each RANSAC iteration, pick 3 source points.
+        3. Find their nearest color neighbors in the target.
+        4. Estimate rigid transform from the 3 source->target pairs.
+        5. Score: apply transform to all source points, find spatial NN in
+           target, count inliers within correspondence distance.
+        6. Return the best transform.
         """
         rng = np.random.default_rng()
         target_tree = cKDTree(target_sample)
+        target_lab_tree = cKDTree(target_lab)
         best = None
         best_inliers = 0
         best_rmse = float("inf")
@@ -1097,21 +1312,32 @@ class PointCloudFusionNode(Node):
             return None
 
         corr_dist = self._global_corr_dist
-        score_sample = source_sample
-        max_score_points = max(3, min(self._global_candidate_count, len(source_sample)))
-        if len(score_sample) > max_score_points:
-            score_sample = score_sample[
-                rng.choice(len(score_sample), max_score_points, replace=False)
-            ]
+        color_inlier_threshold = self._color_inlier_threshold
 
-        min_score_inliers = max(
-            3,
-            int(np.ceil(self._global_min_fitness * len(score_sample))),
-            min(self._global_min_corr, len(score_sample)),
-        )
-        for _ in range(max(1, self._global_max_iter)):
+        # Score against a subset for speed
+        max_score_points = max(3, min(self._global_candidate_count, max_src))
+        if max_src > max_score_points:
+            score_idx = rng.choice(max_src, max_score_points, replace=False)
+        else:
+            score_idx = np.arange(max_src)
+        score_sample = source_sample[score_idx]
+        score_lab = source_lab[score_idx]
+
+        min_score_inliers = max(3, int(np.ceil(self._global_min_fitness * len(score_sample))))
+
+        # Use fewer iterations for color-only since it's more exploratory
+        max_iter = max(1, min(self._global_max_iter, 500))
+
+        for _ in range(max_iter):
             idx = rng.choice(max_src, 3, replace=False)
             src_pts = source_sample[idx].astype(np.float64)
+            src_lab = source_lab[idx]
+
+            # Find nearest COLOR neighbors (ignoring position entirely)
+            _, nn_idx = target_lab_tree.query(src_lab.astype(np.float64), k=1)
+            tgt_pts = target_sample[nn_idx].astype(np.float64)
+
+            # Check that the 3 source points are not degenerate
             if (
                 np.linalg.norm(src_pts[0] - src_pts[1]) < 0.015
                 or np.linalg.norm(src_pts[0] - src_pts[2]) < 0.015
@@ -1119,17 +1345,22 @@ class PointCloudFusionNode(Node):
             ):
                 continue
 
-            # Use TF as the initial guess: nearest target points to the current
-            # source sample provide tentative correspondences for the hypothesis.
-            _, nn_idx = target_tree.query(src_pts, k=1)
-            tgt_pts = target_sample[nn_idx]
             estimated = _estimate_rigid_transform(src_pts, tgt_pts)
             if estimated is None:
                 continue
             R, t = estimated
+
+            # Score: transform score subset and check spatial overlap
             transformed = (score_sample.astype(np.float64) @ R.T) + t
-            dists, _ = target_tree.query(transformed, k=1)
-            inlier_mask = dists < corr_dist
+            dists, nn_dists_idx = target_tree.query(transformed, k=1)
+            spatial_mask = dists < corr_dist
+
+            # Also check color consistency of the correspondences
+            tgt_lab_corr = target_lab[nn_dists_idx]
+            color_dists = np.sqrt(np.sum((score_lab - tgt_lab_corr) ** 2, axis=1))
+            color_mask = color_dists < color_inlier_threshold
+            inlier_mask = spatial_mask & color_mask
+
             inliers = int(np.sum(inlier_mask))
             if inliers < min_score_inliers:
                 continue
@@ -1144,15 +1375,186 @@ class PointCloudFusionNode(Node):
         if best is None:
             return None
 
+        # Validate on full sample
         R_best, t_best = best
         full_transformed = (source_sample.astype(np.float64) @ R_best.T) + t_best
-        full_dists, _ = target_tree.query(full_transformed, k=1)
-        full_inlier_mask = full_dists < corr_dist
+        full_dists, full_nn_idx = target_tree.query(full_transformed, k=1)
+        full_spatial_mask = full_dists < corr_dist
+        full_tgt_lab = target_lab[full_nn_idx]
+        full_color_dists = np.sqrt(
+            np.sum((source_lab - full_tgt_lab) ** 2, axis=1)
+        )
+        full_color_mask = full_color_dists < color_inlier_threshold
+        full_inlier_mask = full_spatial_mask & full_color_mask
         full_inliers = int(np.sum(full_inlier_mask))
         fitness = full_inliers / max(len(source_sample), 1)
         if full_inliers < min(self._global_min_corr, len(source_sample)):
             return None
         if fitness < self._global_min_fitness:
+            return None
+        full_rmse = float(np.sqrt(np.mean(full_dists[full_inlier_mask] ** 2)))
+        return R_best, t_best, float(fitness), full_rmse
+
+    def _coarse_global_align(
+        self,
+        target_sample: np.ndarray,
+        source_sample: np.ndarray,
+        target_lab: np.ndarray | None = None,
+        source_lab: np.ndarray | None = None,
+    ):
+        """RANSAC-style coarse alignment on voxelized samples.
+
+        When target_lab / source_lab are provided, correspondences are
+        filtered by color similarity in Lab space.  This dramatically
+        improves registration when the scene has distinctive colors (e.g.
+        colored objects, textured surfaces) even when the geometric
+        structure is ambiguous.
+
+        Keep scoring bounded: evaluating every hypothesis against every
+        registration point is too slow in Python.  Hypotheses are generated
+        from the full samples, then scored against a capped deterministic
+        subset before the best candidate is checked against thresholds.
+        """
+        rng = np.random.default_rng()
+        target_tree = cKDTree(target_sample)
+        best = None
+        best_inliers = 0
+        best_rmse = float("inf")
+        best_color_score = -1.0
+        max_src = len(source_sample)
+        if max_src < 3 or len(target_sample) < 3:
+            return None
+
+        use_color = (
+            target_lab is not None
+            and source_lab is not None
+            and len(target_lab) == len(target_sample)
+            and len(source_lab) == len(source_sample)
+        )
+
+        # If color is available, build a combined XYZ+weighted-Lab tree
+        # for finding better initial correspondences.
+        color_weight = self._color_weight if use_color else 0.0
+        if use_color and color_weight > 0.0:
+            # Normalize Lab to comparable scale as XYZ (in metres).
+            # Lab delta-E ranges 0-100; scale so color_weight controls
+            # the relative importance.
+            tgt_combined = np.hstack(
+                [target_sample, target_lab[:, :3] * color_weight]
+            )
+            src_combined = np.hstack(
+                [source_sample, source_lab[:, :3] * color_weight]
+            )
+            combined_tree = cKDTree(tgt_combined)
+        else:
+            combined_tree = None
+
+        corr_dist = self._global_corr_dist
+        color_inlier_threshold = self._color_inlier_threshold
+        score_sample = source_sample
+        score_lab = source_lab if use_color else None
+        max_score_points = max(3, min(self._global_candidate_count, len(source_sample)))
+        if len(score_sample) > max_score_points:
+            keep_idx = rng.choice(len(score_sample), max_score_points, replace=False)
+            score_sample = score_sample[keep_idx]
+            if score_lab is not None:
+                score_lab = score_lab[keep_idx]
+
+        min_score_inliers = max(
+            3,
+            int(np.ceil(self._global_min_fitness * len(score_sample))),
+        )
+        iterations_run = 0
+        for _ in range(max(1, self._global_max_iter)):
+            iterations_run += 1
+            idx = rng.choice(max_src, 3, replace=False)
+            src_pts = source_sample[idx].astype(np.float64)
+            if (
+                np.linalg.norm(src_pts[0] - src_pts[1]) < 0.015
+                or np.linalg.norm(src_pts[0] - src_pts[2]) < 0.015
+                or np.linalg.norm(src_pts[1] - src_pts[2]) < 0.015
+            ):
+                continue
+
+            # Find correspondences using combined tree if color is available,
+            # otherwise fall back to pure spatial nearest neighbor.
+            if combined_tree is not None:
+                src_query = np.hstack(
+                    [
+                        src_pts,
+                        source_lab[idx].astype(np.float64) * color_weight,
+                    ]
+                )
+                _, nn_idx = combined_tree.query(src_query, k=1)
+            else:
+                _, nn_idx = target_tree.query(src_pts, k=1)
+            tgt_pts = target_sample[nn_idx]
+            estimated = _estimate_rigid_transform(src_pts, tgt_pts)
+            if estimated is None:
+                continue
+            R, t = estimated
+            transformed = (score_sample.astype(np.float64) @ R.T) + t
+            dists, nn_dists_idx = target_tree.query(transformed, k=1)
+            spatial_mask = dists < corr_dist
+
+            # Spatial inliers only — color is a soft tiebreaker below
+            inlier_mask = spatial_mask
+            inliers = int(np.sum(inlier_mask))
+            if inliers < min_score_inliers:
+                continue
+            rmse = float(np.sqrt(np.mean(dists[inlier_mask] ** 2)))
+
+            # Soft color tiebreaker: when spatial inliers and RMSE are
+            # tied, prefer the hypothesis with better color consistency.
+            color_inliers = 0
+            if use_color and score_lab is not None:
+                tgt_lab_corr = target_lab[nn_dists_idx[inlier_mask]]
+                src_lab_corr = score_lab[inlier_mask]
+                color_dists = np.sqrt(
+                    np.sum((src_lab_corr - tgt_lab_corr) ** 2, axis=1)
+                )
+                color_inliers = int(np.sum(color_dists < color_inlier_threshold))
+
+            if (
+                inliers > best_inliers
+                or (inliers == best_inliers and rmse < best_rmse)
+                or (inliers == best_inliers and abs(rmse - best_rmse) < 1e-6
+                    and color_inliers > best_color_score)
+            ):
+                best_inliers = inliers
+                best_rmse = rmse
+                best_color_score = color_inliers
+                best = (R, t)
+                if inliers >= int(0.8 * len(score_sample)):
+                    break
+
+        if best is None:
+            self.get_logger().debug(
+                f"Coarse align: no hypothesis accepted after "
+                f"{iterations_run} iterations "
+                f"(target={len(target_sample)} src={len(source_sample)} "
+                f"score_pts={len(score_sample)} min_inliers={min_score_inliers} "
+                f"use_color={use_color})"
+            )
+            return None
+
+        R_best, t_best = best
+        full_transformed = (source_sample.astype(np.float64) @ R_best.T) + t_best
+        full_dists, full_nn_idx = target_tree.query(full_transformed, k=1)
+        full_spatial_mask = full_dists < corr_dist
+        full_inlier_mask = full_spatial_mask
+        full_inliers = int(np.sum(full_inlier_mask))
+        fitness = full_inliers / max(len(source_sample), 1)
+        if full_inliers < min(self._global_min_corr, len(source_sample)):
+            self.get_logger().debug(
+                f"Coarse align: full validation failed — "
+                f"inliers={full_inliers} < min_corr={self._global_min_corr}"
+            )
+            return None
+        if fitness < self._global_min_fitness:
+            self.get_logger().debug(
+                f"Coarse align: fitness={fitness:.3f} < min={self._global_min_fitness}"
+            )
             return None
         full_rmse = float(np.sqrt(np.mean(full_dists[full_inlier_mask] ** 2)))
         return R_best, t_best, float(fitness), full_rmse
@@ -1163,8 +1565,14 @@ class PointCloudFusionNode(Node):
         source_sample: np.ndarray,
         R_init: np.ndarray,
         t_init: np.ndarray,
+        target_lab: np.ndarray | None = None,
+        source_lab: np.ndarray | None = None,
     ):
-        """Point-to-point ICP refinement on voxelized samples."""
+        """Point-to-point ICP refinement on voxelized samples.
+
+        When target_lab / source_lab are provided, correspondences are
+        additionally filtered by color similarity in Lab space.
+        """
         target_tree = cKDTree(target_sample)
         R_total = R_init.copy()
         t_total = t_init.copy()
@@ -1172,10 +1580,19 @@ class PointCloudFusionNode(Node):
         best_fitness = 0.0
         best_rmse = float("inf")
 
+        use_color = (
+            target_lab is not None
+            and source_lab is not None
+            and len(target_lab) == len(target_sample)
+            and len(source_lab) == len(source_sample)
+        )
+        color_inlier_threshold = self._color_inlier_threshold
+
         for _ in range(max(1, self._icp_max_iter)):
             transformed = (source_sample.astype(np.float64) @ R_total.T) + t_total
             dists, nn_idx = target_tree.query(transformed, k=1)
             mask = dists < self._icp_corr_dist
+
             corr_count = int(np.sum(mask))
             if corr_count < self._icp_min_corr:
                 return None

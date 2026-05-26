@@ -239,20 +239,22 @@ pointcloud_fusion:
         enable_quality_registration: true
         registration_voxel_size: 0.03
         registration_max_points: 500
-        global_max_iterations: 250
-        global_candidate_count: 120
+        global_max_iterations: 150
+        global_candidate_count: 80
         global_correspondence_distance_m: 0.08
-        global_min_correspondences: 60
-        global_min_fitness: 0.12
-        global_max_correction_m: 1.5
-        global_max_correction_deg: 180.0
+        global_min_correspondences: 30
+        global_min_fitness: 0.08
+        global_max_correction_m: 0.5
+        global_max_correction_deg: 30.0
         icp_max_iterations: 20
         icp_correspondence_distance_m: 0.05
-        icp_min_correspondences: 60
-        icp_min_fitness: 0.18
-        icp_max_rmse_m: 0.06
-        icp_max_correction_m: 1.5
-        icp_max_correction_deg: 180.0
+        icp_min_correspondences: 30
+        icp_min_fitness: 0.10
+        icp_max_rmse_m: 0.10
+        icp_max_correction_m: 0.5
+        icp_max_correction_deg: 30.0
+        color_weight: 0.0005
+        color_inlier_threshold: 50.0
         enable_ransac_alignment: false
         mounts_config_path: ""
         active_mount: "8_cm_cam_mount"
