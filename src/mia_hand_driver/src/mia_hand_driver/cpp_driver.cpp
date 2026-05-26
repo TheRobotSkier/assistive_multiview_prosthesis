@@ -1319,7 +1319,7 @@ bool CppDriver::send_command(const std::string& cmd)
      */
     try
     {
-      serial_port_.Read(rx_msg_, 17, 20);
+      serial_port_.Read(rx_msg_, 17, ack_timeout_ms_);
     }
     catch (std::exception& err)
     {
@@ -1340,6 +1340,45 @@ bool CppDriver::send_command(const std::string& cmd)
       strcpy(err_msg_, "Invalid ACK received back from Mia Hand.");
       serial_port_.FlushInputBuffer();
     }
+  }
+
+  if (!success)
+  {
+    /* Retry once on ACK timeout or invalid ACK.
+     */
+    serial_port_.FlushInputBuffer();
+    serial_port_.FlushOutputBuffer();
+    try
+    {
+      serial_port_.Write(cmd);
+      serial_port_.DrainWriteBuffer();
+    }
+    catch (std::exception& err)
+    {
+      strcpy(err_msg_, err.what());
+      return false;
+    }
+
+    try
+    {
+      serial_port_.Read(rx_msg_, 17, ack_timeout_ms_);
+    }
+    catch (std::exception& err)
+    {
+      strcpy(err_msg_,
+          "Timeout occurred before receiving command acknowledge from Mia Hand (retry).");
+      serial_port_.FlushInputBuffer();
+      return false;
+    }
+
+    if (('<' != rx_msg_[0]) || (0 != cmd.compare(1, 14, rx_msg_, 1, 14)))
+    {
+      strcpy(err_msg_, "Invalid ACK received back from Mia Hand (retry).");
+      serial_port_.FlushInputBuffer();
+      return false;
+    }
+
+    success = true;
   }
 
   return success;

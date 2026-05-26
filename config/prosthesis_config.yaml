@@ -39,6 +39,14 @@ command_bridge:
         joint_stream_switch: "data_streams/joints/positions/switch"
         # Trajectory speed/force percentage for set_trajectory calls
         default_speed_percent: 80
+        # Command coalescing
+        command_epsilon: 0.005
+        min_command_interval_s: 0.20
+
+mia_hand_driver:
+    ros__parameters:
+        # ACK read timeout for serial commands (milliseconds)
+        ack_timeout_ms: 50
 
 force_controller:
     ros__parameters:

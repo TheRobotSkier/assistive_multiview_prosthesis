@@ -398,11 +398,20 @@ private:
    */
   bool send_command(const std::string& cmd);
 
+  /**
+   * \brief Set ACK read timeout for serial commands.
+   *
+   * @param ms Timeout in milliseconds.
+   */
+  void set_ack_timeout_ms(int ms) { ack_timeout_ms_ = ms; }
+
   LibSerial::SerialPort serial_port_;  //!< Mia Hand serial port object.
 
   std::string rx_msg_;  //!< Message received from the serial port.
 
   bool emergency_stop_on_;  //!< Flag for signaling emergency stop on.
+
+  int ack_timeout_ms_ = 50;  //!< ACK read timeout in milliseconds.
 
   char err_msg_[128];  //!< Error message, filled after any occurred error.
 
