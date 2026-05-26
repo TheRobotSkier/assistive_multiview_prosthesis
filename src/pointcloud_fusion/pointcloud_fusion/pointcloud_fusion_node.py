@@ -183,6 +183,60 @@ def _voxel_downsample(xyz: np.ndarray, rgb_packed: np.ndarray, voxel_size: float
     return xyz_out, rgb_out
 
 
+def _voxel_sample_xyz(
+    xyz: np.ndarray, voxel_size: float, max_points: int
+) -> np.ndarray:
+    """Downsample XYZ points for registration and cap to max_points."""
+    if len(xyz) == 0:
+        return xyz.astype(np.float32)
+    finite = np.isfinite(xyz).all(axis=1)
+    sample = xyz[finite].astype(np.float32)
+    if len(sample) == 0:
+        return sample
+    if voxel_size > 0.0:
+        dummy_rgb = np.zeros(len(sample), dtype=np.uint32)
+        sample, _ = _voxel_downsample(sample, dummy_rgb, voxel_size)
+    if max_points > 0 and len(sample) > max_points:
+        rng = np.random.default_rng()
+        sample = sample[rng.choice(len(sample), max_points, replace=False)]
+    return sample.astype(np.float32)
+
+
+def _estimate_rigid_transform(src: np.ndarray, tgt: np.ndarray):
+    """Return R,t that maps src onto tgt using Kabsch/SVD."""
+    if len(src) < 3 or len(tgt) < 3 or len(src) != len(tgt):
+        return None
+    src_f = src.astype(np.float64)
+    tgt_f = tgt.astype(np.float64)
+    src_mean = np.mean(src_f, axis=0)
+    tgt_mean = np.mean(tgt_f, axis=0)
+    src_c = src_f - src_mean
+    tgt_c = tgt_f - tgt_mean
+    H = src_c.T @ tgt_c
+    try:
+        U, _, Vt = np.linalg.svd(H)
+    except np.linalg.LinAlgError:
+        return None
+    R = Vt.T @ U.T
+    if np.linalg.det(R) < 0:
+        Vt[2, :] *= -1
+        R = Vt.T @ U.T
+    t = tgt_mean - R @ src_mean
+    return R, t
+
+
+def _compose_transform(
+    R_new: np.ndarray, t_new: np.ndarray, R_old: np.ndarray, t_old: np.ndarray
+):
+    """Compose transforms: new(old(x))."""
+    return R_new @ R_old, (R_new @ t_old) + t_new
+
+
+def _rotation_angle_rad(R: np.ndarray) -> float:
+    trace = float(np.clip((np.trace(R) - 1.0) * 0.5, -1.0, 1.0))
+    return float(np.arccos(trace))
+
+
 def _extract_rotation_translation(t) -> tuple[np.ndarray, np.ndarray]:
     """Extract rotation matrix (3,3) and translation vector (3,) from a TF2 transform."""
     qx = t.transform.rotation.x
@@ -268,6 +322,27 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("bbox_lookup_timeout_s", 0.02)
         self.declare_parameter("max_processing_age_s", 5.0)
 
+        # ── Quality-first registration parameters ────────────────────────
+        self.declare_parameter("enable_quality_registration", True)
+        self.declare_parameter("registration_voxel_size", 0.03)
+        self.declare_parameter("registration_max_points", 500)
+        self.declare_parameter("global_max_iterations", 250)
+        self.declare_parameter("global_candidate_count", 120)
+        self.declare_parameter("global_correspondence_distance_m", 0.08)
+        self.declare_parameter("global_min_correspondences", 80)
+        self.declare_parameter("global_min_fitness", 0.12)
+        self.declare_parameter("global_max_correction_m", 1.5)
+        self.declare_parameter("global_max_correction_deg", 180.0)
+        self.declare_parameter("icp_max_iterations", 50)
+        self.declare_parameter("icp_correspondence_distance_m", 0.05)
+        self.declare_parameter("icp_min_correspondences", 80)
+        self.declare_parameter("icp_min_fitness", 0.18)
+        self.declare_parameter("icp_max_rmse_m", 0.06)
+        self.declare_parameter("icp_max_correction_m", 1.5)
+        self.declare_parameter("icp_max_correction_deg", 180.0)
+        self.declare_parameter("icp_convergence_translation_m", 0.001)
+        self.declare_parameter("icp_convergence_rotation_deg", 0.2)
+
         # ── RANSAC alignment parameters ─────────────────────────────────
         # Disabled by default for live operation: TF already places both
         # clouds in target_frame, and per-frame RANSAC can be expensive and
@@ -335,6 +410,51 @@ class PointCloudFusionNode(Node):
         )
         self._tf_ready_check_interval = float(
             self.get_parameter("tf_ready_check_interval").value
+        )
+        self._enable_quality_registration = self.get_parameter(
+            "enable_quality_registration"
+        ).value
+        self._registration_voxel_size = float(
+            self.get_parameter("registration_voxel_size").value
+        )
+        self._registration_max_points = int(
+            self.get_parameter("registration_max_points").value
+        )
+        self._global_max_iter = int(self.get_parameter("global_max_iterations").value)
+        self._global_candidate_count = int(
+            self.get_parameter("global_candidate_count").value
+        )
+        self._global_corr_dist = float(
+            self.get_parameter("global_correspondence_distance_m").value
+        )
+        self._global_min_corr = int(
+            self.get_parameter("global_min_correspondences").value
+        )
+        self._global_min_fitness = float(self.get_parameter("global_min_fitness").value)
+        self._global_max_correction = float(
+            self.get_parameter("global_max_correction_m").value
+        )
+        self._global_max_correction_rad = np.deg2rad(
+            float(self.get_parameter("global_max_correction_deg").value)
+        )
+        self._icp_max_iter = int(self.get_parameter("icp_max_iterations").value)
+        self._icp_corr_dist = float(
+            self.get_parameter("icp_correspondence_distance_m").value
+        )
+        self._icp_min_corr = int(self.get_parameter("icp_min_correspondences").value)
+        self._icp_min_fitness = float(self.get_parameter("icp_min_fitness").value)
+        self._icp_max_rmse = float(self.get_parameter("icp_max_rmse_m").value)
+        self._icp_max_correction = float(
+            self.get_parameter("icp_max_correction_m").value
+        )
+        self._icp_max_correction_rad = np.deg2rad(
+            float(self.get_parameter("icp_max_correction_deg").value)
+        )
+        self._icp_conv_translation = float(
+            self.get_parameter("icp_convergence_translation_m").value
+        )
+        self._icp_conv_rotation_rad = np.deg2rad(
+            float(self.get_parameter("icp_convergence_rotation_deg").value)
         )
 
         # ── Load pruning boxes from camera_mounts.yaml or fall back to params ─
@@ -437,6 +557,12 @@ class PointCloudFusionNode(Node):
             "ransac_used": 0,
             "ransac_skipped": 0,
             "ransac_inliers": 0,
+            "registration_used": 0,
+            "registration_skipped": 0,
+            "global_used": 0,
+            "icp_used": 0,
+            "registration_fitness_sum": 0.0,
+            "registration_rmse_sum": 0.0,
             "tf_fail": {},
         }
         self._last_publish_time = self.get_clock().now()
@@ -488,6 +614,15 @@ class PointCloudFusionNode(Node):
             if self._enable_ransac
             else "RANSAC alignment: OFF"
         )
+        registration_str = (
+            f"quality_registration=ON (voxel={self._registration_voxel_size}m, "
+            f"max_points={self._registration_max_points}, "
+            f"global_iter={self._global_max_iter}, "
+            f"global_candidates={self._global_candidate_count}, "
+            f"icp_iter={self._icp_max_iter})"
+            if self._enable_quality_registration
+            else "quality_registration=OFF"
+        )
         self.get_logger().info(
             f"Pointcloud fusion: {cam1_topic} + {cam2_topic} -> {output_topic} "
             f"(target_frame={self._target_frame}, arm_frame={self._arm_frame}, "
@@ -496,7 +631,7 @@ class PointCloudFusionNode(Node):
             f"bbox_fallback={self._bbox_fallback_mode}, "
             f"bbox_timeout={self._bbox_lookup_timeout:.3f}s, "
             f"max_processing_age={self._max_processing_age:.2f}s, "
-            f"{ransac_str})"
+            f"{registration_str}, {ransac_str})"
         )
 
     # ── Synced callback (message_filters) ────────────────────────────────
@@ -666,10 +801,22 @@ class PointCloudFusionNode(Node):
                     )
             return
 
-        # ── Step 2: RANSAC alignment (optional) ─────────────────────────
+        # ── Step 2: Registration alignment (optional) ───────────────────
         ransac_inliers = 0
         ransac_used = False
-        if self._enable_ransac and len(transformed) == 2:
+        registration_result = None
+        if self._enable_quality_registration and len(transformed) == 2:
+            head_xyz, _ = _parse_cloud(transformed[0])
+            arm_xyz, arm_rgb = _parse_cloud(transformed[1])
+            if len(head_xyz) >= 3 and len(arm_xyz) >= 3:
+                aligned_arm, registration_result = self._quality_register(
+                    head_xyz, arm_xyz
+                )
+                if registration_result["used"]:
+                    transformed[1] = _build_cloud(
+                        aligned_arm, arm_rgb, transformed[1].header
+                    )
+        elif self._enable_ransac and len(transformed) == 2:
             head_xyz, _ = _parse_cloud(transformed[0])
             arm_xyz, arm_rgb = _parse_cloud(transformed[1])
             if len(head_xyz) >= 3 and len(arm_xyz) >= 3:
@@ -718,10 +865,25 @@ class PointCloudFusionNode(Node):
             stamp = transformed[0].header.stamp
             with self._stats_lock:
                 self._stats["dual"] += 1
+                if registration_result is not None:
+                    if registration_result["used"]:
+                        self._stats["registration_used"] += 1
+                        self._stats["registration_fitness_sum"] += registration_result[
+                            "fitness"
+                        ]
+                        self._stats["registration_rmse_sum"] += registration_result[
+                            "rmse"
+                        ]
+                        if registration_result["global_used"]:
+                            self._stats["global_used"] += 1
+                        if registration_result["icp_used"]:
+                            self._stats["icp_used"] += 1
+                    else:
+                        self._stats["registration_skipped"] += 1
                 if ransac_used:
                     self._stats["ransac_used"] += 1
                     self._stats["ransac_inliers"] += ransac_inliers
-                elif self._enable_ransac:
+                elif self._enable_ransac and not self._enable_quality_registration:
                     self._stats["ransac_skipped"] += 1
 
         if len(xyz_all) == 0:
@@ -829,6 +991,231 @@ class PointCloudFusionNode(Node):
         with self._stats_lock:
             self._stats["published"] += 1
         self._last_publish_time = self.get_clock().now()
+
+    # ── Quality registration alignment ───────────────────────────────────
+
+    def _quality_register(self, target_xyz: np.ndarray, source_xyz: np.ndarray):
+        """Coarse global alignment followed by ICP refinement.
+
+        The input clouds are already transformed into target_frame by TF.  This
+        method treats TF/OpenVINS as a rough initial guess, then estimates an
+        additional source->target correction from voxelized samples.  It returns
+        the full-resolution source cloud after applying the accepted correction.
+        """
+        result = {
+            "used": False,
+            "global_used": False,
+            "icp_used": False,
+            "fitness": 0.0,
+            "rmse": 0.0,
+        }
+        target_sample = _voxel_sample_xyz(
+            target_xyz, self._registration_voxel_size, self._registration_max_points
+        )
+        source_sample = _voxel_sample_xyz(
+            source_xyz, self._registration_voxel_size, self._registration_max_points
+        )
+        min_needed = max(3, min(self._global_min_corr, self._icp_min_corr))
+        if len(target_sample) < min_needed or len(source_sample) < min_needed:
+            self.get_logger().warn(
+                f"Registration skipped: insufficient samples "
+                f"target={len(target_sample)} source={len(source_sample)}",
+                throttle_duration_sec=5.0,
+            )
+            return source_xyz, result
+
+        R_total = np.eye(3, dtype=np.float64)
+        t_total = np.zeros(3, dtype=np.float64)
+
+        global_fit = self._coarse_global_align(target_sample, source_sample)
+        if global_fit is not None:
+            Rg, tg, g_fitness, g_rmse = global_fit
+            if self._registration_transform_allowed(
+                Rg, tg, self._global_max_correction, self._global_max_correction_rad
+            ):
+                R_total, t_total = Rg, tg
+                result["global_used"] = True
+                result["fitness"] = g_fitness
+                result["rmse"] = g_rmse
+            else:
+                self.get_logger().warn(
+                    "Global registration rejected: correction exceeds configured bounds",
+                    throttle_duration_sec=2.0,
+                )
+
+        icp_fit = self._icp_refine(target_sample, source_sample, R_total, t_total)
+        if icp_fit is not None:
+            Ri, ti, i_fitness, i_rmse = icp_fit
+            if self._registration_transform_allowed(
+                Ri, ti, self._icp_max_correction, self._icp_max_correction_rad
+            ):
+                R_total, t_total = Ri, ti
+                result["icp_used"] = True
+                result["fitness"] = i_fitness
+                result["rmse"] = i_rmse
+            else:
+                self.get_logger().warn(
+                    "ICP registration rejected: correction exceeds configured bounds",
+                    throttle_duration_sec=2.0,
+                )
+
+        result["used"] = result["global_used"] or result["icp_used"]
+        if not result["used"]:
+            self.get_logger().warn(
+                "Registration skipped: no acceptable global/ICP correction found",
+                throttle_duration_sec=3.0,
+            )
+            return source_xyz, result
+
+        aligned = (source_xyz.astype(np.float64) @ R_total.T) + t_total
+        self.get_logger().info(
+            f"Registration applied: global={result['global_used']} "
+            f"icp={result['icp_used']} fitness={result['fitness']:.3f} "
+            f"rmse={result['rmse']:.3f} trans={np.linalg.norm(t_total):.3f}m "
+            f"rot={np.rad2deg(_rotation_angle_rad(R_total)):.1f}deg",
+            throttle_duration_sec=2.0,
+        )
+        return aligned.astype(np.float32), result
+
+    def _coarse_global_align(
+        self, target_sample: np.ndarray, source_sample: np.ndarray
+    ):
+        """RANSAC-style coarse alignment on voxelized samples.
+
+        Keep scoring bounded: evaluating every hypothesis against every
+        registration point is too slow in Python.  Hypotheses are generated
+        from the full samples, then scored against a capped deterministic
+        subset before the best candidate is checked against thresholds.
+        """
+        rng = np.random.default_rng()
+        target_tree = cKDTree(target_sample)
+        best = None
+        best_inliers = 0
+        best_rmse = float("inf")
+        max_src = len(source_sample)
+        if max_src < 3 or len(target_sample) < 3:
+            return None
+
+        corr_dist = self._global_corr_dist
+        score_sample = source_sample
+        max_score_points = max(3, min(self._global_candidate_count, len(source_sample)))
+        if len(score_sample) > max_score_points:
+            score_sample = score_sample[
+                rng.choice(len(score_sample), max_score_points, replace=False)
+            ]
+
+        min_score_inliers = max(
+            3,
+            int(np.ceil(self._global_min_fitness * len(score_sample))),
+            min(self._global_min_corr, len(score_sample)),
+        )
+        for _ in range(max(1, self._global_max_iter)):
+            idx = rng.choice(max_src, 3, replace=False)
+            src_pts = source_sample[idx].astype(np.float64)
+            if (
+                np.linalg.norm(src_pts[0] - src_pts[1]) < 0.015
+                or np.linalg.norm(src_pts[0] - src_pts[2]) < 0.015
+                or np.linalg.norm(src_pts[1] - src_pts[2]) < 0.015
+            ):
+                continue
+
+            # Use TF as the initial guess: nearest target points to the current
+            # source sample provide tentative correspondences for the hypothesis.
+            _, nn_idx = target_tree.query(src_pts, k=1)
+            tgt_pts = target_sample[nn_idx]
+            estimated = _estimate_rigid_transform(src_pts, tgt_pts)
+            if estimated is None:
+                continue
+            R, t = estimated
+            transformed = (score_sample.astype(np.float64) @ R.T) + t
+            dists, _ = target_tree.query(transformed, k=1)
+            inlier_mask = dists < corr_dist
+            inliers = int(np.sum(inlier_mask))
+            if inliers < min_score_inliers:
+                continue
+            rmse = float(np.sqrt(np.mean(dists[inlier_mask] ** 2)))
+            if inliers > best_inliers or (inliers == best_inliers and rmse < best_rmse):
+                best_inliers = inliers
+                best_rmse = rmse
+                best = (R, t)
+                if inliers >= int(0.8 * len(score_sample)):
+                    break
+
+        if best is None:
+            return None
+
+        R_best, t_best = best
+        full_transformed = (source_sample.astype(np.float64) @ R_best.T) + t_best
+        full_dists, _ = target_tree.query(full_transformed, k=1)
+        full_inlier_mask = full_dists < corr_dist
+        full_inliers = int(np.sum(full_inlier_mask))
+        fitness = full_inliers / max(len(source_sample), 1)
+        if full_inliers < min(self._global_min_corr, len(source_sample)):
+            return None
+        if fitness < self._global_min_fitness:
+            return None
+        full_rmse = float(np.sqrt(np.mean(full_dists[full_inlier_mask] ** 2)))
+        return R_best, t_best, float(fitness), full_rmse
+
+    def _icp_refine(
+        self,
+        target_sample: np.ndarray,
+        source_sample: np.ndarray,
+        R_init: np.ndarray,
+        t_init: np.ndarray,
+    ):
+        """Point-to-point ICP refinement on voxelized samples."""
+        target_tree = cKDTree(target_sample)
+        R_total = R_init.copy()
+        t_total = t_init.copy()
+        last_rmse = None
+        best_fitness = 0.0
+        best_rmse = float("inf")
+
+        for _ in range(max(1, self._icp_max_iter)):
+            transformed = (source_sample.astype(np.float64) @ R_total.T) + t_total
+            dists, nn_idx = target_tree.query(transformed, k=1)
+            mask = dists < self._icp_corr_dist
+            corr_count = int(np.sum(mask))
+            if corr_count < self._icp_min_corr:
+                return None
+
+            src_corr = transformed[mask]
+            tgt_corr = target_sample[nn_idx[mask]]
+            update = _estimate_rigid_transform(src_corr, tgt_corr)
+            if update is None:
+                return None
+            R_delta, t_delta = update
+            R_total, t_total = _compose_transform(R_delta, t_delta, R_total, t_total)
+
+            rmse = float(np.sqrt(np.mean(dists[mask] ** 2)))
+            fitness = corr_count / max(len(source_sample), 1)
+            best_fitness, best_rmse = fitness, rmse
+            if last_rmse is not None and abs(last_rmse - rmse) < 1e-5:
+                break
+            last_rmse = rmse
+            if (
+                np.linalg.norm(t_delta) < self._icp_conv_translation
+                and _rotation_angle_rad(R_delta) < self._icp_conv_rotation_rad
+            ):
+                break
+
+        if best_fitness < self._icp_min_fitness or best_rmse > self._icp_max_rmse:
+            return None
+        return R_total, t_total, float(best_fitness), float(best_rmse)
+
+    def _registration_transform_allowed(
+        self,
+        R: np.ndarray,
+        t: np.ndarray,
+        max_translation: float,
+        max_rotation_rad: float,
+    ) -> bool:
+        if np.linalg.norm(t) > max_translation:
+            return False
+        if _rotation_angle_rad(R) > max_rotation_rad:
+            return False
+        return True
 
     # ── RANSAC alignment ────────────────────────────────────────────────
 
@@ -1289,6 +1676,22 @@ class PointCloudFusionNode(Node):
                 f" ransac_skipped={stats_snapshot['ransac_skipped']}"
                 f" ransac_avg_inliers={avg_inliers:.0f}"
             )
+        registration_str = ""
+        if self._enable_quality_registration:
+            avg_fitness = stats_snapshot["registration_fitness_sum"] / max(
+                stats_snapshot["registration_used"], 1
+            )
+            avg_rmse = stats_snapshot["registration_rmse_sum"] / max(
+                stats_snapshot["registration_used"], 1
+            )
+            registration_str = (
+                f" registration_used={stats_snapshot['registration_used']}"
+                f" registration_skipped={stats_snapshot['registration_skipped']}"
+                f" global_used={stats_snapshot['global_used']}"
+                f" icp_used={stats_snapshot['icp_used']}"
+                f" registration_avg_fitness={avg_fitness:.3f}"
+                f" registration_avg_rmse={avg_rmse:.3f}"
+            )
         processing_avg = stats_snapshot["processing_ms_sum"] / max(
             stats_snapshot["published"] + stats_snapshot["processing_age_drops"], 1
         )
@@ -1303,6 +1706,7 @@ class PointCloudFusionNode(Node):
             f" age_drops={stats_snapshot['processing_age_drops']}"
             f" proc_avg_ms={processing_avg:.1f}"
             f" proc_max_ms={stats_snapshot['processing_ms_max']:.1f}"
+            f"{registration_str}"
             f"{ransac_str}"
             f"{tf_fail_str}"
             f" last_publish_ago={since_last:.1f}s"
@@ -1370,6 +1774,12 @@ class PointCloudFusionNode(Node):
                 "ransac_used": 0,
                 "ransac_skipped": 0,
                 "ransac_inliers": 0,
+                "registration_used": 0,
+                "registration_skipped": 0,
+                "global_used": 0,
+                "icp_used": 0,
+                "registration_fitness_sum": 0.0,
+                "registration_rmse_sum": 0.0,
                 "tf_fail": {},
             }
 
