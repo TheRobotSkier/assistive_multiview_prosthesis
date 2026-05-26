@@ -63,7 +63,61 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp
+.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis
+
+# ── Help ───────────────────────────────────────────────────────────────────
+help:
+	@echo "Prosthesis — available commands"
+	@echo ""
+	@echo "  Build & Development:"
+	@echo "    make build                  Build all container images"
+	@echo "    make build-prosthesis       Build prosthesis container only"
+	@echo "    make rebuild                Rebuild all images (no cache)"
+	@echo "    make dev                    Start prosthesis container (detached)"
+	@echo "    make dev-shell              Start container + open shell"
+	@echo "    make shell                  Shell into running container"
+	@echo ""
+	@echo "  Test 1 — Software Verification:"
+	@echo "    make test1-tier-a           Run Tier A (latency + occlusion, host)"
+	@echo "    make test1-tier-b           Run Tier B (full ROS pipeline, Docker)"
+	@echo "    make test1-analysis         Generate figures from results (host)"
+	@echo ""
+	@echo "  Testing:"
+	@echo "    make test                   Build + run unit tests (Docker)"
+	@echo ""
+	@echo "  Segmentation:"
+	@echo "    make segmentation-cuda      Start CUDA segmentation service"
+	@echo "    make segmentation-cpu       Start CPU segmentation service"
+	@echo "    make down-segmentation      Stop segmentation services"
+	@echo "    make segmentation-status    Show segmentation health"
+	@echo ""
+	@echo "  Launch:"
+	@echo "    make up                     Start prosthesis + segmentation"
+	@echo "    make up-hw                  Start with hardware devices"
+	@echo "    make run                    Full launch with USB detection"
+	@echo "    make down                   Stop all containers"
+	@echo ""
+	@echo "  RViz:"
+	@echo "    make rviz                   Launch RViz (robotlab Ethernet)"
+	@echo "    make rviz-kill              Stop RViz"
+	@echo "    make rviz-static            RViz + static TF at world origin"
+	@echo "    make rviz-twist-propagation RViz for trajectory prediction"
+	@echo ""
+	@echo "  Robotlab / Jetson:"
+	@echo "    make robotlab-connect       Connect to Jetson via Ethernet"
+	@echo "    make jetson-sync            Push code to Jetson"
+	@echo "    make jetson-cameras         Sync + start cameras + RViz"
+	@echo "    make timesync               Sync clocks (host + Jetson)"
+	@echo ""
+	@echo "  Grasp Test:"
+	@echo "    make test-static-grasp      Static grasp test with MIA hand"
+	@echo "    make emg-force-grasp        EMG force grasp + wrist controller"
+	@echo "    make emg-grasp-test         EMG-driven grasp test"
+	@echo ""
+	@echo "  Cleanup:"
+	@echo "    make clean                  Remove containers + images + volumes"
+	@echo "    make clean-volumes          Remove named volumes only"
+	@echo "    make logs                   Follow all container logs"
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -623,8 +677,34 @@ print-force:
 		prosthesis:latest \
 		bash /prosthesis_ws/scripts/print_force.sh
 
+test1-tier-a:
+	GRASP_PRESHAPING_LIB_PATH=src/grasp_preshaping/lib/libgrasp_preshaping.so \
+	GRASP_PRESHAPING_HOME=src/grasp_preshaping \
+	python3 tests/test1_software_verification/run.py
+
+test1-tier-b: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -lc 'make test1-tier-b-internal'
+
+test1-analysis:
+	GRASP_PRESHAPING_LIB_PATH=src/grasp_preshaping/lib/libgrasp_preshaping.so \
+	GRASP_PRESHAPING_HOME=src/grasp_preshaping \
+	python3 tests/test1_software_verification/plot_results.py
+
+# ── Internal targets (called from inside container) ────────────────────────
+
+# Runs Tier B inside the prosthesis container. Requires mock.launch.py running.
+test1-tier-b-internal:
+	@echo "=== Test 1 Tier B: Full ROS Pipeline Latency ==="
+	@if ! ros2 topic list 2>/dev/null | grep -q /grasp_preshaping/grasp_type; then \
+		echo "ERROR: Mock system not running. Start it first:"; \
+		echo "  ros2 launch prosthesis_launch mock.launch.py"; \
+		exit 1; \
+	fi
+	python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py
+
+# ── Static Grasp Test ──────────────────────────────────────────────────────
+
 test-static-grasp:
-	@echo "=== MIA Hand Static Grasp Test ==="
 	@echo "Hand device: $${MIA_PORT:-/dev/ttyUSB0}"
 	@test -f scripts/static_grasp_test.sh || { echo "Missing scripts/static_grasp_test.sh"; exit 1; }
 	@test -f config/static_grasp_test.yaml || { echo "Missing config/static_grasp_test.yaml"; exit 1; }

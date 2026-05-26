@@ -111,8 +111,6 @@ def plot_wrist_error_cdf(occlusion_rows: list[dict], fmt: str, dpi: int):
     ax.set_ylim(0, 1.05)
     ax.grid(True, alpha=0.3, color=COLORS["grid"])
 
-    fig.suptitle("Test 1b: Wrist Rotation Error CDF",
-                 fontsize=12, fontweight="bold", color=COLORS["text"])
     fig.tight_layout()
     _save_fig(fig, "fig5_wrist_error_cdf", fmt, dpi)
 
@@ -207,8 +205,6 @@ def plot_convexity_analysis(delta_rows: list[dict], summary_rows: list[dict],
                   fontweight="bold", fontsize=10)
     ax2.grid(axis="y", alpha=0.3, color=COLORS["grid"])
 
-    fig.suptitle("Test 1b: Multi-view Advantage by Object Geometry",
-                 fontsize=12, fontweight="bold", color=COLORS["text"])
     fig.tight_layout()
     _save_fig(fig, "fig7b_convexity_analysis", fmt, dpi)
 
@@ -378,9 +374,7 @@ def plot_per_view_coverage(occlusion_rows: list[dict], fmt: str, dpi: int):
     fig.legend(handles=legend_elements, loc='lower center', ncol=4, fontsize=9,
                framealpha=0.9, edgecolor='#cccccc')
 
-    fig.suptitle(f"Per-View Point Cloud Coverage: {obj_name.replace('_', ' ').title()}",
-                 fontsize=12, fontweight="bold", color=COLORS["text"])
-    fig.tight_layout(rect=[0, 0.06, 1, 0.95])
+    fig.tight_layout(rect=[0, 0.06, 1, 1])
     _save_fig(fig, "fig7c_per_view_coverage", fmt, dpi)
 
 # ---------------------------------------------------------------------------
@@ -612,9 +606,6 @@ def plot_best_score_by_type(occlusion_rows: list[dict], fmt: str, dpi: int):
     for ax_idx in range(len(objects), nrows * ncols):
         axes[ax_idx // ncols][ax_idx % ncols].set_visible(False)
 
-    fig.suptitle("Test 1b: Best Score per Grasp Type — Multi-view vs. Single-view\n"
-                 "(\"+\" marks where multi-view finds a higher-scoring grasp)",
-                 fontsize=10, fontweight="bold", color=COLORS["text"])
     fig.tight_layout()
     _save_fig(fig, "fig7e_best_score_by_type", fmt, dpi)
 
@@ -697,9 +688,6 @@ def plot_score_vs_wrist_angle(occlusion_rows: list[dict], fmt: str, dpi: int):
     for ax_idx in range(len(objects), nrows * ncols):
         axes[ax_idx // ncols][ax_idx % ncols].set_visible(False)
 
-    fig.suptitle("Test 1b: Combined Score vs Wrist Rotation Angle\n"
-                 "(Stars = best trial per condition)",
-                 fontsize=10, fontweight="bold", color=COLORS["text"])
     fig.tight_layout()
     _save_fig(fig, "fig7f_score_vs_wrist_angle", fmt, dpi)
 
@@ -995,9 +983,7 @@ def plot_synthetic_setup(fmt: str, dpi: int):
              bbox=dict(boxstyle="round,pad=0.5", facecolor="white", alpha=0.9,
                        edgecolor="#cccccc"))
 
-    fig.suptitle("Test 1: Synthetic Multi-View Setup Geometry",
-                 fontsize=14, fontweight="bold", y=0.98)
-    fig.tight_layout(rect=[0, 0.06, 1, 0.95])
+    fig.tight_layout(rect=[0, 0.06, 1, 1])
     _save_fig(fig, "fig9_synthetic_setup_3d", fmt, dpi)
 
 # ---------------------------------------------------------------------------
@@ -1393,9 +1379,7 @@ def plot_object_gallery(fmt: str, dpi: int):
     fig.legend(handles=legend_elements, loc='lower center', ncol=len(legend_elements),
                fontsize=11, frameon=False)
 
-    fig.suptitle("Test 1 Object Gallery", fontsize=14, color=COLORS["text"],
-                 fontweight="bold", y=0.98)
-    fig.tight_layout(rect=[0, 0.03, 1, 0.96])
+    fig.tight_layout(rect=[0, 0.03, 1, 1])
     _save_fig(fig, "fig12_object_gallery", fmt, dpi)
 
 # ---------------------------------------------------------------------------
@@ -1490,8 +1474,6 @@ def plot_score_vs_samples(fmt: str, dpi: int):
     ax2.grid(True, alpha=0.3, color=COLORS["grid"])
     ax2.set_facecolor(COLORS["panel_bg"])
 
-    fig.suptitle("Score & Latency vs SMC Sample Count",
-                 fontsize=14, color=COLORS["text"], fontweight="bold")
     fig.tight_layout()
     _save_fig(fig, "fig13_score_vs_samples", fmt, dpi)
 

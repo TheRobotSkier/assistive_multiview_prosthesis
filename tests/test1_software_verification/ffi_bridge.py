@@ -70,6 +70,7 @@ class GraspComputeRequestFFI(ctypes.Structure):
         ("cloud", PointCloudViewFFI),
         ("cameras", CameraPositionFFI * 4),
         ("n_cameras", ctypes.c_uint32),
+        ("hit_time_s", ctypes.c_double),
     ]
 
 
@@ -168,7 +169,7 @@ def _load_so() -> tuple[ctypes.CDLL, str]:
     """Load the library at module level for use by reload_config."""
     so_path = _find_so()
     lib = ctypes.CDLL(so_path)
-    lib.grasp_preshaping_reload_config.restype = ctypes.c_int32
+    lib.grasp_preshaping_reload_config.restype = None
     return lib, so_path
 
 
@@ -295,6 +296,7 @@ def make_request(
         ),
         cameras=cam_array,
         n_cameras=min(len(cameras), 4),
+        hit_time_s=-1.0,
     )
 
 

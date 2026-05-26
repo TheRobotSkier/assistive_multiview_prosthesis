@@ -689,7 +689,7 @@ def run_score_sweep(lib, objects, args):
             pose = approach["pose"]
             hand_pose = make_pose(pose["px"], pose["py"], pose["pz"],
                                    pose["qx"], pose["qy"], pose["qz"], pose["qw"])
-            twist = make_twist(0.10, 0, 0, 0, 0, 0)
+            twist = make_twist(**approach["twist"])
 
             conditions = [
                 ("single_view", head_cloud, [cam_frames[0]["position"]]),
