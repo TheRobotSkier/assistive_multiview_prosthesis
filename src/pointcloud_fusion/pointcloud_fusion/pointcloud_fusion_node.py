@@ -29,6 +29,7 @@ import numpy as np
 import rclpy
 import yaml
 from rclpy.node import Node
+from scipy.spatial import cKDTree
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from sensor_msgs.msg import PointCloud2, PointField
 from visualization_msgs.msg import Marker
@@ -250,6 +251,13 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("wait_for_tf", True)
         self.declare_parameter("tf_ready_check_interval", 2.0)
 
+        # ── RANSAC alignment parameters ─────────────────────────────────
+        self.declare_parameter("enable_ransac_alignment", True)
+        self.declare_parameter("ransac_min_correspondences", 8)
+        self.declare_parameter("ransac_max_iterations", 1000)
+        self.declare_parameter("ransac_inlier_distance_m", 0.03)
+        self.declare_parameter("ransac_downsample_max_points", 2000)
+
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
         self._arm_frame = self.get_parameter("arm_frame").value
@@ -270,6 +278,11 @@ class PointCloudFusionNode(Node):
         self._bbox_fallback_mode = self.get_parameter("bbox_fallback_mode").value
         self._bbox_cache_max_age = float(
             self.get_parameter("bbox_cache_max_age_s").value)
+        self._enable_ransac = self.get_parameter("enable_ransac_alignment").value
+        self._ransac_min_corr = self.get_parameter("ransac_min_correspondences").value
+        self._ransac_max_iter = self.get_parameter("ransac_max_iterations").value
+        self._ransac_inlier_dist = self.get_parameter("ransac_inlier_distance_m").value
+        self._ransac_max_points = self.get_parameter("ransac_downsample_max_points").value
         self._wait_for_tf = self.get_parameter("wait_for_tf").value
         self._tf_ready_check_interval = float(
             self.get_parameter("tf_ready_check_interval").value)
@@ -347,6 +360,8 @@ class PointCloudFusionNode(Node):
         self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
                        "distance_removed": 0, "bbox_removed": 0,
                        "bbox_skipped": 0, "bbox_cache_hits": 0,
+                       "ransac_used": 0, "ransac_skipped": 0,
+                       "ransac_inliers": 0,
                        "tf_fail": {}}
         self._last_publish_time = self.get_clock().now()
         self.create_timer(10.0, self._log_stats)
@@ -388,12 +403,16 @@ class PointCloudFusionNode(Node):
                 "processing clouds immediately"
             )
 
+        ransac_str = (f"RANSAC alignment: ON (min_corr={self._ransac_min_corr}, "
+                       f"iter={self._ransac_max_iter}, dist={self._ransac_inlier_dist}m)"
+                       if self._enable_ransac else "RANSAC alignment: OFF")
         self.get_logger().info(
             f"Pointcloud fusion: {cam1_topic} + {cam2_topic} -> {output_topic} "
             f"(target_frame={self._target_frame}, arm_frame={self._arm_frame}, "
             f"max_dist={self._max_distance}m, voxel={self._voxel_size}m, "
             f"pruning_boxes={len(self._pruning_boxes)}, "
-            f"bbox_fallback={self._bbox_fallback_mode})"
+            f"bbox_fallback={self._bbox_fallback_mode}, "
+            f"{ransac_str})"
         )
 
     # ── Synced callback (message_filters) ────────────────────────────────
@@ -479,7 +498,22 @@ class PointCloudFusionNode(Node):
                     )
             return
 
-        # ── Step 2: Concatenate clouds ────────────────────────────────
+        # ── Step 2: RANSAC alignment (optional) ─────────────────────────
+        ransac_inliers = 0
+        ransac_used = False
+        if self._enable_ransac and len(transformed) == 2:
+            head_xyz, _ = _parse_cloud(transformed[0])
+            arm_xyz, arm_rgb = _parse_cloud(transformed[1])
+            if len(head_xyz) >= 3 and len(arm_xyz) >= 3:
+                aligned_arm, ransac_used, ransac_inliers = self._ransac_align(
+                    head_xyz, arm_xyz)
+                if ransac_used:
+                    # Rebuild the arm PointCloud2 with aligned points
+                    aligned_msg = _build_cloud(aligned_arm, arm_rgb,
+                                               transformed[1].header)
+                    transformed[1] = aligned_msg
+
+        # ── Step 3: Concatenate clouds ────────────────────────────────
         if len(transformed) == 1:
             xyz_all, rgb_all = _parse_cloud(transformed[0])
             stamp = transformed[0].header.stamp
@@ -514,6 +548,11 @@ class PointCloudFusionNode(Node):
             stamp = transformed[0].header.stamp
             with self._stats_lock:
                 self._stats["dual"] += 1
+                if ransac_used:
+                    self._stats["ransac_used"] += 1
+                    self._stats["ransac_inliers"] += ransac_inliers
+                elif self._enable_ransac:
+                    self._stats["ransac_skipped"] += 1
 
         if len(xyz_all) == 0:
             return
@@ -608,6 +647,88 @@ class PointCloudFusionNode(Node):
         with self._stats_lock:
             self._stats["published"] += 1
         self._last_publish_time = self.get_clock().now()
+
+    # ── RANSAC alignment ────────────────────────────────────────────────
+
+    def _ransac_align(self, target_xyz: np.ndarray, source_xyz: np.ndarray):
+        """RANSAC-based rigid registration of source onto target.
+
+        Uses 3-point correspondences with SVD (Kabsch) to find the best
+        rigid transform, then counts inliers via nearest-neighbour search.
+
+        Parameters
+        ----------
+        target_xyz : (N,3) float32 — points to align TO (head cloud)
+        source_xyz : (M,3) float32 — points to align FROM (arm cloud)
+
+        Returns
+        -------
+        aligned : (M,3) float32 — source points transformed to target frame
+        ransac_used : bool       — True if alignment was applied
+        inliers : int           — number of inlier correspondences found
+        """
+        n_src = min(len(source_xyz), self._ransac_max_points)
+        n_tgt = min(len(target_xyz), self._ransac_max_points)
+
+        # Downsample randomly for speed
+        rng = np.random.default_rng()
+        src_sample = source_xyz[rng.choice(len(source_xyz), n_src, replace=False)]
+        tgt_sample = target_xyz[rng.choice(len(target_xyz), n_tgt, replace=False)]
+
+        # Build KD-Tree on target for fast nearest-neighbor queries
+        tree = cKDTree(tgt_sample)
+
+        best_inliers = 0
+        best_R = np.eye(3, dtype=np.float64)
+        best_t = np.zeros(3, dtype=np.float64)
+
+        for _ in range(self._ransac_max_iter):
+            # Pick 3 random non-collinear points from source
+            idx = rng.choice(n_src, 3, replace=False)
+            src_pts = src_sample[idx].astype(np.float64)
+
+            # Skip if points are too close (degenerate triangle)
+            d01 = np.linalg.norm(src_pts[0] - src_pts[1])
+            d02 = np.linalg.norm(src_pts[0] - src_pts[2])
+            d12 = np.linalg.norm(src_pts[1] - src_pts[2])
+            if d01 < 0.01 or d02 < 0.01 or d12 < 0.01:
+                continue
+
+            # Find nearest neighbours in target
+            _, nn_idx = tree.query(src_pts)
+            tgt_pts = tgt_sample[nn_idx].astype(np.float64)
+
+            # Compute rigid transform (Kabsch / SVD)
+            src_mean = np.mean(src_pts, axis=0)
+            tgt_mean = np.mean(tgt_pts, axis=0)
+            src_c = src_pts - src_mean
+            tgt_c = tgt_pts - tgt_mean
+            H = src_c.T @ tgt_c
+            U, S, Vt = np.linalg.svd(H)
+            R = Vt.T @ U.T
+            if np.linalg.det(R) < 0:
+                Vt[2, :] *= -1
+                R = Vt.T @ U.T
+            t = tgt_mean - R @ src_mean
+
+            # Count inliers on source sample (fast)
+            aligned_sample = (src_sample.astype(np.float64) @ R.T) + t
+            dists, _ = tree.query(aligned_sample, k=1)
+            inliers = int(np.sum(dists < self._ransac_inlier_dist))
+
+            if inliers > best_inliers:
+                best_inliers = inliers
+                best_R, best_t = R, t
+
+                # Early exit if we have enough inliers
+                if best_inliers >= 3 * self._ransac_min_corr:
+                    break
+
+        if best_inliers >= self._ransac_min_corr:
+            aligned = (source_xyz.astype(np.float64) @ best_R.T) + best_t
+            return aligned.astype(np.float32), True, best_inliers
+
+        return source_xyz, False, best_inliers
 
     def _lookup_bbox_transform(self, frame: str, xyz_all: np.ndarray):
         """Try to look up the transform for a bbox pruning box.
@@ -935,6 +1056,14 @@ class PointCloudFusionNode(Node):
             tf_fail_str = " tf_fail={" + ", ".join(
                 f"{k}:{v}" for k, v in sorted(stats_snapshot["tf_fail"].items())
             ) + "}"
+        ransac_str = ""
+        if self._enable_ransac:
+            avg_inliers = (stats_snapshot['ransac_inliers'] / max(stats_snapshot['ransac_used'], 1))
+            ransac_str = (
+                f" ransac_used={stats_snapshot['ransac_used']}"
+                f" ransac_skipped={stats_snapshot['ransac_skipped']}"
+                f" ransac_avg_inliers={avg_inliers:.0f}"
+            )
         self.get_logger().info(
             f"Stats: published={stats_snapshot['published']} "
             f"(dual={stats_snapshot['dual']}, cam1_only={stats_snapshot['cam1_only']}) "
@@ -942,6 +1071,7 @@ class PointCloudFusionNode(Node):
             f"bbox_removed={stats_snapshot['bbox_removed']}"
             f" bbox_skipped={stats_snapshot['bbox_skipped']}"
             f" bbox_cache_hits={stats_snapshot['bbox_cache_hits']}"
+            f"{ransac_str}"
             f"{tf_fail_str}"
             f" last_publish_ago={since_last:.1f}s"
         )
@@ -990,6 +1120,8 @@ class PointCloudFusionNode(Node):
             self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
                            "distance_removed": 0, "bbox_removed": 0,
                            "bbox_skipped": 0, "bbox_cache_hits": 0,
+                           "ransac_used": 0, "ransac_skipped": 0,
+                           "ransac_inliers": 0,
                            "tf_fail": {}}
 
 
