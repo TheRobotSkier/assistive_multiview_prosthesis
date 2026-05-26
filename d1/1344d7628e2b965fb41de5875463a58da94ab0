@@ -1,0 +1,31 @@
+src/pipeline_manager/pipeline_manager/simple_pipeline_manager_node.py
+  s_e3a37bf76b6b5f::t_0285aa9b9dcb25 1-4,11-12,16-19,23-37,39-43,45-92,94-257,268,274-328,332-462
+  s_e3a37bf76b6b5f::t_efe3566dcd1f3b 5-10,13-15,20-22,44,93,258-267,269-273,329-331
+  s_e3a37bf76b6b5f::t_92f637b69e2d91 38
+Makefile
+  s_e3a37bf76b6b5f::t_40177781418227 156-164
+  s_e3a37bf76b6b5f::t_f83d9e7e479e5d 66
+  s_56cbda1e2fb14d::t_f711384d915899 2-17,22-23,25-29,31-32,34-45,52-56,75-77,80,100-102,105,107-109,113,115-117,120,125-126,217-222,225-226,229,231,233-245
+  s_56cbda1e2fb14d::t_89d85d8025547b 223-224,227-228,232
+Makefile.workspace
+  s_37898e8ccf6ca8::t_7e70857f6d1bb1 344
+  s_37898e8ccf6ca8::t_c1ccbfb08537cc 30
+  s_e3a37bf76b6b5f::t_eba4eef6b6c5e6 105-111
+config/prosthesis_config.yaml
+  s_85a1f585f2b2b8::t_a7a65468dc47b1 107
+  s_d4d4e8d9a58f06::t_8df5f71d53216d 50-51,53-54,57-58,60-61,65,67,70-79,82-86,492,499,502-505,508-516
+  s_e3a37bf76b6b5f::t_d25d8ce4025732 138
+  s_9cba2a8185be48::t_9e2a5d309cef1e 480
+  s_85a1f585f2b2b8::t_304006f14814fb 343,345
+  s_e3a37bf76b6b5f::t_20afc0e2a35d57 120-137,139-146
+src/pipeline_manager/setup.py
+  s_e3a37bf76b6b5f::t_b25a424600e4b3 23
+src/prosthesis_launch/launch/simple_emg_grasp.launch.py
+  s_e3a37bf76b6b5f::t_50b7c6ec961e55 1-200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "d11344d7628e2b965fb41de5875463a58da94ab0",
+  "prompts": {}
+}
