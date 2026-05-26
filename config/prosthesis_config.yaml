@@ -243,6 +243,8 @@ openvins_odom_tf_relay:
         # Optional custom topic for receiving live extrinsics from the Jetson
         # (future support).  Leave empty to disable.
         extrinsics_topic: ""
+        max_pose_norm_m: 2.0
+        max_pose_jump_m: 0.50
 
 openvins_realsense_tf_bridge:
     ros__parameters:

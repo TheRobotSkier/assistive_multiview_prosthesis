@@ -153,6 +153,8 @@ class OpenVINSOdomTFRelay(Node):
         self.declare_parameter("self_calibration_max_retries", 100)
         # ── Future Jetson-side extrinsics topic ───────────────────────────
         self.declare_parameter("extrinsics_topic", "")
+        self.declare_parameter("max_pose_norm_m", 2.0)
+        self.declare_parameter("max_pose_jump_m", 0.50)
 
         # ── Read parameters ───────────────────────────────────────────────
         head_odom_topic = self.get_parameter("head_odom_topic").value
@@ -186,6 +188,8 @@ class OpenVINSOdomTFRelay(Node):
         self._self_calibration_max_retries = self.get_parameter(
             "self_calibration_max_retries").value
         self._extrinsics_topic = self.get_parameter("extrinsics_topic").value
+        self._max_pose_norm_m = self.get_parameter("max_pose_norm_m").value
+        self._max_pose_jump_m = self.get_parameter("max_pose_jump_m").value
 
         # ── TF2 buffer for self-calibration lookups ───────────────────────
         self._tf_buffer = Buffer()
@@ -245,6 +249,8 @@ class OpenVINSOdomTFRelay(Node):
         # self-calibration lookups through the RealSense TF tree.
         self._head_actual_imu_frame: str | None = None
         self._arm_actual_imu_frame: str | None = None
+        self._last_head_pos: tuple[float, float, float] | None = None
+        self._last_arm_pos: tuple[float, float, float] | None = None
 
         # -- Publish static *_imu -> *_cam0 edges --------------------------
         # Stored for liveness re-send on /tf, matching the same pattern
@@ -364,6 +370,35 @@ class OpenVINSOdomTFRelay(Node):
                 f"elapsed={elapsed:.1f}s, "
                 f"actual_imu_frame={actual_imu!r})"
             )
+
+        # ── Post-initialization outlier suppression ────────────────────────
+        pos_norm = math.sqrt(x * x + y * y + z * z)
+        if pos_norm > self._max_pose_norm_m:
+            self.get_logger().warn(
+                f'{name} odom pose norm {pos_norm:.2f}m exceeds max '
+                f'{self._max_pose_norm_m}m — suppressing TF',
+                throttle_duration_sec=2.0)
+            return
+
+        last_pos = self._last_head_pos if name == 'head' else self._last_arm_pos
+        if last_pos is not None:
+            jump = math.sqrt(
+                (x - last_pos[0]) ** 2
+                + (y - last_pos[1]) ** 2
+                + (z - last_pos[2]) ** 2
+            )
+            if jump > self._max_pose_jump_m:
+                self.get_logger().warn(
+                    f'{name} odom pose jumped {jump:.3f}m '
+                    f'(> {self._max_pose_jump_m}m) — suppressing TF',
+                    throttle_duration_sec=2.0)
+                return
+
+        # Update last position
+        if name == 'head':
+            self._last_head_pos = (x, y, z)
+        else:
+            self._last_arm_pos = (x, y, z)
 
         # Stamp with the host clock so all edges in the TF chain
         # (relay, bridge, camera mounts) share the same time domain.
