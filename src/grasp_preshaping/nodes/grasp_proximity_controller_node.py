@@ -354,7 +354,7 @@ class GraspProximityControllerNode(Node):
                 throttle_duration_sec=5.0)
             return
 
-        dist = self._compute_proximity_distance(
+        dist, (dx, dy, dz) = self._compute_proximity_distance(
             self._current_hand_pose, self._planned_hand_frame)
 
         # Sanity guards
@@ -389,8 +389,9 @@ class GraspProximityControllerNode(Node):
                     self._is_near = False
                     self._near_exit_count = 0
                     self.get_logger().info(
-                        f'Left near zone (dist={dist:.3f}m > '
-                        f'exit={self._exit_thresh:.3f}m)')
+                        f'Left near zone (dist={dist:.3f} m, '
+                        f'offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m'
+                        f' > exit={self._exit_thresh:.3f} m)')
                     self._near_zone_pub.publish(Bool(data=False))
             else:
                 self._near_exit_count = 0
@@ -401,8 +402,9 @@ class GraspProximityControllerNode(Node):
                     self._is_near = True
                     self._near_enter_count = 0
                     self.get_logger().info(
-                        f'Entered near zone (dist={dist:.3f}m < '
-                        f'enter={self._enter_thresh:.3f}m)')
+                        f'Entered near zone (dist={dist:.3f} m, '
+                        f'offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m'
+                        f' < enter={self._enter_thresh:.3f} m)')
                     self._near_zone_pub.publish(Bool(data=True))
             else:
                 self._near_enter_count = 0
@@ -412,12 +414,16 @@ class GraspProximityControllerNode(Node):
 
         if self._is_near:
             self.get_logger().info(
-                f'NEAR mode (dist={dist:.3f} m): full closure',
+                f'NEAR mode (dist={dist:.3f} m, '
+                f'offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m): '
+                f'full closure',
                 throttle_duration_sec=1.0)
             self._publish_joint_commands(thumb, index, mrl, mode)
         else:
             self.get_logger().info(
-                f'FAR mode (dist={dist:.3f} m): partial closure + wrist',
+                f'FAR mode (dist={dist:.3f} m, '
+                f'offset=[{dx:+.3f}, {dy:+.3f}, {dz:+.3f}] m): '
+                f'partial closure + wrist',
                 throttle_duration_sec=1.0)
             self._publish_wrist_command(self._planned_wrist_deg, mode)
             self._publish_joint_commands(
@@ -429,20 +435,26 @@ class GraspProximityControllerNode(Node):
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _compute_proximity_distance(self, current: PoseStamped, planned: Pose) -> float:
+    def _compute_proximity_distance(
+        self, current: PoseStamped, planned: Pose,
+    ) -> tuple[float, tuple[float, float, float]]:
         """Compute distance between current and planned hand positions.
 
         Both positions are shifted from the tracked pose origin (camera) to
         the grasp contact point (fingertips) using ``_grasp_contact_offset``
         before computing the Euclidean distance.  The offset is expressed in
         each pose's local frame and rotated by that pose's orientation.
+
+        Returns:
+            (euclidean_distance, (dx, dy, dz)) where dx/dy/dz are the
+            signed per-axis offsets from planned to current grasp contact.
         """
         cur_pos = self._apply_offset(current.pose, self._grasp_contact_offset)
         plan_pos = self._apply_offset(planned, self._grasp_contact_offset)
         dx = cur_pos[0] - plan_pos[0]
         dy = cur_pos[1] - plan_pos[1]
         dz = cur_pos[2] - plan_pos[2]
-        return math.sqrt(dx * dx + dy * dy + dz * dz)
+        return math.sqrt(dx * dx + dy * dy + dz * dz), (dx, dy, dz)
 
     @staticmethod
     def _apply_offset(pose: Pose, offset: list[float]) -> tuple[float, float, float]:
