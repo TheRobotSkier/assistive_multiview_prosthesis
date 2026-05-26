@@ -164,6 +164,8 @@ preshaping_service:
         min_closure_amount: 0.1
         preshaping_closure_fraction: 0.3
         publish_initial_commands: false
+        contact_override_max_age_s: 6.0
+        max_wrist_delta_deg: 90.0
 
 pointcloud_fusion:
     ros__parameters:
