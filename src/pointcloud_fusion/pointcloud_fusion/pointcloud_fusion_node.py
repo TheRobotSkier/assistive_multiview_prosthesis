@@ -27,18 +27,19 @@ from pathlib import Path
 
 import numpy as np
 import rclpy
-import yaml
-from rclpy.node import Node
-from scipy.spatial import cKDTree
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from sensor_msgs.msg import PointCloud2, PointField
-from visualization_msgs.msg import Marker
 import tf2_ros
 import tf2_sensor_msgs  # noqa: F401 — registers do_transform_cloud
+import yaml
+from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from scipy.spatial import cKDTree
+from sensor_msgs.msg import PointCloud2, PointField
+from visualization_msgs.msg import Marker
 
 try:
     import message_filters
     from message_filters import ApproximateTimeSynchronizer
+
     _HAS_MSG_FILTERS = True
 except ImportError:
     _HAS_MSG_FILTERS = False
@@ -47,6 +48,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # PointCloud2 helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_cloud(msg: PointCloud2):
     """Extract xyz (N,3) float32 and rgb_packed (N,) uint32 from a PointCloud2.
@@ -64,7 +66,7 @@ def _parse_cloud(msg: PointCloud2):
 
     def _col_f32(name: str) -> np.ndarray:
         off = fields[name].offset
-        return np.frombuffer(raw[:, off:off + 4].copy().tobytes(), dtype=np.float32)
+        return np.frombuffer(raw[:, off : off + 4].copy().tobytes(), dtype=np.float32)
 
     xyz = np.column_stack([_col_f32("x"), _col_f32("y"), _col_f32("z")])
 
@@ -87,9 +89,9 @@ def _build_cloud(xyz: np.ndarray, rgb_packed: np.ndarray, header) -> PointCloud2
     msg.height = 1
     msg.width = n
     msg.fields = [
-        PointField(name="x",   offset=0,  datatype=PointField.FLOAT32, count=1),
-        PointField(name="y",   offset=4,  datatype=PointField.FLOAT32, count=1),
-        PointField(name="z",   offset=8,  datatype=PointField.FLOAT32, count=1),
+        PointField(name="x", offset=0, datatype=PointField.FLOAT32, count=1),
+        PointField(name="y", offset=4, datatype=PointField.FLOAT32, count=1),
+        PointField(name="z", offset=8, datatype=PointField.FLOAT32, count=1),
         PointField(name="rgb", offset=12, datatype=PointField.FLOAT32, count=1),
     ]
     msg.is_bigendian = False
@@ -109,14 +111,19 @@ def _build_cloud(xyz: np.ndarray, rgb_packed: np.ndarray, header) -> PointCloud2
 # Filtering helpers
 # ---------------------------------------------------------------------------
 
-def _distance_filter(xyz: np.ndarray, center: np.ndarray, max_dist: float) -> np.ndarray:
+
+def _distance_filter(
+    xyz: np.ndarray, center: np.ndarray, max_dist: float
+) -> np.ndarray:
     """Return boolean mask: True for points within max_dist of center."""
     diff = xyz - center
     dists_sq = np.sum(diff * diff, axis=1)
     return dists_sq <= (max_dist * max_dist)
 
 
-def _bbox_filter(xyz_arm: np.ndarray, bbox_min: np.ndarray, bbox_max: np.ndarray) -> np.ndarray:
+def _bbox_filter(
+    xyz_arm: np.ndarray, bbox_min: np.ndarray, bbox_max: np.ndarray
+) -> np.ndarray:
     """Return boolean mask: True for points OUTSIDE the AABB (to keep)."""
     inside = np.all(
         (xyz_arm >= bbox_min) & (xyz_arm <= bbox_max),
@@ -138,7 +145,10 @@ def _voxel_downsample(xyz: np.ndarray, rgb_packed: np.ndarray, voxel_size: float
     inv = 1.0 / voxel_size
     voxel_idx = np.floor(xyz * inv).astype(np.int64)
     _, unique_idx, inverse = np.unique(
-        voxel_idx, axis=0, return_index=True, return_inverse=True,
+        voxel_idx,
+        axis=0,
+        return_index=True,
+        return_inverse=True,
     )
 
     n_voxels = len(unique_idx)
@@ -180,29 +190,31 @@ def _extract_rotation_translation(t) -> tuple[np.ndarray, np.ndarray]:
     qz = t.transform.rotation.z
     qw = t.transform.rotation.w
 
-    r00 = 1 - 2*(qy*qy + qz*qz)
-    r01 = 2*(qx*qy - qz*qw)
-    r02 = 2*(qx*qz + qy*qw)
-    r10 = 2*(qx*qy + qz*qw)
-    r11 = 1 - 2*(qx*qx + qz*qz)
-    r12 = 2*(qy*qz - qx*qw)
-    r20 = 2*(qx*qz - qy*qw)
-    r21 = 2*(qy*qz + qx*qw)
-    r22 = 1 - 2*(qx*qx + qy*qy)
+    r00 = 1 - 2 * (qy * qy + qz * qz)
+    r01 = 2 * (qx * qy - qz * qw)
+    r02 = 2 * (qx * qz + qy * qw)
+    r10 = 2 * (qx * qy + qz * qw)
+    r11 = 1 - 2 * (qx * qx + qz * qz)
+    r12 = 2 * (qy * qz - qx * qw)
+    r20 = 2 * (qx * qz - qy * qw)
+    r21 = 2 * (qy * qz + qx * qw)
+    r22 = 1 - 2 * (qx * qx + qy * qy)
 
-    R = np.array([[r00, r01, r02],
-                   [r10, r11, r12],
-                   [r20, r21, r22]], dtype=np.float64)
-    t_vec = np.array([
-        t.transform.translation.x,
-        t.transform.translation.y,
-        t.transform.translation.z,
-    ], dtype=np.float64)
+    R = np.array([[r00, r01, r02], [r10, r11, r12], [r20, r21, r22]], dtype=np.float64)
+    t_vec = np.array(
+        [
+            t.transform.translation.x,
+            t.transform.translation.y,
+            t.transform.translation.z,
+        ],
+        dtype=np.float64,
+    )
     return R, t_vec
 
 
-def _transform_points_to_frame(xyz: np.ndarray, tf_buffer, target_frame: str,
-                                source_frame: str, stamp) -> np.ndarray | None:
+def _transform_points_to_frame(
+    xyz: np.ndarray, tf_buffer, target_frame: str, source_frame: str, stamp
+) -> np.ndarray | None:
     """Transform an (N,3) xyz array from source_frame to target_frame using TF2.
 
     Returns transformed (N,3) float32 or None if TF lookup fails.
@@ -220,6 +232,7 @@ def _transform_points_to_frame(xyz: np.ndarray, tf_buffer, target_frame: str,
 # ---------------------------------------------------------------------------
 # Node
 # ---------------------------------------------------------------------------
+
 
 class PointCloudFusionNode(Node):
     """Fuses dual-camera point clouds in world frame with filtering."""
@@ -246,62 +259,101 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("cloud_max_age_s", 0.5)
         self.declare_parameter("mounts_config_path", "")
         self.declare_parameter("active_mount", "8_cm_cam_mount")
-        self.declare_parameter("bbox_fallback_mode", "cache")  # skip | cache | conservative
+        self.declare_parameter(
+            "bbox_fallback_mode", "cache"
+        )  # skip | cache | conservative
         self.declare_parameter("bbox_cache_max_age_s", 2.0)
         self.declare_parameter("wait_for_tf", True)
         self.declare_parameter("tf_ready_check_interval", 2.0)
+        self.declare_parameter("bbox_lookup_timeout_s", 0.02)
+        self.declare_parameter("max_processing_age_s", 5.0)
 
         # ── RANSAC alignment parameters ─────────────────────────────────
+        # Disabled by default for live operation: TF already places both
+        # clouds in target_frame, and per-frame RANSAC can be expensive and
+        # can introduce visible lag if it chases weak/ambiguous geometry.
         self.declare_parameter("enable_ransac_alignment", True)
         self.declare_parameter("ransac_min_correspondences", 8)
-        self.declare_parameter("ransac_max_iterations", 1000)
+        self.declare_parameter("ransac_max_iterations", 100)
         self.declare_parameter("ransac_inlier_distance_m", 0.03)
-        self.declare_parameter("ransac_downsample_max_points", 2000)
+        self.declare_parameter("ransac_downsample_max_points", 500)
+        self.declare_parameter("ransac_min_inlier_ratio", 0.08)
+        self.declare_parameter("ransac_max_correction_m", 1.0)
+        self.declare_parameter("ransac_max_correction_deg", 360.0)
 
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
         self._arm_frame = self.get_parameter("arm_frame").value
         self._max_distance = self.get_parameter("max_distance").value
         self._voxel_size = self.get_parameter("voxel_size").value
-        self._bbox_min = np.array(self.get_parameter("bbox_min").value, dtype=np.float32)
-        self._bbox_max = np.array(self.get_parameter("bbox_max").value, dtype=np.float32)
+        self._bbox_min = np.array(
+            self.get_parameter("bbox_min").value, dtype=np.float32
+        )
+        self._bbox_max = np.array(
+            self.get_parameter("bbox_max").value, dtype=np.float32
+        )
         self._enable_downsampling = self.get_parameter("enable_downsampling").value
-        self._enable_distance_filter = self.get_parameter("enable_distance_filter").value
+        self._enable_distance_filter = self.get_parameter(
+            "enable_distance_filter"
+        ).value
         self._enable_hand_removal = self.get_parameter("enable_hand_removal").value
         cam1_topic = self.get_parameter("cam1_topic").value
         cam2_topic = self.get_parameter("cam2_topic").value
         output_topic = self.get_parameter("output_topic").value
         sync_tol = self.get_parameter("sync_tolerance_s").value
         self._require_both = self.get_parameter("require_both_cameras").value
-        fallback_rate = max(float(self.get_parameter("fallback_merge_rate_hz").value), 1.0)
+        fallback_rate = max(
+            float(self.get_parameter("fallback_merge_rate_hz").value), 1.0
+        )
         self._cloud_max_age = float(self.get_parameter("cloud_max_age_s").value)
         self._bbox_fallback_mode = self.get_parameter("bbox_fallback_mode").value
         self._bbox_cache_max_age = float(
-            self.get_parameter("bbox_cache_max_age_s").value)
+            self.get_parameter("bbox_cache_max_age_s").value
+        )
         self._enable_ransac = self.get_parameter("enable_ransac_alignment").value
         self._ransac_min_corr = self.get_parameter("ransac_min_correspondences").value
         self._ransac_max_iter = self.get_parameter("ransac_max_iterations").value
         self._ransac_inlier_dist = self.get_parameter("ransac_inlier_distance_m").value
-        self._ransac_max_points = self.get_parameter("ransac_downsample_max_points").value
+        self._ransac_max_points = self.get_parameter(
+            "ransac_downsample_max_points"
+        ).value
+        self._ransac_min_inlier_ratio = float(
+            self.get_parameter("ransac_min_inlier_ratio").value
+        )
+        self._ransac_max_correction = float(
+            self.get_parameter("ransac_max_correction_m").value
+        )
+        self._ransac_max_correction_rad = np.deg2rad(
+            float(self.get_parameter("ransac_max_correction_deg").value)
+        )
         self._wait_for_tf = self.get_parameter("wait_for_tf").value
+        self._bbox_lookup_timeout = float(
+            self.get_parameter("bbox_lookup_timeout_s").value
+        )
+        self._max_processing_age = float(
+            self.get_parameter("max_processing_age_s").value
+        )
         self._tf_ready_check_interval = float(
-            self.get_parameter("tf_ready_check_interval").value)
+            self.get_parameter("tf_ready_check_interval").value
+        )
 
         # ── Load pruning boxes from camera_mounts.yaml or fall back to params ─
         mounts_config = self.get_parameter("mounts_config_path").value
         if mounts_config:
             self._pruning_boxes = self._load_pruning_boxes(
-                mounts_config, self.get_parameter("active_mount").value)
+                mounts_config, self.get_parameter("active_mount").value
+            )
             for i, (frame, bmin, bmax) in enumerate(self._pruning_boxes):
                 self.get_logger().info(
                     f"Pruning box {i}: frame={frame}, "
-                    f"min={bmin.tolist()}, max={bmax.tolist()}")
+                    f"min={bmin.tolist()}, max={bmax.tolist()}"
+                )
         else:
-            self._pruning_boxes = [
-                (self._arm_frame, self._bbox_min, self._bbox_max)]
+            self._pruning_boxes = [(self._arm_frame, self._bbox_min, self._bbox_max)]
             self.get_logger().info(
                 f"Pruning box 0 (fallback): frame={self._arm_frame}, "
-                f"min={self._bbox_min.tolist()}, max={self._bbox_max.tolist()}")
+                f"min={self._bbox_min.tolist()}, max={self._bbox_max.tolist()}"
+            )
 
         # ── TF2 ───────────────────────────────────────────────────────────
         self._tf_buffer = tf2_ros.Buffer()
@@ -310,7 +362,8 @@ class PointCloudFusionNode(Node):
         # ── Publishers ────────────────────────────────────────────────────
         self._pub = self.create_publisher(PointCloud2, output_topic, 5)
         self._bbox_marker_pub = self.create_publisher(
-            Marker, "/pointcloud_fusion/hand_removal_bbox", 1)
+            Marker, "/pointcloud_fusion/hand_removal_bbox", 1
+        )
 
         # ── Subscriptions ─────────────────────────────────────────────────
         # Use RELIABLE QoS — RealSense publishers use RELIABLE
@@ -325,44 +378,67 @@ class PointCloudFusionNode(Node):
         self._cam2_cloud = None
         self._cam1_stamp = None
         self._cam2_stamp = None
+        self._input_seq = 0
+        self._processing_active = False
+        self._processing_started_ns = 0
         self._lock = threading.Lock()
-        self.create_subscription(
-            PointCloud2, cam1_topic, self._cb_cam1, cloud_qos)
-        self.create_subscription(
-            PointCloud2, cam2_topic, self._cb_cam2, cloud_qos)
+        self.create_subscription(PointCloud2, cam1_topic, self._cb_cam1, cloud_qos)
+        self.create_subscription(PointCloud2, cam2_topic, self._cb_cam2, cloud_qos)
 
         if _HAS_MSG_FILTERS and self._require_both:
             # Synchronizer-only mode: require both clouds to arrive together.
-            sub1 = message_filters.Subscriber(self, PointCloud2, cam1_topic, qos_profile=cloud_qos)
-            sub2 = message_filters.Subscriber(self, PointCloud2, cam2_topic, qos_profile=cloud_qos)
+            sub1 = message_filters.Subscriber(
+                self, PointCloud2, cam1_topic, qos_profile=cloud_qos
+            )
+            sub2 = message_filters.Subscriber(
+                self, PointCloud2, cam2_topic, qos_profile=cloud_qos
+            )
             self._sync = ApproximateTimeSynchronizer(
-                [sub1, sub2], queue_size=5, slop=sync_tol)
+                [sub1, sub2], queue_size=5, slop=sync_tol
+            )
             self._sync.registerCallback(self._synced_callback)
             self._fallback_timer = None
             self.get_logger().info(
-                f"Using ApproximateTimeSynchronizer (tolerance={sync_tol}s, require_both=True)")
+                f"Using ApproximateTimeSynchronizer (tolerance={sync_tol}s, require_both=True)"
+            )
         else:
             # Fallback timer merge: process whichever clouds are fresh.
             self._sync = None
             self._fallback_timer = self.create_timer(
-                1.0 / fallback_rate, self._timer_merge)
-            mode_desc = "require_both=True but message_filters unavailable" \
-                if self._require_both else "require_both=False"
+                1.0 / fallback_rate, self._timer_merge
+            )
+            mode_desc = (
+                "require_both=True but message_filters unavailable"
+                if self._require_both
+                else "require_both=False"
+            )
             self.get_logger().info(
                 f"Using timer-based merge ({mode_desc}, "
-                f"rate={fallback_rate}Hz, max_age={self._cloud_max_age}s)")
+                f"rate={fallback_rate}Hz, max_age={self._cloud_max_age}s)"
+            )
 
         # ── BBox visualization timer ──────────────────────────────────────
         self.create_timer(1.0, self._publish_bbox_marker)
 
         # ── Stats ─────────────────────────────────────────────────────────
         self._stats_lock = threading.Lock()
-        self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
-                       "distance_removed": 0, "bbox_removed": 0,
-                       "bbox_skipped": 0, "bbox_cache_hits": 0,
-                       "ransac_used": 0, "ransac_skipped": 0,
-                       "ransac_inliers": 0,
-                       "tf_fail": {}}
+        self._stats = {
+            "published": 0,
+            "cam1_only": 0,
+            "dual": 0,
+            "distance_removed": 0,
+            "bbox_removed": 0,
+            "bbox_skipped": 0,
+            "bbox_cache_hits": 0,
+            "processing_busy_skips": 0,
+            "processing_age_drops": 0,
+            "processing_ms_sum": 0.0,
+            "processing_ms_max": 0.0,
+            "ransac_used": 0,
+            "ransac_skipped": 0,
+            "ransac_inliers": 0,
+            "tf_fail": {},
+        }
         self._last_publish_time = self.get_clock().now()
         self.create_timer(10.0, self._log_stats)
 
@@ -370,7 +446,9 @@ class PointCloudFusionNode(Node):
         # Caches the most recent successful transform for each pruning box
         # frame as (R, t_vec, timestamp_ns). Used when fresh TF lookup fails
         # and bbox_fallback_mode == "cache".
-        self._bbox_transform_cache: dict[str, tuple] = {}  # frame -> (R, t_vec, cache_time_ns)
+        self._bbox_transform_cache: dict[
+            str, tuple
+        ] = {}  # frame -> (R, t_vec, cache_time_ns)
 
         # ── Bbox health tracking ───────────────────────────────────────────
         self._bbox_attempts = 0
@@ -391,7 +469,8 @@ class PointCloudFusionNode(Node):
             # Check immediately, then periodically.
             self._check_tf_ready()
             self._tf_ready_timer = self.create_timer(
-                self._tf_ready_check_interval, self._check_tf_ready)
+                self._tf_ready_check_interval, self._check_tf_ready
+            )
             self.get_logger().info(
                 f"TF wait gate active: waiting for TF tree to connect "
                 f"(checking every {self._tf_ready_check_interval:.1f}s)"
@@ -403,15 +482,20 @@ class PointCloudFusionNode(Node):
                 "processing clouds immediately"
             )
 
-        ransac_str = (f"RANSAC alignment: ON (min_corr={self._ransac_min_corr}, "
-                       f"iter={self._ransac_max_iter}, dist={self._ransac_inlier_dist}m)"
-                       if self._enable_ransac else "RANSAC alignment: OFF")
+        ransac_str = (
+            f"RANSAC alignment: ON (min_corr={self._ransac_min_corr}, "
+            f"iter={self._ransac_max_iter}, dist={self._ransac_inlier_dist}m)"
+            if self._enable_ransac
+            else "RANSAC alignment: OFF"
+        )
         self.get_logger().info(
             f"Pointcloud fusion: {cam1_topic} + {cam2_topic} -> {output_topic} "
             f"(target_frame={self._target_frame}, arm_frame={self._arm_frame}, "
             f"max_dist={self._max_distance}m, voxel={self._voxel_size}m, "
             f"pruning_boxes={len(self._pruning_boxes)}, "
             f"bbox_fallback={self._bbox_fallback_mode}, "
+            f"bbox_timeout={self._bbox_lookup_timeout:.3f}s, "
+            f"max_processing_age={self._max_processing_age:.2f}s, "
             f"{ransac_str})"
         )
 
@@ -421,7 +505,20 @@ class PointCloudFusionNode(Node):
         """Called when both clouds arrive within sync tolerance."""
         if not self._tf_ready:
             return
-        self._process_clouds([msg1, msg2])
+
+        now = self.get_clock().now()
+        with self._lock:
+            self._cam1_cloud = msg1
+            self._cam2_cloud = msg2
+            self._cam1_stamp = now
+            self._cam2_stamp = now
+            self._input_seq += 1
+            if self._processing_active:
+                with self._stats_lock:
+                    self._stats["processing_busy_skips"] += 1
+                return
+
+        self._start_latest_processing(now)
 
     # ── Fallback individual callbacks ────────────────────────────────────
 
@@ -429,42 +526,110 @@ class PointCloudFusionNode(Node):
         with self._lock:
             self._cam1_cloud = msg
             self._cam1_stamp = self.get_clock().now()
+            self._input_seq += 1
 
     def _cb_cam2(self, msg: PointCloud2):
         with self._lock:
             self._cam2_cloud = msg
             self._cam2_stamp = self.get_clock().now()
+            self._input_seq += 1
 
     def _timer_merge(self):
-        """Process whichever clouds are fresh enough.
+        """Start one latest-cloud processing job when the worker is idle.
 
-        Runs processing in a background thread so the executor can continue
-        receiving cloud callbacks and TF updates without starvation.
+        Incoming clouds are stored by the callbacks with depth=1 QoS.  If
+        processing is slower than camera rate, intermediate frames are skipped;
+        after each publish the next worker snapshots the newest cached clouds.
         """
         if not self._tf_ready:
             return
         now = self.get_clock().now()
         with self._lock:
+            if self._processing_active:
+                active_age = 0.0
+                if self._processing_started_ns:
+                    active_age = (now.nanoseconds - self._processing_started_ns) / 1e9
+                with self._stats_lock:
+                    self._stats["processing_busy_skips"] += 1
+                if active_age > 1.0:
+                    self.get_logger().warn(
+                        f"Fusion processing still active after {active_age:.2f}s; "
+                        "will process newest cached clouds when it finishes",
+                        throttle_duration_sec=2.0,
+                    )
+                return
+
+        self._start_latest_processing(now)
+
+    def _start_latest_processing(self, now=None):
+        """Snapshot newest cached clouds and launch one background worker."""
+        if now is None:
+            now = self.get_clock().now()
+
+        with self._lock:
+            if self._processing_active:
+                return False
+
             c1, s1 = self._cam1_cloud, self._cam1_stamp
             c2, s2 = self._cam2_cloud, self._cam2_stamp
 
-        clouds = []
-        if c1 is not None and s1 is not None:
-            age = (now - s1).nanoseconds / 1e9
-            if age <= self._cloud_max_age:
-                clouds.append(c1)
-        if c2 is not None and s2 is not None:
-            age = (now - s2).nanoseconds / 1e9
-            if age <= self._cloud_max_age:
-                clouds.append(c2)
-        if clouds:
-            # Process in a daemon thread so the executor is not blocked.
-            t = threading.Thread(target=self._process_clouds, args=(clouds,), daemon=True)
-            t.start()
+            clouds = []
+            newest_stamp = None
+            if c1 is not None and s1 is not None:
+                age = (now - s1).nanoseconds / 1e9
+                if age <= self._cloud_max_age:
+                    clouds.append(c1)
+                    newest_stamp = (
+                        s1
+                        if newest_stamp is None or s1 > newest_stamp
+                        else newest_stamp
+                    )
+            if c2 is not None and s2 is not None:
+                age = (now - s2).nanoseconds / 1e9
+                if age <= self._cloud_max_age:
+                    clouds.append(c2)
+                    newest_stamp = (
+                        s2
+                        if newest_stamp is None or s2 > newest_stamp
+                        else newest_stamp
+                    )
+
+            if not clouds:
+                return False
+
+            self._processing_active = True
+            self._processing_started_ns = now.nanoseconds
+
+        # Process in a daemon thread so the executor is not blocked.  Only one
+        # worker is allowed at a time; new arrivals update the cached snapshot
+        # for the next cycle rather than invalidating the current publish.
+        t = threading.Thread(
+            target=self._process_clouds_worker,
+            args=(clouds, newest_stamp),
+            daemon=True,
+        )
+        t.start()
+        return True
+
+    def _process_clouds_worker(self, clouds: list[PointCloud2], newest_stamp):
+        start = self.get_clock().now()
+        try:
+            self._process_clouds(clouds, newest_stamp)
+        finally:
+            duration_ms = (self.get_clock().now() - start).nanoseconds / 1e6
+            with self._stats_lock:
+                self._stats["processing_ms_sum"] += float(duration_ms)
+                self._stats["processing_ms_max"] = max(
+                    self._stats["processing_ms_max"], float(duration_ms)
+                )
+            with self._lock:
+                self._processing_active = False
+                self._processing_started_ns = 0
+            self._start_latest_processing()
 
     # ── Core processing pipeline ─────────────────────────────────────────
 
-    def _process_clouds(self, clouds: list[PointCloud2]):
+    def _process_clouds(self, clouds: list[PointCloud2], newest_stamp=None):
         """Transform, merge, filter, downsample, and publish."""
         # ── Step 1: Transform all clouds to target frame ──────────────
         transformed: list[PointCloud2] = []
@@ -474,14 +639,17 @@ class PointCloudFusionNode(Node):
                 continue
             try:
                 t = self._tf_buffer.lookup_transform(
-                    self._target_frame, cloud.header.frame_id,
+                    self._target_frame,
+                    cloud.header.frame_id,
                     rclpy.time.Time(),
                 )
                 transformed.append(tf2_sensor_msgs.do_transform_cloud(cloud, t))
             except Exception as exc:
                 frame = cloud.header.frame_id
                 with self._stats_lock:
-                    self._stats["tf_fail"][frame] = self._stats["tf_fail"].get(frame, 0) + 1
+                    self._stats["tf_fail"][frame] = (
+                        self._stats["tf_fail"].get(frame, 0) + 1
+                    )
                 self.get_logger().warn(
                     f"TF transform failed for {frame}: {exc}",
                     throttle_duration_sec=10.0,
@@ -506,11 +674,13 @@ class PointCloudFusionNode(Node):
             arm_xyz, arm_rgb = _parse_cloud(transformed[1])
             if len(head_xyz) >= 3 and len(arm_xyz) >= 3:
                 aligned_arm, ransac_used, ransac_inliers = self._ransac_align(
-                    head_xyz, arm_xyz)
+                    head_xyz, arm_xyz
+                )
                 if ransac_used:
                     # Rebuild the arm PointCloud2 with aligned points
-                    aligned_msg = _build_cloud(aligned_arm, arm_rgb,
-                                               transformed[1].header)
+                    aligned_msg = _build_cloud(
+                        aligned_arm, arm_rgb, transformed[1].header
+                    )
                     transformed[1] = aligned_msg
 
         # ── Step 3: Concatenate clouds ────────────────────────────────
@@ -589,8 +759,7 @@ class PointCloudFusionNode(Node):
                 self._bbox_attempts += 1
 
                 # Try non-blocking TF lookup with a short timeout; falls back to cache
-                transform_result = self._lookup_bbox_transform(
-                    frame, xyz_all)
+                transform_result = self._lookup_bbox_transform(frame, xyz_all)
 
                 if transform_result is not None:
                     R, t_vec, xyz_box = transform_result
@@ -611,12 +780,13 @@ class PointCloudFusionNode(Node):
                         self.get_logger().info(
                             f"Bbox removal via fresh TF removed {removed} points "
                             f"from {frame}",
-                            throttle_duration_sec=10.0)
+                            throttle_duration_sec=10.0,
+                        )
                 else:
                     # Fresh lookup failed — apply fallback strategy
                     handled = self._bbox_fallback(
-                        frame, bbox_min, bbox_max,
-                        xyz_all, rgb_all)
+                        frame, bbox_min, bbox_max, xyz_all, rgb_all
+                    )
                     if handled is not None:
                         xyz_all, rgb_all = handled[0], handled[1]
                     # else: bbox_skipped already counted in _bbox_fallback
@@ -632,6 +802,18 @@ class PointCloudFusionNode(Node):
             return
 
         # ── Step 6: Build and publish ─────────────────────────────────
+        if newest_stamp is not None:
+            result_age_s = (self.get_clock().now() - newest_stamp).nanoseconds / 1e9
+            if result_age_s > self._max_processing_age:
+                with self._stats_lock:
+                    self._stats["processing_age_drops"] += 1
+                self.get_logger().warn(
+                    f"Dropping stale fused cloud result age={result_age_s:.2f}s "
+                    f"> max_processing_age_s={self._max_processing_age:.2f}s",
+                    throttle_duration_sec=2.0,
+                )
+                return
+
         header = transformed[0].header if transformed else None
         if header is None:
             return
@@ -724,7 +906,34 @@ class PointCloudFusionNode(Node):
                 if best_inliers >= 3 * self._ransac_min_corr:
                     break
 
+        inlier_ratio = best_inliers / max(n_src, 1)
+        correction_t = float(np.linalg.norm(best_t))
+        trace = float(np.clip((np.trace(best_R) - 1.0) * 0.5, -1.0, 1.0))
+        correction_angle = float(np.arccos(trace))
+
         if best_inliers >= self._ransac_min_corr:
+            if inlier_ratio < self._ransac_min_inlier_ratio:
+                self.get_logger().debug(
+                    f"RANSAC skipped: inlier_ratio={inlier_ratio:.3f} "
+                    f"< {self._ransac_min_inlier_ratio:.3f}"
+                )
+                return source_xyz, False, best_inliers
+            if correction_t > self._ransac_max_correction:
+                self.get_logger().warn(
+                    f"RANSAC correction rejected: translation={correction_t:.3f}m "
+                    f"> {self._ransac_max_correction:.3f}m",
+                    throttle_duration_sec=2.0,
+                )
+                return source_xyz, False, best_inliers
+            if correction_angle > self._ransac_max_correction_rad:
+                self.get_logger().warn(
+                    f"RANSAC correction rejected: rotation="
+                    f"{np.rad2deg(correction_angle):.1f}deg > "
+                    f"{np.rad2deg(self._ransac_max_correction_rad):.1f}deg",
+                    throttle_duration_sec=2.0,
+                )
+                return source_xyz, False, best_inliers
+
             aligned = (source_xyz.astype(np.float64) @ best_R.T) + best_t
             return aligned.astype(np.float32), True, best_inliers
 
@@ -741,8 +950,10 @@ class PointCloudFusionNode(Node):
         """
         try:
             t = self._tf_buffer.lookup_transform(
-                frame, self._target_frame, rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.5),
+                frame,
+                self._target_frame,
+                rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=self._bbox_lookup_timeout),
             )
         except Exception as e:
             self.get_logger().debug(
@@ -754,8 +965,7 @@ class PointCloudFusionNode(Node):
         xyz_box = (xyz_all.astype(np.float64) @ R.T) + t_vec
         return R, t_vec, xyz_box.astype(np.float32)
 
-    def _bbox_fallback(self, frame: str, bbox_min, bbox_max,
-                       xyz_all, rgb_all):
+    def _bbox_fallback(self, frame: str, bbox_min, bbox_max, xyz_all, rgb_all):
         """Handle bbox removal when fresh TF lookup fails.
 
         Returns (xyz_all, rgb_all) if fallback was applied, or None if
@@ -784,11 +994,13 @@ class PointCloudFusionNode(Node):
                             self.get_logger().info(
                                 f"Bbox removal via cache removed {removed} points "
                                 f"from {frame} (cache age={age_s:.2f}s)",
-                                throttle_duration_sec=10.0)
+                                throttle_duration_sec=10.0,
+                            )
                     self.get_logger().warn(
                         f"Using cached transform for {frame} "
                         f"(age={age_s:.2f}s) — fresh lookup failed",
-                        throttle_duration_sec=5.0)
+                        throttle_duration_sec=5.0,
+                    )
                     return xyz_all, rgb_all
                 else:
                     with self._stats_lock:
@@ -797,7 +1009,8 @@ class PointCloudFusionNode(Node):
                         f"Cannot transform to {frame} for bbox removal — "
                         f"cached transform too old ({age_s:.1f}s > "
                         f"{self._bbox_cache_max_age}s), skipping",
-                        throttle_duration_sec=5.0)
+                        throttle_duration_sec=5.0,
+                    )
                     return None
             # No cache available
             with self._stats_lock:
@@ -805,7 +1018,8 @@ class PointCloudFusionNode(Node):
             self.get_logger().warn(
                 f"Cannot transform to {frame} for bbox removal — "
                 f"no cached transform available, skipping",
-                throttle_duration_sec=5.0)
+                throttle_duration_sec=5.0,
+            )
             return None
 
         elif self._bbox_fallback_mode == "conservative":
@@ -814,7 +1028,8 @@ class PointCloudFusionNode(Node):
             self.get_logger().warn(
                 f"Cannot transform to {frame} for bbox removal — "
                 f"conservative mode: dropping fused cloud",
-                throttle_duration_sec=5.0)
+                throttle_duration_sec=5.0,
+            )
             return np.zeros((0, 3), dtype=np.float32), rgb_all[:0]
 
         else:  # "skip" mode (original behavior)
@@ -822,7 +1037,8 @@ class PointCloudFusionNode(Node):
                 self._stats["bbox_skipped"] += 1
             self.get_logger().warn(
                 f"Cannot transform to {frame} for bbox removal — skipping",
-                throttle_duration_sec=5.0)
+                throttle_duration_sec=5.0,
+            )
             return None
 
     def _check_bbox_health(self):
@@ -850,12 +1066,16 @@ class PointCloudFusionNode(Node):
         """Get the origin of `frame` in target_frame. Returns (3,) float32 or None."""
         try:
             t = self._tf_buffer.lookup_transform(
-                self._target_frame, frame, rclpy.time.Time())
-            return np.array([
-                t.transform.translation.x,
-                t.transform.translation.y,
-                t.transform.translation.z,
-            ], dtype=np.float32)
+                self._target_frame, frame, rclpy.time.Time()
+            )
+            return np.array(
+                [
+                    t.transform.translation.x,
+                    t.transform.translation.y,
+                    t.transform.translation.z,
+                ],
+                dtype=np.float32,
+            )
         except Exception:
             return None
 
@@ -889,9 +1109,7 @@ class PointCloudFusionNode(Node):
 
         elapsed = 0.0
         if self._node_start_time is not None:
-            elapsed = (
-                self.get_clock().now() - self._node_start_time
-            ).nanoseconds / 1e9
+            elapsed = (self.get_clock().now() - self._node_start_time).nanoseconds / 1e9
 
         diag_parts = []
 
@@ -904,9 +1122,7 @@ class PointCloudFusionNode(Node):
                     timeout=rclpy.duration.Duration(seconds=0.0),
                 )
             except Exception as exc:
-                diag_parts.append(
-                    f"{depth_frame}: can_transform threw '{exc}'"
-                )
+                diag_parts.append(f"{depth_frame}: can_transform threw '{exc}'")
                 connected = False
 
             if connected:
@@ -1013,13 +1229,16 @@ class PointCloudFusionNode(Node):
         corner = bb["palm_to_corner"]["translation"]
         opp_offset = bb["corner_to_opposite"]["translation"]
         c = np.array([corner["x"], corner["y"], corner["z"]], dtype=np.float32)
-        o = c + np.array([opp_offset["x"], opp_offset["y"], opp_offset["z"]],
-                         dtype=np.float32)
-        boxes.append((
-            "palm_frame",
-            np.minimum(c, o),
-            np.maximum(c, o),
-        ))
+        o = c + np.array(
+            [opp_offset["x"], opp_offset["y"], opp_offset["z"]], dtype=np.float32
+        )
+        boxes.append(
+            (
+                "palm_frame",
+                np.minimum(c, o),
+                np.maximum(c, o),
+            )
+        )
 
         # Box 2: cam_bounding_box in screw frame (if present)
         cam_key = f"cam_bounding_box_{mount_name.split('_')[0]}cm"
@@ -1030,16 +1249,16 @@ class PointCloudFusionNode(Node):
         if cam_bb is not None:
             c1_dict = cam_bb["screw_to_bbcam1"]["translation"]
             c2_dict = cam_bb["screw_to_bbcam2"]["translation"]
-            c1 = np.array([c1_dict["x"], c1_dict["y"], c1_dict["z"]],
-                          dtype=np.float32)
-            c2 = np.array([c2_dict["x"], c2_dict["y"], c2_dict["z"]],
-                          dtype=np.float32)
+            c1 = np.array([c1_dict["x"], c1_dict["y"], c1_dict["z"]], dtype=np.float32)
+            c2 = np.array([c2_dict["x"], c2_dict["y"], c2_dict["z"]], dtype=np.float32)
             screw_frame = f"d435i_arm_bottom_screw_frame_{mount_name}"
-            boxes.append((
-                screw_frame,
-                np.minimum(c1, c2),
-                np.maximum(c1, c2),
-            ))
+            boxes.append(
+                (
+                    screw_frame,
+                    np.minimum(c1, c2),
+                    np.maximum(c1, c2),
+                )
+            )
 
         return boxes
 
@@ -1053,17 +1272,26 @@ class PointCloudFusionNode(Node):
         since_last = (now - self._last_publish_time).nanoseconds / 1e9
         tf_fail_str = ""
         if stats_snapshot["tf_fail"]:
-            tf_fail_str = " tf_fail={" + ", ".join(
-                f"{k}:{v}" for k, v in sorted(stats_snapshot["tf_fail"].items())
-            ) + "}"
+            tf_fail_str = (
+                " tf_fail={"
+                + ", ".join(
+                    f"{k}:{v}" for k, v in sorted(stats_snapshot["tf_fail"].items())
+                )
+                + "}"
+            )
         ransac_str = ""
         if self._enable_ransac:
-            avg_inliers = (stats_snapshot['ransac_inliers'] / max(stats_snapshot['ransac_used'], 1))
+            avg_inliers = stats_snapshot["ransac_inliers"] / max(
+                stats_snapshot["ransac_used"], 1
+            )
             ransac_str = (
                 f" ransac_used={stats_snapshot['ransac_used']}"
                 f" ransac_skipped={stats_snapshot['ransac_skipped']}"
                 f" ransac_avg_inliers={avg_inliers:.0f}"
             )
+        processing_avg = stats_snapshot["processing_ms_sum"] / max(
+            stats_snapshot["published"] + stats_snapshot["processing_age_drops"], 1
+        )
         self.get_logger().info(
             f"Stats: published={stats_snapshot['published']} "
             f"(dual={stats_snapshot['dual']}, cam1_only={stats_snapshot['cam1_only']}) "
@@ -1071,6 +1299,10 @@ class PointCloudFusionNode(Node):
             f"bbox_removed={stats_snapshot['bbox_removed']}"
             f" bbox_skipped={stats_snapshot['bbox_skipped']}"
             f" bbox_cache_hits={stats_snapshot['bbox_cache_hits']}"
+            f" busy_skips={stats_snapshot['processing_busy_skips']}"
+            f" age_drops={stats_snapshot['processing_age_drops']}"
+            f" proc_avg_ms={processing_avg:.1f}"
+            f" proc_max_ms={stats_snapshot['processing_ms_max']:.1f}"
             f"{ransac_str}"
             f"{tf_fail_str}"
             f" last_publish_ago={since_last:.1f}s"
@@ -1087,27 +1319,33 @@ class PointCloudFusionNode(Node):
 
             parts = []
             if c1 is None or c1_age is None or c1_age > self._cloud_max_age:
-                parts.append(f"cam1: no cloud"
-                             if c1 is None or c1_age is None
-                             else f"cam1: stale ({c1_age:.1f}s)")
+                parts.append(
+                    f"cam1: no cloud"
+                    if c1 is None or c1_age is None
+                    else f"cam1: stale ({c1_age:.1f}s)"
+                )
             else:
                 parts.append(f"cam1: fresh ({c1_age:.2f}s)")
                 # Cloud is fresh but TF failed — diagnose which chain link is missing
                 try:
                     self._tf_buffer.lookup_transform(
-                        self._target_frame, c1.header.frame_id, rclpy.time.Time())
+                        self._target_frame, c1.header.frame_id, rclpy.time.Time()
+                    )
                 except Exception as e:
                     parts.append(f"cam1 TF: {e}")
 
             if c2 is None or c2_age is None or c2_age > self._cloud_max_age:
-                parts.append(f"cam2: no cloud"
-                             if c2 is None or c2_age is None
-                             else f"cam2: stale ({c2_age:.1f}s)")
+                parts.append(
+                    f"cam2: no cloud"
+                    if c2 is None or c2_age is None
+                    else f"cam2: stale ({c2_age:.1f}s)"
+                )
             else:
                 parts.append(f"cam2: fresh ({c2_age:.2f}s)")
                 try:
                     self._tf_buffer.lookup_transform(
-                        self._target_frame, c2.header.frame_id, rclpy.time.Time())
+                        self._target_frame, c2.header.frame_id, rclpy.time.Time()
+                    )
                 except Exception as e:
                     parts.append(f"cam2 TF: {e}")
 
@@ -1117,17 +1355,29 @@ class PointCloudFusionNode(Node):
 
         # Reset per-interval counters
         with self._stats_lock:
-            self._stats = {"published": 0, "cam1_only": 0, "dual": 0,
-                           "distance_removed": 0, "bbox_removed": 0,
-                           "bbox_skipped": 0, "bbox_cache_hits": 0,
-                           "ransac_used": 0, "ransac_skipped": 0,
-                           "ransac_inliers": 0,
-                           "tf_fail": {}}
+            self._stats = {
+                "published": 0,
+                "cam1_only": 0,
+                "dual": 0,
+                "distance_removed": 0,
+                "bbox_removed": 0,
+                "bbox_skipped": 0,
+                "bbox_cache_hits": 0,
+                "processing_busy_skips": 0,
+                "processing_age_drops": 0,
+                "processing_ms_sum": 0.0,
+                "processing_ms_max": 0.0,
+                "ransac_used": 0,
+                "ransac_skipped": 0,
+                "ransac_inliers": 0,
+                "tf_fail": {},
+            }
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main(args=None):
     rclpy.init(args=args)
