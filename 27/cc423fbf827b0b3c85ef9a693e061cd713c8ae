@@ -1,0 +1,21 @@
+scripts/static_grasp_test.sh
+  s_e3a37bf76b6b5f::t_314041ec381237 1-325
+config/static_grasp_test.yaml
+  s_e3a37bf76b6b5f::t_471e8ce740f853 1-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "27cc423fbf827b0b3c85ef9a693e061cd713c8ae",
+  "prompts": {},
+  "sessions": {
+    "s_e3a37bf76b6b5f": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19ddc3ae3ffejUdANULxKCM4DB",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
