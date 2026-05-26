@@ -1,0 +1,25 @@
+Makefile.workspace
+  s_37898e8ccf6ca8::t_c1ccbfb08537cc 30
+  s_37898e8ccf6ca8::t_7e70857f6d1bb1 338-343
+scripts/check_openvins_topics.sh
+  s_37898e8ccf6ca8::t_6996815fe6af6f 1-47
+src/prosthesis_launch/launch/pipeline.launch.py
+  s_37898e8ccf6ca8::t_85ed2753048624 498-503
+  s_37898e8ccf6ca8::t_cfd904c0798af1 90-95,100-101,107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "4410e90fda8cd81e104c02072b8064b07093d39c",
+  "prompts": {},
+  "sessions": {
+    "s_37898e8ccf6ca8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19e68d597ffe1sCdXYl5UJUKA4",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
