@@ -27,7 +27,7 @@ TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates source
+.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -334,6 +334,12 @@ start-twist: ## Activate twist propagation service
 stop-twist: ## Deactivate twist propagation service
 	@$(ROS_SETUP) && \
 	ros2 service call /twist_propagation/deactivate std_srvs/srv/Trigger '{}'
+
+openvins-check: ## Check that both OpenVINS odometry topics are publishing
+	@echo "=== Checking OpenVINS topics ==="
+	@ros2 topic list 2>/dev/null | grep -qF "/ov_msckf/odomimu" || (echo "ERROR: Head odom NOT available" && exit 1)
+	@ros2 topic list 2>/dev/null | grep -qF "/ov_msckf_arm/odomimu" || (echo "ERROR: Arm odom NOT available" && exit 1)
+	@echo "[OK] Both OpenVINS topics available"
 
 # ── Utility ──────────────────────────────────────────────────────────────────
 

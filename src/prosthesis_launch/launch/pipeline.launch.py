@@ -87,16 +87,24 @@ def _launch_setup(context, *args, **kwargs):
     mounts_link_frame = LaunchConfiguration("mounts_link_frame").perform(context)
     tf_diagnostics = LaunchConfiguration("tf_diagnostics").perform(context)
     model_dir = LaunchConfiguration("model_dir").perform(context)
+    require_dual_openvins = _as_bool(context, "require_dual_openvins")
+
+    if require_dual_openvins:
+        print("[pipeline] INFO: require_dual_openvins=true — "
+              "pipeline will not enable grasp execution until both "
+              "/ov_msckf/odomimu and /ov_msckf_arm/odomimu are publishing.")
 
     nodes = []
 
     # Pipeline Manager - state machine orchestrator
+    pipeline_manager_params = _node_params(config, "pipeline_manager")
+    pipeline_manager_params["require_dual_openvins"] = require_dual_openvins
     nodes.append(
         Node(
             package="pipeline_manager",
             executable="pipeline_manager_node",
             name="pipeline_manager",
-            parameters=[_node_params(config, "pipeline_manager")],
+            parameters=[pipeline_manager_params],
             output="screen",
         )
     )
@@ -486,6 +494,12 @@ def generate_launch_description():
                 default_value="true",
                 description="Launch lightweight TF diagnostics node that logs "
                             "OpenVINS and camera-mount chain health.",
+            ),
+            DeclareLaunchArgument(
+                "require_dual_openvins",
+                default_value="false",
+                description="Require both head and arm OpenVINS odometry "
+                            "before enabling grasp execution.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]
