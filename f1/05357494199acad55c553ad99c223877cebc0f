@@ -1,0 +1,26 @@
+src/grasp_preshaping/nodes/preshaping_service_bridge_node.cpp
+  s_df8991f586f331::t_8ac586139f79cf 66-68
+  s_df8991f586f331::t_e91b9b1ad9d64c 322,327,331-335,342,344
+  s_df8991f586f331::t_4df4c083090b97 641-642
+  s_df8991f586f331::t_886d95157857c1 324
+  s_df8991f586f331::t_9608a8b55060f8 551-554
+  s_df8991f586f331::t_2d240921a74148 286
+config/prosthesis_config.yaml
+  s_df8991f586f331::t_62de56626b97b7 167-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.1",
+  "base_commit_sha": "f105357494199acad55c553ad99c223877cebc0f",
+  "prompts": {},
+  "sessions": {
+    "s_df8991f586f331": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_19e69abaeffeWn76guX8a0jUi6",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
