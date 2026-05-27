@@ -4,10 +4,9 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /TF1/Status1
         - /TF1/Frames1
       Splitter Ratio: 0.5354523062705994
-    Tree Height: 186
+    Tree Height: 187
   - Class: rviz_common/Views
     Expanded:
       - /Current View1
@@ -43,6 +42,8 @@ Visualization Manager:
         All Enabled: false
         arm_cam0:
           Value: true
+        arm_cam0_corrected:
+          Value: true
         arm_d435i_arm_accel_frame:
           Value: false
         arm_d435i_arm_accel_optical_frame:
@@ -74,6 +75,8 @@ Visualization Manager:
         arm_imu:
           Value: false
         arm_imu_from_marker:
+          Value: true
+        arm_imu_openvins_corrected:
           Value: true
         bb_corner:
           Value: true
@@ -173,28 +176,13 @@ Visualization Manager:
                       {}
           arm_imu_from_marker:
             {}
+          arm_imu_openvins_corrected:
+            arm_cam0_corrected:
+              {}
           head_d435i_head_color_optical_frame_body_display:
             {}
           head_d435i_head_color_optical_frame_from_marker:
             {}
-          head_imu:
-            head_cam0:
-              head_d435i_head_link:
-                head_d435i_head_accel_frame:
-                  head_d435i_head_accel_optical_frame:
-                    {}
-                head_d435i_head_color_frame:
-                  head_d435i_head_color_optical_frame:
-                    {}
-                head_d435i_head_depth_frame:
-                  head_d435i_head_depth_optical_frame:
-                    {}
-                head_d435i_head_gyro_frame:
-                  head_d435i_head_gyro_optical_frame:
-                    {}
-                head_d435i_head_imu_frame:
-                  head_d435i_head_imu_optical_frame:
-                    {}
           head_imu_from_marker:
             {}
           marker_0:
@@ -419,7 +407,7 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz_default_plugins/Path
       Color: 25; 255; 0
-      Enabled: true
+      Enabled: false
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
@@ -442,12 +430,12 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /ov_msckf/pathimu
-      Value: true
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
       Color: 25; 255; 0
-      Enabled: true
+      Enabled: false
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
@@ -470,7 +458,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /ov_msckf_arm/pathimu
-      Value: true
+      Value: false
     - Class: rviz_default_plugins/MarkerArray
       Enabled: true
       Name: TrajPrediction
@@ -516,7 +504,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 1.798467993736267
+      Distance: 2.2235116958618164
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -531,15 +519,15 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.299795389175415
+      Pitch: 0.8797956109046936
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 4.993168354034424
+      Yaw: 3.183168411254883
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 999
+  Height: 996
   Hide Left Dock: false
   Hide Right Dock: false
   ImageArm:
@@ -549,6 +537,6 @@ Window Geometry:
   QMainWindow State: ~
   Views:
     collapsed: false
-  Width: 1908
-  X: 0
-  Y: 0
+  Width: 947
+  X: 929
+  Y: -32
