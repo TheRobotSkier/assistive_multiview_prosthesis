@@ -688,13 +688,7 @@ PARAMETRIC_GENERATORS = [
     gen_cylinder_tilted,
     gen_ellipsoid,
     gen_tapered_bottle,
-    gen_l_block,
     gen_small_cube,
-    gen_thin_plate,
-    # Non-convex objects for multi-view advantage evaluation
-    # mug_with_handle removed — redundant with YCB mug
-
-    gen_notched_box,
     gen_cross_shape,
 ]
 

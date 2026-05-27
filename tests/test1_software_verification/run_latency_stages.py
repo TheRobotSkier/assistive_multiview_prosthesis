@@ -25,7 +25,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from sensor_msgs.msg import PointCloud2, PointField
-from std_msgs.msg import Header, Int32, String, Float32
+from std_msgs.msg import Header, Int32, String, Float32, Bool
 from geometry_msgs.msg import PoseStamped, TwistStamped, Vector3, PointStamped
 
 # Add parent directory to path for imports
@@ -111,6 +111,10 @@ def run_latency_stages(objects: list[str], repetitions: int = 30,
     emg_pub = node.create_publisher(Int32, "/emg/gesture_label", 10)
     latched_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
     emg_confidence_pub = node.create_publisher(Float32, "/emg/confidence", latched_qos)
+
+    # Hit detection publisher (must match pipeline_manager QoS)
+    hit_pub = node.create_publisher(Bool, "/twist_propagation/hit_detected",
+                                    QoSProfile(depth=10, durability=DurabilityPolicy.TRANSIENT_LOCAL))
 
     # Hand pose and twist publishers
     pose_pub = node.create_publisher(PoseStamped, "/hand_pose", 10)
@@ -405,12 +409,30 @@ def run_latency_stages(objects: list[str], repetitions: int = 30,
             # Wait briefly for trajectory to start
             time.sleep(0.1)
 
-            # Publish confidence BEFORE gesture (ensures it arrives first)
-            emg_confidence_pub.publish(Float32(data=0.95))
-            time.sleep(0.05)  # Small delay to ensure confidence arrives
+            # Trigger EMG gesture — hold POWER with high confidence for > gesture_hold_timeout_s
+            emg_confidence_pub.publish(Float32(data=1.0))
+            for _ in range(15):  # 1.5s hold (> 1.0s gesture_hold_timeout)
+                emg_pub.publish(Int32(data=1))  # GESTURE_POWER
+                emg_confidence_pub.publish(Float32(data=1.0))
+                time.sleep(0.1)
 
-            # Trigger EMG gesture (POWER = 1, PINCH = 2, POINT = 4)
-            emg_pub.publish(Int32(data=1))
+            # Wait for TWISTING state, then trigger hit detection
+            time.sleep(0.3)
+            with lock:
+                in_twisting = current_trial is not None  # check trial still active
+            hit_msg = Bool()
+            hit_msg.data = True
+            for _ in range(3):
+                hit_pub.publish(hit_msg)
+                time.sleep(0.1)
+
+            # Wait for SEGMENTING, then publish object cloud directly
+            time.sleep(0.3)
+            with lock:
+                if current_trial is not None and current_trial.get("object_cloud") is not None:
+                    cloud_msg = current_trial["object_cloud"]
+                    cloud_msg.header.stamp = node.get_clock().now().to_msg()
+                    seg_object_pub.publish(cloud_msg)
 
             # -------------------------------------------------------------------
             # Phase 3: Wait for completion or timeout
@@ -462,8 +484,13 @@ def run_latency_stages(objects: list[str], repetitions: int = 30,
                     trial_copy.pop(key, None)
                 results.append(trial_copy)
 
-            # Inter-trial reset delay
-            time.sleep(1.0)
+            # Inter-trial reset: send OPEN gesture to return to IDLE
+            open_msg = Int32(data=2)  # GESTURE_OPEN
+            for _ in range(15):
+                emg_pub.publish(open_msg)
+                emg_confidence_pub.publish(Float32(data=1.0))
+                time.sleep(0.1)
+            time.sleep(0.5)
 
     # ---------------------------------------------------------------------------
     # Save results

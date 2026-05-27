@@ -136,9 +136,17 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
     # ── State monitoring ─────────────────────────────────────────────────
     pipeline_state = {"value": None}
     state_received = threading.Event()
+    stage_timestamps: dict[str, float] = {}
+    stage_lock = threading.Lock()
 
     def on_pipeline_state(msg: Int32):
         pipeline_state["value"] = msg.data
+        now = time.perf_counter()
+        state_name = {0: "idle", 1: "twisting", 2: "segmenting",
+                      3: "planning", 4: "approaching", 5: "grasping",
+                      6: "holding", 7: "volitional", 8: "releasing"}.get(msg.data, f"unknown_{msg.data}")
+        with stage_lock:
+            stage_timestamps[state_name] = now
         state_received.set()
 
     node.create_subscription(Int32, "/pipeline/state",
@@ -161,6 +169,8 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
                 emg_result["total_latency_ms"] = (t_end - emg_result["t_start"]) * 1000
                 emg_result["grasp_type"] = msg.data
                 emg_result["status"] = "ok"
+                with stage_lock:
+                    emg_result["stage_timestamps"] = dict(stage_timestamps)
                 emg_received.set()
 
     node.create_subscription(Int32, "/grasp_preshaping/grasp_type",
@@ -242,6 +252,10 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
         for rep in range(repetitions):
             # ── Method A: Full EMG path ──────────────────────────────────
             if method in ("emg", "both"):
+                # Clear stage timestamps for this repetition
+                with stage_lock:
+                    stage_timestamps.clear()
+
                 # 1. Publish pose/twist (available for twist propagation)
                 now = node.get_clock().now().to_msg()
                 pose_msg.header.stamp = now
@@ -256,9 +270,10 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
                     time.sleep(0.05)
 
                 # 3. Send POWER gesture and hold for > gesture_hold_timeout_s
+                t_emg_sent = time.perf_counter()
                 with lock:
                     emg_result.clear()
-                    emg_result["t_start"] = time.perf_counter()
+                    emg_result["t_emg_sent"] = t_emg_sent
                     emg_result["object"] = obj_name
                     emg_result["repetition"] = rep
                     emg_result["method"] = "emg"
@@ -273,25 +288,61 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
                     emg_conf_pub.publish(conf_msg)
                     time.sleep(0.1)
 
-                # 4. Wait for TWISTING state, then trigger hit detection
-                state_received.clear()
-                if state_received.wait(timeout=3.0) and pipeline_state["value"] == 1:
+                # 4. Trigger hit detection if in TWISTING
+                #    Pipeline may already be in TWISTING from the POWER hold
+                time.sleep(0.3)  # brief settle for state callback
+                if pipeline_state["value"] == 1:
                     # State 1 = TWISTING — publish hit detection
                     hit_msg = Bool()
                     hit_msg.data = True
-                    hit_pub.publish(hit_msg)
-                    time.sleep(0.2)
+                    for _ in range(3):
+                        hit_pub.publish(hit_msg)
+                        time.sleep(0.1)
 
                     # 5. Wait for SEGMENTING state, then publish cloud
                     state_received.clear()
                     if state_received.wait(timeout=3.0) and pipeline_state["value"] == 2:
                         # State 2 = SEGMENTING — publish cloud with fresh timestamp
+                        t_cloud_sent = time.perf_counter()
                         now = node.get_clock().now().to_msg()
                         cloud_msg.header.stamp = now
                         cloud_pub.publish(cloud_msg)
 
-                # 6. Wait for grasp_type output (end of pipeline)
+                        # Set t_start to cloud publish for accurate pipeline latency
+                        with lock:
+                            emg_result["t_start"] = t_cloud_sent
+                            emg_result["t_cloud_sent"] = t_cloud_sent
+                    else:
+                        # Pipeline did not reach SEGMENTING — fall back to t_emg_sent
+                        with lock:
+                            emg_result["t_start"] = t_emg_sent
+                else:
+                    # Pipeline not in TWISTING — fall back to t_emg_sent
+                    with lock:
+                        emg_result["t_start"] = t_emg_sent
+
+                # 6. Ensure t_start is set (fallback if state machine didn't reach SEGMENTING)
+                with lock:
+                    if "t_start" not in emg_result:
+                        emg_result["t_start"] = t_emg_sent
+
+                # 7. Wait for grasp_type output (end of pipeline)
                 if emg_received.wait(timeout=15.0):
+                    ts = emg_result.get("stage_timestamps", {})
+                    t_emg = emg_result.get("t_emg_sent", 0)
+                    t_cloud = emg_result.get("t_cloud_sent", t_emg)
+
+                    # Compute per-stage latencies
+                    stage_lat = {}
+                    if "twisting" in ts and t_emg:
+                        stage_lat["emg_to_twisting_ms"] = round((ts["twisting"] - t_emg) * 1000, 2)
+                    if "segmenting" in ts and "twisting" in ts:
+                        stage_lat["twisting_to_segmenting_ms"] = round((ts["segmenting"] - ts["twisting"]) * 1000, 2)
+                    if "planning" in ts and t_cloud:
+                        stage_lat["cloud_to_planning_ms"] = round((ts["planning"] - t_cloud) * 1000, 2)
+                    if "approaching" in ts and "planning" in ts:
+                        stage_lat["planning_to_approaching_ms"] = round((ts["approaching"] - ts["planning"]) * 1000, 2)
+
                     row = {
                         "object": obj_name,
                         "repetition": rep,
@@ -301,9 +352,12 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
                         "n_cloud_points": len(cloud_points),
                         "status": emg_result.get("status", "unknown"),
                     }
+                    row.update(stage_lat)
                     rows.append(row)
                     if rep == 0:
-                        print(f"    EMG rep 0: {row['total_latency_ms']:.1f} ms")
+                        total = row['total_latency_ms']
+                        stages = " | ".join(f"{k}={v:.1f}" for k, v in stage_lat.items())
+                        print(f"    EMG rep 0: total={total:.1f} ms  ({stages})")
                 else:
                     rows.append({
                         "object": obj_name,
@@ -437,6 +491,8 @@ def run_tier_b(objects: list[str], repetitions: int = 5, method: str = "emg"):
     if rows:
         fieldnames = [
             "object", "repetition", "method", "total_latency_ms",
+            "emg_to_twisting_ms", "twisting_to_segmenting_ms",
+            "cloud_to_planning_ms", "planning_to_approaching_ms",
             "pipeline_time_ms", "ros_overhead_ms", "smc_iterations",
             "grasp_type", "n_cloud_points", "status",
         ]
@@ -487,9 +543,8 @@ def main():
     default_objects = [
         "cylinder_upright",
         "tapered_bottle",
-        "l_block",
+        "cross_shape",
         "small_cube",
-        "thin_plate",
     ]
 
     objects = args.objects or default_objects

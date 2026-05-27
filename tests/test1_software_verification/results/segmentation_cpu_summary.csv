@@ -1,0 +1,2 @@
+backend,minkowski_engine_cuda,minkowski_engine_version,n_trials,n_success,n_errors,n_points,mean_ms,median_ms,stdev_ms,min_ms,max_ms,p90_ms,p95_ms,p99_ms,fg_mean,fg_min,fg_max
+cpu,False,0.5.4,100,100,0,5000,726.15,735.27,71.95,545.41,930.01,823.83,851.75,930.01,4999.9,4999,5000

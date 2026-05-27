@@ -15,6 +15,7 @@ Usage:
     python run.py --objects cylinder_upright small_cube  # specific objects
     python run.py --repetitions 20       # more repetitions (default 10)
     python run.py --debug                # enable debug dumps
+    python run.py --debug-dumps           # generate SQ debug dumps only (no latency)
 
 Inside Docker:
     docker compose run --rm prosthesis python /prosthesis_ws/tests/test1_software_verification/run.py
@@ -733,6 +734,78 @@ def run_score_sweep(lib, objects, args):
 
 
 # ---------------------------------------------------------------------------
+# Debug dump generation (separate from latency measurement)
+# ---------------------------------------------------------------------------
+
+def generate_debug_dumps(lib: GraspLibrary, objects: list[str]):
+    """Generate one debug dump per object for SQ estimation overlays.
+
+    This runs the pipeline once per object with debug_visualization enabled,
+    producing .npz files in results/debug_dumps/ that contain sq_params.
+    Latency is NOT measured during this pass — debug dumps add significant
+    overhead and would skew timing results.
+
+    Should be run AFTER the normal test pass so that the production config
+    is already in place. Uses a temporary config with debug enabled.
+    """
+    import yaml
+
+    print("\n" + "=" * 60)
+    print("GENERATING DEBUG DUMPS (SQ estimation data)")
+    print("=" * 60)
+    print("  Note: Latency is NOT measured in this pass.\n")
+
+    prod_config = os.path.join(CONFIG_DIR, "grasp_preshaping.yaml")
+    with open(prod_config) as f:
+        cfg = yaml.safe_load(f)
+    cfg["debug_visualization"] = True
+    cfg["debug_output_dir"] = os.path.join(RESULTS_DIR, "debug_dumps")
+    debug_config = os.path.join(RESULTS_DIR, "_debug_dumps_config.yaml")
+    with open(debug_config, "w") as f:
+        yaml.dump(cfg, f)
+    os.environ["GRASP_CONFIG_PATH"] = debug_config
+
+    # Force Rust library to reload config
+    from ffi_bridge import reload_config
+    reload_config()
+
+    os.makedirs(os.path.join(RESULTS_DIR, "debug_dumps"), exist_ok=True)
+
+    for obj_name in objects:
+        print(f"  Generating debug dump for {obj_name}...", end="", flush=True)
+        try:
+            obj = load_object(obj_name)
+            approach = get_approach(obj_name)
+        except (KeyError, FileNotFoundError) as e:
+            print(f" SKIP ({e})")
+            continue
+
+        pose = make_pose(**approach["pose"])
+        twist = make_twist(**approach["twist"])
+        cloud = obj["points"]
+        cameras = get_camera_world_positions(approach["pose"])
+
+        # Run one computation to generate the debug dump
+        req = make_request(pose, twist, cloud, cameras)
+        status, resp, msg = lib.compute(req)
+
+        if status == GRASP_COMPUTE_OK:
+            print(f" OK (score={resp.combined_score:.3f})")
+        else:
+            print(f" FAILED ({msg})")
+
+    # Restore production config
+    os.environ["GRASP_CONFIG_PATH"] = prod_config
+    reload_config()
+
+    # Clean up temp config
+    if os.path.isfile(debug_config):
+        os.remove(debug_config)
+
+    print("\n  Debug dumps generated in: results/debug_dumps/")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -751,7 +824,11 @@ def main():
     parser.add_argument("--repetitions", type=int, default=100,
                         help="Number of repetitions per condition (default: 100)")
     parser.add_argument("--debug", action="store_true",
-                        help="Enable debug visualization dumps")
+                        help="Enable debug visualization dumps (adds latency overhead)")
+    parser.add_argument("--debug-dumps", action="store_true",
+                        help="Generate SQ debug dumps only (no latency measurement). "
+                             "Run this after the normal test pass to produce SQ "
+                             "estimation data for the object gallery figure.")
     parser.add_argument("--baseline-timeout", type=int, default=120,
                         help="Per-object baseline timeout in seconds (default: 120)")
     parser.add_argument("--sweep-samples", action="store_true",
@@ -807,6 +884,11 @@ def main():
 
     if args.sweep_samples:
         run_score_sweep(lib, objects, args)
+        return
+
+    if args.debug_dumps:
+        generate_debug_dumps(lib, objects)
+        print("\nDone. Debug dumps in:", os.path.join(RESULTS_DIR, "debug_dumps"))
         return
 
     run_latency = not args.occlusion_only

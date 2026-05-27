@@ -78,11 +78,11 @@ help:
 	@echo "    make shell                  Shell into running container"
 	@echo ""
 	@echo "  Test 1 — Software Verification:"
-	@echo "    make test1-tier-a           Run Tier A (latency + occlusion, host)"
+	@echo "    make test1-tier-a           Run Tier A (latency + occlusion + score sweep, host)"
 	@echo "    make test1-mock             Start mock ROS system (Docker, background)"
 	@echo "    make test1-mock-check       Check if mock system is ready"
 	@echo "    make test1-mock-stop        Stop mock system"
-	@echo "    make test1-tier-b           Run Tier B (full ROS pipeline, needs mock)"
+	@echo "    make test1-tier-b           Run Tier B (full ROS pipeline + per-stage latency, needs mock)"
 	@echo "    make test1-rebuild          Rebuild ROS packages in container"
 	@echo "    make test1-analysis         Generate figures from results (host)"
 	@echo ""
@@ -685,6 +685,9 @@ test1-tier-a:
 	GRASP_PRESHAPING_LIB_PATH=src/grasp_preshaping/lib/libgrasp_preshaping.so \
 	GRASP_PRESHAPING_HOME=src/grasp_preshaping \
 	python3 tests/test1_software_verification/run.py
+	GRASP_PRESHAPING_LIB_PATH=src/grasp_preshaping/lib/libgrasp_preshaping.so \
+	GRASP_PRESHAPING_HOME=src/grasp_preshaping \
+	python3 tests/test1_software_verification/run.py --sweep-samples
 
 test1-mock: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec -d \
@@ -730,7 +733,9 @@ test1-tier-b: dev
 			echo "  make test1-mock"; \
 			exit 1; \
 		fi; \
-		python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py'
+		python3 /prosthesis_ws/tests/test1_software_verification/run_tier_b.py --method both; \
+		cd /prosthesis_ws/tests/test1_software_verification && \
+		python3 run_latency_stages.py --objects cylinder_upright tapered_bottle cross_shape small_cube ellipsoid mug'
 
 test1-rebuild: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -c '\

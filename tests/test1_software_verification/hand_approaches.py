@@ -59,24 +59,12 @@ APPROACHES = {
         "pose": _pose(-0.25, 0.0, -0.02),
         "twist": _DEFAULT_TWIST,
     },
-    "l_block": {
-        "pose": _pose(-0.25, 0.0, 0.01),
-        "twist": _DEFAULT_TWIST,
-    },
     "small_cube": {
         "pose": _DEFAULT_POSE,
         "twist": _DEFAULT_TWIST,
     },
-    "thin_plate": {
-        "pose": _pose(-0.25, 0.0, 0.005),
-        "twist": _DEFAULT_TWIST,
-    },
 
     # ---- Non-convex objects ----
-    "notched_box": {
-        "pose": _DEFAULT_POSE,
-        "twist": _DEFAULT_TWIST,
-    },
     "cross_shape": {
         "pose": _DEFAULT_POSE,
         "twist": _DEFAULT_TWIST,

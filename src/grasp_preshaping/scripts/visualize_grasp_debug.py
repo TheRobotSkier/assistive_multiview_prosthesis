@@ -54,8 +54,8 @@ F32_MAX = np.float32(np.finfo(np.float32).max)
 # Superquadric template names (must match superquadric.rs TEMPLATES order).
 SQ_TEMPLATE_NAMES = ["sphere", "box", "cylinder"]
 
-# Truncation constant (must match config.rs TRUNCATION_CELLS).
-TRUNCATION_CELLS = 8
+# Truncation constant (must match runtime_config.rs defaults::TRUNCATION_CELLS).
+TRUNCATION_CELLS = 4
 
 # Surface band width for TSDF surface mode (cells from zero-crossing).
 # This is a visualization parameter, independent of the truncation distance.
@@ -701,6 +701,12 @@ def visualize_pyvista(dump: dict, args):
         # VTK expects x-fastest cell ordering for ImageData cell arrays.
         # TSDF was reconstructed as tsdf[x, y, z], so flatten in Fortran order
         # (first axis fastest) to match VTK's expected memory layout.
+
+        # Mask out voxels outside the truncation band (abs >= TRUNCATION_CELLS).
+        # These are unobserved / SQ-filled boundary voxels that should not be
+        # rendered in any mode.
+        tsdf_vis[np.abs(tsdf_vis) >= TRUNCATION_CELLS] = np.nan
+
         grid = pv.ImageData()
         grid.dimensions = np.array(tsdf_vis.shape) + 1
         grid.origin = origin
@@ -727,7 +733,6 @@ def visualize_pyvista(dump: dict, args):
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
                     "color": "white",
-                    # position the scalar bar centered at the bottom of the view
                     "position_x": 0.35,
                     "position_y": 0.02,
                     "width": 0.3,
@@ -740,17 +745,7 @@ def visualize_pyvista(dump: dict, args):
 
         elif mode == "points":
             # Show observed voxels within the truncation band as points.
-            # Mask voxels at the grid edge (abs(distance) >= TRUNCATION_CELLS)
-            # to NaN so they are excluded. These are SQ-filled boundary voxels
-            # that are the least accurate and would otherwise fill the whole grid.
-            tsdf_vis_pts = tsdf_vis.copy()
-            tsdf_vis_pts[np.abs(tsdf_vis_pts) >= TRUNCATION_CELLS] = np.nan
-            grid_pts = pv.ImageData()
-            grid_pts.dimensions = np.array(tsdf_vis_pts.shape) + 1
-            grid_pts.origin = origin
-            grid_pts.spacing = [res, res, res]
-            grid_pts.cell_data["distance"] = tsdf_vis_pts.ravel(order="F")
-            clipped = grid_pts.threshold(
+            clipped = grid.threshold(
                 value=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
                 scalars="distance",
             )
@@ -766,14 +761,13 @@ def visualize_pyvista(dump: dict, args):
                 cmap="coolwarm",
                 clim=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
                 style="points",
-                point_size=4,
+                point_size=7,
                 render_points_as_spheres=True,
                 opacity=0.5,
                 show_scalar_bar=True,
                 scalar_bar_args={
                     "title": "TSDF distance (cells)",
                     "color": "white",
-                    # position the scalar bar centered at the bottom of the view
                     "position_x": 0.35,
                     "position_y": 0.02,
                     "width": 0.3,
@@ -786,14 +780,7 @@ def visualize_pyvista(dump: dict, args):
         elif mode == "signs":
             # Show inside/outside classification as colored points.
             # Red = inside (negative), Blue = outside (positive), Green = surface (near-zero).
-            tsdf_vis_signs = tsdf_vis.copy()
-            tsdf_vis_signs[np.abs(tsdf_vis_signs) >= TRUNCATION_CELLS] = np.nan
-            grid_signs = pv.ImageData()
-            grid_signs.dimensions = np.array(tsdf_vis_signs.shape) + 1
-            grid_signs.origin = origin
-            grid_signs.spacing = [res, res, res]
-            grid_signs.cell_data["distance"] = tsdf_vis_signs.ravel(order="F")
-            clipped = grid_signs.threshold(
+            clipped = grid.threshold(
                 value=[-TRUNCATION_CELLS, TRUNCATION_CELLS],
                 scalars="distance",
             )
@@ -822,7 +809,7 @@ def visualize_pyvista(dump: dict, args):
                 cmap=["red", "lime", "dodgerblue"],
                 clim=[-1, 1],
                 style="points",
-                point_size=4,
+                point_size=7,
                 render_points_as_spheres=True,
                 opacity=0.5,
                 show_scalar_bar=True,
@@ -1135,7 +1122,10 @@ def visualize_pyvista(dump: dict, args):
         _hand_specs_resolved = []
         print("  Hand skeleton: unavailable (pinocchio or URDF not found)")
 
-    _contact_definitions_by_name = {contact["name"]: contact for contact in CONTACT_DEFINITIONS}
+    if _pin_hand_available:
+        _contact_definitions_by_name = {contact["name"]: contact for contact in CONTACT_DEFINITIONS}
+    else:
+        _contact_definitions_by_name = {}
 
     def _contact_position_in_hand_frame(contact_name):
         """Return the contact position in the hand base frame for the current q."""
@@ -1597,6 +1587,12 @@ def visualize_pyvista(dump: dict, args):
 
     def rebuild_tsdf():
         """Remove and re-add TSDF actors."""
+        # Remove scalar bars first — they are separate actors from the meshes.
+        for bar_name in ["TSDF distance (cells)", "Sign (red=in, green=surf, blue=out)"]:
+            try:
+                plotter.remove_scalar_bar(bar_name)
+            except Exception:
+                pass
         for actor in actor_groups["tsdf"]:
             plotter.remove_actor(actor)
         actor_groups["tsdf"].clear()

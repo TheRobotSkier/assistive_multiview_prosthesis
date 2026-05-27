@@ -1,0 +1,45 @@
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l r r r r}
+\toprule
+\textbf{Object} & \textbf{Mean (ms)} & \textbf{P95 (ms)} & \textbf{P99 (ms)} & \textbf{Result} \\
+\midrule
+banana & 69.3 & 76.0 & 81.5 & \textcolor{green!60!black}{\checkmark} \\
+cross\_shape & 102.7 & 177.1 & 189.0 & \textcolor{green!60!black}{\checkmark} \\
+cylinder\_tilted & 94.2 & 183.1 & 196.1 & \textcolor{green!60!black}{\checkmark} \\
+cylinder\_upright & 85.8 & 171.8 & 199.0 & \textcolor{green!60!black}{\checkmark} \\
+ellipsoid & 69.5 & 76.0 & 79.0 & \textcolor{green!60!black}{\checkmark} \\
+mug & 74.6 & 84.0 & 86.0 & \textcolor{green!60!black}{\checkmark} \\
+power\_drill & 72.0 & 78.0 & 79.0 & \textcolor{green!60!black}{\checkmark} \\
+small\_cube & 78.3 & 87.0 & 89.0 & \textcolor{green!60!black}{\checkmark} \\
+tapered\_bottle & 66.8 & 71.0 & 73.0 & \textcolor{green!60!black}{\checkmark} \\
+\bottomrule
+\end{tabular}
+\caption{Test 1a: Pipeline latency results per object. MAR $\leq 400$\,ms.}
+\label{tab:test1_latency}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{l r r r r}
+\toprule
+\textbf{Object} & \textbf{SV (\%)} & \textbf{MV (\%)} & \textbf{$\Delta$ (\%)} & \textbf{Wrist Err (deg)} \\
+\midrule
+banana & 44.0 & 46.0 & +2.0 & 85 / 79 \\
+cross\_shape & 82.0 & 95.0 & +13.0 & 47 / 62 \\
+cylinder\_tilted & 48.0 & 51.0 & +3.0 & 105 / 89 \\
+cylinder\_upright & 53.0 & 44.0 & -9.0 & 60 / 66 \\
+ellipsoid & 51.0 & 66.0 & +15.0 & 67 / 65 \\
+mug & 62.0 & 52.0 & -10.0 & 69 / 72 \\
+power\_drill & 32.0 & 28.0 & -4.0 & 78 / 70 \\
+small\_cube & 62.0 & 59.0 & -3.0 & 62 / 65 \\
+tapered\_bottle & 38.0 & 47.0 & +9.0 & 74 / 83 \\
+\midrule
+\textbf{Mean} & & & +1.8 \\
+\bottomrule
+\end{tabular}
+\caption{Test 1b: Intent precision $\Delta$ (multi-view $-$ single-view). Grasp type correctness. MAR $> 0$\,\%, IDE $\geq 10$\,\%. Wrist Err shows SV / MV mean orientation error.}
+\label{tab:test1_delta}
+\end{table}
