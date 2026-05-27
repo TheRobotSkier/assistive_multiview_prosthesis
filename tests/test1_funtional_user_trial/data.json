@@ -1,0 +1,61 @@
+{
+    "Failures": {
+        "EMG": "e",
+        "Trigger": "t",
+        "Vision": "v",
+        "Intent": "i",
+        "Segmentation": "s",
+        "Proximity": "p",
+        "Localisation": "l"
+    },
+    "reference": [
+        {
+            "Trial": "Daniel Biological Hand 1",
+            "Time": [53, 45, 47, 41, 52]
+        },
+        {
+            "Trial": "Daniel Biological Hand 2",
+            "Time": [51, 41, 47, 38, 50]
+        },
+        {
+            "Trial": "Asger Biological Hand 1",
+            "Time": [52, 40, 41, 34, 39]
+        },
+        {
+            "Trial": "Asger Biological Hand 2",
+            "Time": [55, 69, 28, 30, 34]
+        }
+    ],
+    "data": [
+        {
+            "Trial": "Daniel Single View 1",
+            "Time": [null, null, 600, 1275, null],
+            "Failure": ["eve", "eei", "v", "el", "ille"]
+        },
+        {
+            "Trial": "Asger Single View 1",
+            "Time": [1791, 478, 819, 1580, null],
+            "Failure": ["lvl", "l", "v", "vvs", "llv"]
+        },
+        {
+            "Trial": "Daniel Dual View 1",
+            "Time": [721, null, null, null, 490],
+            "Failure": ["", "ee", "ls", "lllpp", "ptt"]
+        },
+        {
+            "Trial": "Daniel Single View 2",
+            "Time": [null, null, 605, 1470, null],
+            "Failure": ["il", "ee", "l", "pi", "le"]
+        },
+        {
+            "Trial": "Asger Single View 2",
+            "Time": [1234, 943, 668, 763, null],
+            "Failure": ["vlvl", "l", "ll", "llv", "e"]
+        },
+        {
+            "Trial": "Daniel Dual View 2",
+            "Time": [null, null, null, null, null],
+            "Failure": ["lv", "lv", "lvp", "lvip", "lvpl"]
+        }
+    ]
+}
