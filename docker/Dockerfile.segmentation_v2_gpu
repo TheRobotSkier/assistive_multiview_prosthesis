@@ -1,0 +1,70 @@
+# MobileSAM inference server (V6 plan §6.4) — GPU variant.
+#
+# Uses the official PyTorch CUDA image with GPU-accelerated torch wheels.
+# Requires the NVIDIA container runtime (nvidia-container-toolkit).
+#
+# Build:
+#   docker build -t mobile_sam:gpu \
+#       -f docker/Dockerfile.segmentation_v2_gpu .
+#
+# Run (GPU passthrough via --gpus):
+#   docker run --gpus all -v ./models:/weights:ro -p 5679:5679 mobile_sam:gpu
+#
+# Download weights:
+#   wget -O models/mobile_sam.pt \
+#       https://github.com/ChaoningZhang/MobileSAM/raw/master/weights/mobile_sam.pt
+
+FROM docker.io/pytorch/pytorch:2.1.0-cuda11.8-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+# System deps for OpenCV (headless) + libglib.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+        wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# PyTorch is already installed in the base image (CUDA build).
+# Install the remaining Python deps.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+        # PyTorch 2.1.0 in the base image was compiled against NumPy 1.x.
+        # Pin <2 to avoid "Could not infer dtype of numpy.uint8" at runtime.
+        "numpy<2" \
+        flask \
+        opencv-python-headless \
+        Pillow \
+        # MobileSAM's TinyViT backbone depends on timm; the package does not
+        # declare it in its own install_requires, so we add it explicitly.
+        timm \
+        # MobileSAM is not published on PyPI; install from the official repo.
+        # Pin to the master branch for reproducibility.
+        git+https://github.com/ChaoningZhang/MobileSAM.git
+
+# Copy the inference server.
+COPY scripts/mobile_sam_server.py /app/mobile_sam_server.py
+
+# Pre-create the weights directory (writable for userns-remap keep-id).
+RUN mkdir -p /weights && chmod 777 /weights
+
+# Optionally bake weights into the image at build time.
+#   docker build --build-arg DOWNLOAD_WEIGHTS=1 ...
+ARG DOWNLOAD_WEIGHTS=0
+RUN if [ "${DOWNLOAD_WEIGHTS}" = "1" ]; then \
+        wget -q \
+          https://github.com/ChaoningZhang/MobileSAM/raw/master/weights/mobile_sam.pt \
+          -O /weights/mobile_sam.pt; \
+    fi
+
+ENV SAM_WEIGHTS=/weights/mobile_sam.pt
+ENV MOBILE_SAM_PORT=5679
+
+EXPOSE 5679
+
+CMD ["python3", "/app/mobile_sam_server.py"]

@@ -136,6 +136,80 @@ services:
         privileged: true # LINUX ONLY
         userns_mode: "keep-id" # LINUX_ONLY
 
+    # ── MobileSAM 2D segmentation server (V6 plan §6.4) ──────────────────────
+    # Standalone Flask service — zero ROS dependencies.  Takes an RGB image +
+    # 2D click, returns a dilated binary mask.  Replaces InterObject3D for the
+    # 2D stage of the TSDF-fusion pipeline.
+    #
+    # Two variants are provided; pick the one matching your hardware:
+    #   make mobile-sam-cpu   # CPU-only (runs anywhere)
+    #   make mobile-sam-gpu   # CUDA (requires NVIDIA container runtime)
+    #
+    # The server auto-detects CUDA via torch.cuda.is_available() and loads the
+    # model onto the GPU when available.  Both services listen on port 5679.
+
+    mobile_sam_cpu:
+        container_name: mobile_sam_cpu
+        image: mobile_sam:cpu
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.segmentation_v2
+            args:
+                DOWNLOAD_WEIGHTS: ${MOBILE_SAM_DOWNLOAD_WEIGHTS:-0}
+        environment:
+            - MOBILE_SAM_PORT=${MOBILE_SAM_PORT:-5679}
+            - SAM_WEIGHTS=/weights/mobile_sam.pt
+        volumes:
+            # Persist MobileSAM weights across container recreations (~40MB)
+            - ${HOME}/prosthesis_data/weights:/weights:rw
+        network_mode: host
+        restart: unless-stopped
+        healthcheck:
+            test: ["CMD-SHELL", "python -c \"import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:5679/health'); sys.exit(0 if r.status==200 else 1)\""]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        profiles:
+            - mobile-sam-cpu
+        privileged: true # LINUX ONLY
+        userns_mode: "keep-id" # LINUX_ONLY
+
+    mobile_sam_gpu:
+        container_name: mobile_sam_gpu
+        image: mobile_sam:gpu
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.segmentation_v2_gpu
+            args:
+                DOWNLOAD_WEIGHTS: ${MOBILE_SAM_DOWNLOAD_WEIGHTS:-0}
+        environment:
+            - MOBILE_SAM_PORT=${MOBILE_SAM_PORT:-5679}
+            - SAM_WEIGHTS=/weights/mobile_sam.pt
+            - NVIDIA_VISIBLE_DEVICES=all
+            - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+        volumes:
+            - ${HOME}/prosthesis_data/weights:/weights:rw
+        network_mode: host
+        restart: unless-stopped
+        # GPU passthrough (docker-compose native API; requires nvidia runtime).
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
+        healthcheck:
+            test: ["CMD-SHELL", "python -c \"import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:5679/health'); sys.exit(0 if r.status==200 else 1)\""]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 30s
+        profiles:
+            - mobile-sam-gpu
+        privileged: true # LINUX ONLY
+        userns_mode: "keep-id" # LINUX_ONLY
     # ── Test runner: uses production image, builds + runs smoke tests, exits ────
     test:
         container_name: test

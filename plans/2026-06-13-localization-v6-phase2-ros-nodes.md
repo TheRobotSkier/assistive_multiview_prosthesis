@@ -64,8 +64,8 @@ class Keyframe:
     organized: bool             # True if cloud is (H, W, 3)
 ```
 
-- [ ] Implement the dataclass with `__slots__` or dataclass for memory efficiency.
-- [ ] Add a `memory_mb` property that returns the approximate memory footprint (sum of array nbytes). Used for diagnostics.
+- [x] Implement the dataclass with `__slots__` or dataclass for memory efficiency.
+- [x] Add a `memory_mb` property that returns the approximate memory footprint (sum of array nbytes). Used for diagnostics.
 
 ### A.3 Service definition
 
@@ -87,15 +87,15 @@ int32 count
 >
 > **Recommendation:** Start with option 2 (service) for clean process isolation, but design the node so the core `get_in_roi()` method is a pure-Python function that returns `list[Keyframe]`. The service handler just serializes. This keeps it testable.
 
-- [ ] Decide on the service message format. If a custom `Keyframe.msg` is needed, define it in `sensor_fusion_msgs` (coordinate with Phase 1 Task A owner) or inline in this package.
-- [ ] Write the `.srv` file.
-- [ ] Update `CMakeLists.txt`/`setup.py` to generate the service. Since this is an `ament_python` package, service generation requires `rosidl`. If the package is pure-Python, you may need to convert to `ament_cmake` or define the service in `sensor_fusion_msgs` instead. **Check the existing convention** — `src/pointcloud_fusion` is `ament_python` and has no custom services, so there may be no precedent. If `ament_python` can't generate services cleanly, define `GetKeyframesInROI.srv` in `sensor_fusion_msgs` (Phase 1 Task A package, which is `ament_cmake`).
+- [x] Decide on the service message format. If a custom `Keyframe.msg` is needed, define it in `sensor_fusion_msgs` (coordinate with Phase 1 Task A owner) or inline in this package.
+- [x] Write the `.srv` file.
+- [x] Update `CMakeLists.txt`/`setup.py` to generate the service. Since this is an `ament_python` package, service generation requires `rosidl`. If the package is pure-Python, you may need to convert to `ament_cmake` or define the service in `sensor_fusion_msgs` instead. **Check the existing convention** — `src/pointcloud_fusion` is `ament_python` and has no custom services, so there may be no precedent. If `ament_python` can't generate services cleanly, define `GetKeyframesInROI.srv` in `sensor_fusion_msgs` (Phase 1 Task A package, which is `ament_cmake`).
 
 ### A.4 Main node implementation
 
 Implement `keyframe_buffer_node.py` following V6 plan §6.2:
 
-- [ ] **Parameters** (declare all with defaults from V6 §6.9 config):
+- [x] **Parameters** (declare all with defaults from V6 §6.9 config):
   - `head_image_topic`, `arm_image_topic`
   - `head_cloud_topic`, `arm_cloud_topic`
   - `head_info_topic`, `arm_info_topic`
@@ -104,12 +104,12 @@ Implement `keyframe_buffer_node.py` following V6 plan §6.2:
   - `spatial_gate_translation_m: 0.10`
   - `spatial_gate_rotation_deg: 15.0`
 
-- [ ] **Independent subscriptions (CRITICAL):**
+- [x] **Independent subscriptions (CRITICAL):**
   - Subscribe to each camera's cloud, image, camera_info, and pose **independently** — do NOT use `ApproximateTimeSynchronizer`.
   - Maintain per-camera "latest" buffers for image, cloud, camera_info, and pose.
   - When a new cloud arrives (the slowest signal), check if a pose is available within 50ms; if so, evaluate the spatial gate and potentially create a keyframe.
 
-- [ ] **Cloud organization auto-detection (V6 §5.5 — mandatory):**
+- [x] **Cloud organization auto-detection (V6 §5.5 — mandatory):**
   ```python
   if self._cloud_organized is None:
       self._cloud_organized = (msg.height > 1)
@@ -117,49 +117,50 @@ Implement `keyframe_buffer_node.py` following V6 plan §6.2:
                              f"{'ORGANIZED' if self._cloud_organized else 'UNORGANIZED'}")
   ```
 
-- [ ] **Spatial gate** (per camera, independent):
+- [x] **Spatial gate** (per camera, independent):
   - Translation: reject if `||t_new - t_last|| < spatial_gate_translation_m`
   - Rotation: reject if `angle_between_quaternions(q_new, q_last) < spatial_gate_rotation_deg`
   - Use `se3_helpers.angle_between_quaternions` from Phase 1 Task C.
   - Only accept if BOTH translation AND rotation thresholds are exceeded (i.e., enough motion has happened).
 
-- [ ] **Keyframe creation:**
+- [x] **Keyframe creation:**
   - Parse PointCloud2 into `(N, 3)` xyz + `(N, 3)` rgb using `rosbags`-style struct unpacking or `sensor_msgs_py.point_cloud2` (check what's available in-container).
   - Store image as `(H, W, 3)` uint8.
   - Store pose as `(4, 4)` from the PoseWithCovariance message.
   - Create `Keyframe` dataclass, append to the per-camera ring buffer.
 
-- [ ] **Eviction:** `collections.deque(maxlen=max_keyframes_per_camera)` per camera. Oldest dropped automatically.
+- [x] **Eviction:** `collections.deque(maxlen=max_keyframes_per_camera)` per camera. Oldest dropped automatically.
 
-- [ ] **Service handler** `get_in_roi`:
+- [x] **Service handler** `get_in_roi`:
   - Iterate all keyframes in both cameras.
   - Keep those where `||keyframe.pose_translation - center|| < radius`.
   - Return the list.
 
-- [ ] **Diagnostics publisher:** Publish a `diagnostic_msgs/DiagnosticArray` every 5s with:
+- [x] **Diagnostics publisher:** Publish a `diagnostic_msgs/DiagnosticArray` every 5s with:
   - Total keyframes per camera
   - Total memory in MB
   - Cloud organization mode
 
 ### A.5 Tests
 
-- [ ] **`test/test_keyframe_buffer.py`** — test the pure-logic parts without rclpy:
+- [x] **`test/test_keyframe_buffer.py`** — test the pure-logic parts without rclpy:
   - **Spatial gate logic:** Create a mock buffer (plain class, not a Node), feed a sequence of poses, verify that keyframes are accepted/rejected correctly based on translation and rotation thresholds.
   - **Ring buffer eviction:** Fill beyond `max_keyframes`, verify oldest is dropped.
   - **ROI query:** Insert keyframes at known positions, query a region, verify correct subset returned.
   - **Memory accounting:** Create keyframes with known array sizes, verify `memory_mb` property.
   - These tests use the `Keyframe` dataclass and a stripped-down buffer class — no ROS needed. Run on host: `python3 -m pytest src/keyframe_buffer/test/test_keyframe_buffer.py -v`.
 
-- [ ] **ROS integration smoke test** (in-container, uses mock data):
+- [x] **ROS integration smoke test** (in-container, uses mock data):
   - Launch the node with `mock.launch.py` providing fake cloud/image/pose publishers.
   - Verify the node logs the cloud organization detection.
   - Call the `GetKeyframesInROI` service and verify it responds.
+  - **Status:** DONE — custom smoke test (`scripts/test_keyframe_buffer_ros.py`) publishes synthetic clouds/images/poses, verifies 3 keyframes created (spatial gate rejects 1), cloud org auto-detection logs `height=1 -> UNORGANIZED`, and ROI query returns correct subset. Run in `prosthesis` container.
 
 ### A.6 Build and verify
 
-- [ ] `make build-pkg PKG=keyframe_buffer` succeeds.
-- [ ] All tests pass.
-- [ ] Node launches without error in the container with mock data.
+- [x] `make build-pkg PKG=keyframe_buffer` succeeds. *(Verified in `prosthesis` container — builds cleanly after adding `setup.cfg`.)*
+- [x] All tests pass. *(44/44 passing on host: 22 from test_keyframe_buffer.py + 22 from test_cloud_utils.py.)*
+- [x] Node launches without error in the container with mock data. *(Verified via `scripts/test_keyframe_buffer_ros.py` — all 4 checks pass: service responds, 3 keyframes created, fields valid, ROI query correct.)*
 
 ---
 
@@ -201,8 +202,8 @@ EXPOSE 5679
 CMD ["python3", "/app/mobile_sam_server.py"]
 ```
 
-- [ ] Write `docker/Dockerfile.segmentation_v2`.
-- [ ] **GPU variant:** If the laptop has the GTX 3050 and we want GPU inference, create a `Dockerfile.segmentation_v2_gpu` using `nvidia/cuda` base + `torch` GPU wheels. For now, CPU-only is the safe default (MobileSAM is fast enough on CPU for burst-mode grasp-time inference).
+- [x] Write `docker/Dockerfile.segmentation_v2`.
+- [x] **GPU variant:** If the laptop has the GTX 3050 and we want GPU inference, create a `Dockerfile.segmentation_v2_gpu` using `nvidia/cuda` base + `torch` GPU wheels. For now, CPU-only is the safe default (MobileSAM is fast enough on CPU for burst-mode grasp-time inference).
 
 ### B.2 Inference server
 
@@ -216,24 +217,24 @@ Returns JSON: {"mask": [[bool,...],...], "height": H, "width": W}
 """
 ```
 
-- [ ] **Model loading:** Load MobileSAM at startup. Log the cold-start time (V6 validation gate: < 5s).
-- [ ] **Endpoint `/segment_2d`:**
+- [x] **Model loading:** Load MobileSAM at startup. Log the cold-start time (V6 validation gate: < 5s).
+- [x] **Endpoint `/segment_2d`:**
   - Accept base64-encoded RGB image + click coordinates + optional dilation.
   - Run `sam.predict(point_coords=[[x, y]], point_labels=[1])`.
   - Dilate the mask by `dilation_px` (default 15) using `cv2.dilate`.
   - Return the mask as a base64-encoded PNG or JSON 2D array.
-- [ ] **Endpoint `/health`:** Return `{"status": "ready"}` — used by TSDF fusion to check availability before calling.
-- [ ] **Logging:** Log inference time per request (V6 validation gate: < 300ms for burst of 20).
+- [x] **Endpoint `/health`:** Return `{"status": "ready"}` — used by TSDF fusion to check availability before calling.
+- [x] **Logging:** Log inference time per request (V6 validation gate: < 300ms for burst of 20).
 
 ### B.3 Weights
 
-- [ ] Download MobileSAM weights (`mobile_sam.pt` or `vit_b` variant). Place in `models/` or a mounted volume at `/weights/`.
-- [ ] Document the download command in the Dockerfile comments.
+- [x] Download MobileSAM weights (`mobile_sam.pt` or `vit_b` variant). Place in `models/` or a mounted volume at `/weights/`. *(Downloaded to `models/mobile_sam.pt` — 40 MB from `github.com/ChaoningZhang/MobileSAM`.)*
+- [x] Document the download command in the Dockerfile comments.
 
 ### B.4 Tests
 
-- [ ] **Unit test (host, no Docker):** Load a test image (use a synthetic or sample image), call the segmentation function directly (not via HTTP), verify the mask shape matches the image dimensions and is binary.
-- [ ] **Integration test (Docker):**
+- [x] **Unit test (host, no Docker):** Load a test image (use a synthetic or sample image), call the segmentation function directly (not via HTTP), verify the mask shape matches the image dimensions and is binary.
+- [x] **Integration test (Docker):**
   ```bash
   docker build -t mobile_sam_server -f docker/Dockerfile.segmentation_v2 .
   docker run -d -p 5679:5679 --name sam_test mobile_sam_server
@@ -242,12 +243,12 @@ Returns JSON: {"mask": [[bool,...],...], "height": H, "width": W}
   # Send a test request with a sample image
   python3 scripts/test_sam_server.py  # sends a sample image + click
   ```
-  Verify the mask is returned and has the expected shape.
-- [ ] **Cold-start timing:** Measure time from container start to `/health` returning ready. Must be < 5s.
+  Verify the mask is returned and has the expected shape. *(DONE — image built as `mobile_sam:cpu`, health returns ready, `/segment_2d` returns valid binary mask 256x256 with non-trivial coverage.)*
+- [x] **Cold-start timing:** Measure time from container start to `/health` returning ready. Must be < 5s. *(DONE — cold-start 2243 ms, well under 5s gate. Steady-state burst of 20: median 428 ms on CPU host; 300ms gate targets Jetson GPU.)*
 
 ### B.5 Docker compose integration
 
-- [ ] Add the MobileSAM service to `docker/docker-compose.yml`:
+- [x] Add the MobileSAM service to `docker/docker-compose.yml`:
   ```yaml
   mobile_sam:
     build:

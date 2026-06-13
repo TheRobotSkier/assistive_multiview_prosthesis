@@ -13,6 +13,9 @@
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
   <depend>message_filters</depend>
+  <depend>sensor_fusion_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>builtin_interfaces</depend>
 
   <exec_depend>python3-numpy</exec_depend>
 

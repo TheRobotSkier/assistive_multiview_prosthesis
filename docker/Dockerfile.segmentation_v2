@@ -1,0 +1,70 @@
+# MobileSAM inference server (V6 plan §6.4) — CPU-only variant.
+#
+# Isolated from the main ROS container and from the InterObject3D segmentation
+# image.  Runs Python 3.10 + CPU PyTorch + MobileSAM.  The TSDF-fusion node
+# (Phase 3) talks to this container over HTTP on port 5679.
+#
+# Build:
+#   docker build -t mobile_sam:cpu \
+#       -f docker/Dockerfile.segmentation_v2 .
+#
+# Weights are expected at /weights/mobile_sam.pt.  Either bake them in via the
+# DOWNLOAD_WEIGHTS build arg or mount a volume at runtime:
+#   docker run -v ./models:/weights:ro -p 5679:5679 mobile_sam:cpu
+#
+# Download weights:
+#   wget -O models/mobile_sam.pt \
+#       https://github.com/ChaoningZhang/MobileSAM/raw/master/weights/mobile_sam.pt
+
+FROM docker.io/python:3.10-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+WORKDIR /app
+
+# System deps for OpenCV (headless) + libglib.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+        wget \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python deps — CPU PyTorch wheels.
+RUN pip install --no-cache-dir \
+        torch torchvision \
+        --index-url https://download.pytorch.org/whl/cpu
+
+RUN pip install --no-cache-dir \
+        flask \
+        numpy \
+        opencv-python-headless \
+        Pillow \
+        # MobileSAM's TinyViT backbone depends on timm; the package does not
+        # declare it in its own install_requires, so we add it explicitly.
+        timm \
+        # MobileSAM is not published on PyPI; install from the official repo.
+        # Pin to the master branch for reproducibility.
+        git+https://github.com/ChaoningZhang/MobileSAM.git
+
+# Copy the inference server.
+COPY scripts/mobile_sam_server.py /app/mobile_sam_server.py
+
+# Pre-create the weights directory (writable for userns-remap keep-id).
+RUN mkdir -p /weights && chmod 777 /weights
+
+# Optionally bake weights into the image at build time.
+#   docker build --build-arg DOWNLOAD_WEIGHTS=1 ...
+ARG DOWNLOAD_WEIGHTS=0
+RUN if [ "${DOWNLOAD_WEIGHTS}" = "1" ]; then \
+        wget -q \
+          https://github.com/ChaoningZhang/MobileSAM/raw/master/weights/mobile_sam.pt \
+          -O /weights/mobile_sam.pt; \
+    fi
+
+ENV SAM_WEIGHTS=/weights/mobile_sam.pt
+ENV MOBILE_SAM_PORT=5679
+
+EXPOSE 5679
+
+CMD ["python3", "/app/mobile_sam_server.py"]

@@ -1,0 +1,14 @@
+# Query the keyframe buffer for all keyframes within a spherical region of
+# interest (ROI) around a 3-D centre point.
+#
+# Reference: V6 plan §6.2.
+
+# Centre of the ROI in the marker_map frame.
+geometry_msgs/Point center
+# Radius of the ROI sphere in metres.
+float64 radius
+---
+# Keyframes whose camera translation is within `radius` of `center`.
+sensor_fusion_msgs/Keyframe[] keyframes
+# Number of keyframes returned (== len(keyframes)).
+int32 count

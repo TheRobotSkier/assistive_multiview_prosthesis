@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>cross_camera_features</name>
+  <version>0.1.0</version>
+  <description>SIFT-based cross-camera 3D-3D alignment (head/arm) for the GTSAM tracker</description>
+  <maintainer email="dev@multiview-prosthesis.org">multiview_prosthesis</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>message_filters</depend>
+  <depend>keyframe_buffer</depend>
+  <depend>gtsam_tracker</depend>
+
+  <exec_depend>python3-numpy</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

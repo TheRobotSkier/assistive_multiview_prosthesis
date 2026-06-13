@@ -1,0 +1,25 @@
+# Trigger an on-demand TSDF fusion run at grasp time.
+#
+# The caller (twist propagation / pipeline manager) supplies the predicted 3-D
+# hit point and the node fuses keyframes around it into a cleaned object cloud.
+#
+# Reference: V6 plan §6.5.
+
+# 3-D click / hit point in the marker_map frame.
+geometry_msgs/Point hit_point
+# Which camera saw the click ("head" or "arm").  Used to bias the inward shift
+# along the viewing ray of that camera.
+string camera_id
+# Search radius for keyframes (metres).  Default 0.15.
+float64 roi_radius
+---
+# True if fusion produced a non-empty cloud.
+bool success
+# Fused, cleaned object cloud (xyz + rgb) in the marker_map frame.
+sensor_msgs/PointCloud2 object_cloud
+# Number of points in the returned cloud.
+int32 num_points
+# Wall-clock processing time of the fusion run.
+float64 processing_time_ms
+# Human-readable status / error message.
+string message

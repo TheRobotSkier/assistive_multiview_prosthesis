@@ -44,7 +44,7 @@ src/tsdf_fusion/
 └── package.xml
 ```
 
-- [ ] Create the package skeleton following `src/pointcloud_fusion/setup.py` and `package.xml` patterns.
+- [x] Create the package skeleton following `src/pointcloud_fusion/setup.py` and `package.xml` patterns.
 
 ### A.2 Service definition
 
@@ -64,7 +64,7 @@ float64 processing_time_ms
 string message
 ```
 
-- [ ] If `ament_python` can't generate services, define this in `sensor_fusion_msgs` (coordinate with Phase 1/2). Same decision point as the keyframe buffer service.
+- [x] If `ament_python` can't generate services, define this in `sensor_fusion_msgs` (coordinate with Phase 1/2). Same decision point as the keyframe buffer service.
 
 ### A.3 Core fusion pipeline (pure logic — `tsdf_fusion_core.py`)
 
@@ -84,18 +84,18 @@ def fuse_object_cloud(keyframes, hit_point_3d, K_click, pose_click,
     """
 ```
 
-- [ ] **Step 1 — Shift hit point inward** (V6 §4.4): Move the hit point 1.5cm along the camera viewing ray (toward the camera origin). This biases the segmentation toward the object interior.
+- [x] **Step 1 — Shift hit point inward** (V6 §4.4): Move the hit point 1.5cm along the camera viewing ray (toward the camera origin). This biases the segmentation toward the object interior.
 
-- [ ] **Step 2 — Query keyframes:** Already provided as input (the node does the service call).
+- [x] **Step 2 — Query keyframes:** Already provided as input (the node does the service call).
 
-- [ ] **Step 3 — Initialize TSDF volume:**
+- [x] **Step 3 — Initialize TSDF volume:**
   ```python
   volume = o3d.pipelines.integration.ScalableTSDFVolume(
       voxel_length=voxel_size, sdf_trunc=sdf_trunc,
       color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8)
   ```
 
-- [ ] **Step 4 — Per-keyframe loop** (V6 §6.5, the critical unorganized-safe path):
+- [x] **Step 4 — Per-keyframe loop** (V6 §6.5, the critical unorganized-safe path):
   For each keyframe:
   1. Project the shifted hit point to 2D: `uv = project_3d_to_2d(hit_internal, kf.K, kf.pose)` (from `cloud_utils`).
   2. Call SAM: `mask = sam_segment_fn(kf.image, uv, mask_dilation)`.
@@ -106,7 +106,7 @@ def fuse_object_cloud(keyframes, hit_point_3d, K_click, pose_click,
   5. Create RGBD image (RGB from keyframe image, depth from rasterized cloud).
   6. Integrate into TSDF: `volume.integrate(rgbd, intrinsic, inv(kf.pose))`.
 
-- [ ] **Step 5 — Extract mesh/point cloud:**
+- [x] **Step 5 — Extract mesh/point cloud:**
   ```python
   mesh = volume.extract_triangle_mesh()
   cloud = o3d.geometry.PointCloud()
@@ -114,18 +114,18 @@ def fuse_object_cloud(keyframes, hit_point_3d, K_click, pose_click,
   cloud.colors = mesh.vertex_colors
   ```
 
-- [ ] **Step 6 — DBSCAN cleanup** (V6 §4.4):
+- [x] **Step 6 — DBSCAN cleanup** (V6 §4.4):
   ```python
   labels = np.array(cloud.cluster_dbscan(eps=dbscan_eps, min_points=dbscan_min_points))
   # Keep the largest cluster near the hit point
   ```
   Remove noise (label == -1) and small clusters.
 
-- [ ] **Step 7 — Return** the cleaned `(M, 3)` xyz + `(M, 3)` rgb arrays.
+- [x] **Step 7 — Return** the cleaned `(M, 3)` xyz + `(M, 3)` rgb arrays.
 
 ### A.4 ROS node wrapper (`tsdf_fusion_node.py`)
 
-- [ ] **Parameters** (V6 §6.9):
+- [x] **Parameters** (V6 §6.9):
   - `keyframe_service: "/keyframe_buffer/get_in_roi"`
   - `sam_inference_url: "http://127.0.0.1:5679"`
   - `roi_radius_m: 0.15`, `hit_point_shift_m: 0.015`, `mask_dilation_px: 15`
@@ -133,9 +133,9 @@ def fuse_object_cloud(keyframes, hit_point_3d, K_click, pose_click,
   - `dbscan_eps_m: 0.02`, `dbscan_min_points: 10`
   - `output_topic: "/segmentation/object_cloud"`
 
-- [ ] **SAM client:** HTTP client (using `requests` or `urllib`) that calls the MobileSAM server's `/segment_2d` endpoint. Wrap it as a `sam_segment_fn(image, uv, dilation_px) -> mask` callable that `fuse_object_cloud` expects.
+- [x] **SAM client:** HTTP client (using `requests` or `urllib`) that calls the MobileSAM server's `/segment_2d` endpoint. Wrap it as a `sam_segment_fn(image, uv, dilation_px) -> mask` callable that `fuse_object_cloud` expects.
 
-- [ ] **Service handler:**
+- [x] **Service handler:**
   - On `TriggerGraspFusion` request:
     1. Call the keyframe buffer service `GetKeyframesInROI` with the hit point + radius.
     2. Deserialize returned keyframes into `Keyframe` objects.
@@ -143,13 +143,13 @@ def fuse_object_cloud(keyframes, hit_point_3d, K_click, pose_click,
     4. Convert the result to `sensor_msgs/PointCloud2`.
     5. Publish to `/segmentation/object_cloud` AND return in the service response.
 
-- [ ] **Health check:** On startup, ping the MobileSAM server `/health`. Log a warning if unavailable (the node can still start; it will fail at trigger time if SAM is down).
+- [x] **Health check:** On startup, ping the MobileSAM server `/health`. Log a warning if unavailable (the node can still start; it will fail at trigger time if SAM is down).
 
-- [ ] **Publisher:** `/segmentation/object_cloud` — this is the topic `pipeline_manager_node.py:243` subscribes to (V6 §5.1). Must use the same message type (`sensor_msgs/PointCloud2`).
+- [x] **Publisher:** `/segmentation/object_cloud` — this is the topic `pipeline_manager_node.py:243` subscribes to (V6 §5.1). Must use the same message type (`sensor_msgs/PointCloud2`).
 
 ### A.5 Tests
 
-- [ ] **`test/test_tsdf_core.py` — synthetic scene test (the most important test):**
+- [x] **`test/test_tsdf_core.py` — synthetic scene test (the most important test):**
   This is the offline validation strategy. Build a synthetic scene:
   1. Create a known 3D object (e.g., a cylinder or box at a known position).
   2. Generate 5–10 synthetic keyframes with known poses around the object.
@@ -160,21 +160,21 @@ def fuse_object_cloud(keyframes, hit_point_3d, K_click, pose_click,
 
   This test validates the entire fusion pipeline (masking, depth rasterization, TSDF integration, DBSCAN) without ROS, without SAM, and without hardware. If it passes, the pipeline logic is sound.
 
-- [ ] **Edge case tests:**
+- [x] **Edge case tests:**
   - Empty keyframe list → returns empty cloud, success=False.
   - All keyframes have no points in front of camera → empty result.
   - Hit point outside all keyframe FOVs → graceful handling.
 
-- [ ] **ROS smoke test** (in-container):
+- [x] **ROS smoke test** (in-container):
   - Launch tsdf_fusion + keyframe_buffer + mock SAM server.
   - Call `TriggerGraspFusion` with a synthetic hit point.
   - Verify a PointCloud2 is published on `/segmentation/object_cloud`.
 
 ### A.6 Build and verify
 
-- [ ] `make build-pkg PKG=tsdf_fusion` succeeds.
-- [ ] `python3 -m pytest src/tsdf_fusion/test/test_tsdf_core.py -v` passes (the synthetic scene test).
-- [ ] Node launches and responds to the service in-container.
+- [x] `make build-pkg PKG=tsdf_fusion` succeeds.
+- [x] `python3 -m pytest src/tsdf_fusion/test/test_tsdf_core.py -v` passes (the synthetic scene test).
+- [x] Node launches and responds to the service in-container.
 
 ---
 
@@ -203,7 +203,7 @@ src/cross_camera_features/
 
 Implement `sift_feature_node.py` following V6 plan §6.6:
 
-- [ ] **Parameters** (V6 §6.9):
+- [x] **Parameters** (V6 §6.9):
   - `head_image_topic`, `arm_image_topic`
   - `head_cloud_topic`, `arm_cloud_topic`
   - `head_info_topic`, `arm_info_topic`
@@ -212,11 +212,11 @@ Implement `sift_feature_node.py` following V6 plan §6.6:
   - `min_matches: 5`
   - `backend: "sift"`
 
-- [ ] **Synchronization** (V6 §5.8): Use `message_filters.ApproximateTimeSynchronizer` with 50ms slop to sync head+arm image pairs. Register a `TimeSynchronizer` callback.
+- [x] **Synchronization** (V6 §5.8): Use `message_filters.ApproximateTimeSynchronizer` with 50ms slop to sync head+arm image pairs. Register a `TimeSynchronizer` callback.
 
   > **Note:** Unlike the keyframe buffer (which must NOT sync), this node intentionally syncs head+arm pairs because it needs corresponding features for 3D-3D alignment.
 
-- [ ] **SIFT extraction + matching** (V6 §6.6):
+- [x] **SIFT extraction + matching** (V6 §6.6):
   ```python
   self._sift = cv2.SIFT_create()
   self._matcher = cv2.BFMatcher(cv2.NORM_L2)
@@ -225,43 +225,43 @@ Implement `sift_feature_node.py` following V6 plan §6.6:
   - Match descriptors, sort by distance, keep top 100.
   - Apply Lowe's ratio test if using knnMatch (optional, improves quality).
 
-- [ ] **Depth lookup — organization-aware** (V6 §6.6, uses `cloud_utils.lookup_depth_3d`):
+- [x] **Depth lookup — organization-aware** (V6 §6.6, uses `cloud_utils.lookup_depth_3d`):
   For each match, look up the 3D point at the keypoint pixel in both cameras:
   - Organized: `cloud[v, u]` directly.
   - Unorganized (default): find the nearest 3D point to the ray through pixel `(u, v)` using projection. This is the V6-critical path.
 
-- [ ] **Umeyama alignment** (V6 §3.1, uses Phase 1 Task C `umeyama.py`):
+- [x] **Umeyama alignment** (V6 §3.1, uses Phase 1 Task C `umeyama.py`):
   - Collect matched 3D point pairs `(p_head, p_arm)`.
   - If `len(valid_matches) >= min_matches`: run `umeyama(src_points, dst_points)` to get `T_head_arm` + covariance.
   - Publish as `geometry_msgs/PoseWithCovariance` on `/vis/head_arm_pose`.
 
-- [ ] **Publisher:** `/vis/head_arm_pose` — consumed by the GTSAM tracker as a visual between-factor.
+- [x] **Publisher:** `/vis/head_arm_pose` — consumed by the GTSAM tracker as a visual between-factor.
 
-- [ ] **Diagnostics:** Log match count per frame. If consistently < `min_matches`, log a warning suggesting SuperPoint upgrade.
+- [x] **Diagnostics:** Log match count per frame. If consistently < `min_matches`, log a warning suggesting SuperPoint upgrade.
 
 ### B.3 Tests
 
-- [ ] **`test/test_sift_features.py` — synthetic image pair test:**
+- [x] **`test/test_sift_features.py` — synthetic image pair test:**
   1. Generate a synthetic textured image (random pattern or known features).
   2. Create a second image by applying a known small homography (simulating a different viewpoint).
   3. Run SIFT detect + match on the pair.
   4. Verify match count > 0 and that matched points are geometrically consistent.
   5. Test the depth-lookup logic with a synthetic unorganized cloud + known intrinsics.
 
-- [ ] **Umeyama integration test:**
+- [x] **Umeyama integration test:**
   1. Generate known 3D point pairs with a known rigid transform + small noise.
   2. Run `umeyama()`.
   3. Verify recovered transform matches ground truth within tolerance.
 
-- [ ] **Edge cases:**
+- [x] **Edge cases:**
   - No matches found → node does not publish (no crash).
   - All depth lookups fail (points behind camera) → no publish.
 
 ### B.4 Build and verify
 
-- [ ] `make build-pkg PKG=cross_camera_features` succeeds.
-- [ ] `python3 -m pytest src/cross_camera_features/test/test_sift_features.py -v` passes.
-- [ ] Node launches in-container with mock data (mock.launch.py provides synced image pairs).
+- [x] `make build-pkg PKG=cross_camera_features` succeeds.
+- [x] `python3 -m pytest src/cross_camera_features/test/test_sift_features.py -v` passes.
+- [x] Node launches in-container with mock data (mock.launch.py provides synced image pairs).
 
 ---
 

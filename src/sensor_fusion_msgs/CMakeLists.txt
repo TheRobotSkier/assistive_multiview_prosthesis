@@ -2,15 +2,20 @@ cmake_minimum_required(VERSION 3.8)
 project(sensor_fusion_msgs)
 
 find_package(ament_cmake REQUIRED)
+find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/DynamicArmPoseObservation.msg"
   "msg/DynamicMarkerObservation.msg"
+  "msg/Keyframe.msg"
   "msg/MarkerPoseObservation.msg"
-  DEPENDENCIES geometry_msgs std_msgs
+  "srv/GetKeyframesInROI.srv"
+  "srv/TriggerGraspFusion.srv"
+  DEPENDENCIES builtin_interfaces geometry_msgs std_msgs sensor_msgs
 )
 
 ament_export_dependencies(rosidl_default_runtime)

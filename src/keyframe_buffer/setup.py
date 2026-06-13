@@ -10,7 +10,9 @@ setup(
     packages=[package_name],
     py_modules=[],
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "keyframe_buffer_node = keyframe_buffer.keyframe_buffer_node:main",
+        ],
     },
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),

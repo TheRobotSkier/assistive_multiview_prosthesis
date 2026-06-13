@@ -11,6 +11,12 @@
 #   make segmentation-cuda         # run CUDA segmentation service (requires GPU)
 #   make down-segmentation         # stop any segmentation service
 #
+# MobileSAM 2D segmentation server (V6 plan):
+#   make build-mobile-sam-cpu      # build CPU-only MobileSAM image
+#   make mobile-sam-cpu            # run MobileSAM service
+#   make mobile-sam-gpu            # run MobileSAM GPU variant (requires NVIDIA runtime)
+#   make down-mobile-sam           # stop MobileSAM service
+#
 # Docker Compose GPU runtime is enabled via compose override for the CUDA service.
 # Podman GPU runtime uses --device nvidia.com/gpu=all via a compose override.
 #
@@ -63,7 +69,7 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild
+.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-prosthesis up-hw test shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -94,6 +100,11 @@ help:
 	@echo "    make segmentation-cpu       Start CPU segmentation service"
 	@echo "    make down-segmentation      Stop segmentation services"
 	@echo "    make segmentation-status    Show segmentation health"
+	@echo ""
+	@echo "  MobileSAM (V6 2D segmentation):"
+	@echo "    make mobile-sam-cpu         Start MobileSAM service (CPU)"
+	@echo "    make mobile-sam-gpu         Start MobileSAM service (GPU, needs NVIDIA)"
+	@echo "    make down-mobile-sam        Stop MobileSAM service"
 	@echo ""
 	@echo "  Launch:"
 	@echo "    make up                     Start prosthesis + segmentation"
@@ -137,6 +148,13 @@ build-segmentation-cuda:
 build-segmentation-cpu:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build segmentation-cpu
 
+# MobileSAM 2D segmentation server (V6 plan §6.4)
+build-mobile-sam-cpu:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu build mobile_sam_cpu
+
+build-mobile-sam-gpu:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-gpu build mobile_sam_gpu
+
 build-segmentation:
 	cd $(COMPOSE_DIR) && SEGMENTATION_CPU_ONLY=1 $(COMPOSE) build segmentation
 
@@ -176,6 +194,18 @@ segmentation: segmentation-cuda
 
 down-segmentation:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile segmentation-cuda --profile segmentation-cpu down
+
+# MobileSAM services (V6 plan §6.4)
+mobile-sam-cpu:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu up -d mobile_sam_cpu
+
+mobile-sam-gpu:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-gpu up -d mobile_sam_gpu
+
+mobile-sam: mobile-sam-cpu
+
+down-mobile-sam:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu --profile mobile-sam-gpu down
 
 # ── Run ────────────────────────────────────────────────────────────────────
 up:
