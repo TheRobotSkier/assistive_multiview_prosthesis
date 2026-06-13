@@ -30,11 +30,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Python dependencies ──────────────────────────────────────────────────────
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
+# --ignore-installed avoids "Cannot uninstall X, RECORD file not found" errors
+# for packages (e.g. psutil) that were installed by Debian apt in the base image.
+RUN python3 -m pip install --no-cache-dir --break-system-packages --ignore-installed \
         dynamixel-sdk \
         requests \
         scikit-learn \
-        mindrove
+        mindrove \
+        gtsam \
+        open3d \
+        rosbags
 
 # ── User setup ───────────────────────────────────────────────────────────────
 # The osrf/ros:jazzy-desktop image already has a 'ubuntu' user with UID 1000.
