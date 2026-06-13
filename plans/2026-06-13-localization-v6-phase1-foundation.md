@@ -34,30 +34,27 @@ Follow the existing pattern from `src/pointcloud_fusion/test/test_pointcloud_fus
 **Agent:** 1 (quick, ~1 hour)
 **Blocks:** Phase 2 Task C (GTSAM tracker node needs these messages)
 
-- [ ] **A.1** Locate the Jetson-side `sensor_fusion_msgs` package. Check these paths:
-  - `../worktrees/*/docker_ws/multi_cam_localization/sensor_fusion_msgs/`
-  - Search the repo: `find / -path "*/sensor_fusion_msgs/package.xml" 2>/dev/null`
-  - If not found locally, reconstruct from the message definitions in V6 plan §2.2.
+- [x] **A.1** Locate the Jetson-side `sensor_fusion_msgs` package. Found at `worktrees/assistive_multiview_prosthesis/ample-linden/assistive_multiview_prosthesis/docker_ws/multi_cam_localization/sensor_fusion_msgs/`.
 
-- [ ] **A.2** Copy the package into the laptop workspace:
+- [x] **A.2** Copy the package into the laptop workspace:
   ```bash
   cp -r <source>/sensor_fusion_msgs/ src/sensor_fusion_msgs/
   ```
 
-- [ ] **A.3** Verify the package contains these `.msg` files (from V6 §2.2):
+- [x] **A.3** Verify the package contains these `.msg` files (from V6 §2.2):
   - `msg/MarkerPoseObservation.msg`
   - `msg/DynamicMarkerObservation.msg`
   - `msg/DynamicArmPoseObservation.msg`
 
-- [ ] **A.4** Verify `CMakeLists.txt` uses `rosidl_generate_interfaces` for all three messages and that `package.xml` has `<buildtool_depend>rosidl_default_generators</buildtool_depend>` and `<exec_depend>rosidl_default_runtime</exec_depend>`.
+- [x] **A.4** Verify `CMakeLists.txt` uses `rosidl_generate_interfaces` for all three messages and that `package.xml` has `<buildtool_depend>rosidl_default_generators</buildtool_depend>` and `<exec_depend>rosidl_default_runtime</exec_depend>`.
 
-- [ ] **A.5** Build the package in-container:
+- [x] **A.5** Build the package in-container:
   ```bash
   make build-pkg PKG=sensor_fusion_msgs
   ```
   Must succeed with zero errors.
 
-- [ ] **A.6** Verify the Python messages are importable:
+- [x] **A.6** Verify the Python messages are importable:
   ```bash
   python3 -c "from sensor_fusion_msgs.msg import MarkerPoseObservation; print('OK')"
   python3 -c "from sensor_fusion_msgs.msg import DynamicMarkerObservation; print('OK')"
@@ -74,7 +71,7 @@ Follow the existing pattern from `src/pointcloud_fusion/test/test_pointcloud_fus
 
 This is a **pure Python package** (not a ROS package) — it lives inside the `keyframe_buffer` package as a sub-module but has no ROS dependencies.
 
-- [ ] **B.1** Create the directory structure:
+- [x] **B.1** Create the directory structure:
   ```
   src/keyframe_buffer/
   ├── keyframe_buffer/
@@ -89,7 +86,7 @@ This is a **pure Python package** (not a ROS package) — it lives inside the `k
   ```
   Create `setup.py` and `package.xml` following the pattern in `src/pointcloud_fusion/setup.py:1-27` and `src/pointcloud_fusion/package.xml:1-24`.
 
-- [ ] **B.2** Implement `cloud_utils.py` with these functions (all pure numpy, vectorized, no Python loops over points):
+- [x] **B.2** Implement `cloud_utils.py` with these functions (all pure numpy, vectorized, no Python loops over points):
 
   **`detect_organization(height: int) -> bool`**
   Returns `True` if `height > 1` (organized). One-liner but documents the convention.
@@ -120,7 +117,7 @@ This is a **pure Python package** (not a ROS package) — it lives inside the `k
   - For organized: return `cloud[v, u]` directly.
   - For unorganized: find nearest 3D point to the ray through pixel `(u, v)`. Used by SIFT node for depth lookup at keypoint locations.
 
-- [ ] **B.3** Write `test/test_cloud_utils.py` with synthetic data tests:
+- [x] **B.3** Write `test/test_cloud_utils.py` with synthetic data tests:
   - **Test projection round-trip:** Generate random 3D points, project to 2D, verify re-projection error < 0.5 px.
   - **Test unorganized masking:** Create a synthetic scene (points in front of camera), create a mask covering half the image, verify the keep array matches expected geometry.
   - **Test depth rasterization:** Generate points at known depths, rasterize, verify depth image values match within 1mm.
@@ -129,7 +126,7 @@ This is a **pure Python package** (not a ROS package) — it lives inside the `k
   - **Test edge cases:** empty cloud, all points behind camera, points at image boundary.
   - Run with: `python3 -m pytest src/keyframe_buffer/test/test_cloud_utils.py -v` (works on host since no ROS deps).
 
-- [ ] **B.4** Verify the package builds in-container:
+- [x] **B.4** Verify the package builds in-container:
   ```bash
   make build-pkg PKG=keyframe_buffer
   ```
@@ -145,7 +142,7 @@ This is a **pure Python package** (not a ROS package) — it lives inside the `k
 
 This lives inside the `gtsam_tracker` package as sub-modules.
 
-- [ ] **C.1** Create the directory structure:
+- [x] **C.1** Create the directory structure:
   ```
   src/gtsam_tracker/
   ├── gtsam_tracker/
@@ -161,7 +158,7 @@ This lives inside the `gtsam_tracker` package as sub-modules.
   └── package.xml
   ```
 
-- [ ] **C.2** Implement `se3_helpers.py` (pure numpy):
+- [x] **C.2** Implement `se3_helpers.py` (pure numpy):
 
   **`pose_to_matrix(pose_msg) -> np.ndarray`**
   Convert `geometry_msgs/Pose` (position + quaternion) to `(4, 4)` homogeneous matrix.
@@ -193,7 +190,7 @@ This lives inside the `gtsam_tracker` package as sub-modules.
   **`angle_between_quaternions(q1, q2) -> float`**
   Returns angle in radians (for spatial gate: 15° threshold).
 
-- [ ] **C.3** Write `test/test_se3_helpers.py`:
+- [x] **C.3** Write `test/test_se3_helpers.py`:
   - **Round-trip:** matrix → pose → matrix, verify identity within 1e-9.
   - **Inverse:** `T @ inv(T) ≈ I`.
   - **Compose:** verify `compose(A, B) == A @ B`.
@@ -201,7 +198,7 @@ This lives inside the `gtsam_tracker` package as sub-modules.
   - **GTSAM round-trip:** numpy → Pose3 → numpy, verify identity.
   - Run on host: `python3 -m pytest src/gtsam_tracker/test/test_se3_helpers.py -v` (needs `gtsam` installed — run in container if host lacks it).
 
-- [ ] **C.4** Implement `factor_graph.py` (GTSAM, zero ROS):
+- [x] **C.4** Implement `factor_graph.py` (GTSAM, zero ROS):
 
   **`class TrajectoryFactorGraph`**
   - `__init__(self, lag_s=15.0)`: create `gtsam.BatchFixedLagSmoother` or `gtsam.FixedLagSmoother` with the given lag. Use ISAM2 params: `relinearizeThreshold=0.001`, `relinearizeSkip=3`.
@@ -219,7 +216,7 @@ This lives inside the `gtsam_tracker` package as sub-modules.
   **`default_odom_noise(sigma_t=0.01, sigma_r=0.01) -> gtsam.noiseModel`**
   Fixed diagonal noise when odom covariance unavailable.
 
-- [ ] **C.5** Write `test/test_factor_graph.py` with synthetic trajectories:
+- [x] **C.5** Write `test/test_factor_graph.py` with synthetic trajectories:
   - **Odom-only recovery:** Feed a known smooth trajectory (e.g., constant velocity circle) as between-factors. Verify recovered poses match ground truth within 1cm.
   - **Prior correction:** Inject a drifting odom sequence, then add a prior factor at the true pose. Verify the smoother pulls the estimate back toward truth.
   - **Marginalization:** Feed 1000 factors, verify the graph doesn't grow unbounded (check that old keys are marginalized — this is the FixedLagSmoother's job).
@@ -227,7 +224,7 @@ This lives inside the `gtsam_tracker` package as sub-modules.
   - **Two-chain test:** Head and arm chains with independent odom, connected by a visual between-factor. Verify cross-chain consistency.
   - Run in container: `python3 -m pytest src/gtsam_tracker/test/test_factor_graph.py -v`.
 
-- [ ] **C.6** Implement `umeyama.py` (SVD-based 3D-3D alignment, pure numpy):
+- [x] **C.6** Implement `umeyama.py` (SVD-based 3D-3D alignment, pure numpy):
   - **`umeyama(src_points, dst_points) -> tuple[np.ndarray, np.ndarray]`**
   - Returns `(T_4x4, covariance_6x6)`.
   - See V6 plan §3.1 for reference implementation.
