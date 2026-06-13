@@ -4,13 +4,14 @@ Launches the prosthesis pipeline without hardware:
   - No Mia Hand serial connection
   - No MindRove EMG band
   - No RealSense camera
-  - Mock publishers simulate sensor data
+  - Mock publishers simulate sensor data (clouds, odometry, poses)
 
 Use this for development, testing, and debugging the pipeline logic.
 
 Usage:
   ros2 launch mock.launch.py
   ros2 launch mock.launch.py config_file:=/path/to/config.yaml
+  ros2 launch mock.launch.py use_tsdf_fusion:=true
 """
 
 import os
@@ -18,7 +19,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, Command
+from launch.substitutions import LaunchConfiguration, PythonExpression
 
 
 # Default config path: try workspace-root config/ first, then relative to launch file
@@ -45,6 +46,16 @@ def generate_launch_description():
         description="Path to prosthesis_config.yaml",
     )
 
+    tsdf_arg = DeclareLaunchArgument(
+        "use_tsdf_fusion",
+        default_value="false",
+        description="Use V6 TSDF fusion pipeline instead of the legacy "
+                    "segmentation bridge.",
+    )
+
+    config = LaunchConfiguration("config_file")
+    use_tsdf = LaunchConfiguration("use_tsdf_fusion")
+
     # ── Mock data publishers ──────────────────────────────────────────────
     # Mock EMG gesture publisher (cycles through gestures)
     mock_emg = Node(
@@ -52,7 +63,7 @@ def generate_launch_description():
         executable="pipeline_manager_node",
         name="pipeline_manager",
         parameters=[
-            LaunchConfiguration("config_file"),
+            config,
             {"use_mock_emg": False},  # test scripts publish synthetic EMG
         ],
         output="screen",
@@ -66,8 +77,58 @@ def generate_launch_description():
         output="screen",
     )
 
-    # ── Pipeline nodes (same as real) ─────────────────────────────────────
-    # Segmentation ROS bridge (can point to inference server or mock)
+    # Mock odometry + GTSAM pose publisher (for gtsam_tracker / keyframe_buffer)
+    mock_odom = Node(
+        package="pipeline_manager",
+        executable="mock_odom_publisher",
+        name="mock_odom_publisher",
+        parameters=[{
+            "publish_hz": 15.0,
+            "publish_gtsam_poses": True,
+        }],
+        output="screen",
+    )
+
+    # ── V6 perception nodes ───────────────────────────────────────────────
+    # GTSAM trajectory tracker (factor graph smoother)
+    gtsam_tracker = Node(
+        package="gtsam_tracker",
+        executable="gtsam_tracker_node",
+        name="gtsam_tracker",
+        parameters=[config],
+        output="screen",
+    )
+
+    # Keyframe buffer (spatial-gated storage for TSDF fusion)
+    keyframe_buffer = Node(
+        package="keyframe_buffer",
+        executable="keyframe_buffer_node",
+        name="keyframe_buffer",
+        parameters=[config],
+        output="screen",
+    )
+
+    # Cross-camera SIFT feature alignment
+    cross_camera_features = Node(
+        package="cross_camera_features",
+        executable="sift_feature_node",
+        name="cross_camera_features",
+        parameters=[config],
+        output="screen",
+    )
+
+    # TSDF fusion node (replaces segmentation_bridge when enabled)
+    tsdf_fusion = Node(
+        package="tsdf_fusion",
+        executable="tsdf_fusion_node",
+        name="tsdf_fusion",
+        parameters=[config],
+        output="screen",
+        condition=IfCondition(use_tsdf),
+    )
+
+    # ── Pipeline nodes ────────────────────────────────────────────────────
+    # Segmentation ROS bridge (only when TSDF fusion is disabled)
     segmentation_bridge = Node(
         package="segmentation_bridge",
         executable="segmentation_ros2_node",
@@ -76,6 +137,8 @@ def generate_launch_description():
             "inference_url": "http://127.0.0.1:5678",
         }],
         output="screen",
+        condition=IfCondition(
+            PythonExpression(["not ", use_tsdf])),
     )
 
     # Grasp Preshaping Service
@@ -91,7 +154,7 @@ def generate_launch_description():
         package="twist_propagation",
         executable="twist_propagation_node",
         name="twist_propagation",
-        parameters=[LaunchConfiguration("config_file")],
+        parameters=[config],
         output="screen",
     )
 
@@ -100,7 +163,7 @@ def generate_launch_description():
         package="grasp_preshaping",
         executable="grasp_proximity_controller_node.py",
         name="proximity_controller",
-        parameters=[LaunchConfiguration("config_file")],
+        parameters=[config],
         output="screen",
     )
 
@@ -109,7 +172,7 @@ def generate_launch_description():
         package="force_controller",
         executable="force_controller_node",
         name="force_controller",
-        parameters=[LaunchConfiguration("config_file")],
+        parameters=[config],
         output="screen",
     )
 
@@ -147,9 +210,15 @@ def generate_launch_description():
         [
             config_arg,
             rviz_arg,
+            tsdf_arg,
             camera_tf,
             mock_cloud,
+            mock_odom,
             mock_emg,
+            gtsam_tracker,
+            keyframe_buffer,
+            cross_camera_features,
+            tsdf_fusion,
             segmentation_bridge,
             twist_propagation,
             preshaping_service,

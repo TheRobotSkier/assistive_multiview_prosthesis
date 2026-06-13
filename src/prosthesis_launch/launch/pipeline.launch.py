@@ -88,6 +88,7 @@ def _launch_setup(context, *args, **kwargs):
     tf_diagnostics = LaunchConfiguration("tf_diagnostics").perform(context)
     model_dir = LaunchConfiguration("model_dir").perform(context)
     require_dual_openvins = _as_bool(context, "require_dual_openvins")
+    use_tsdf_fusion = _as_bool(context, "use_tsdf_fusion")
 
     if require_dual_openvins:
         print("[pipeline] INFO: require_dual_openvins=true — "
@@ -311,20 +312,71 @@ def _launch_setup(context, *args, **kwargs):
                 ),
             ]
         )
+
+        # ── V6 Phase 4: new perception nodes ──────────────────────────
+        # GTSAM trajectory tracker (factor graph smoother)
+        camera_nodes.append(
+            Node(
+                package="gtsam_tracker",
+                executable="gtsam_tracker_node",
+                name="gtsam_tracker",
+                parameters=[_node_params(config, "gtsam_tracker")],
+                output="screen",
+            )
+        )
+
+        # Keyframe buffer (spatial-gated storage for TSDF fusion)
+        camera_nodes.append(
+            Node(
+                package="keyframe_buffer",
+                executable="keyframe_buffer_node",
+                name="keyframe_buffer",
+                parameters=[_node_params(config, "keyframe_buffer")],
+                output="screen",
+            )
+        )
+
+        # Cross-camera SIFT feature alignment (visual between-factor)
+        camera_nodes.append(
+            Node(
+                package="cross_camera_features",
+                executable="sift_feature_node",
+                name="cross_camera_features",
+                parameters=[_node_params(config, "cross_camera_features")],
+                output="screen",
+            )
+        )
+
+        # TSDF fusion node (replaces segmentation_bridge when enabled)
+        if use_tsdf_fusion:
+            camera_nodes.append(
+                Node(
+                    package="tsdf_fusion",
+                    executable="tsdf_fusion_node",
+                    name="tsdf_fusion",
+                    parameters=[_node_params(config, "tsdf_fusion")],
+                    output="screen",
+                )
+            )
+            print("[pipeline] use_tsdf_fusion=true — launching tsdf_fusion "
+                  "instead of segmentation_bridge")
+
         nodes.extend(camera_nodes)
 
     # Segmentation ROS bridge (talks to inference server over HTTP)
     # Subscribes directly to /fused_pointcloud via remapping.
-    nodes.append(
-        Node(
-            package="segmentation_bridge",
-            executable="segmentation_ros2_node",
-            name="segmentation_bridge",
-            remappings={("/segmentation/input_cloud", "/fused_pointcloud")},
-            parameters=[{"inference_url": inference_url, "roi_radius_m": float(roi_radius)}],
-            output="screen",
+    # When use_tsdf_fusion=true, the tsdf_fusion node replaces this.
+    if not use_tsdf_fusion:
+        nodes.append(
+            Node(
+                package="segmentation_bridge",
+                executable="segmentation_ros2_node",
+                name="segmentation_bridge",
+                remappings={("/segmentation/input_cloud", "/fused_pointcloud")},
+                parameters=[{"inference_url": inference_url, "roi_radius_m": float(roi_radius)}],
+                output="screen",
+            )
         )
-    )
 
     # Twist Propagation Target Selector
     nodes.append(
@@ -501,6 +553,14 @@ def generate_launch_description():
                 default_value="false",
                 description="Require both head and arm OpenVINS odometry "
                             "before enabling grasp execution.",
+            ),
+            DeclareLaunchArgument(
+                "use_tsdf_fusion",
+                default_value="false",
+                description="Use V6 TSDF fusion pipeline instead of the legacy "
+                            "segmentation bridge. When true, launches "
+                            "tsdf_fusion, keyframe_buffer, gtsam_tracker, and "
+                            "cross_camera_features nodes.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]

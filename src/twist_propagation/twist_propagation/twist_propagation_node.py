@@ -534,6 +534,12 @@ class TwistPropagationNode(Node):
         # Background warm cache
         self.declare_parameter("background_cycle_enabled", True)
 
+        # V6 TSDF fusion integration (Phase 4 Task A)
+        self.declare_parameter("use_tsdf_fusion", False)
+        self.declare_parameter("tsdf_fusion_service", "/tsdf_fusion/trigger")
+        self.declare_parameter("max_head_wrist_distance_m", 1.0)
+        self.declare_parameter("enforce_kinematic_constraint", False)
+
         # ── Read parameters ────────────────────────────────────────────────
         self._cycle_delay = self.get_parameter("cycle_delay_s").value
         self._horizon = self.get_parameter("propagation_time_horizon_s").value
@@ -571,6 +577,14 @@ class TwistPropagationNode(Node):
         self._click_random_seed = int(self.get_parameter("click_random_seed").value)
         self._background_cycle_enabled = bool(self.get_parameter("background_cycle_enabled").value)
         self._external_twist_max_age = float(self.get_parameter("external_twist_max_age_s").value)
+
+        # V6 TSDF fusion integration (Phase 4 Task A)
+        self._use_tsdf_fusion = bool(self.get_parameter("use_tsdf_fusion").value)
+        self._tsdf_service = str(self.get_parameter("tsdf_fusion_service").value)
+        self._max_head_wrist_distance = float(
+            self.get_parameter("max_head_wrist_distance_m").value)
+        self._enforce_kinematic_constraint = bool(
+            self.get_parameter("enforce_kinematic_constraint").value)
 
         # Validation
         if self._click_count < 0:
@@ -727,6 +741,24 @@ class TwistPropagationNode(Node):
             self._on_deactivate,
         )
 
+        # ── TSDF fusion service client (V6 Phase 4 Task A) ────────────────
+        self._tsdf_client = None
+        if self._use_tsdf_fusion:
+            try:
+                from sensor_fusion_msgs.srv import TriggerGraspFusion
+                self._TriggerGraspFusion = TriggerGraspFusion
+                self._tsdf_client = self.create_client(
+                    TriggerGraspFusion, self._tsdf_service)
+                self.get_logger().info(
+                    f"TSDF fusion enabled — service client: "
+                    f"{self._tsdf_service}")
+            except ImportError:
+                self._TriggerGraspFusion = None
+                self.get_logger().warn(
+                    "use_tsdf_fusion=true but sensor_fusion_msgs not "
+                    "available — falling back to click-publish path")
+                self._use_tsdf_fusion = False
+
         # ── Cycle timer ────────────────────────────────────────────────────
         self.create_timer(self._cycle_delay, self._cycle_callback)
 
@@ -738,7 +770,8 @@ class TwistPropagationNode(Node):
             f"effective_thresh={self._effective_hit_thresh}m, "
             f"multi_click={self._click_count} (r={self._click_radius}m, r_min={self._click_min_radius}m), "
             f"background_cycle={self._background_cycle_enabled}, "
-            f"cycle_rate={1.0/self._cycle_delay:.0f}Hz"
+            f"cycle_rate={1.0/self._cycle_delay:.0f}Hz, "
+            f"use_tsdf_fusion={self._use_tsdf_fusion}"
         )
         if self._has_external_twist_sub:
             twist_input_topic = self.get_parameter("hand_twist_input_topic").value
@@ -1696,38 +1729,37 @@ class TwistPropagationNode(Node):
                         f"Hit detected — collision distance: {collision_dist:.3f}m"
                     )
 
-                # Publish click cluster (original hit + synthetic clicks)
-                rng = np.random.default_rng(self._click_random_seed)
-                synthetic = _sample_spherical_shell_clicks(
-                    hit_point, self._click_min_radius, self._click_radius, self._click_count, rng
-                )
-                total_clicks = 1 + len(synthetic)
+                # ── Trigger segmentation (V6 Phase 4 Task A) ────────────────
+                # When use_tsdf_fusion is true, call the TriggerGraspFusion
+                # service instead of publishing clicks.  The tsdf_fusion node
+                # publishes the fused cloud to /segmentation/object_cloud,
+                # which the existing _on_segmented_cloud callback already
+                # monitors — so the WAITING_FOR_SEGMENTATION state machine
+                # is unchanged.
+                #
+                # Kinematic constraint check (V6 §6.1): verify the hand/wrist
+                # is within reach of the head camera before triggering.
+                if self._enforce_kinematic_constraint and \
+                        not self._check_kinematic_range():
+                    self.get_logger().warn(
+                        "Kinematic constraint violated — hand/wrist too far "
+                        f"from head camera (limit={self._max_head_wrist_distance}m). "
+                        "Skipping segmentation trigger."
+                    )
+                    self._publish_status(
+                        hit_point=[round(hit_x, 4), round(hit_y, 4), round(hit_z, 4)],
+                        reason="kinematic_constraint_violated",
+                        num_predicted_poses=len(positions),
+                    )
+                    return
 
-                # Publish original hit first
-                click = PointStamped()
-                click.header.stamp = self.get_clock().now().to_msg()
-                click.header.frame_id = self._cloud_frame
-                click.point.x = hit_x
-                click.point.y = hit_y
-                click.point.z = hit_z
-                self._click_pub.publish(click)
-
-                # Publish synthetic clicks
-                for sx, sy, sz in synthetic:
-                    sclick = PointStamped()
-                    sclick.header.stamp = self.get_clock().now().to_msg()
-                    sclick.header.frame_id = self._cloud_frame
-                    sclick.point.x = sx
-                    sclick.point.y = sy
-                    sclick.point.z = sz
-                    self._click_pub.publish(sclick)
-
-                self.get_logger().info(
-                    f"Published click cluster: {total_clicks} clicks "
-                    f"(1 original + {len(synthetic)} synthetic) around hit "
-                    f"({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}), "
-                    f"r=[{self._click_min_radius:.4f}, {self._click_radius:.4f}]m"
-                )
+                if self._use_tsdf_fusion and self._tsdf_client is not None:
+                    total_clicks = 0
+                    self._trigger_tsdf_fusion(hit_x, hit_y, hit_z)
+                else:
+                    # Existing path: publish click cluster
+                    total_clicks = self._publish_click_cluster(
+                        hit_x, hit_y, hit_z, hit_point)
 
                 # Update current target and transition
                 self._current_segmentation_target = hit_point
@@ -1744,6 +1776,7 @@ class TwistPropagationNode(Node):
                     click_count=self._click_count,
                     click_radius_m=self._click_radius,
                     click_min_radius_m=self._click_min_radius,
+                    use_tsdf_fusion=self._use_tsdf_fusion,
                 )
         else:
             # No hit -- publish -1.0 sentinel to invalidate any stale hit time
@@ -1758,6 +1791,159 @@ class TwistPropagationNode(Node):
                 twist_linear_mag=round(lin_mag, 4),
                 num_predicted_poses=len(positions),
             )
+
+    # ------------------------------------------------------------------
+    # V6 Phase 4 Task A — TSDF fusion + kinematic constraint helpers
+    # ------------------------------------------------------------------
+
+    def _check_kinematic_range(self) -> bool:
+        """Verify the hand/wrist is within reach of the head camera.
+
+        Looks up the head and wrist poses via TF (or the pose buffer) and
+        computes the Euclidean distance.  Returns ``True`` if within
+        ``max_head_wrist_distance_m``, ``False`` otherwise.
+
+        When TF is unavailable or the lookup fails, the check passes
+        (fail-open) so the pipeline is not blocked by missing transforms.
+        """
+        if not _HAS_TF2 or self._tf_buffer is None:
+            return True
+
+        # Use the latest pose buffer entry as the wrist position.
+        if len(self._pose_buf) == 0:
+            return True
+
+        wrist_entry = self._pose_buf[-1]
+        wx, wy, wz = wrist_entry[1], wrist_entry[2], wrist_entry[3]
+
+        # Look up head pose via TF.
+        try:
+            from geometry_msgs.msg import TransformStamped
+        except ImportError:
+            return True
+
+        head_frame = "head_d435i_head_link"
+        wrist_frame = "arm_d435i_arm_link"
+        target = "marker_map"
+
+        try:
+            tf_head = self._tf_buffer.lookup_transform(
+                target, head_frame, Time(),
+                timeout=rclpy.duration.Duration(seconds=0.1))
+            hx = tf_head.transform.translation.x
+            hy = tf_head.transform.translation.y
+            hz = tf_head.transform.translation.z
+        except Exception:
+            # TF not available — fail open.
+            return True
+
+        dist = math.sqrt((hx - wx) ** 2 + (hy - wy) ** 2 + (hz - wz) ** 2)
+        if dist > self._max_head_wrist_distance:
+            self.get_logger().warn(
+                f"Kinematic range exceeded: head-wrist distance={dist:.3f}m "
+                f"(limit={self._max_head_wrist_distance}m)"
+            )
+            return False
+        return True
+
+    def _publish_click_cluster(
+        self, hit_x: float, hit_y: float, hit_z: float,
+        hit_point: tuple,
+    ) -> int:
+        """Publish the original hit click + synthetic clicks.  Returns count."""
+        rng = np.random.default_rng(self._click_random_seed)
+        synthetic = _sample_spherical_shell_clicks(
+            hit_point, self._click_min_radius, self._click_radius,
+            self._click_count, rng
+        )
+        total_clicks = 1 + len(synthetic)
+
+        # Publish original hit first
+        click = PointStamped()
+        click.header.stamp = self.get_clock().now().to_msg()
+        click.header.frame_id = self._cloud_frame
+        click.point.x = hit_x
+        click.point.y = hit_y
+        click.point.z = hit_z
+        self._click_pub.publish(click)
+
+        # Publish synthetic clicks
+        for sx, sy, sz in synthetic:
+            sclick = PointStamped()
+            sclick.header.stamp = self.get_clock().now().to_msg()
+            sclick.header.frame_id = self._cloud_frame
+            sclick.point.x = sx
+            sclick.point.y = sy
+            sclick.point.z = sz
+            self._click_pub.publish(sclick)
+
+        self.get_logger().info(
+            f"Published click cluster: {total_clicks} clicks "
+            f"(1 original + {len(synthetic)} synthetic) around hit "
+            f"({hit_x:.3f}, {hit_y:.3f}, {hit_z:.3f}), "
+            f"r=[{self._click_min_radius:.4f}, {self._click_radius:.4f}]m"
+        )
+        return total_clicks
+
+    def _trigger_tsdf_fusion(
+        self, hit_x: float, hit_y: float, hit_z: float,
+    ) -> None:
+        """Call the TriggerGraspFusion service asynchronously.
+
+        The fused cloud is published by the tsdf_fusion node to
+        ``/segmentation/object_cloud``, which the existing
+        ``_on_segmented_cloud`` callback already monitors.  So this method
+        only needs to fire the request — the state machine handles the rest.
+        """
+        if self._tsdf_client is None:
+            self.get_logger().error(
+                "TSDF fusion requested but client is not initialised")
+            return
+
+        if not self._tsdf_client.service_is_ready():
+            self.get_logger().warn(
+                f"TSDF fusion service '{self._tsdf_service}' not ready — "
+                "waiting up to 2s")
+            if not self._tsdf_client.wait_for_service(timeout_sec=2.0):
+                self.get_logger().error(
+                    f"TSDF fusion service '{self._tsdf_service}' unavailable")
+                return
+
+        request = self._TriggerGraspFusion.Request()
+        request.hit_point.x = float(hit_x)
+        request.hit_point.y = float(hit_y)
+        request.hit_point.z = float(hit_z)
+        request.camera_id = "arm"
+        request.roi_radius = float(self._hit_thresh)
+
+        future = self._tsdf_client.call_async(request)
+        future.add_done_callback(self._on_tsdf_fusion_response)
+
+        self.get_logger().info(
+            f"Triggered TSDF fusion: hit=({hit_x:.3f}, {hit_y:.3f}, "
+            f"{hit_z:.3f}), roi={self._hit_thresh:.3f}m"
+        )
+
+    def _on_tsdf_fusion_response(self, future) -> None:
+        """Handle the TriggerGraspFusion service response."""
+        try:
+            response = future.result()
+        except Exception as exc:
+            self.get_logger().error(f"TSDF fusion service call failed: {exc}")
+            return
+
+        if response is None:
+            self.get_logger().error("TSDF fusion service returned None")
+            return
+
+        if response.success:
+            self.get_logger().info(
+                f"TSDF fusion success: {response.num_points} points in "
+                f"{response.processing_time_ms:.1f}ms — {response.message}")
+        else:
+            self.get_logger().warn(
+                f"TSDF fusion returned no cloud: {response.message} "
+                f"(time={response.processing_time_ms:.1f}ms)")
 
 
 

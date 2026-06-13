@@ -383,6 +383,17 @@ twist_propagation:
         propagation_origin_offset: [0.1543, -0.1485, 0.1352]
         preshaping_call_delay_s: 0.15
         background_cycle_enabled: true
+        # ── V6 Phase 4: TSDF fusion integration ───────────────────────
+        # When true, the node calls the TriggerGraspFusion service instead
+        # of publishing clicks to the segmentation bridge.  Defaults to
+        # false for backward compatibility.
+        use_tsdf_fusion: false
+        tsdf_fusion_service: "/tsdf_fusion/trigger"
+        # Maximum head-to-wrist distance (m) for the kinematic constraint.
+        # When enforce_kinematic_constraint is true, segmentation is skipped
+        # if the hand is farther than this from the head camera.
+        max_head_wrist_distance_m: 1.0
+        enforce_kinematic_constraint: false
 
 # EMG Grasp Controller — state machine gesture interpreter
 # Launched when emg:=true (default).
@@ -410,6 +421,108 @@ emg_grasp_controller:
         emg_proportional_topic: "/emg/proportional"
         intent_topic: "/emg_grasp/intent"
         mode_topic: "/emg_grasp/mode"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# V6 Localization Nodes (Phase 0–3)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+gtsam_tracker:
+    ros__parameters:
+        # Odometry topics
+        head_odom_topic: "/ov_msckf/odomimu"
+        arm_odom_topic: "/ov_msckf_arm/odomimu"
+        # Head pose source: "odom" (subscribe to odom topic) or "tf"
+        # (look up marker_map -> head_imu via TF2).
+        head_pose_source: "odom"
+        # TF frames for the TF fallback
+        head_tf_target_frame: "marker_map"
+        head_tf_source_frame: "head_imu"
+        # ArUco topics (graceful degradation if absent)
+        aruco_marker_topic: "/aruco/marker_pose"
+        aruco_dynamic_topic: "/aruco/dynamic_marker"
+        aruco_arm_pose_topic: "/aruco/arm_pose"
+        # Visual factor topic (from cross_camera_features)
+        visual_factor_topic: "/vis/head_arm_pose"
+        # Graph parameters
+        graph_rate_hz: 15.0
+        smoother_lag_s: 15.0
+        # Kinematic range factor (soft constraint between head and arm)
+        kinematic_range_m: 1.0
+        kinematic_range_sigma_m: 0.05
+        kinematic_check_interval: 10
+        # Noise sigmas (used when odom covariance is zero/invalid)
+        odom_translation_sigma_m: 0.02
+        odom_rotation_sigma_rad: 0.02
+        # Output topics
+        head_pose_topic: "/gtsam/head_pose"
+        arm_pose_topic: "/gtsam/arm_pose"
+        # Output frame
+        world_frame: "marker_map"
+
+keyframe_buffer:
+    ros__parameters:
+        # Per-camera topic names
+        head_image_topic: "/head/d435i_head/color/image_raw"
+        arm_image_topic: "/arm/d435i_arm/color/image_raw"
+        head_cloud_topic: "/head/d435i_head/depth/color/points"
+        arm_cloud_topic: "/arm/d435i_arm/depth/color/points"
+        head_info_topic: "/head/d435i_head/color/camera_info"
+        arm_info_topic: "/arm/d435i_arm/color/camera_info"
+        # Pose topics (from gtsam_tracker)
+        head_pose_topic: "/gtsam/head_pose"
+        arm_pose_topic: "/gtsam/arm_pose"
+        # Buffer parameters
+        max_keyframes_per_camera: 50
+        spatial_gate_translation_m: 0.10
+        spatial_gate_rotation_deg: 15.0
+        # Maximum age between a cloud stamp and its pose stamp for the
+        # keyframe to be accepted.  RealSense clouds and OpenVINS poses
+        # may not be perfectly time-synchronised.
+        pose_max_age_s: 0.05
+
+cross_camera_features:
+    ros__parameters:
+        # Per-camera topic names
+        head_image_topic: "/head/d435i_head/color/image_raw"
+        arm_image_topic: "/arm/d435i_arm/color/image_raw"
+        head_cloud_topic: "/head/d435i_head/depth/color/points"
+        arm_cloud_topic: "/arm/d435i_arm/depth/color/points"
+        head_info_topic: "/head/d435i_head/color/camera_info"
+        arm_info_topic: "/arm/d435i_arm/color/camera_info"
+        # Pose topics (from gtsam_tracker)
+        head_pose_topic: "/gtsam/head_pose"
+        arm_pose_topic: "/gtsam/arm_pose"
+        # Output
+        output_topic: "/vis/head_arm_pose"
+        # Processing
+        process_rate_hz: 5.0
+        sync_slop_s: 0.05
+        min_matches: 5
+        top_k_matches: 100
+        ratio_threshold: 0.8
+        depth_search_radius_m: 0.02
+        # Feature backend: "sift" (default) or "superpoint" (future)
+        backend: "sift"
+        world_frame: "marker_map"
+
+tsdf_fusion:
+    ros__parameters:
+        # Keyframe buffer service
+        keyframe_service: "/keyframe_buffer/get_in_roi"
+        # MobileSAM inference server
+        sam_inference_url: "http://127.0.0.1:5679"
+        sam_timeout_s: 5.0
+        # Fusion parameters
+        roi_radius_m: 0.15
+        hit_point_shift_m: 0.015
+        mask_dilation_px: 15
+        voxel_size_m: 0.005
+        sdf_trunc_m: 0.02
+        dbscan_eps_m: 0.02
+        dbscan_min_points: 10
+        # Output
+        output_topic: "/segmentation/object_cloud"
+        world_frame: "marker_map"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)
