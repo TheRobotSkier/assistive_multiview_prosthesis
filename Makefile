@@ -69,7 +69,7 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-prosthesis up-hw test shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild
+.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -101,15 +101,19 @@ help:
 	@echo "    make down-segmentation      Stop segmentation services"
 	@echo "    make segmentation-status    Show segmentation health"
 	@echo ""
-	@echo "  MobileSAM (V6 2D segmentation):"
-	@echo "    make mobile-sam-cpu         Start MobileSAM service (CPU)"
+	@echo "  MobileSAM (V6 2D segmentation — GPU is default):"
+	@echo "    make mobile-sam             Start MobileSAM (GPU by default)"
 	@echo "    make mobile-sam-gpu         Start MobileSAM service (GPU, needs NVIDIA)"
+	@echo "    make mobile-sam-cpu         Start MobileSAM service (CPU fallback)"
 	@echo "    make down-mobile-sam        Stop MobileSAM service"
 	@echo ""
 	@echo "  Launch:"
-	@echo "    make up                     Start prosthesis + segmentation"
-	@echo "    make up-hw                  Start with hardware devices"
+	@echo "    make up                     Start prosthesis + MobileSAM GPU"
+	@echo "    make up-cpu                 Start prosthesis + MobileSAM CPU (no GPU)"
+	@echo "    make up-hw                  Start with hardware devices + MobileSAM GPU"
 	@echo "    make run                    Full launch with USB detection"
+	@echo "    make mock-v6                Launch V6 mock pipeline (TSDF fusion + synthetic data)"
+	@echo "    make pipeline-v6            Launch V6 hardware pipeline (use_tsdf_fusion:=true)"
 	@echo "    make down                   Stop all containers"
 	@echo ""
 	@echo "  RViz:"
@@ -202,19 +206,24 @@ mobile-sam-cpu:
 mobile-sam-gpu:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-gpu up -d mobile_sam_gpu
 
-mobile-sam: mobile-sam-cpu
+mobile-sam: mobile-sam-gpu
 
 down-mobile-sam:
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu --profile mobile-sam-gpu down
 
 # ── Run ────────────────────────────────────────────────────────────────────
+# Default: prosthesis + MobileSAM GPU (V6 segmentation, <400ms latency target).
+# Use up-cpu for machines without NVIDIA runtime.
 up:
-	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis segmentation-cpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-gpu up -d prosthesis mobile_sam_gpu
+
+up-cpu:
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu up -d prosthesis mobile_sam_cpu
 
 up-prosthesis: dev
 
 up-hw:
-	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml up -d prosthesis segmentation-cpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml --profile mobile-sam-gpu up -d prosthesis mobile_sam_gpu
 
 # ── Tonight host validation gates ────────────────────────────────────────────
 # These run the in-container Makefile targets from the host checkout. They keep
@@ -230,6 +239,22 @@ $(TONIGHT_TARGETS): dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec prosthesis /bin/bash -lc 'make $@'
 
 # ── Launch proxies (from host) ─────────────────────────────────────────────
+
+# V6 mock pipeline: launches all V6 perception nodes with synthetic data.
+# Requires MobileSAM (make mobile-sam) running for TSDF fusion triggers.
+mock-v6: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc '\
+		source /opt/ros/jazzy/setup.bash && \
+		source /prosthesis_ws/install/setup.bash 2>/dev/null || true && \
+		ros2 launch prosthesis_launch mock.launch.py use_tsdf_fusion:=true'
+
+# V6 full pipeline: hardware launch with TSDF fusion enabled.
+pipeline-v6: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc '\
+		source /opt/ros/jazzy/setup.bash && \
+		source /prosthesis_ws/install/setup.bash 2>/dev/null || true && \
+		ros2 launch prosthesis_launch pipeline.launch.py use_tsdf_fusion:=true'
+
 run: up-hw
 	make segmentation-status
 	make timesync-check

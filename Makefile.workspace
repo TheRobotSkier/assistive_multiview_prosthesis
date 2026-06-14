@@ -22,12 +22,12 @@ TONIGHT_RAW_RATE_SECONDS ?= 8
 TONIGHT_CHECK_STARTUP_SECONDS ?= 8
 TONIGHT_TF_ECHO_SECONDS ?= 3
 TONIGHT_SAFE_LAUNCH_ARGS := rviz:=false mia_hand:=false wrist:=false emg:=false haptic:=false camera:=true config_file:=$(TONIGHT_CONFIG) mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml
-TONIGHT_SAFE_PACKAGES := camera prosthesis_launch pointcloud_fusion segmentation_bridge twist_propagation grasp_preshaping pipeline_manager sensor_fusion_bringup
+TONIGHT_SAFE_PACKAGES := camera prosthesis_launch pointcloud_fusion segmentation_bridge twist_propagation grasp_preshaping pipeline_manager sensor_fusion_bringup gtsam_tracker keyframe_buffer tsdf_fusion cross_camera_features sensor_fusion_msgs
 TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source
+.PHONY: help build build-pkg build-debug clean test mock mock-v6 pipeline pipeline-v6 digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -81,9 +81,17 @@ mock: ## Launch mock pipeline (no hardware needed)
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch mock.launch.py
 
+mock-v6: ## Launch V6 mock pipeline with TSDF fusion (no hardware needed)
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch mock.launch.py use_tsdf_fusion:=true
+
 pipeline: ## Launch full hardware pipeline
 	@$(ROS_SETUP) && \
 	ros2 launch prosthesis_launch pipeline.launch.py
+
+pipeline-v6: ## Launch V6 hardware pipeline with TSDF fusion enabled
+	@$(ROS_SETUP) && \
+	ros2 launch prosthesis_launch pipeline.launch.py use_tsdf_fusion:=true
 
 camera-test: ## Build + launch visual pipeline (no hardware)
 	@$(ROS_SETUP) && \
