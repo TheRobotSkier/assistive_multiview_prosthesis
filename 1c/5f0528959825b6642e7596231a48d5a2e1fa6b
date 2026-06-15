@@ -1,0 +1,51 @@
+scripts/emg_latency_workflow.sh
+  s_f2d1a9751d7547::t_4b6f28ffff7ef0 1-7,14-26,35-58,63-87,89-93,97-112
+  s_f2d1a9751d7547::t_43405663688de4 27-34,59-62
+  s_f2d1a9751d7547::t_31aaf2ea8fee94 8-13,88,94-96
+src/emg_bridge/emg_bridge/latency_benchmark_entry.py
+  s_f2d1a9751d7547::t_02157e5c913e89 1-8
+src/emg_bridge/emg_bridge/latency_protocol.py
+  s_f2d1a9751d7547::t_87f7963c652179 1-32
+docs/reference/directory-structure.md
+  s_f2d1a9751d7547::t_457a086db2fe31 12,72-78
+src/emg_bridge/test/test_latency_benchmark_cli.py
+  s_f2d1a9751d7547::t_87f7963c652179 9,12,16
+  s_f2d1a9751d7547::t_4b6f28ffff7ef0 1-8,10-11,13-15,17-22
+agents.md
+  s_f2d1a9751d7547::t_457a086db2fe31 49-51,61
+docs/reference/validation-and-workflows.md
+  s_f2d1a9751d7547::t_457a086db2fe31 16,31-34,55-83
+src/emg_bridge/emg_bridge/latency_analysis.py
+  s_f2d1a9751d7547::t_dfbcd1a45e7ee5 1-180,182-222,227-238
+  s_f2d1a9751d7547::t_0c018d15d8d09e 181,223-226
+docs/architecture/control-and-actuation.md
+  s_f2d1a9751d7547::t_457a086db2fe31 122-151
+docs/architecture/packages.md
+  s_f2d1a9751d7547::t_457a086db2fe31 66-74
+Makefile
+  s_f2d1a9751d7547::t_4b6f28ffff7ef0 66,177-179
+src/emg_bridge/setup.py
+  s_f2d1a9751d7547::t_02157e5c913e89 25
+src/emg_bridge/emg_bridge/scripts/latency_benchmark.py
+  s_f2d1a9751d7547::t_02157e5c913e89 1-38,40-460,465-510,512-596
+  s_f2d1a9751d7547::t_708eac155fdb47 461-464
+  s_f2d1a9751d7547::t_87f7963c652179 39,511
+src/emg_bridge/test/test_latency_analysis.py
+  s_f2d1a9751d7547::t_c59cea39145006 1-147
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "1c5f0528959825b6642e7596231a48d5a2e1fa6b",
+  "prompts": {},
+  "sessions": {
+    "s_f2d1a9751d7547": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1348635b1ffe3l9r2dZTL7WwHQ",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
