@@ -9,6 +9,7 @@ Use this as the primary navigation map for the repository.
 - `docs/`: canonical architecture and navigation documentation
 - `logs/`: historical log captures, not source-of-truth docs
 - `models/`: model assets used by runtime or experiments
+- `data/`: persisted EMG recordings and latency benchmark outputs
 - `rviz/`: RViz configuration
 - `scripts/`: host and workspace utility scripts, smoke tests, setup scripts
 - `src/`: ROS packages and vendored dependencies
@@ -67,6 +68,14 @@ Use this as the primary navigation map for the repository.
 
 - Start: `src/prosthesis_launch/launch/simple_emg_grasp.launch.py`
 - Then: `src/pipeline_manager/pipeline_manager/simple_pipeline_manager_node.py`
+
+### Change EMG collection, training, inference, or latency benchmarking
+
+- Start: `src/emg_bridge/`
+- Live benchmark runner: `src/emg_bridge/emg_bridge/scripts/latency_benchmark.py`
+- Latency analysis logic: `src/emg_bridge/emg_bridge/latency_analysis.py`
+- Host workflow wrapper: `scripts/emg_latency_workflow.sh`
+- Host command: `make emg-latency-workflow`
 
 ### Change point cloud fusion
 

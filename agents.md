@@ -46,6 +46,9 @@ High-value code entry points:
 - approach controller: `src/grasp_preshaping/nodes/grasp_proximity_controller_node.py`
 - hand command adapter: `src/command_bridge/command_bridge/command_bridge_node.py`
 - force controller: `src/force_controller/force_controller/force_controller_node.py`
+- EMG latency workflow: `scripts/emg_latency_workflow.sh`
+- EMG latency runner: `src/emg_bridge/emg_bridge/scripts/latency_benchmark.py`
+- EMG latency analysis: `src/emg_bridge/emg_bridge/latency_analysis.py`
 
 Use `docs/reference/directory-structure.md` for the full map.
 
@@ -55,6 +58,7 @@ Use `docs/reference/directory-structure.md` for the full map.
 - Start from launch files and config when trying to understand runtime behavior.
 - Treat `config/prosthesis_config.yaml` as a critical integration file.
 - Be careful around cross-package contracts: topics, services, TF frames, and controller ownership.
+- For EMG work, prefer reusing the existing `collect_data`, `train`, `run_classifier`, and `latency_benchmark` entry points instead of adding parallel workflows.
 - If changing vendored dependencies in `src/open_vins/` or `src/realsense-ros/`, confirm that the task really requires it.
 
 ## Required Documentation Update Rule

@@ -63,6 +63,15 @@ This is the fast package map for everything under `src/`.
 
 - Purpose: EMG collection, training, inference, and ROS publication
 - Key files: `src/emg_bridge/emg_bridge/*.py`, `src/emg_bridge/scripts/*`
+- Important entry points:
+  - `ros2 run emg_bridge collect_data`
+  - `ros2 run emg_bridge train`
+  - `ros2 run emg_bridge run_classifier`
+  - `ros2 run emg_bridge latency_benchmark`
+- Important latency modules:
+  - `src/emg_bridge/emg_bridge/latency_analysis.py`
+  - `src/emg_bridge/emg_bridge/latency_protocol.py`
+  - `src/emg_bridge/emg_bridge/scripts/latency_benchmark.py`
 
 ### `haptic_band`
 

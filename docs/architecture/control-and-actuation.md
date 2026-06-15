@@ -119,6 +119,36 @@ Role:
 - Map wrist angle, finger force, and pipeline state into Vibro8 motor commands
 - Send those commands over Bluetooth
 
+## EMG Collection, Training, And Latency Benchmarking
+
+Main package: `src/emg_bridge/`
+
+Primary entry points:
+
+- `ros2 run emg_bridge collect_data`
+- `ros2 run emg_bridge train`
+- `ros2 run emg_bridge run_classifier`
+- `ros2 run emg_bridge latency_benchmark`
+
+Host workflow wrapper:
+
+- `scripts/emg_latency_workflow.sh`
+- `make emg-latency-workflow`
+
+Latency benchmark role:
+
+- reuse the production EMG preprocessing, feature extraction, classifier, smoothing, and proportional-control path
+- prompt the user through repeated non-REST gesture trials
+- print live classifier output during the benchmark
+- record sample-level EMG and frame-level predictions to CSV
+- estimate muscle-activity-to-prediction delay from a trial-local onset detector linked to the prediction-support window
+
+Generated artifacts:
+
+- training recordings under `data/`
+- trained model files under `models/`
+- latency CSV outputs under `data/latency/<run-name>/`
+
 ## Control Change Checklist
 
 If you change control or actuation behavior, likely update:
