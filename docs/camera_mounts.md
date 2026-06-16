@@ -14,7 +14,7 @@ src/sensor_fusion_bringup/
   scripts/publish_camera_mounts.py   — ROS2 node: reads YAML, publishes TF + markers
 
 rviz/camera_mounts.rviz              — RViz2 config (TF axes, bounding box marker)
-Makefile.rviz                        — Docker-based launch targets
+Makefile                             — Docker-based launch targets (make mounts-viz)
 ```
 
 ## TF Tree
@@ -63,7 +63,7 @@ xhost +local:
 ### Visualize All Mounts (default)
 
 ```bash
-make -f Makefile.rviz mounts-viz
+make mounts-viz
 ```
 
 RViz2 opens showing:
@@ -74,14 +74,14 @@ RViz2 opens showing:
 ### Visualize Single Mount
 
 ```bash
-make -f Makefile.rviz mounts-viz MOUNT=5_cm_cam_mount
-make -f Makefile.rviz mounts-viz MOUNT=12_cm_H_cam_mount
+make mounts-viz MOUNT=5_cm_cam_mount
+make mounts-viz MOUNT=12_cm_H_cam_mount
 ```
 
 ### Stop
 
 ```bash
-make -f Makefile.rviz mounts-viz-kill
+make mounts-viz-kill
 ```
 
 ### CLI Only (no GUI)

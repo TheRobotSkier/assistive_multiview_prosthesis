@@ -1,0 +1,70 @@
+{
+  "bag": {
+    "bag": "replay_bag",
+    "captured_at": "2026-06-16T23:11:38",
+    "duration_s": 170.575,
+    "start_iso": "2026-06-16 23:08:35",
+    "sysmon": {
+      "host_cpu_pct": {
+        "avg": 62.2,
+        "max": 87.7,
+        "min": 14.4
+      },
+      "host_mem_pct": {
+        "avg": 28.1,
+        "max": 30.8,
+        "min": 22.4
+      }
+    },
+    "topics": {
+      "/gtsam/arm_pose": {
+        "count": 2054,
+        "effective_hz": 12.042,
+        "expected_hz": 15.0,
+        "health": "OK"
+      },
+      "/gtsam/head_pose": {
+        "count": 2054,
+        "effective_hz": 12.042,
+        "expected_hz": 15.0,
+        "health": "OK"
+      },
+      "/keyframe_buffer/diagnostics": {
+        "count": 34,
+        "effective_hz": 0.199,
+        "expected_hz": 1.0,
+        "health": "STARVED"
+      },
+      "/tf": {
+        "count": 5274,
+        "effective_hz": 30.919,
+        "expected_hz": 50.0,
+        "health": "OK"
+      },
+      "/tf_static": {
+        "count": 3,
+        "effective_hz": 0.018,
+        "expected_hz": 1.0,
+        "health": "STARVED"
+      },
+      "/vis/head_arm_pose": {
+        "count": 1,
+        "effective_hz": 0.006,
+        "expected_hz": 30.0,
+        "health": "STARVED"
+      }
+    },
+    "total_msgs": 9420
+  },
+  "log": {
+    "captured_at": "2026-06-16T23:11:42",
+    "known_failures": {},
+    "log": "host-log-20260616_162416_analysis.txt",
+    "n_crashes": 0,
+    "n_errors": 0,
+    "n_lines": 111,
+    "n_nodes_started": 0,
+    "severity": {},
+    "tf_jump_events_total": 0
+  }
+}

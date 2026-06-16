@@ -51,6 +51,10 @@ run_test "preshaping"  "$SCRIPT_DIR/test_preshaping_so.sh"
 run_test "nodes_start" "$SCRIPT_DIR/test_nodes_start.sh"
 run_test "twist_prop"  "$SCRIPT_DIR/test_twist_propagation.sh"
 
+# Run the full pytest unit test suite (247 tests across 8 packages).
+# This is the highest-value hardware-free test layer.
+run_test "unit"        "$SCRIPT_DIR/test_unit.sh"
+
 echo ""
 echo "=========================================="
 echo "  Results"

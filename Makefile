@@ -99,7 +99,7 @@ else
   COMPOSE_PROFILE_FLAG := --profile mobile-sam-gpu
 endif
 
-.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-v6 record-v6-mock record-v6-pipeline inspect-bag run-camera-log run-camera-log-debug
+.PHONY: help build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test test-unit test-baseline test-fresh test-replay test-replay-baseline shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill mounts-viz mounts-viz-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-bag record-bag-mock record-debug analyze-log analyze-bag analyze-bag-meta inspect-bag run-camera-log run-camera-log-debug run-tui
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -123,7 +123,12 @@ help:
 	@echo "    make test1-analysis         Generate figures from results (host)"
 	@echo ""
 	@echo "  Testing:"
-	@echo "    make test                   Build + run unit tests (Docker)"
+	@echo "    make test                   Run smoke + unit tests (fast, in running container)"
+	@echo "    make test-unit              Run pytest unit tests only (247 hardware-free tests)"
+	@echo "    make test-baseline          Capture current timings as golden baseline"
+	@echo "    make test-fresh             Clean-room build + test (slower, catches cache issues)"
+	@echo "    make test-replay            Replay golden bag, analyze, compare vs baseline (~3min)"
+	@echo "    make test-replay-baseline   Capture golden replay metrics as the baseline"
 	@echo ""
 	@echo "  Segmentation:"
 	@echo "    make segmentation-cuda      Start CUDA segmentation service"
@@ -146,16 +151,23 @@ help:
 	@echo "    make pipeline-v6            Launch V6 hardware pipeline (use_tsdf_fusion:=true)"
 	@echo "    make run-camera-log         Camera pipeline + auto-save log to logs/host-log-*.txt"
 	@echo "    make run-camera-log-debug   Same + pipeline_diagnostics node (TF/rate/divergence monitor)"
-	@echo "    make record-v6              Record all V6 topics to data/bags/ (needs running container)"
-	@echo "    make record-v6-mock         Record mock pipeline topics (needs running container)"
+	@echo "    make run-tui                Config TUI: pick launch args, then launch pipeline"
+	@echo "    make record-bag             Record all V6 topics to data/bags/ (needs running container)"
+	@echo "    make record-bag-mock        Record mock pipeline topics (needs running container)"
+	@echo "    make record-debug           Record bag + system telemetry (host + Jetson sysmon)"
 	@echo "    make inspect-bag            Show topic list + counts for latest bag"
+	@echo "    make analyze-log            Summarize the latest host-log for debugging"
+	@echo "    make analyze-bag            Analyze the latest bag + sysmon for debugging"
+	@echo "    make analyze-bag-meta       Analyze the latest bag metadata only (fast, Tier A)"
 	@echo "    make down                   Stop all containers"
 	@echo ""
 	@echo "  RViz:"
+	@echo "    make build-rviz             Build host RViz image (localhost/rviz-robotlab)"
 	@echo "    make rviz                   Launch RViz (robotlab Ethernet)"
 	@echo "    make rviz-kill              Stop RViz"
 	@echo "    make rviz-static            RViz + static TF at world origin"
 	@echo "    make rviz-twist-propagation RViz for trajectory prediction"
+	@echo "    make mounts-viz             Visualize camera mounts (MOUNT=8_cm_cam_mount for one)"
 	@echo ""
 	@echo "  Robotlab / Jetson:"
 	@echo "    make robotlab-connect       Connect to Jetson via Ethernet"
@@ -197,11 +209,10 @@ build-mobile-sam-cpu:
 build-mobile-sam-gpu:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build mobile_sam_gpu
 
-build-segmentation:
-	cd $(COMPOSE_DIR) && SEGMENTATION_CPU_ONLY=1 $(COMPOSE) build segmentation
-
-build-jazzy-rviz:
-	$(DOCKER_CMD) build -f docker/Dockerfile.jazzy-rviz -t localhost/ros2-jazzy-rviz:latest .
+# Build the lightweight host-side RViz image. All rviz-* targets below
+# depend on this image, tagged localhost/rviz-robotlab.
+build-rviz:
+	$(DOCKER_CMD) build -f docker/Dockerfile.jazzy-rviz -t localhost/rviz-robotlab:latest .
 
 rebuild:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build --no-cache
@@ -216,9 +227,10 @@ dev-shell: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash
 
 # Segmentation services (explicit backend variants)
-# Use the appropriate compose override based on detected backend for CUDA GPU support.
+# Use DOCKER_CMD (always set correctly) rather than CONTAINER_BACKEND (only set
+# when explicitly provided) to pick the right compose override for CUDA GPU.
 segmentation-cuda:
-ifeq ($(CONTAINER_BACKEND),podman)
+ifeq ($(DOCKER_CMD),podman)
 	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA_PODMAN) up -d segmentation-cuda
 else
 	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_SEGMENTATION_CUDA) --profile segmentation-cuda up -d segmentation-cuda
@@ -299,7 +311,7 @@ pipeline-v6: dev
 # of truth). See the in-container targets for details.
 #
 # These targets exec into the ALREADY-RUNNING container via the in-container
-# Makefile targets (Makefile.workspace: record-v6, record-v6-mock, inspect-bag).
+# Makefile targets (Makefile.workspace: record-bag, record-bag-mock, inspect-bag).
 #
 # They NEVER recreate the container, so they are safe to run alongside a live
 # pipeline. If the container is not running, they tell you to start it first.
@@ -307,9 +319,12 @@ pipeline-v6: dev
 # Bags land in data/bags/v6_<timestamp>/ on the host (bind-mounted).
 #
 # Usage (from host, with pipeline already running in another terminal):
-#   make record-v6          # record all V6 perception + odometry topics
-#   make record-v6-mock     # record mock pipeline topics (lighter)
-#   make inspect-bag        # show topic list + message counts for latest bag
+#   make record-bag          # record all V6 perception + odometry topics
+#   make record-bag-mock     # record mock pipeline topics (lighter)
+#   make record-debug        # record bag + system telemetry (host + Jetson)
+#   make inspect-bag         # show topic list + message counts for latest bag
+#   make analyze-log         # summarize the latest (or given) host-log
+#   make analyze-bag         # analyze the latest (or given) bag + sysmon
 
 # Guard: exec into the running container only. Fails fast if it's down so we
 # never accidentally trigger a `compose up` that would recreate it.
@@ -326,13 +341,68 @@ fi
 @cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc '$(1)'
 endef
 
-record-v6: ## Record all V6 perception + odometry topics (requires running container)
-	$(call exec-in-container,make record-v6)
+record-bag: ## Record all V6 perception + odometry topics (requires running container)
+	$(call exec-in-container,make record-bag)
 
-record-v6-mock: ## Record mock pipeline topics (requires running container)
-	$(call exec-in-container,make record-v6-mock)
+record-bag-mock: ## Record mock pipeline topics (requires running container)
+	$(call exec-in-container,make record-bag-mock)
 
-record-v6-pipeline: record-v6  # alias for clarity in hardware runs
+# Record a bag AND capture system telemetry (host + Jetson) alongside it.
+# Checks the container is up first, then starts the bag recording in the
+# background, detects the NEW bag dir (not a pre-existing one), and runs
+# sysmon.py in the foreground. Ctrl+C stops both cleanly.
+record-debug: ## Record bag + system telemetry (host CPU/GPU/RAM/drift/NIC + Jetson)
+	@echo "=== record-debug: bag recording + system telemetry ==="; \
+	if ! $(DOCKER_CMD) inspect -f '{{.State.Running}}' prosthesis 2>/dev/null | grep -q true; then \
+		echo "ERROR: prosthesis container is not running."; \
+		echo "Start it first with 'make dev', then run your pipeline, then record."; \
+		exit 1; \
+	fi; \
+	echo "Container is up. Starting bag recording (background)..."; \
+	BEFORE=$$(ls -d data/bags/v6_*/ 2>/dev/null | tr '\n' ' '); \
+	$(MAKE) record-bag & \
+	RECORD_PID=$$!; \
+	sleep 3; \
+	AFTER=$$(ls -d data/bags/v6_*/ 2>/dev/null | tr '\n' ' '); \
+	BAG_DIR=$$(for d in $$AFTER; do case "$$BEFORE" in *"$$d"*) ;; *) echo "$$d"; break;; esac; done); \
+	if [ -z "$$BAG_DIR" ]; then \
+		echo "ERROR: no new bag dir detected after 3s (recording may have failed)."; \
+		kill $$RECORD_PID 2>/dev/null; wait $$RECORD_PID 2>/dev/null; true; exit 1; \
+	fi; \
+	echo "Bag dir:    $$BAG_DIR"; \
+	echo "Sysmon out: $$BAG_DIR/sysmon.jsonl"; \
+	trap 'kill $$RECORD_PID 2>/dev/null; wait $$RECORD_PID 2>/dev/null; true' INT TERM; \
+	python3 scripts/sysmon.py --output "$$BAG_DIR/sysmon.jsonl"; \
+	kill $$RECORD_PID 2>/dev/null; wait $$RECORD_PID 2>/dev/null; true
+
+# Analyze a host-log for fast debugging. Defaults to the latest log.
+# Usage: make analyze-log  /  make analyze-log LOG=logs/host-log-<ts>.txt
+LOG ?=
+analyze-log: ## Summarize the latest (or given) host-log for debugging
+	@if [ -z "$(LOG)" ]; then \
+		python3 scripts/analyze_log.py --plot; \
+	else \
+		python3 scripts/analyze_log.py --plot "$(LOG)"; \
+	fi
+
+# Analyze a bag + sibling sysmon.jsonl. Defaults to the latest bag.
+# Usage: make analyze-bag  /  make analyze-bag BAG=data/bags/v6_<ts>/
+BAG ?=
+analyze-bag: ## Analyze the latest (or given) bag + sysmon for debugging
+	@if [ -z "$(BAG)" ]; then \
+		python3 scripts/analyze_bag.py --plot; \
+	else \
+		python3 scripts/analyze_bag.py --plot "$(BAG)"; \
+	fi
+
+# Analyze only the bag metadata (Tier A, fast — no MCAP replay).
+# Usage: make analyze-bag-meta  /  make analyze-bag-meta BAG=data/bags/v6_<ts>/
+analyze-bag-meta: ## Analyze the latest (or given) bag metadata only (fast, Tier A)
+	@if [ -z "$(BAG)" ]; then \
+		python3 scripts/analyze_bag.py --no-deep; \
+	else \
+		python3 scripts/analyze_bag.py --no-deep "$(BAG)"; \
+	fi
 
 # Inspect the most recent bag: list topics, message counts, and duration
 inspect-bag: ## Show topic list + message counts for latest bag
@@ -371,6 +441,12 @@ run-camera-log: dev
 run-camera-log-debug: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-camera-log-debug'
 
+# Launch the pipeline-config TUI inside the container. Presents toggles and
+# tuning knobs for the pipeline.launch.py launch arguments, then launches
+# the pipeline with your chosen settings. Uses curses (no X11 needed).
+run-tui: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-tui'
+
 collect-data: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make collect-data'
 
@@ -381,8 +457,45 @@ emg-infer: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-classifier'
 
 # ── Test ───────────────────────────────────────────────────────────────────
-test:
+# Fast: exec into the running container and run the test suite against the
+# already-built workspace. Use this after `make build` for quick feedback.
+test: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make test'
+
+test-unit: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make test-unit'
+
+test-baseline: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make test-baseline'
+
+# Clean-room: rebuild the image from scratch and run tests in a fresh
+# container. Slower, but catches issues that cached layers might mask.
+test-fresh:
 	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) run --rm test
+
+# Hardware-free regression test: replay the golden bag's /jetson/* inputs
+# through the host pipeline, record the regenerated outputs, analyze them,
+# and compare against a committed baseline. Catches degradations (drift,
+# rate drops, TF instability) that pass/fail unit tests miss.
+# Requires: running container (make dev) + built workspace.
+test-replay:
+	@if ! $(DOCKER_CMD) inspect -f '{{.State.Running}}' prosthesis 2>/dev/null | grep -q true; then \
+		echo "ERROR: prosthesis container is not running."; \
+		echo "Start it first with 'make dev' and build with 'make build'."; \
+		exit 1; \
+	fi
+	python3 scripts/replay_test.py
+
+# Capture the current replay metrics as the golden baseline. Run this once
+# after confirming a known-good pipeline state, then 'make test-replay' will
+# flag any subsequent regressions.
+test-replay-baseline:
+	@if ! $(DOCKER_CMD) inspect -f '{{.State.Running}}' prosthesis 2>/dev/null | grep -q true; then \
+		echo "ERROR: prosthesis container is not running."; \
+		echo "Start it first with 'make dev' and build with 'make build'."; \
+		exit 1; \
+	fi
+	python3 scripts/replay_test.py --capture
 
 # ── Shell into running container ──────────────────────────────────────────
 shell:
@@ -477,31 +590,48 @@ rviz-kill:
 	-$(DOCKER_CMD) rm -f ros2-jazzy-host-rviz 2>/dev/null
 	@echo "RViz stopped."
 
+# ── RViz container macros ──────────────────────────────────────────────────
+# All rviz-* targets launch the same localhost/rviz-robotlab image with
+# identical X11 / CycloneDDS / network setup. They differ only in the
+# container name and the .rviz config file. These macros capture the shared
+# boilerplate so each target stays a readable one-liner.
+#
+#   $(1) = container name        $(2) = .rviz path (repo-relative)
+define launch-rviz
+@test -f $(2) || { echo "Missing $(2)"; exit 1; }
+@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
+xhost +
+-podman rm -f $(1) -t 1 2>/dev/null
+podman run --rm -d --name $(1) \
+	--network host \
+	--ipc host \
+	--userns=keep-id \
+	$(RVIZ_GPU_FLAGS) \
+	-e DISPLAY=$(DISPLAY) \
+	-e XAUTHORITY=/tmp/.xauth \
+	$(RVIZ_GPU_ENV) \
+	-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
+	-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
+	-e ROS_DOMAIN_ID=0 \
+	-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+	-v $(XAUTHORITY):/tmp/.xauth:ro \
+	-v $(CURDIR)/$(2):/rviz_config.rviz:ro \
+	-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
+	localhost/rviz-robotlab \
+	bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
+@sleep 3
+endef
+
+#   $(1) = container name
+define kill-rviz
+-podman kill $(1) 2>/dev/null
+-podman rm $(1) 2>/dev/null
+endef
+
 # ── Robotlab RViz + static TF (both cameras at world origin) ─────────
 rviz-static:
 	@echo "Starting static TF publisher (both cameras → world origin)"
-	@test -f rviz/robotlab_cameras_static_tf.rviz || { echo "Missing rviz/robotlab_cameras_static_tf.rviz"; exit 1; }
-	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
-	xhost +
-	-podman rm -f static-tf-robotlab -t 1 2>/dev/null
-	podman run --rm -d --name rviz-robotlab \
-		--network host \
-		--ipc host \
-		--userns=keep-id \
-		$(RVIZ_GPU_FLAGS) \
-		-e DISPLAY=$(DISPLAY) \
-		-e XAUTHORITY=/tmp/.xauth \
-		$(RVIZ_GPU_ENV) \
-		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
-		-e ROS_DOMAIN_ID=0 \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-		-v $(XAUTHORITY):/tmp/.xauth:ro \
-		-v $(CURDIR)/rviz/robotlab_cameras_static_tf.rviz:/rviz_config.rviz:ro \
-		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
-		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
-	@sleep 3
+	$(call launch-rviz,rviz-robotlab,rviz/robotlab_cameras_static_tf.rviz)
 	@echo "RViz started. Kill both with: make rviz-static-kill"
 	podman run --rm -d --name static-tf-robotlab \
 		--network host \
@@ -523,10 +653,8 @@ rviz-static:
 	@echo "Static TF container started (static-tf-robotlab)"
 
 rviz-static-kill:
-	-podman kill rviz-robotlab 2>/dev/null
-	-podman rm rviz-robotlab 2>/dev/null
-	-podman kill static-tf-robotlab 2>/dev/null
-	-podman rm static-tf-robotlab 2>/dev/null
+	$(call kill-rviz,rviz-robotlab)
+	$(call kill-rviz,static-tf-robotlab)
 	@echo "RViz and static TF publisher stopped."
 
 robotlab-view: rviz
@@ -534,6 +662,57 @@ robotlab-view: rviz
 
 robotlab-stop: rviz-kill
 	@echo "Robotlab view stopped."
+
+# ── Camera mount visualization ─────────────────────────────────────────────
+# Publishes camera-mount TFs (from camera_mounts.yaml) and opens RViz.
+#   make mounts-viz                       (all mounts with bounding boxes)
+#   make mounts-viz MOUNT=8_cm_cam_mount  (single mount)
+#   make mounts-viz-kill
+MOUNT ?= all
+MOUNTS_RVIZ := $(CURDIR)/rviz/camera_mounts.rviz
+MOUNTS_YAML := $(CURDIR)/src/sensor_fusion_bringup/config/camera_mounts.yaml
+MOUNTS_SCRIPT := $(CURDIR)/src/sensor_fusion_bringup/scripts/publish_camera_mounts.py
+
+mounts-viz:
+	@echo "Publishing camera mount TFs ($(MOUNT)) and launching RViz..."
+	@test -f $(MOUNTS_RVIZ) || { echo "Missing $(MOUNTS_RVIZ)"; exit 1; }
+	@test -f $(MOUNTS_SCRIPT) || { echo "Missing $(MOUNTS_SCRIPT)"; exit 1; }
+	@xhost +local: >/dev/null 2>&1 || true
+	@if [ "$(MOUNT)" = "all" ]; then \
+		MODE="--all"; \
+		MSG="all mounts + bounding boxes"; \
+	else \
+		MODE="--mount $(MOUNT)"; \
+		MSG="mount $(MOUNT)"; \
+	fi; \
+	$(DOCKER_CMD) run --rm -d --name mounts-viz \
+		--network host \
+		-e DISPLAY=$(DISPLAY) \
+		-e ROS_DOMAIN_ID=0 \
+		-e XAUTHORITY=/tmp/.xauthority \
+		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+		-v $(XAUTHORITY):/tmp/.xauthority:ro \
+		-v $(MOUNTS_RVIZ):/rviz_config.rviz:ro \
+		-v $(MOUNTS_SCRIPT):/tmp/publish_camera_mounts.py:ro \
+		-v $(MOUNTS_YAML):/tmp/camera_mounts.yaml:ro \
+		localhost/rviz-robotlab \
+		bash -c '\
+			source /opt/ros/jazzy/setup.bash && \
+			python3 /tmp/publish_camera_mounts.py '"$$MODE"' --config /tmp/camera_mounts.yaml & \
+			sleep 2 && \
+			timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
+	@sleep 3; \
+	if $(DOCKER_CMD) ps --filter name=mounts-viz --format '{{.Status}}' 2>/dev/null | grep -q Up; then \
+		echo "RViz running: $$MSG. Kill with: make mounts-viz-kill"; \
+	else \
+		echo "ERROR: Container failed."; \
+		$(DOCKER_CMD) logs mounts-viz 2>/dev/null || true; \
+		exit 1; \
+	fi
+
+mounts-viz-kill:
+	-$(DOCKER_CMD) kill mounts-viz 2>/dev/null || true
+	-$(DOCKER_CMD) rm mounts-viz 2>/dev/null || true
 
 # ── Robotlab ethernet connection ──────────────────────────────────────────
 # Ensures the USB-to-ethernet adapter is up and the Jetson is reachable.
@@ -702,63 +881,21 @@ jetson-openvins-logs: robotlab-connect
 # ── Phase 2 RViz (OpenVINS TF + pointclouds) ─────────────────────────────────
 rviz-openvins:
 	@echo "Launching Phase 2 RViz (OpenVINS marker_map frame)"
-	@test -f rviz/phase2_dual_openvins.rviz || { echo "Missing rviz/phase2_dual_openvins.rviz"; exit 1; }
-	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
-	xhost +
-	podman run --rm -d --name rviz-openvins \
-		--network host \
-		--ipc host \
-		--userns=keep-id \
-		$(RVIZ_GPU_FLAGS) \
-		-e DISPLAY=$(DISPLAY) \
-		-e XAUTHORITY=/tmp/.xauth \
-		$(RVIZ_GPU_ENV) \
-		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
-		-e ROS_DOMAIN_ID=0 \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-		-v $(XAUTHORITY):/tmp/.xauth:ro \
-		-v $(CURDIR)/rviz/phase2_dual_openvins.rviz:/rviz_config.rviz:ro \
-		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
-		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
-	@sleep 3
+	$(call launch-rviz,rviz-openvins,rviz/phase2_dual_openvins.rviz)
 	@echo "Phase 2 RViz started (rviz-openvins). Kill with: make rviz-openvins-kill"
 
 rviz-openvins-kill:
-	-podman kill rviz-openvins 2>/dev/null
-	-podman rm rviz-openvins 2>/dev/null
+	$(call kill-rviz,rviz-openvins)
 	@echo "Phase 2 RViz stopped."
 
 # ── Trajectory Prediction RViz (twist_propagation visualisation) ────────────────
 rviz-twist-propagation:
 	@echo "Launching Trajectory Prediction RViz (twist_propagation visualisation)"
-	@test -f rviz/twist_propagation.rviz || { echo "Missing rviz/twist_propagation.rviz"; exit 1; }
-	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
-	xhost +
-	podman run --rm -d --name rviz-twist-propagation \
-		--network host \
-		--ipc host \
-		--userns=keep-id \
-		$(RVIZ_GPU_FLAGS) \
-		-e DISPLAY=$(DISPLAY) \
-		-e XAUTHORITY=/tmp/.xauth \
-		$(RVIZ_GPU_ENV) \
-		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
-		-e ROS_DOMAIN_ID=0 \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-		-v $(XAUTHORITY):/tmp/.xauth:ro \
-		-v $(CURDIR)/rviz/twist_propagation.rviz:/rviz_config.rviz:ro \
-		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
-		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
-	@sleep 3
+	$(call launch-rviz,rviz-twist-propagation,rviz/twist_propagation.rviz)
 	@echo "Trajectory Prediction RViz started. Kill with: make rviz-twist-propagation-kill"
 
 rviz-twist-propagation-kill:
-	-podman kill rviz-twist-propagation 2>/dev/null
-	-podman rm rviz-twist-propagation 2>/dev/null
+	$(call kill-rviz,rviz-twist-propagation)
 	@echo "Trajectory Prediction RViz stopped."
 
 # ── Jetson IMU dead reckoning test ────────────────────────────────────────────
@@ -783,56 +920,15 @@ jetson-imu-test-logs: robotlab-connect
 
 # ── IMU test RViz (local PC) ──────────────────────────────────────────────────
 rviz-imu-test-single:
-	@test -f rviz/imu_test_single.rviz || { echo "Missing rviz/imu_test_single.rviz"; exit 1; }
-	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
-	xhost +
-	podman run --rm -d --name rviz-imu-test \
-		--network host \
-		--ipc host \
-		--userns=keep-id \
-		$(RVIZ_GPU_FLAGS) \
-		-e DISPLAY=$(DISPLAY) \
-		-e XAUTHORITY=/tmp/.xauth \
-		$(RVIZ_GPU_ENV) \
-		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
-		-e ROS_DOMAIN_ID=0 \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-		-v $(XAUTHORITY):/tmp/.xauth:ro \
-		-v $(CURDIR)/rviz/imu_test_single.rviz:/rviz_config.rviz:ro \
-		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
-		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
-	@sleep 3
+	$(call launch-rviz,rviz-imu-test,rviz/imu_test_single.rviz)
 	@echo "IMU test RViz (single cam) started. Kill with: make rviz-imu-test-kill"
 
 rviz-imu-test-dual:
-	@test -f rviz/imu_test_dual.rviz || { echo "Missing rviz/imu_test_dual.rviz"; exit 1; }
-	@test -f config/cyclonedds_peer.xml || { echo "Missing config/cyclonedds_peer.xml"; exit 1; }
-	xhost +
-	podman run --rm -d --name rviz-imu-test \
-		--network host \
-		--ipc host \
-		--userns=keep-id \
-		$(RVIZ_GPU_FLAGS) \
-		-e DISPLAY=$(DISPLAY) \
-		-e XAUTHORITY=/tmp/.xauth \
-		$(RVIZ_GPU_ENV) \
-		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
-		-e ROS_DOMAIN_ID=0 \
-		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-		-v $(XAUTHORITY):/tmp/.xauth:ro \
-		-v $(CURDIR)/rviz/imu_test_dual.rviz:/rviz_config.rviz:ro \
-		-v $(CURDIR)/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro \
-		localhost/rviz-robotlab \
-		bash -c 'source /opt/ros/jazzy/setup.bash && timeout $(HOST_CONTAINER_LIFETIME) rviz2 -d /rviz_config.rviz' 2>&1 &
-	@sleep 3
+	$(call launch-rviz,rviz-imu-test,rviz/imu_test_dual.rviz)
 	@echo "IMU test RViz (dual cam) started. Kill with: make rviz-imu-test-kill"
 
 rviz-imu-test-kill:
-	-podman kill rviz-imu-test 2>/dev/null
-	-podman rm rviz-imu-test 2>/dev/null
+	$(call kill-rviz,rviz-imu-test)
 	@echo "IMU test RViz stopped."
 
 # ── Grasp Test ──────────────────────────────────────────────────────────────

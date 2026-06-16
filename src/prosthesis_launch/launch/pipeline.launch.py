@@ -98,15 +98,28 @@ def _launch_setup(context, *args, **kwargs):
     #                   replaces pointcloud_fusion on /fused_pointcloud
     #   "tsdf_grasp"  → tsdf_fusion in grasp mode (on-demand, needs SAM),
     #                   keeps pointcloud_fusion for the live cloud
+    #   "gtsam_only"  → GTSAM pose smoothing + legacy segmentation
+    #                   (pointcloud_fusion + segmentation_bridge), but NO
+    #                   tsdf_fusion.  Runs gtsam_tracker, keyframe_buffer,
+    #                   and cross_camera_features so smoothed poses are
+    #                   published on /gtsam/* for logging/diagnostics while
+    #                   segmentation uses the legacy click→bridge path.
     fusion_mode = LaunchConfiguration("fusion_mode").perform(context)
     if use_tsdf_fusion and fusion_mode == "legacy":
         # Backward compat: use_tsdf_fusion=true maps to tsdf_grasp.
         fusion_mode = "tsdf_grasp"
-    if fusion_mode not in ("legacy", "tsdf_preview", "tsdf_grasp"):
+    if fusion_mode not in ("legacy", "tsdf_preview", "tsdf_grasp", "gtsam_only"):
         print(f"[pipeline] WARNING: unknown fusion_mode={fusion_mode!r}, "
               f"falling back to 'legacy'")
         fusion_mode = "legacy"
     print(f"[pipeline] fusion_mode={fusion_mode!r}")
+
+    # ── Derive twist_propagation.use_tsdf_fusion from fusion_mode ──────
+    # twist_propagation must call the TriggerGraspFusion service (instead
+    # of publishing clicks to segmentation_bridge) exactly when tsdf_fusion
+    # is the active segmentation backend.  This was previously left to the
+    # config file default (false), which silently broke tsdf_grasp mode.
+    twist_use_tsdf = fusion_mode == "tsdf_grasp"
 
     if require_dual_openvins:
         print("[pipeline] INFO: require_dual_openvins=true — "
@@ -327,9 +340,9 @@ def _launch_setup(context, *args, **kwargs):
         # ── Legacy pointcloud fusion ────────────────────────────────────
         # In tsdf_preview mode the tsdf_fusion node publishes the fused cloud
         # on /fused_pointcloud, so the legacy node is skipped.  In tsdf_grasp
-        # mode the legacy node provides the live cloud for twist propagation
-        # while tsdf_fusion handles on-demand grasp reconstruction.
-        if fusion_mode in ("legacy", "tsdf_grasp"):
+        # and gtsam_only modes the legacy node provides the live cloud for
+        # twist propagation / segmentation_bridge.
+        if fusion_mode in ("legacy", "tsdf_grasp", "gtsam_only"):
             camera_nodes.append(
                 Node(
                     package="pointcloud_fusion",
@@ -356,38 +369,48 @@ def _launch_setup(context, *args, **kwargs):
                 )
             )
 
-        # GTSAM trajectory tracker (factor graph smoother)
-        camera_nodes.append(
-            Node(
-                package="gtsam_tracker",
-                executable="gtsam_tracker_node",
-                name="gtsam_tracker",
-                parameters=[_node_params(config, "gtsam_tracker")],
-                output="screen",
+        # ── V6 perception nodes (gtsam_tracker, keyframe_buffer,
+        #    cross_camera_features) ─────────────────────────────────────
+        # These publish smoothed poses on /gtsam/* and feed the TSDF fusion
+        # pipeline.  They run in all TSDF modes plus gtsam_only (where they
+        # provide pose smoothing for logging/diagnostics while segmentation
+        # still uses the legacy click→bridge path).  They are skipped in
+        # pure legacy mode — nothing downstream consumes their output there,
+        # and launching them wastes CPU (GTSAM @ 15 Hz, SIFT matching,
+        # keyframe storage) on resource-constrained machines.
+        if fusion_mode in ("tsdf_preview", "tsdf_grasp", "gtsam_only"):
+            # GTSAM trajectory tracker (factor graph smoother)
+            camera_nodes.append(
+                Node(
+                    package="gtsam_tracker",
+                    executable="gtsam_tracker_node",
+                    name="gtsam_tracker",
+                    parameters=[_node_params(config, "gtsam_tracker")],
+                    output="screen",
+                )
             )
-        )
 
-        # Keyframe buffer (spatial-gated storage for TSDF fusion)
-        camera_nodes.append(
-            Node(
-                package="keyframe_buffer",
-                executable="keyframe_buffer_node",
-                name="keyframe_buffer",
-                parameters=[_node_params(config, "keyframe_buffer")],
-                output="screen",
+            # Keyframe buffer (spatial-gated storage for TSDF fusion)
+            camera_nodes.append(
+                Node(
+                    package="keyframe_buffer",
+                    executable="keyframe_buffer_node",
+                    name="keyframe_buffer",
+                    parameters=[_node_params(config, "keyframe_buffer")],
+                    output="screen",
+                )
             )
-        )
 
-        # Cross-camera SIFT feature alignment (visual between-factor)
-        camera_nodes.append(
-            Node(
-                package="cross_camera_features",
-                executable="sift_feature_node",
-                name="cross_camera_features",
-                parameters=[_node_params(config, "cross_camera_features")],
-                output="screen",
+            # Cross-camera SIFT feature alignment (visual between-factor)
+            camera_nodes.append(
+                Node(
+                    package="cross_camera_features",
+                    executable="sift_feature_node",
+                    name="cross_camera_features",
+                    parameters=[_node_params(config, "cross_camera_features")],
+                    output="screen",
+                )
             )
-        )
 
         # TSDF fusion node
         # - tsdf_preview: preview_mode=true (timer-driven, no SAM)
@@ -411,8 +434,9 @@ def _launch_setup(context, *args, **kwargs):
 
     # Segmentation ROS bridge (talks to inference server over HTTP)
     # Subscribes directly to /fused_pointcloud via remapping.
-    # Skipped in both tsdf modes (tsdf_fusion replaces it).
-    if fusion_mode == "legacy":
+    # Skipped in tsdf modes (tsdf_fusion replaces it).  Runs in legacy and
+    # gtsam_only modes (both use the legacy click→bridge segmentation path).
+    if fusion_mode in ("legacy", "gtsam_only"):
         nodes.append(
             Node(
                 package="segmentation_bridge",
@@ -425,12 +449,17 @@ def _launch_setup(context, *args, **kwargs):
         )
 
     # Twist Propagation Target Selector
+    # use_tsdf_fusion is derived from fusion_mode above so that tsdf_grasp
+    # mode actually triggers the TSDF service instead of publishing clicks
+    # that nobody consumes (segmentation_bridge is skipped in tsdf modes).
+    twist_params = _node_params(config, "twist_propagation")
+    twist_params["use_tsdf_fusion"] = twist_use_tsdf
     nodes.append(
         Node(
             package="twist_propagation",
             executable="twist_propagation_node",
             name="twist_propagation",
-            parameters=[_node_params(config, "twist_propagation")],
+            parameters=[twist_params],
             output="screen",
         )
     )
@@ -614,7 +643,10 @@ def generate_launch_description():
                 description="Fusion mode: 'legacy' (pointcloud_fusion + "
                             "segmentation_bridge), 'tsdf_preview' (TSDF scene "
                             "preview at ~1 Hz, no hit point / SAM), "
-                            "'tsdf_grasp' (on-demand TSDF at grasp time). "
+                            "'tsdf_grasp' (on-demand TSDF at grasp time), "
+                            "'gtsam_only' (GTSAM pose smoothing + legacy "
+                            "segmentation — runs gtsam_tracker/keyframe_buffer/"
+                            "cross_camera_features but NOT tsdf_fusion). "
                             "When use_tsdf_fusion=true and fusion_mode=legacy, "
                             "fusion_mode is overridden to 'tsdf_grasp' for "
                             "backward compatibility.",

@@ -13,7 +13,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-IMAGE="${ROS2_JAZZY_IMAGE:-localhost/ros2-jazzy-rviz:latest}"
+IMAGE="${ROS2_JAZZY_IMAGE:-localhost/rviz-robotlab:latest}"
 DDS_CONFIG="${DDS_CONFIG:-$REPO_ROOT/config/cyclonedds_peer.xml}"
 RVIZ_CONFIG="${RVIZ_CONFIG:-$REPO_ROOT/rviz/phase2_dual_openvins_head_preview.rviz}"
 ROS_DOMAIN_ID_VALUE="${ROS_DOMAIN_ID:-0}"
@@ -34,7 +34,7 @@ Commands:
   rviz           Start RViz2 in the container
 
 Environment overrides:
-  ROS2_JAZZY_IMAGE              Docker image, default localhost/ros2-jazzy-rviz:latest
+  ROS2_JAZZY_IMAGE              Docker image, default localhost/rviz-robotlab:latest
   DDS_CONFIG                    CycloneDDS XML, default config/cyclonedds_peer.xml
   RVIZ_CONFIG                   RViz config, default rviz/phase2_dual_openvins_head_preview.rviz
   ROS_DOMAIN_ID                 ROS domain, default 0

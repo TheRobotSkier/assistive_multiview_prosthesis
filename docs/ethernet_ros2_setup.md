@@ -95,14 +95,14 @@ File: `config/cyclonedds_peer.xml` (relative to host repo root)
 
 ### Host ROS2/RViz Docker Container
 
-The host uses Docker with the local `localhost/ros2-jazzy-rviz:latest` image and the helper script `scripts/ros2_ethernet_hello_host.sh`. The helper mounts `config/cyclonedds_peer.xml`, uses host networking, and sets the CycloneDDS environment consistently for shell, hello-world, topic listing, and RViz.
+The host uses Docker with the local `localhost/rviz-robotlab:latest` image and the helper script `scripts/ros2_ethernet_hello_host.sh`. The helper mounts `config/cyclonedds_peer.xml`, uses host networking, and sets the CycloneDDS environment consistently for shell, hello-world, topic listing, and RViz.
 
 By default, `make rviz` opens `rviz/phase2_dual_openvins_head_preview.rviz`. Override it with `RVIZ_CONFIG=/path/to/file.rviz make rviz` if needed.
 
 Build the host image once:
 
 ```bash
-make build-jazzy-rviz
+make build-rviz
 ```
 
 Key environment variables and flags:
@@ -118,7 +118,7 @@ docker run --rm -it \
   -e ROS_DOMAIN_ID=0 \
   -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
   -v "$PWD/config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro" \
-  localhost/ros2-jazzy-rviz:latest \
+  localhost/rviz-robotlab:latest \
   bash
 ```
 
@@ -462,7 +462,7 @@ With mirrored networking active, `--network host` in podman gives the container 
 
 ```bash
 # Build the image (one-time)
-make build-jazzy-rviz
+make build-rviz
 
 # Verify connectivity
 make robotlab-connect
@@ -485,7 +485,7 @@ make rviz
 | WSL sees `10.42.0.1` but can't ping Jetson | Windows firewall blocking | Run `New-NetFirewallRule -DisplayName "Jetson Ethernet" -Direction Inbound -Action Allow -Protocol Any -RemoteAddress 10.42.0.0/24` in elevated PowerShell |
 | Podman container can't reach Jetson | `--network host` not used | All `make` targets use `--network host` — don't override |
 | DNS breaks after enabling mirrored mode | Mirrored mode changes DNS resolution | Add `dnsTunneling=true` to `.wslconfig` under `[wsl2]`, or use `generateResolvConf=false` and manage `/etc/resolv.conf` manually |
-| CycloneDDS can't bind to `10.42.0.1` | Interface not visible inside container | Verify with `podman run --rm --network host localhost/ros2-jazzy-rviz ip addr` |
+| CycloneDDS can't bind to `10.42.0.1` | Interface not visible inside container | Verify with `podman run --rm --network host localhost/rviz-robotlab ip addr` |
 
 ---
 

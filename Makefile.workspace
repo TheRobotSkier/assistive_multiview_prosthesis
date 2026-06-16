@@ -33,7 +33,7 @@ TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock mock-v6 pipeline pipeline-v6 start digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source run-camera-log record-v6 record-v6-mock inspect-bag
+.PHONY: help build build-pkg build-debug clean test test-unit test-baseline mock mock-v6 pipeline pipeline-v6 start digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source run-camera-log run-tui record-bag record-bag-mock inspect-bag
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -76,10 +76,24 @@ clean: ## Remove all build artifacts (build/, install/, log/)
 	rm -rf /prosthesis_ws/build/* /prosthesis_ws/install/* /prosthesis_ws/log/*
 	@echo "Build artifacts cleaned."
 
-test: ## Run the smoke test suite
+test: ## Run the full test suite (smoke tests + pytest unit tests)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
 	bash scripts/run_tests.sh
+
+test-unit: ## Run pytest unit tests only (247 hardware-free tests)
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	bash scripts/test_unit.sh
+
+test-baseline: ## Capture current unit-test timings as the golden baseline
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	echo "Capturing timing baseline from logs/test-results/..." && \
+	mkdir -p tests/baselines && \
+	python3 scripts/compare_timings.py \
+		--capture tests/baselines/timings.json \
+		--current-dir logs/test-results
 
 # ── Launch targets ───────────────────────────────────────────────────────────
 
@@ -147,6 +161,10 @@ run-camera-log-debug: ## Same as run-camera-log but launches the pipeline_diagno
 	echo "=== Logging to $$LOG_FILE (with pipeline_diagnostics) ===" && \
 	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview debug_monitor:=true 2>&1 | tee $$LOG_FILE
 
+run-tui: ## Open the pipeline-config TUI (toggles + tuning knobs), then launch
+	@$(ROS_SETUP) && \
+	python3 /prosthesis_ws/scripts/launch_tui.py
+
 # ── Rosbag recording (in-container) ─────────────────────────────────────────
 # These targets run entirely inside the container — no host involvement, so
 # they never recreate the container or interrupt a running pipeline.
@@ -155,12 +173,12 @@ run-camera-log-debug: ## Same as run-camera-log but launches the pipeline_diagno
 # bind-mounted to the host ./data/bags/ directory.
 #
 # Usage (from inside the container):
-#   make record-v6          # record all V6 perception + odometry topics
-#   make record-v6-mock     # record mock pipeline topics (lighter)
-#   make inspect-bag        # show topic list + message counts for latest bag
+#   make record-bag          # record all V6 perception + odometry topics
+#   make record-bag-mock     # record mock pipeline topics (lighter)
+#   make inspect-bag         # show topic list + message counts for latest bag
 #
 # Or from the host:
-#   make record-v6          # (host proxy — execs into running container)
+#   make record-bag          # (host proxy — execs into running container)
 
 RECORD_BAG_DIR := v6_$$(date +%Y%m%d_%H%M%S)
 
@@ -191,7 +209,7 @@ RECORD_TOPICS_MOCK := \
 	/tf \
 	/tf_static
 
-record-v6: ## Record all V6 perception + odometry topics for offline replay
+record-bag: ## Record all V6 perception + odometry topics for offline replay
 	@$(ROS_SETUP) && \
 	mkdir -p /prosthesis_ws/data/bags && \
 	echo "Recording V6 topics to /prosthesis_ws/data/bags/$(RECORD_BAG_DIR)" && \
@@ -200,7 +218,7 @@ record-v6: ## Record all V6 perception + odometry topics for offline replay
 	ros2 bag record -o /prosthesis_ws/data/bags/$(RECORD_BAG_DIR) \
 		--topics $(RECORD_TOPICS_V6)
 
-record-v6-mock: ## Record mock pipeline topics (lighter set)
+record-bag-mock: ## Record mock pipeline topics (lighter set)
 	@$(ROS_SETUP) && \
 	mkdir -p /prosthesis_ws/data/bags && \
 	echo "Recording mock topics to /prosthesis_ws/data/bags/$(RECORD_BAG_DIR)" && \

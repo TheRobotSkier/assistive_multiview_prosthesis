@@ -64,6 +64,10 @@ backup/
 # Force logs
 tests/test2_hw_force_controller/results/
 
+# Test result XMLs (regenerated each run; baselines are tracked separately)
+logs/test-results/
+logs/replay-results/
+
 # Rosbags
 rosbags/
 
