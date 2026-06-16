@@ -72,6 +72,7 @@ This is the fast package map for everything under `src/`.
   - `src/emg_bridge/emg_bridge/latency_analysis.py`
   - `src/emg_bridge/emg_bridge/latency_protocol.py`
   - `src/emg_bridge/emg_bridge/scripts/latency_benchmark.py`
+- Latency behavior note: onset detection can look back across the last `N` target-predicting windows and only accepts onset evidence from channels that stay consistently active across that window history
 
 ### `haptic_band`
 

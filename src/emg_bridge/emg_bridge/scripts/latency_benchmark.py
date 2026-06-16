@@ -242,6 +242,7 @@ def _run_trial(
     min_active_samples: int,
     max_gap_samples: int,
     pre_onset_search_samples: int,
+    onset_lookback_windows: int,
 ) -> TrialOutcome:
     filt = OnlineFilter()
     ring = RingBuffer(WINDOW_LEN)
@@ -401,6 +402,7 @@ def _run_trial(
         min_active_samples=min_active_samples,
         max_gap_samples=max_gap_samples,
         pre_onset_search_samples=pre_onset_search_samples,
+        onset_lookback_windows=onset_lookback_windows,
         sample_times_s=relative_sample_times if relative_sample_times.size else None,
     )
 
@@ -457,6 +459,7 @@ def main() -> None:
     parser.add_argument("--min-active-samples", type=int, default=6, help="Minimum consecutive active samples for onset detection")
     parser.add_argument("--max-gap-samples", type=int, default=2, help="Maximum inactive gap inside one activation run")
     parser.add_argument("--pre-onset-search-samples", type=int, default=20, help="How many samples before prediction support to search for onset")
+    parser.add_argument("--onset-lookback-windows", type=int, default=PREDICTION_SMOOTHING_FRAMES, help="How many recent target-predicting windows to require consistent channel support across")
     args = parser.parse_args()
 
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -541,6 +544,7 @@ def main() -> None:
                 min_active_samples=args.min_active_samples,
                 max_gap_samples=args.max_gap_samples,
                 pre_onset_search_samples=args.pre_onset_search_samples,
+                onset_lookback_windows=args.onset_lookback_windows,
             )
             outcomes.append(outcome)
             trials_writer.writerow(_summary_dict(outcome))
@@ -572,6 +576,7 @@ def main() -> None:
         "tail_s": args.tail_s,
         "threshold": args.threshold,
         "smooth": args.smooth,
+        "onset_lookback_windows": args.onset_lookback_windows,
         "sampling_rate_hz": SAMPLING_RATE,
         "window_len": WINDOW_LEN,
         "window_step": WINDOW_STEP,

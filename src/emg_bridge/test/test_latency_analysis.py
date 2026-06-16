@@ -145,3 +145,36 @@ def test_measure_latency_links_onset_to_prediction_support_window():
     assert result.onset_sample_index == 22
     assert result.prediction_frame_index == 3
     assert abs(result.latency_ms - 180.0) < 1e-6
+
+
+def test_measure_latency_can_look_back_across_prior_windows_on_same_channel_signal():
+    raw_samples = np.zeros((70, 2), dtype=float)
+    raw_samples[5:10, 0] = 3.0
+    raw_samples[12:38, 1] = 4.0
+
+    frames = [
+        _frame(frame_index=0, prediction_time_s=0.10, raw_label=0, smoothed_label=0, confidence=0.9, window_start_sample=0, window_end_sample=20),
+        _frame(frame_index=1, prediction_time_s=0.20, raw_label=1, smoothed_label=0, confidence=0.8, window_start_sample=10, window_end_sample=30),
+        _frame(frame_index=2, prediction_time_s=0.30, raw_label=1, smoothed_label=0, confidence=0.85, window_start_sample=20, window_end_sample=40),
+        _frame(frame_index=3, prediction_time_s=0.40, raw_label=1, smoothed_label=1, confidence=0.9, window_start_sample=30, window_end_sample=50),
+    ]
+
+    result = measure_latency(
+        raw_samples=raw_samples,
+        frames=frames,
+        target_label=1,
+        cue_time_s=0.15,
+        sampling_rate_hz=100.0,
+        baseline_end_sample=10,
+        min_confidence=0.55,
+        smoothing_frames=2,
+        min_active_samples=4,
+        max_gap_samples=1,
+        pre_onset_search_samples=0,
+        onset_lookback_windows=3,
+    )
+
+    assert result is not None
+    assert result.onset_sample_index == 12
+    assert result.prediction_frame_index == 3
+    assert abs(result.latency_ms - 280.0) < 1e-6

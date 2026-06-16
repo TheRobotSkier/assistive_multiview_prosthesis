@@ -142,6 +142,11 @@ Latency benchmark role:
 - print live classifier output during the benchmark
 - record sample-level EMG and frame-level predictions to CSV
 - estimate muscle-activity-to-prediction delay from a trial-local onset detector linked to the prediction-support window
+- require consistent per-channel activation across the last configurable set of target-predicting windows before accepting an onset as the signal that produced the prediction
+
+Important latency knob:
+
+- `--onset-lookback-windows`: number of recent target-predicting windows that must share the same active channel support before onset is accepted; defaults to the smoothing window length so the detector follows the prediction history used by the classifier output
 
 Generated artifacts:
 

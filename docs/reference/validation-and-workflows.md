@@ -82,6 +82,13 @@ Key environment variables:
 - `EMG_LATENCY_RESULT_DIR_NAME`
 - `EMG_PUSH_RESULTS`
 
+Latency benchmark notes:
+
+- `ros2 run emg_bridge latency_benchmark` writes sample-level EMG, frame-level predictions, per-trial latency summaries, aggregate latency stats, and run metadata to CSV/JSON under the chosen output directory.
+- The onset detector now links the accepted prediction to the same EMG signal across the last `N` target-predicting windows instead of only searching immediately before the final support window.
+- Use `--onset-lookback-windows` to control how many recent target-predicting windows must share consistent per-channel activation. The default matches the classifier smoothing window.
+- `--pre-onset-search-samples` still extends the search slightly earlier than the earliest qualifying window when needed, but it no longer has to carry the full multi-window lookback by itself.
+
 ## Safe Validation Heuristic For Agents
 
 When making code changes:
