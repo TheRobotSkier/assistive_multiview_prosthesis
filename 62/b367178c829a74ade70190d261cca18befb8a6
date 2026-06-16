@@ -1,0 +1,41 @@
+docs/architecture/control-and-actuation.md
+  s_f2d1a9751d7547::t_21da2db13ff379 138-142
+docker/docker-compose.yml
+  s_f2d1a9751d7547::t_d7faebf7de05c9 26-52,191-193
+docs/reference/validation-and-workflows.md
+  s_f2d1a9751d7547::t_21da2db13ff379 13-14,70,77-81
+docs/architecture/packages.md
+  s_f2d1a9751d7547::t_21da2db13ff379 66
+scripts/emg_latency_workflow.sh
+  s_f2d1a9751d7547::t_d7faebf7de05c9 24,54-55
+src/emg_bridge/test/test_emg_container_config.py
+  s_f2d1a9751d7547::t_fc82c994ae4883 29-35
+  s_f2d1a9751d7547::t_90f426c22fd2f5 1-15
+  s_f2d1a9751d7547::t_4c8cca599204c2 16-26
+  s_f2d1a9751d7547::t_0675bad5e8bd77 27-28,36-42
+docker/Dockerfile.emg
+  s_f2d1a9751d7547::t_0ac1843b3480a4 28-36,45
+  s_f2d1a9751d7547::t_d7faebf7de05c9 1-27,37-44,46-63
+docs/reference/directory-structure.md
+  s_f2d1a9751d7547::t_21da2db13ff379 79
+agents.md
+  s_f2d1a9751d7547::t_21da2db13ff379 63
+Makefile
+  s_f2d1a9751d7547::t_d7faebf7de05c9 66,100-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "62b367178c829a74ade70190d261cca18befb8a6",
+  "prompts": {},
+  "sessions": {
+    "s_f2d1a9751d7547": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1348635b1ffe3l9r2dZTL7WwHQ",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
