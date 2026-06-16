@@ -406,11 +406,19 @@ class JetsonRelay(Node):
             return
         if self._pc_dec_enabled and self._pc_dec_step > 1:
             msg = decimate_pointcloud(msg, self._pc_dec_step)
+        # Override header stamp with system time so clouds are in the
+        # same clock domain as odometry (OpenVINS uses system time).
+        # The RealSense driver stamps with the ASIC hardware clock,
+        # which is not synced via chrony and drifts independently.
+        msg.header.stamp = self.get_clock().now().to_msg()
         self._pc_pub[camera].publish(msg)
 
     def _on_img(self, msg: Image, camera: str) -> None:
         if not self._gates[f"img_{camera}"].should_publish():
             return
+        # Override header stamp with system time — same rationale as
+        # pointclouds (RealSense ASIC clock != system clock).
+        msg.header.stamp = self.get_clock().now().to_msg()
         self._img_pub[camera].publish(msg)
 
     def _on_trackhist(self, msg: Image, camera: str) -> None:

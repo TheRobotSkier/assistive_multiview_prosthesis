@@ -92,8 +92,8 @@ openvins:
   dynamic_arm_reanchor_max_velocity_mps: 2.0
   dynamic_arm_reanchor_max_sample_translation_std_m: 0.12
   dynamic_arm_reanchor_max_sample_rotation_std_deg: 8.0
-  dynamic_arm_reanchor_trigger_translation_m: 0.75
-  dynamic_arm_reanchor_trigger_rotation_deg: 20.0
+  dynamic_arm_reanchor_trigger_translation_m: 0.35
+  dynamic_arm_reanchor_trigger_rotation_deg: 15.0
   dynamic_arm_reanchor_cooldown_s: 5.0
   dynamic_arm_reanchor_skip_after_fixed_marker_s: 3.0
   dynamic_arm_reanchor_covariance_multiplier: 2.0
