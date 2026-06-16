@@ -1,0 +1,31 @@
+src/emg_bridge/test/test_latency_analysis.py
+  s_f2d1a9751d7547::t_18dd6d235c7c10 148-180
+src/emg_bridge/emg_bridge/scripts/latency_benchmark.py
+  s_f2d1a9751d7547::t_ef59f06bc4f09d 245,405,462,547,579
+docs/reference/validation-and-workflows.md
+  s_f2d1a9751d7547::t_fac9cbed87db69 85-91
+docs/architecture/control-and-actuation.md
+  s_f2d1a9751d7547::t_4f0a1078179caf 145-149
+docs/architecture/packages.md
+  s_f2d1a9751d7547::t_1d8400b7881e1a 75
+agents.md
+  s_f2d1a9751d7547::t_b644165b43bf14 62
+src/emg_bridge/emg_bridge/latency_analysis.py
+  s_f2d1a9751d7547::t_2870df10c7aa2e 45-51,175-237,251,267,274-284,291-308,311-312
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "a4aa5b51501ab24f322d6ed3b919adb08be4f35a",
+  "prompts": {},
+  "sessions": {
+    "s_f2d1a9751d7547": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1348635b1ffe3l9r2dZTL7WwHQ",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
