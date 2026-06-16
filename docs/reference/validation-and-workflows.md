@@ -14,11 +14,13 @@ Common commands:
 - `make emg-shell`: shell into the dedicated EMG container
 - `make build-prosthesis`: build main runtime container
 - `make segmentation-cpu` or `make segmentation-cuda`: start segmentation service
-- `make mia-haptic-force-test`: run the isolated Mia/EMG/wrist/haptic force test container
-- `make test`: run containerized test target
-- `make emg-latency-workflow`: run EMG collection, training, and interactive latency benchmarking
-- `make emg-latency-workflow-notrain`: skip collection/training, reuse existing model
-- `make emg-simulate`: offline prediction simulator — replay raw data with tunable parameters
+- `make test`: open the interactive test selector
+- `make test-help`: show test commands and config YAML locations
+- `make test-grasp`: run the isolated Mia/EMG/wrist/haptic force test container
+- `make test-emg-latency`: run EMG collection, training, and interactive latency benchmarking
+- `make test-emg-latency-notrain`: skip collection/training, reuse existing model
+- `make test-emg-sim`: offline prediction simulator - replay raw data with tunable parameters
+- `make test-smoke`: run the existing containerized smoke test suite
 
 ### In-container
 
@@ -32,7 +34,7 @@ Common commands:
 - `make pipeline`: launch the full hardware pipeline
 - `make run`: build then launch the hardware pipeline
 - `make run-emg-grasp`: build then launch the simplified EMG pipeline
-- `make run-mia-haptic-force-test`: build then launch the Mia haptic force test from inside its container
+- `make test-grasp`: build then launch the Mia haptic force test from inside its container
 - `make camera-test`: build selected packages and run a hardware-light camera validation path
 - `ros2 run emg_bridge collect_data`: interactive EMG recording
 - `ros2 run emg_bridge train`: offline EMG model training
@@ -68,7 +70,8 @@ It runs these tests:
 Primary host entrypoint:
 
 - `scripts/emg_latency_workflow.sh`
-- `make emg-latency-workflow`
+- `make test-emg-latency`
+- Config: `config/emg_latency_test.yaml`
 
 Default flow:
 
@@ -96,10 +99,12 @@ Key environment variables:
 - `EMG_LATENCY_TAIL_S`
 - `EMG_LATENCY_RESULT_DIR_NAME`
 - `EMG_PUSH_RESULTS`
+- `EMG_LATENCY_CONFIG`
 
 Latency benchmark notes:
 
 - `ros2 run emg_bridge latency_benchmark` writes sample-level EMG, frame-level predictions, per-trial latency summaries, aggregate latency stats, and run metadata to CSV/JSON under the chosen output directory.
+- `config/emg_latency_test.yaml` provides the default live benchmark and offline simulator parameters; `EMG_*` environment variables still override YAML values for one-off runs.
 - The onset detector now links the accepted prediction to the same EMG signal across the last `N` target-predicting windows instead of only searching immediately before the final support window.
 - Use `--onset-lookback-windows` to control how many recent target-predicting windows must share consistent per-channel activation. The default matches the classifier smoothing window.
 - `--pre-onset-search-samples` still extends the search slightly earlier than the earliest qualifying window when needed, but it no longer has to carry the full multi-window lookback by itself.
@@ -108,7 +113,8 @@ Latency benchmark notes:
 
 Primary host entrypoint:
 
-- `make mia-haptic-force-test`
+- `make test-grasp`
+- Config: `config/mia_haptic_force_test.yaml`
 
 Default flow:
 

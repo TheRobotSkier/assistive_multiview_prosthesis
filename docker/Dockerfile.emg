@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-pytest \
         python3-rosdep \
         python3-scipy \
+        python3-yaml \
         ros-jazzy-cyclonedds \
         ros-jazzy-rclpy \
         ros-jazzy-rmw-cyclonedds-cpp \

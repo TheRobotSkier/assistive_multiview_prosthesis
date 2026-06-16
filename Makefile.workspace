@@ -27,7 +27,7 @@ TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier run-mia-haptic-force-test setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source
+.PHONY: help build build-pkg build-debug clean test test-grasp mock pipeline digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -109,7 +109,7 @@ run-emg-grasp: ## Build + launch EMG-triggered grasp pipeline (no perception)
 	$(ROS_WORKSPACE_SETUP) && \
 	ros2 launch prosthesis_launch simple_emg_grasp.launch.py
 
-run-mia-haptic-force-test: ## Build + launch EMG/haptic Mia force test (no cameras)
+test-grasp: ## Build + launch EMG/haptic Mia force test (no cameras)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
 	bash scripts/mia_haptic_force_test.sh

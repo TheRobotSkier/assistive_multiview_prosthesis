@@ -150,7 +150,8 @@ Primary entry points:
 Host workflow wrapper:
 
 - `scripts/emg_latency_workflow.sh`
-- `make emg-latency-workflow`
+- `make test-emg-latency`
+- `config/emg_latency_test.yaml`
 
 Container path:
 

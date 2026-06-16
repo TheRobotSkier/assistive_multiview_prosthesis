@@ -74,7 +74,7 @@ Use this as the primary navigation map for the repository.
 - Start: `scripts/mia_haptic_force_test.py`
 - Launch: `src/prosthesis_launch/launch/mia_haptic_force_test.launch.py`
 - Config: `config/mia_haptic_force_test.yaml`
-- Host command: `make mia-haptic-force-test`
+- Host command: `make test-grasp`
 
 ### Change EMG collection, training, inference, or latency benchmarking
 
@@ -82,7 +82,8 @@ Use this as the primary navigation map for the repository.
 - Live benchmark runner: `src/emg_bridge/emg_bridge/scripts/latency_benchmark.py`
 - Latency analysis logic: `src/emg_bridge/emg_bridge/latency_analysis.py`
 - Host workflow wrapper: `scripts/emg_latency_workflow.sh`
-- Host command: `make emg-latency-workflow`
+- Host command: `make test-emg-latency`
+- Config: `config/emg_latency_test.yaml`
 - Dedicated EMG container: `docker/Dockerfile.emg`, compose service `emg`
 
 ### Change point cloud fusion

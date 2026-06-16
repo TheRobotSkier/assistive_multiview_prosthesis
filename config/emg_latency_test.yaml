@@ -1,0 +1,42 @@
+# EMG latency and offline prediction-simulator test configuration.
+
+workflow: # Host workflow defaults for scripts/emg_latency_workflow.sh.
+  collect_reps: 3 # Default 3; repetitions recorded per gesture during data collection.
+  collect_duration_s: 8 # Default 8; seconds recorded for each collection repetition.
+  model_dir: "/app/models" # Default /app/models; in-container directory for trained EMG model files.
+  data_dir: "/app/data" # Default /app/data; in-container directory for recordings and benchmark outputs.
+  result_dir_name: "auto" # Default auto; use a timestamped data/latency/<run> directory when set to auto.
+  fetch_remote: false # Default false; fetch origin/asger_dev before the run only when true.
+  push_results: false # Default false; commit and push generated data/models only when true.
+  skip_train: false # Default false; collect and train unless overridden by EMG_SKIP_TRAIN=true.
+
+benchmark: # Live latency benchmark defaults passed to ros2 run emg_bridge latency_benchmark.
+  repeats: 5 # Default 5; latency trials per non-REST gesture.
+  baseline_s: 1.5 # Default 1.5; rest/baseline seconds captured before each gesture cue.
+  tail_s: 0.5 # Default 0.5; extra capture seconds after a trial ends.
+  confidence_threshold: 0.55 # Default 0.55; classifier confidence needed for accepted predictions.
+  smoothing_frames: 5 # Default 5; prediction majority-vote smoothing window in frames.
+  countdown_s: 3 # Default 3; visible countdown seconds before each gesture cue.
+  auto_stop_confidence: 0.70 # Default 0.70; confidence threshold for automatic trial completion.
+  auto_stop_hold_s: 1.0 # Default 1.0; seconds the target prediction must be held for auto-stop.
+  max_trial_duration_s: 15.0 # Default 15.0; maximum active trial seconds before timeout.
+  min_active_samples: 6 # Default 6; minimum consecutive active samples for onset detection.
+  max_gap_samples: 2 # Default 2; inactive samples allowed inside one onset run.
+  pre_onset_search_samples: 20 # Default 20; samples before prediction support to search for onset.
+  onset_lookback_windows: 5 # Default 5; target-predicting windows that must share channel support.
+
+simulator: # Offline replay defaults for ros2 run emg_bridge prediction_simulator.
+  window_len: 100 # Default 100; EMG samples per classifier window.
+  window_step: 50 # Default 50; EMG samples between successive classifier windows.
+  confidence_threshold: 0.55 # Default 0.55; confidence threshold used during replay.
+  smoothing_frames: 5 # Default 5; prediction smoothing frames used during replay.
+  z_score: 4.0 # Default 4.0; onset activity threshold in baseline standard deviations.
+  min_active_samples: 6 # Default 6; minimum active samples for simulator onset detection.
+  max_gap_samples: 2 # Default 2; inactive gap allowed inside simulator onset runs.
+  pre_onset_search_samples: 20 # Default 20; samples before prediction support to search.
+  onset_lookback_windows: 5 # Default 5; lookback windows with consistent active channel support.
+  baseline_offset_s: -1.0 # Default -1.0; baseline end relative to cue time in seconds.
+  countdown_s: 3 # Default 3; cue countdown seconds used by the recorded benchmark.
+  auto_stop_confidence: 0.70 # Default 0.70; retained for comparing simulator settings with live benchmark.
+  auto_stop_hold_s: 1.0 # Default 1.0; retained for comparing simulator settings with live benchmark.
+  max_trial_duration_s: 15.0 # Default 15.0; retained for comparing simulator settings with live benchmark.

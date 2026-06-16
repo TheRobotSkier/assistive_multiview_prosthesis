@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 from emg_bridge import classifier as clf_mod
 from emg_bridge.classifier import PredictionSmoother, predict
@@ -203,6 +204,39 @@ def _menu_items(config: _SimConfig) -> list[tuple[str, str, str]]:
     ]
 
 
+def _load_config(path: Path | None) -> _SimConfig:
+    config = _SimConfig()
+    if path is None or not path.exists():
+        return config
+
+    with path.open("r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+    section = raw.get("simulator", {})
+    if not isinstance(section, dict):
+        return config
+
+    for key in (
+        "window_len",
+        "window_step",
+        "confidence_threshold",
+        "smoothing_frames",
+        "z_score",
+        "min_active_samples",
+        "max_gap_samples",
+        "pre_onset_search_samples",
+        "onset_lookback_windows",
+        "baseline_offset_s",
+        "countdown_s",
+        "auto_stop_confidence",
+        "auto_stop_hold_s",
+        "max_trial_duration_s",
+    ):
+        if key in section:
+            current = getattr(config, key)
+            setattr(config, key, type(current)(section[key]))
+    return config
+
+
 def _set_config_value(config: _SimConfig, key: str) -> None:
     try:
         raw = input("  New value: ").strip()
@@ -240,6 +274,11 @@ def _set_config_value(config: _SimConfig, key: str) -> None:
 
 def _draw_menu(config: _SimConfig) -> None:
     sys.stdout.write("\033[2J\033[H")
+    print(_bold("EMG Prediction Simulator"))
+    print("Replay the latest latency raw-sample CSV through the classifier pipeline.")
+    print("Tune windowing, smoothing, thresholds, and onset logic, then press R to")
+    print("write sim_predictions.csv and sim_parameters.txt for later analysis.")
+    print()
     print(_bold("Parameter Tuning Menu"))
     print(_bold("=" * 45))
     for key, label, value in _menu_items(config):
@@ -380,6 +419,8 @@ def main() -> None:
                         help="Root directory of latency benchmark outputs")
     parser.add_argument("--output-dir", type=Path, default=None,
                         help="Output directory (default: <data-root>/<latest>/sim)")
+    parser.add_argument("--config", type=Path, default=Path("/prosthesis_ws/config/emg_latency_test.yaml"),
+                        help="YAML config containing simulator defaults")
     args = parser.parse_args()
 
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -403,7 +444,7 @@ def main() -> None:
     print(_green(f"Loaded {len(raw_data)} trials."))
 
     output_dir = args.output_dir or (latest_dir / "sim")
-    config = _SimConfig()
+    config = _load_config(args.config)
 
     _interactive_menu(
         config,

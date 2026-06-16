@@ -18,6 +18,7 @@
 
 COMPOSE_DIR := docker
 DOCKER_CMD ?= podman
+.DEFAULT_GOAL := build
 
 # ── Explicit backend selection ───────────────────────────────────────────
 CONTAINER_BACKEND ?=
@@ -63,7 +64,34 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell emg-dev emg-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp mia-haptic-force-test up-mia-haptic-force-test down-mia-haptic-force-test logs-mia-haptic-force-test emg-grasp-test print-force emg-infer run-emg-grasp emg-latency-workflow emg-latency-workflow-notrain emg-simulate
+.PHONY: help test-help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell emg-dev emg-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test test-smoke test-emg-latency test-emg-latency-notrain test-emg-sim test-grasp test-grasp-up test-grasp-down test-grasp-logs shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp
+
+help: test-help
+
+test-help: ## Show interactive test commands and config files
+	@echo ""
+	@echo "Prosthesis Test Commands"
+	@echo "========================"
+	@echo ""
+	@echo "Interactive selector:"
+	@printf "  %-32s %s\n" "make test" "Choose one of the test workflows from a small menu."
+	@echo ""
+	@echo "EMG latency tests:"
+	@printf "  %-32s %s\n" "make test-emg-latency" "Collect EMG data, train, then run the interactive latency benchmark."
+	@printf "  %-32s %s\n" "make test-emg-latency-notrain" "Reuse existing EMG recordings/model and run the latency benchmark only."
+	@printf "  %-32s %s\n" "make test-emg-sim" "Replay the latest latency raw data with the offline parameter-tuning UI."
+	@printf "  %-32s %s\n" "Config YAML" "config/emg_latency_test.yaml"
+	@echo ""
+	@echo "Mia haptic grasp test:"
+	@printf "  %-32s %s\n" "make test-grasp" "Run the no-camera Mia Hand EMG wrist/force/haptic CSV logger."
+	@printf "  %-32s %s\n" "make test-grasp-up" "Build and start the isolated test container."
+	@printf "  %-32s %s\n" "make test-grasp-down" "Stop and remove the isolated test container."
+	@printf "  %-32s %s\n" "make test-grasp-logs" "Follow logs from the isolated test container."
+	@printf "  %-32s %s\n" "Config YAML" "config/mia_haptic_force_test.yaml"
+	@echo ""
+	@echo "Other:"
+	@printf "  %-32s %s\n" "make test-smoke" "Run the existing containerized smoke test suite."
+	@echo ""
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -180,22 +208,47 @@ train: dev
 emg-infer: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-classifier'
 
-emg-latency-workflow: ## EMG collect -> train -> latency benchmark workflow
+test-emg-latency: ## EMG collect -> train -> latency benchmark workflow
 	@test -f scripts/emg_latency_workflow.sh || { echo "Missing scripts/emg_latency_workflow.sh"; exit 1; }
+	@test -f config/emg_latency_test.yaml || { echo "Missing config/emg_latency_test.yaml"; exit 1; }
 	bash ./scripts/emg_latency_workflow.sh
 
-emg-latency-workflow-notrain: ## Reuse existing EMG model and run latency benchmark only
+test-emg-latency-notrain: ## Reuse existing EMG model and run latency benchmark only
 	@test -f scripts/emg_latency_workflow.sh || { echo "Missing scripts/emg_latency_workflow.sh"; exit 1; }
+	@test -f config/emg_latency_test.yaml || { echo "Missing config/emg_latency_test.yaml"; exit 1; }
 	EMG_SKIP_TRAIN=true bash ./scripts/emg_latency_workflow.sh
 
-emg-simulate: ## Offline prediction simulator — replay raw data with tunable parameters
-	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null; -$(DOCKER_CMD) rm -f emg 2>/dev/null
+test-emg-sim: ## Offline prediction simulator - replay raw data with tunable parameters
+	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null
+	-$(DOCKER_CMD) rm -f emg 2>/dev/null
 	cd $(COMPOSE_DIR) && $(COMPOSE) up -d emg
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis emg /bin/bash -lc 'source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge prediction_simulator --model-dir /app/models --data-root /app/data/latency' || true
-	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null; -$(DOCKER_CMD) rm -f emg 2>/dev/null
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis emg /bin/bash -lc 'source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge prediction_simulator --model-dir /app/models --data-root /app/data/latency --config /prosthesis_ws/config/emg_latency_test.yaml' || true
+	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null
+	-$(DOCKER_CMD) rm -f emg 2>/dev/null
 
 # ── Test ───────────────────────────────────────────────────────────────────
-test:
+test: ## Interactive test selector
+	@printf "\nProsthesis test selector\n"
+	@printf "Run one focused workflow from this checkout. EMG test defaults live in config/emg_latency_test.yaml; the Mia haptic grasp defaults live in config/mia_haptic_force_test.yaml.\n\n"
+	@printf "  1) test-emg-latency          Collect EMG data, train, then run latency benchmark\n"
+	@printf "  2) test-emg-latency-notrain  Reuse existing EMG model/data and run latency benchmark\n"
+	@printf "  3) test-emg-sim              Replay latest latency raw data with parameter tuning UI\n"
+	@printf "  4) test-grasp                Run Mia EMG wrist/force/haptic CSV logger without cameras\n"
+	@printf "  5) test-smoke                Run the existing containerized smoke test suite\n"
+	@printf "  q) quit\n\n"
+	@printf "Choice: "; \
+	read -r choice; \
+	case "$$choice" in \
+		1|test-emg-latency) $(MAKE) test-emg-latency ;; \
+		2|test-emg-latency-notrain) $(MAKE) test-emg-latency-notrain ;; \
+		3|test-emg-sim) $(MAKE) test-emg-sim ;; \
+		4|test-grasp) $(MAKE) test-grasp ;; \
+		5|test-smoke) $(MAKE) test-smoke ;; \
+		q|Q|"") echo "No test selected." ;; \
+		*) echo "Unknown selection: $$choice"; exit 2 ;; \
+	esac
+
+test-smoke: ## Existing containerized smoke test suite
 	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) run --rm test
 
 # ── Shell into running container ──────────────────────────────────────────
@@ -728,7 +781,7 @@ emg-force-grasp: ## EMG force grasp + wrist: collect (if needed) → train → l
 		prosthesis:latest \
 		bash /prosthesis_ws/scripts/emg_force_grasp.sh
 
-up-mia-haptic-force-test: ## Start isolated container for Mia haptic force testing
+test-grasp-up: ## Start isolated container for Mia haptic force testing
 	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
 	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}" && \
 	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-/dev/ttyUSB1}}" && \
@@ -739,7 +792,7 @@ up-mia-haptic-force-test: ## Start isolated container for Mia haptic force testi
 	MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="$$WRIST_PORT" \
 	$(COMPOSE) --profile mia-haptic-force-test up -d --build mia-haptic-force-test
 
-mia-haptic-force-test: up-mia-haptic-force-test ## Run isolated EMG/haptic force test and CSV logger
+test-grasp: test-grasp-up ## Run isolated EMG/haptic force test and CSV logger
 	@echo "=== Mia Hand EMG Haptic Force Test ==="
 	@echo ""
 	@echo "Env overrides (optional):"
@@ -789,11 +842,11 @@ mia-haptic-force-test: up-mia-haptic-force-test ## Run isolated EMG/haptic force
 		-e HAPTIC_BT_ADDR1="$${HAPTIC_BT_ADDR1:-842E1409E14E}" \
 		mia-haptic-force-test /bin/bash -lc 'make setup-usb || true; /prosthesis_ws/scripts/mia_haptic_force_test.sh'
 
-down-mia-haptic-force-test: ## Stop and remove the isolated haptic force-test container
+test-grasp-down: ## Stop and remove the isolated haptic force-test container
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test stop mia-haptic-force-test || true
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test rm -f mia-haptic-force-test || true
 
-logs-mia-haptic-force-test: ## Follow logs for the isolated haptic force-test container
+test-grasp-logs: ## Follow logs for the isolated haptic force-test container
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test logs -f mia-haptic-force-test
 
 emg-grasp-test: ## EMG-driven grasp test: collect → train → launch (set MOCK_HARDWARE=true for CI)

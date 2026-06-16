@@ -16,7 +16,8 @@
 #   make segmentation-cpu   # CPU-only image (no NVIDIA dependencies)
 #   make segmentation-cuda  # CUDA image with GPU support (requires NVIDIA runtime)
 #   make up-hw              # start with USB device mapping
-#   make test               # run smoke tests (builds production image)
+#   make test               # open the interactive test selector
+#   make test-smoke         # run smoke tests (builds production image)
 #
 # Container backend selection:
 #   Set CONTAINER_BACKEND=docker or CONTAINER_BACKEND=podman in environment.
@@ -40,6 +41,7 @@ services:
         volumes:
             - ../src/emg_bridge:/prosthesis_ws/src/emg_bridge:rw
             - ../scripts:/prosthesis_ws/scripts:rw
+            - ../config:/prosthesis_ws/config:ro
             - ../Makefile.workspace:/prosthesis_ws/Makefile:ro
             - emg-build:/prosthesis_ws/build
             - emg-install:/prosthesis_ws/install

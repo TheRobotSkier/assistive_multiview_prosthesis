@@ -115,7 +115,7 @@ Main commands:
 - `make shell`
 - `make run`
 - `make run-emg-grasp`
-- `make mia-haptic-force-test`
+- `make test-grasp`
 - `make test`
 
 ### In-container workspace
@@ -129,6 +129,6 @@ Main targets:
 - `make pipeline`
 - `make run`
 - `make run-emg-grasp`
-- `make run-mia-haptic-force-test`
+- `make test-grasp`
 - `make camera-test`
 - `make tonight-*`

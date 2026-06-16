@@ -553,6 +553,7 @@ class MiaHapticForceTest(Node):
         config_path = self.declare_parameter(
             "config_path", "/prosthesis_ws/config/mia_haptic_force_test.yaml"
         ).value
+        self._config_path = str(config_path)
         self._cfg = _load_config(str(config_path))
         self._log = CsvLogger(self._cfg)
 
@@ -658,12 +659,18 @@ class MiaHapticForceTest(Node):
         self._buzz_values = [0.0] * int(self._cfg.haptics["motor_count"])
         self._last_status_time = 0.0
         self._complete_started_at: Optional[float] = None
+        self._activation_seen = False
+        self._ui_is_tty = sys.stdout.isatty()
+        self._ui_last_render = 0.0
+        self._ui_last_stage: Optional[Stage] = None
+        self._ui_last_mode: Optional[HoldControl] = None
 
         self._timer = self.create_timer(1.0 / max(self._cfg.control_rate_hz, 1.0), self._tick)
         self._write_event("startup", f"config={config_path}; output_dir={self._log.run_dir}")
         self.get_logger().info(
             f"Mia haptic force test starting; CSV output: {self._log.run_dir}"
         )
+        self._render_terminal_ui(force=True)
 
     @property
     def finished(self) -> bool:
@@ -792,6 +799,7 @@ class MiaHapticForceTest(Node):
         self._publish_haptics(self._compute_haptics())
         self._publish_status()
         self._write_sample()
+        self._render_terminal_ui()
 
     def _initialise_runtime(self) -> None:
         try:
@@ -819,6 +827,7 @@ class MiaHapticForceTest(Node):
             self._begin_activation()
 
     def _begin_activation(self) -> None:
+        self._activation_seen = True
         self._power_armed = False
         self._last_power_toggle = time.monotonic()
         self._trigger_buzz(
@@ -1050,6 +1059,7 @@ class MiaHapticForceTest(Node):
         self._state_pub.publish(String(data=new_stage.value))
         self._write_event("state_transition", f"{old_stage.value}->{new_stage.value}: {detail}")
         self.get_logger().info(f"{old_stage.value} -> {new_stage.value}: {detail}")
+        self._render_terminal_ui(force=True)
 
     def _trigger_buzz(self, label: str, duration_s: float, intensity_pct: float) -> None:
         motor_count = int(self._cfg.haptics["motor_count"])
@@ -1271,6 +1281,133 @@ class MiaHapticForceTest(Node):
         if bool(self._cfg.haptics["publish_zero_when_idle"]):
             return [0.0] * motor_count
         return self._last_haptics
+
+    def _render_terminal_ui(self, force: bool = False) -> None:
+        now = time.monotonic()
+        stage_changed = self._ui_last_stage != self._stage
+        mode_changed = self._ui_last_mode != self._control_mode
+        period = 1.0 if not self._activation_seen else 0.5
+        if not force and not stage_changed and not mode_changed and now - self._ui_last_render < period:
+            return
+
+        self._ui_last_render = now
+        self._ui_last_stage = self._stage
+        self._ui_last_mode = self._control_mode
+
+        if self._ui_is_tty:
+            sys.stdout.write("\033[2J\033[H")
+        else:
+            sys.stdout.write("\n")
+
+        if not self._activation_seen and self._stage in (
+            Stage.INITIALISING,
+            Stage.WAITING_FOR_ACTIVATION,
+        ):
+            self._print_intro_ui()
+        else:
+            self._print_state_ui()
+        sys.stdout.flush()
+
+    def _print_intro_ui(self) -> None:
+        print("Mia Hand EMG Haptic Force Test")
+        print(f"Config YAML: {self._config_path}")
+        print(f"CSV output: {self._log.run_dir}")
+        print("")
+        print("Stages:")
+        print("  1. Start horizontal and open. POWER activates the test.")
+        print("  2. Light activation buzz, then wrist rotates vertical while haptics show thumb angle.")
+        print(
+            "  3. After the wrist reaches vertical, "
+            f"a {float(self._cfg.wrist['vertical_delay_s']):.1f} s countdown runs before closure."
+        )
+        print("  4. Brief buzz starts force closure. Contact threshold enters force-hold.")
+        print("  5. In force-hold, FLEXION/EXTENSION adjust grasp force.")
+        print("  6. POWER toggles wrist-control mode; FLEXION/EXTENSION then move the wrist.")
+        print(
+            "  7. Hold OPEN for "
+            f"{float(self._cfg.emg['open_hold_s']):.1f} s to open, wait "
+            f"{float(self._cfg.wrist['return_after_open_delay_s']):.1f} s, "
+            "and return horizontal."
+        )
+        print("")
+        print("Controls now: POWER starts. OPEN held stops. Ctrl-C aborts the launch.")
+        print("------")
+        for line in self._ui_live_lines():
+            print(line)
+
+    def _print_state_ui(self) -> None:
+        print("Mia Hand EMG Haptic Force Test")
+        print(f"State: {self._human_stage()} | Mode: {self._control_mode.value}")
+        for line in self._ui_control_lines():
+            print(line)
+        print("------")
+        for line in self._ui_live_lines():
+            print(line)
+
+    def _ui_control_lines(self) -> list[str]:
+        open_s = float(self._cfg.emg["open_hold_s"])
+        if self._stage == Stage.ROTATING_TO_VERTICAL:
+            return [f"Controls: keep hand open; OPEN held {open_s:.1f}s stops."]
+        if self._stage == Stage.VERTICAL_DELAY:
+            return [f"Controls: OPEN held {open_s:.1f}s stops. Closure starts after countdown."]
+        if self._stage == Stage.FORCE_CLOSING:
+            return [f"Controls: OPEN held {open_s:.1f}s stops. Waiting for force threshold."]
+        if self._stage == Stage.FORCE_HOLD and self._control_mode == HoldControl.FORCE:
+            return [
+                f"Controls: FLEXION increases force, EXTENSION decreases, POWER switches wrist, OPEN held {open_s:.1f}s stops."
+            ]
+        if self._stage == Stage.FORCE_HOLD and self._control_mode == HoldControl.WRIST:
+            return [
+                f"Controls: FLEXION/EXTENSION move wrist, POWER switches force, OPEN held {open_s:.1f}s stops."
+            ]
+        if self._stage == Stage.OPENING_HAND:
+            return ["Controls: opening hand before wrist return."]
+        if self._stage == Stage.RETURN_DELAY:
+            return ["Controls: waiting before returning the wrist horizontal."]
+        if self._stage == Stage.RETURN_WRIST:
+            return ["Controls: returning the wrist to horizontal."]
+        if self._stage == Stage.COMPLETE:
+            return ["Controls: complete; haptics are zeroed and shutdown is pending."]
+        if self._stage == Stage.FAULT:
+            return [f"Controls: fault recovery is opening the hand. Reason: {self._fault_reason}"]
+        return [f"Controls: OPEN held {open_s:.1f}s stops."]
+
+    def _ui_live_lines(self) -> list[str]:
+        normal_forces, source = self._current_normal_forces()
+        avg_force = sum(normal_forces) / FINGER_COUNT
+        max_force = max(normal_forces)
+        target_avg = sum(self._target_forces) / FINGER_COUNT
+        emg_age = "none" if self._last_emg_time <= 0.0 else f"{time.monotonic() - self._last_emg_time:.2f}s"
+        haptic = " ".join(f"{v:.0f}" for v in self._last_haptics)
+        lines = [
+            f"Elapsed: {self._elapsed():.1f}s | State time: {self._stage_elapsed():.1f}s",
+            f"EMG: {self._gesture_name} label={self._gesture_label} conf={self._confidence:.2f} prop={self._proportional:.2f} age={emg_age}",
+            f"Force ({source}): avg={avg_force:.1f} max={max_force:.1f} target_avg={target_avg:.1f} haptic_force={self._force_percent():.1f}%",
+            f"Wrist: current={self._wrist_position_deg:.1f} deg target={self._wrist_target_deg:.1f} deg error={_circ_delta_deg(self._wrist_target_deg, self._wrist_position_deg):.1f} deg",
+            f"Haptics: {self._haptic_phase} motors_pct=[{haptic}]",
+            f"CSV: {self._log.run_dir}",
+        ]
+        countdown = self._ui_countdown_s()
+        if countdown is not None:
+            lines.insert(1, f"Countdown: {countdown:.1f}s")
+        if self._contact_reason:
+            lines.append(f"Contact: {self._contact_reason}")
+        if self._fault_reason:
+            lines.append(f"Fault: {self._fault_reason}")
+        return lines
+
+    def _ui_countdown_s(self) -> Optional[float]:
+        if self._stage == Stage.VERTICAL_DELAY:
+            return max(0.0, float(self._cfg.wrist["vertical_delay_s"]) - self._stage_elapsed())
+        if self._stage == Stage.RETURN_DELAY:
+            return max(
+                0.0,
+                float(self._cfg.wrist["return_after_open_delay_s"]) - self._stage_elapsed(),
+            )
+        return None
+
+    def _human_stage(self) -> str:
+        return self._stage.value.replace("_", " ")
 
     def _publish_status(self) -> None:
         now = time.monotonic()
