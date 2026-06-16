@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
-"""Jetson -> Laptop sensor-data relay with per-stream throttling, compression,
-and decimation.  Subscribes to raw topics from the dual-D435i + dual-OpenVINS
-pipeline and republishes under ``/jetson/`` at lower, laptop-friendly rates.
+"""Jetson -> Laptop sensor-data relay with per-stream throttling,
+pointcloud decimation, and trackhist downsampling.
+
+Subscribes to raw topics from the dual-D435i + dual-OpenVINS pipeline and
+republishes under ``/jetson/`` at lower, laptop-friendly rates.
 
 Supported streams (each independently togglable via ROS2 parameters):
   - PointCloud2     — stride decimation (keep every Nth point) + throttle
-  - Image (colour)  — JPEG compression (cv2.imencode) + throttle
+  - Image (colour)  — raw passthrough + throttle (NO compression)
+  - trackhist       — resolution downsample + throttle (visualization only)
   - CameraInfo      — throttle only
   - Odometry        — passthrough (no throttling — they are tiny)
   - marker_map_locked — latched passthrough (transient_local QoS)
@@ -19,17 +22,15 @@ Usage (inside the Docker container)::
     python3 jetson_relay.py
     python3 jetson_relay.py --ros-args \\
         -p pointcloud.decimation.enabled:=false \\
-        -p image.compression.quality:=90
+        -p trackhist.hz:=3.0
 """
 
 from __future__ import annotations
 
 import time
-from typing import Optional
 
 import numpy as np
 import rclpy
-from cv_bridge import CvBridge
 from rclpy.node import Node
 from rclpy.qos import (
     DurabilityPolicy,
@@ -89,29 +90,33 @@ _HEALTH_QOS = QoSProfile(
 # ═══════════════════════════════════════════════════════════════════════════
 
 _SRC = {
-    "head_pc":   "/head/d435i_head/depth/color/points",
-    "arm_pc":    "/arm/d435i_arm/depth/color/points",
-    "head_img":  "/head/d435i_head/color/image_raw",
-    "arm_img":   "/arm/d435i_arm/color/image_raw",
-    "head_ci":   "/head/d435i_head/color/camera_info",
-    "arm_ci":    "/arm/d435i_arm/color/camera_info",
-    "head_odom": "/ov_msckf/odomimu",
-    "arm_odom":  "/ov_msckf_arm/odomimu",
-    "head_mml":  "/ov_msckf/marker_map_locked",
-    "arm_mml":   "/ov_msckf_arm/marker_map_locked",
+    "head_pc":         "/head/d435i_head/depth/color/points",
+    "arm_pc":          "/arm/d435i_arm/depth/color/points",
+    "head_img":        "/head/d435i_head/color/image_raw",
+    "arm_img":         "/arm/d435i_arm/color/image_raw",
+    "head_trackhist":  "/ov_msckf/trackhist",
+    "arm_trackhist":   "/ov_msckf_arm/trackhist",
+    "head_ci":         "/head/d435i_head/color/camera_info",
+    "arm_ci":          "/arm/d435i_arm/color/camera_info",
+    "head_odom":       "/ov_msckf/odomimu",
+    "arm_odom":        "/ov_msckf_arm/odomimu",
+    "head_mml":        "/ov_msckf/marker_map_locked",
+    "arm_mml":         "/ov_msckf_arm/marker_map_locked",
 }
 
 _DST = {
-    "head_pc":   "/jetson/head/points",
-    "arm_pc":    "/jetson/arm/points",
-    "head_img":  "/jetson/head/image/compressed",
-    "arm_img":   "/jetson/arm/image/compressed",
-    "head_ci":   "/jetson/head/camera_info",
-    "arm_ci":    "/jetson/arm/camera_info",
-    "head_odom": "/jetson/head/odom",
-    "arm_odom":  "/jetson/arm/odom",
-    "head_mml":  "/jetson/head/marker_map_locked",
-    "arm_mml":   "/jetson/arm/marker_map_locked",
+    "head_pc":         "/jetson/head/points",
+    "arm_pc":          "/jetson/arm/points",
+    "head_img":        "/jetson/head/image",
+    "arm_img":         "/jetson/arm/image",
+    "head_trackhist":  "/jetson/head/trackhist",
+    "arm_trackhist":   "/jetson/arm/trackhist",
+    "head_ci":         "/jetson/head/camera_info",
+    "arm_ci":          "/jetson/arm/camera_info",
+    "head_odom":       "/jetson/head/odom",
+    "arm_odom":        "/jetson/arm/odom",
+    "head_mml":        "/jetson/head/marker_map_locked",
+    "arm_mml":         "/jetson/arm/marker_map_locked",
 }
 
 CAMERAS = ("head", "arm")
@@ -187,11 +192,55 @@ def decimate_pointcloud(msg: PointCloud2, step: int) -> PointCloud2:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Image downsample helper (fast bilinear — for trackhist visualization only)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def downsample_image(msg: Image, factor: int) -> Image:
+    """Downsample an Image message by an integer factor using fast
+    bilinear interpolation (``cv2.INTER_LINEAR``).
+
+    Preserves the original encoding.  If OpenCV is unavailable or the
+    encoding is not a simple 1/3/4-channel pixel format, the original
+    message is returned unchanged.
+    """
+    if factor <= 1 or not _HAS_CV2:
+        return msg
+
+    enc = msg.encoding
+    channels = {
+        "mono8": 1, "mono16": 1,
+        "rgb8": 3, "bgr8": 3,
+        "rgba8": 4, "bgra8": 4,
+    }.get(enc)
+    if channels is None:
+        return msg  # unknown encoding — don't touch it
+
+    raw = np.frombuffer(bytes(msg.data), dtype=np.uint8)
+    try:
+        arr = raw.reshape(msg.height, msg.width, channels)
+    except ValueError:
+        return msg
+
+    new_w = msg.width // factor
+    new_h = msg.height // factor
+    resized = cv2.resize(arr, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+
+    out = Image()
+    out.header = msg.header
+    out.height = new_h
+    out.width = new_w
+    out.encoding = enc
+    out.step = new_w * channels
+    out.data = resized.tobytes()
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # JetsonRelay node
 # ═══════════════════════════════════════════════════════════════════════════
 
 class JetsonRelay(Node):
-    """Relay node: raw -> /jetson/ with compression + throttling."""
+    """Relay node: raw -> /jetson/ with throttling + decimation."""
 
     def __init__(self) -> None:
         super().__init__("jetson_relay")
@@ -204,8 +253,10 @@ class JetsonRelay(Node):
 
         self.declare_parameter("image.enabled", True)
         self.declare_parameter("image.hz", 5.0)
-        self.declare_parameter("image.compression.enabled", True)
-        self.declare_parameter("image.compression.quality", 80)
+
+        self.declare_parameter("trackhist.enabled", True)
+        self.declare_parameter("trackhist.hz", 5.0)
+        self.declare_parameter("trackhist.downsample_factor", 2)
 
         self.declare_parameter("camera_info.enabled", True)
         self.declare_parameter("camera_info.hz", 1.0)
@@ -221,8 +272,10 @@ class JetsonRelay(Node):
 
         self._img_enabled = self.get_parameter("image.enabled").value
         self._img_hz = self.get_parameter("image.hz").value
-        self._img_comp_enabled = self.get_parameter("image.compression.enabled").value
-        self._img_comp_quality = self.get_parameter("image.compression.quality").value
+
+        self._trackhist_enabled = self.get_parameter("trackhist.enabled").value
+        self._trackhist_hz = self.get_parameter("trackhist.hz").value
+        self._trackhist_ds = self.get_parameter("trackhist.downsample_factor").value
 
         self._ci_enabled = self.get_parameter("camera_info.enabled").value
         self._ci_hz = self.get_parameter("camera_info.hz").value
@@ -235,19 +288,13 @@ class JetsonRelay(Node):
         for cam in CAMERAS:
             self._gates[f"pc_{cam}"] = RateGate(self._pc_hz)
             self._gates[f"img_{cam}"] = RateGate(self._img_hz)
+            self._gates[f"trackhist_{cam}"] = RateGate(self._trackhist_hz)
             self._gates[f"ci_{cam}"] = RateGate(self._ci_hz)
-
-        # ── cv_bridge ───────────────────────────────────────────────────
-        self._bridge = CvBridge() if _HAS_CV2 else None
-        if self._img_comp_enabled and not _HAS_CV2:
-            self.get_logger().warn(
-                "Image compression enabled but OpenCV not available. "
-                "Images will be relayed raw."
-            )
 
         # ── setup pubs/subs ─────────────────────────────────────────────
         self._setup_pointclouds()
         self._setup_images()
+        self._setup_trackhist()
         self._setup_camera_info()
         self._setup_odometry()
         self._setup_marker_map_locked()
@@ -289,6 +336,21 @@ class JetsonRelay(Node):
             )
         self._img_pub = {
             cam: self.create_publisher(Image, _DST[f"{cam}_img"], _SENSOR_QOS)
+            for cam in CAMERAS
+        }
+
+    def _setup_trackhist(self) -> None:
+        if not self._trackhist_enabled:
+            self.get_logger().info("trackhist relay:   DISABLED")
+            return
+        for cam in CAMERAS:
+            key = f"{cam}_trackhist"
+            self.create_subscription(
+                Image, _SRC[key],
+                lambda m, c=cam: self._on_trackhist(m, c), _SENSOR_QOS,
+            )
+        self._trackhist_pub = {
+            cam: self.create_publisher(Image, _DST[f"{cam}_trackhist"], _SENSOR_QOS)
             for cam in CAMERAS
         }
 
@@ -349,16 +411,14 @@ class JetsonRelay(Node):
     def _on_img(self, msg: Image, camera: str) -> None:
         if not self._gates[f"img_{camera}"].should_publish():
             return
-        out = msg
-        if self._img_comp_enabled and self._bridge is not None:
-            try:
-                out = self._compress_image(msg, self._img_comp_quality)
-            except Exception as exc:
-                self.get_logger().warn(
-                    f"Image compression failed ({camera}): {exc}"
-                )
-                return
-        self._img_pub[camera].publish(out)
+        self._img_pub[camera].publish(msg)
+
+    def _on_trackhist(self, msg: Image, camera: str) -> None:
+        if not self._gates[f"trackhist_{camera}"].should_publish():
+            return
+        if self._trackhist_ds > 1:
+            msg = downsample_image(msg, self._trackhist_ds)
+        self._trackhist_pub[camera].publish(msg)
 
     def _on_ci(self, msg: CameraInfo, camera: str) -> None:
         if not self._gates[f"ci_{camera}"].should_publish():
@@ -370,22 +430,6 @@ class JetsonRelay(Node):
 
     def _on_mml(self, msg: Bool, camera: str) -> None:
         self._mml_pub[camera].publish(msg)
-
-    # ── image compression ────────────────────────────────────────────────
-
-    def _compress_image(self, msg: Image, quality: int) -> Image:
-        cv_img = self._bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-        _, jpeg_bytes = cv2.imencode(
-            ".jpg", cv_img, [cv2.IMWRITE_JPEG_QUALITY, int(quality)]
-        )
-        out = Image()
-        out.header = msg.header
-        out.height = msg.height
-        out.width = msg.width
-        out.encoding = "jpeg"
-        out.step = len(jpeg_bytes)
-        out.data = jpeg_bytes.tobytes()
-        return out
 
     # ── health ───────────────────────────────────────────────────────────
 
@@ -400,7 +444,9 @@ class JetsonRelay(Node):
         info(f"  pointcloud:  enabled={self._pc_enabled}  hz={self._pc_hz:.1f}  "
              f"dec={self._pc_dec_enabled} (step={self._pc_dec_step})")
         info(f"  image:       enabled={self._img_enabled}  hz={self._img_hz:.1f}  "
-             f"jpeg={self._img_comp_enabled} (q={self._img_comp_quality})")
+             f"(raw passthrough)")
+        info(f"  trackhist:   enabled={self._trackhist_enabled}  hz={self._trackhist_hz:.1f}  "
+             f"ds={self._trackhist_ds}x")
         info(f"  camera_info: enabled={self._ci_enabled}  hz={self._ci_hz:.1f}")
         info(f"  odometry:    enabled={self._odom_enabled}  (passthrough at source rate)")
         info(f"  marker_map_locked: enabled={self._mml_enabled}  (latched)")

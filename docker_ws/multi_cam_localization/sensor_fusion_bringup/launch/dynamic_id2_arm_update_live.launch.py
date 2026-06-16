@@ -322,14 +322,24 @@ def _setup(context, *args, **kwargs):
         relay_pc_decimate = str(
             _as_bool(_arg_or_config(context, "relay_pc_decimate", True))
         ).lower()
+
+        # relay_hz is a master override: when set (non-empty), it applies to
+        # pointclouds, images, AND trackhist simultaneously.  Individual
+        # relay_*_hz args still take precedence when explicitly set.
+        relay_hz_raw = str(_arg_or_config(context, "relay_hz", "")).strip()
+
+        pc_default = relay_hz_raw if relay_hz_raw else pointcloud_max_rate_hz
+        img_default = relay_hz_raw if relay_hz_raw else "5.0"
+        trackhist_default = relay_hz_raw if relay_hz_raw else img_default
+
         relay_pc_hz = str(
-            _arg_or_config(context, "relay_pc_hz", pointcloud_max_rate_hz)
+            _arg_or_config(context, "relay_pc_hz", pc_default)
         )
-        relay_img_compress = str(
-            _as_bool(_arg_or_config(context, "relay_img_compress", True))
-        ).lower()
         relay_img_hz = str(
-            _arg_or_config(context, "relay_img_hz", "5.0")
+            _arg_or_config(context, "relay_img_hz", img_default)
+        )
+        relay_trackhist_hz = str(
+            _arg_or_config(context, "relay_trackhist_hz", trackhist_default)
         )
         # Use the bind-mounted source file directly — avoids dependency on
         # overlay rebuild (scripts/ is not in the share install directory).
@@ -342,7 +352,7 @@ def _setup(context, *args, **kwargs):
                     "-p", f"pointcloud.hz:={relay_pc_hz}",
                     "-p", f"pointcloud.decimation.enabled:={relay_pc_decimate}",
                     "-p", f"image.hz:={relay_img_hz}",
-                    "-p", f"image.compression.enabled:={relay_img_compress}",
+                    "-p", f"trackhist.hz:={relay_trackhist_hz}",
                 ],
                 name="jetson_relay",
                 output="screen",
@@ -384,6 +394,12 @@ def generate_launch_description():
                 description="Run the jetson_relay node to throttle/compress sensor data for the laptop.",
             ),
             DeclareLaunchArgument(
+                "relay_hz",
+                default_value="",
+                description="Master Hz override for ALL relay streams (pc + image + trackhist). "
+                            "Empty = use individual relay_*_hz args.",
+            ),
+            DeclareLaunchArgument(
                 "relay_pc_decimate",
                 default_value="true",
                 description="Enable stride decimation on relayed pointclouds.",
@@ -394,14 +410,14 @@ def generate_launch_description():
                 description="Override pointcloud relay throttle Hz (empty = use pointcloud_max_rate_hz).",
             ),
             DeclareLaunchArgument(
-                "relay_img_compress",
-                default_value="true",
-                description="Enable JPEG compression on relayed images.",
-            ),
-            DeclareLaunchArgument(
                 "relay_img_hz",
                 default_value="5.0",
                 description="Image relay throttle frequency in Hz.",
+            ),
+            DeclareLaunchArgument(
+                "relay_trackhist_hz",
+                default_value="",
+                description="Trackhist relay throttle Hz (empty = use relay_img_hz).",
             ),
             OpaqueFunction(function=_setup),
         ]
