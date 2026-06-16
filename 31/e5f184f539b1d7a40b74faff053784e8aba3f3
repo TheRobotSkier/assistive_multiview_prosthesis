@@ -1,0 +1,52 @@
+scripts/mia_haptic_force_test.py
+  s_1b1139e9bd63d9::t_656a3dac7475fe 662-666,673,802,830
+  s_1b1139e9bd63d9::t_69e7f5989fc68f 1062
+  s_1b1139e9bd63d9::t_16799e943246c9 1285-1312,1314-1318,1323-1325,1332-1411
+  s_1b1139e9bd63d9::t_08cc37f4a3a739 1319-1322,1326-1331
+  s_1b1139e9bd63d9::t_2afad567c3b844 556,1313
+docker/Dockerfile.emg
+  s_1b1139e9bd63d9::t_8d6820a2b09021 15
+src/emg_bridge/emg_bridge/scripts/prediction_simulator.py
+  s_1b1139e9bd63d9::t_5da94378b3ac2b 23,207-239,277-281,422-423,447
+config/emg_latency_test.yaml
+  s_1b1139e9bd63d9::t_7798ecdc20dfa6 1-42
+docs/architecture/control-and-actuation.md
+  s_1b1139e9bd63d9::t_978721ec5a2e27 153-154
+docker/docker-compose.yml
+  s_1b1139e9bd63d9::t_c2be6d9b1157c6 19-20
+  s_1b1139e9bd63d9::t_66998b1bab42ec 44
+Makefile.workspace
+  s_1b1139e9bd63d9::t_2c259958ed7a29 30,112
+Makefile
+  s_1b1139e9bd63d9::t_47326f65098e92 67-94
+  s_1b1139e9bd63d9::t_1411d0e983baa4 21
+  s_1b1139e9bd63d9::t_f3d5d92710a8b0 784,795,845,849
+  s_1b1139e9bd63d9::t_eed58d5eced066 211,213,216,218,221,225,230-251
+  s_1b1139e9bd63d9::t_10668e3e15fc55 222-223,226-227
+src/emg_bridge/test/test_emg_container_config.py
+  s_1b1139e9bd63d9::t_aa674d578c27d9 25,55,70-82
+docs/reference/validation-and-workflows.md
+  s_1b1139e9bd63d9::t_11d539d8802f89 17-23,37,73-74,102,107,116-117
+scripts/emg_latency_workflow.sh
+  s_1b1139e9bd63d9::t_ae82c062ce2367 7,15-94,167,190-193
+docs/architecture/runtime-entrypoints.md
+  s_1b1139e9bd63d9::t_37ddde3927bb3a 118,132
+docs/reference/directory-structure.md
+  s_1b1139e9bd63d9::t_5b3ca40efcd629 77,85-86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "31e5f184f539b1d7a40b74faff053784e8aba3f3",
+  "prompts": {},
+  "sessions": {
+    "s_1b1139e9bd63d9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecf7a-05c3-7d63-a1fb-0991911fc7f6",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
