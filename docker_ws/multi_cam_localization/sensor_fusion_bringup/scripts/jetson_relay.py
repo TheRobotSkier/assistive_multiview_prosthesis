@@ -396,31 +396,16 @@ class JetsonRelay(Node):
 
     def _log_config(self) -> None:
         info = self.get_logger().info
-        info("── JetsonRelay configuration ────────────────────────────")
-        info(
-            "  pointcloud:  enabled=%s  hz=%.1f  dec=%s (step=%d)",
-            self._pc_enabled, self._pc_hz,
-            self._pc_dec_enabled, self._pc_dec_step,
-        )
-        info(
-            "  image:       enabled=%s  hz=%.1f  jpeg=%s (q=%d)",
-            self._img_enabled, self._img_hz,
-            self._img_comp_enabled, self._img_comp_quality,
-        )
-        info(
-            "  camera_info: enabled=%s  hz=%.1f",
-            self._ci_enabled, self._ci_hz,
-        )
-        info(
-            "  odometry:    enabled=%s  (passthrough at source rate)",
-            self._odom_enabled,
-        )
-        info(
-            "  marker_map_locked: enabled=%s  (latched)",
-            self._mml_enabled,
-        )
+        info("── JetsonRelay configuration ──────────────────────")
+        info(f"  pointcloud:  enabled={self._pc_enabled}  hz={self._pc_hz:.1f}  "
+             f"dec={self._pc_dec_enabled} (step={self._pc_dec_step})")
+        info(f"  image:       enabled={self._img_enabled}  hz={self._img_hz:.1f}  "
+             f"jpeg={self._img_comp_enabled} (q={self._img_comp_quality})")
+        info(f"  camera_info: enabled={self._ci_enabled}  hz={self._ci_hz:.1f}")
+        info(f"  odometry:    enabled={self._odom_enabled}  (passthrough at source rate)")
+        info(f"  marker_map_locked: enabled={self._mml_enabled}  (latched)")
         info("  health:      /jetson/relay/health @ 1 Hz")
-        info("──────────────────────────────────────────────────────")
+        info("──────────────────────────────────────────────────")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
