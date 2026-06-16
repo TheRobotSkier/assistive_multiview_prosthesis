@@ -69,6 +69,13 @@ Use this as the primary navigation map for the repository.
 - Start: `src/prosthesis_launch/launch/simple_emg_grasp.launch.py`
 - Then: `src/pipeline_manager/pipeline_manager/simple_pipeline_manager_node.py`
 
+### Change Mia haptic force-test execution mode
+
+- Start: `scripts/mia_haptic_force_test.py`
+- Launch: `src/prosthesis_launch/launch/mia_haptic_force_test.launch.py`
+- Config: `config/mia_haptic_force_test.yaml`
+- Host command: `make mia-haptic-force-test`
+
 ### Change EMG collection, training, inference, or latency benchmarking
 
 - Start: `src/emg_bridge/`

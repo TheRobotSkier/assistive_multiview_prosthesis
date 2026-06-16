@@ -79,6 +79,7 @@ This is the fast package map for everything under `src/`.
 
 - Purpose: haptic control logic and Bluetooth bridge
 - Runtime package name used in launch files: `haptic_bridge`
+- The Mia haptic force test bypasses `haptic_controller_node` and publishes the full 8-motor command vector directly to `bridge_node`
 
 ## Hardware Interface Packages
 
@@ -93,6 +94,7 @@ This is the fast package map for everything under `src/`.
 ### `mia_hand_ros2_control`
 
 - Purpose: ros2_control system interface, controllers, and launch/config support
+- Exposes fingertip normal force as joint `effort` and publishes raw `mia_hand_msgs/ForceData` for ros2_control-based force tests
 
 ### `mia_hand_msgs`
 

@@ -99,6 +99,51 @@ services:
         stdin_open: true
         tty: true
 
+    # ── Dedicated Mia Hand haptic force-test container ───────────────────────
+    # Kept separate from the main prosthesis dev container so long-running
+    # hardware tests do not disturb other local agents or their build volumes.
+    mia-haptic-force-test:
+        container_name: mia-haptic-force-test
+        image: prosthesis:latest
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile
+            target: base
+            args:
+                USER_UID: ${USER_UID:-1000}
+                USER_GID: ${USER_GID:-1000}
+        environment:
+            - DISPLAY=${DISPLAY:-:0}
+            - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+            - CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml
+            - ROS_DOMAIN_ID=0
+            - MIA_SERIAL_PORT=${MIA_SERIAL_PORT:-/dev/ttyUSB0}
+            - WRIST_SERIAL_PORT=${WRIST_SERIAL_PORT:-/dev/ttyUSB1}
+        network_mode: host
+        userns_mode: "keep-id"
+        volumes:
+            - /tmp/.X11-unix:/tmp/.X11-unix:rw
+            - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
+            - ../src:/prosthesis_ws/src:rw
+            - ../config:/prosthesis_ws/config:rw
+            - ../scripts:/prosthesis_ws/scripts:rw
+            - ../tests:/prosthesis_ws/tests:rw
+            - ../Makefile.workspace:/prosthesis_ws/Makefile:ro
+            # Bind /dev instead of fixed USB devices so the container can start
+            # even when the Mia Hand or wrist are unplugged.
+            - /dev:/dev:rw
+            - mia-haptic-force-test-build:/prosthesis_ws/build
+            - mia-haptic-force-test-install:/prosthesis_ws/install
+            - mia-haptic-force-test-log:/prosthesis_ws/log
+            - ../data:/app/data:rw
+            - ../models:/app/models:rw
+        privileged: true
+        ipc: host
+        stdin_open: true
+        tty: true
+        profiles:
+            - mia-haptic-force-test
+
     # ── Segmentation inference server — CUDA variant ──────────────────────────
     # Requires NVIDIA container runtime. Use docker-compose.segmentation.cuda.yml
     # (Docker) or docker-compose.segmentation.podman-gpu.yml (Podman) for GPU passthrough.
@@ -194,3 +239,6 @@ volumes:
     prosthesis-build:
     prosthesis-install:
     prosthesis-log:
+    mia-haptic-force-test-build:
+    mia-haptic-force-test-install:
+    mia-haptic-force-test-log:

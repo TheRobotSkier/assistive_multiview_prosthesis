@@ -10,6 +10,24 @@ namespace mia_hand_ros2_control
 {
 MiaHandSystemInterface::MiaHandSystemInterface()
 {
+  for (std::size_t data_it = 0; data_it < 3; ++data_it)
+  {
+    b_jnt_pos_cmd_defined_[data_it] = false;
+    b_jnt_pos_state_defined_[data_it] = false;
+    b_jnt_vel_cmd_defined_[data_it] = false;
+    b_jnt_vel_state_defined_[data_it] = false;
+    b_jnt_eff_state_defined_[data_it] = false;
+
+    jnt_pos_cmd_[data_it] = 0.0;
+    jnt_pos_state_[data_it] = 0.0;
+    jnt_vel_cmd_[data_it] = 0.0;
+    jnt_vel_state_[data_it] = 0.0;
+    jnt_eff_state_[data_it] = 0.0;
+    jnt_tangential_force_[data_it] = 0;
+    rviz2_joints_[data_it].pos = 0.0;
+    rviz2_joints_[data_it].vel = 0.0;
+    rviz2_joints_[data_it].eff = 0.0;
+  }
 }
 
 hardware_interface::CallbackReturn MiaHandSystemInterface::on_init(
@@ -65,6 +83,15 @@ hardware_interface::CallbackReturn MiaHandSystemInterface::on_init(
     read_rviz2_joints_info(params.hardware_info.joints);
   }
 
+  if (hardware_interface::CallbackReturn::ERROR != result)
+  {
+    diagnostics_node_ = rclcpp::Node::make_shared(
+      "mia_hand_system_interface_diagnostics");
+    force_pub_ =
+      diagnostics_node_->create_publisher<mia_hand_msgs::msg::ForceData>(
+        "data_streams/fingers/forces/data", 10);
+  }
+
   return result;
 }
 
@@ -82,6 +109,8 @@ hardware_interface::CallbackReturn MiaHandSystemInterface::on_configure(
   {
     jnt_pos_state_[data_it] = 0.0;
     jnt_vel_state_[data_it] = 0.0;
+    jnt_eff_state_[data_it] = 0.0;
+    jnt_tangential_force_[data_it] = 0;
 
     jnt_pos_cmd_[data_it] = 0.0;
     jnt_vel_cmd_[data_it] = 0.0;
@@ -89,12 +118,15 @@ hardware_interface::CallbackReturn MiaHandSystemInterface::on_configure(
 
   rviz2_joints_[0].pos = 0.0;
   rviz2_joints_[0].vel = 0.0;
+  rviz2_joints_[0].eff = 0.0;
 
   rviz2_joints_[1].pos = 0.0;
   rviz2_joints_[1].vel = 0.0;
+  rviz2_joints_[1].eff = 0.0;
 
   rviz2_joints_[2].pos = 0.0;
   rviz2_joints_[2].vel = 0.0;
+  rviz2_joints_[2].eff = 0.0;
 
   jnt_cmd_modes_[0] = CommandMode::kNone;
   jnt_cmd_modes_[1] = CommandMode::kNone;
@@ -187,6 +219,13 @@ MiaHandSystemInterface::export_state_interfaces()
         &jnt_vel_state_[data_it]));
     }
 
+    if (b_jnt_eff_state_defined_[data_it])
+    {
+      jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
+        jnt_names_[data_it], hardware_interface::HW_IF_EFFORT,
+        &jnt_eff_state_[data_it]));
+    }
+
     if (!rviz2_joints_[data_it].name.empty())
     {
       jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
@@ -196,6 +235,10 @@ MiaHandSystemInterface::export_state_interfaces()
       jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
         rviz2_joints_[data_it].name, hardware_interface::HW_IF_VELOCITY,
         &rviz2_joints_[data_it].vel));
+
+      jnt_state_interfaces.emplace_back(hardware_interface::StateInterface(
+        rviz2_joints_[data_it].name, hardware_interface::HW_IF_EFFORT,
+        &rviz2_joints_[data_it].eff));
     }
   }
 
@@ -338,6 +381,43 @@ hardware_interface::return_type MiaHandSystemInterface::read(
     // result = hardware_interface::return_type::ERROR;
   }
 
+  int32_t thumb_nfor = 0;
+  int32_t index_nfor = 0;
+  int32_t mrl_nfor = 0;
+  int32_t thumb_tfor = 0;
+  int32_t index_tfor = 0;
+  int32_t mrl_tfor = 0;
+  if (mia_hand_->get_finger_forces(
+        thumb_nfor, index_nfor, mrl_nfor,
+        thumb_tfor, index_tfor, mrl_tfor))
+  {
+    jnt_eff_state_[0] = static_cast<double>(thumb_nfor);
+    jnt_eff_state_[1] = static_cast<double>(index_nfor);
+    jnt_eff_state_[2] = static_cast<double>(mrl_nfor);
+
+    jnt_tangential_force_[0] = thumb_tfor;
+    jnt_tangential_force_[1] = index_tfor;
+    jnt_tangential_force_[2] = mrl_tfor;
+
+    if (force_pub_)
+    {
+      mia_hand_msgs::msg::ForceData msg;
+      msg.thumb_nfor = thumb_nfor;
+      msg.index_nfor = index_nfor;
+      msg.mrl_nfor = mrl_nfor;
+      msg.thumb_tfor = thumb_tfor;
+      msg.index_tfor = index_tfor;
+      msg.mrl_tfor = mrl_tfor;
+      force_pub_->publish(msg);
+    }
+  }
+  else if (diagnostics_node_)
+  {
+    RCLCPP_WARN_THROTTLE(
+      *logger_, *diagnostics_node_->get_clock(), 2000,
+      "Failed to read fingertip forces: %s", mia_hand_->get_error_msg());
+  }
+
   return result;
 }
 
@@ -430,6 +510,11 @@ bool MiaHandSystemInterface::read_joints_info(
         if (has_state_interface(*role_match_it, hardware_interface::HW_IF_VELOCITY))
         {
           b_jnt_vel_state_defined_[jnt_roles_it] = true;
+        }
+
+        if (has_state_interface(*role_match_it, hardware_interface::HW_IF_EFFORT))
+        {
+          b_jnt_eff_state_defined_[jnt_roles_it] = true;
         }
       }
       else  // Joint role not found

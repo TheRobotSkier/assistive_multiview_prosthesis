@@ -51,6 +51,7 @@ This is the most important behavioral contract in the repository. Any agent chan
 
 - Full hardware pipeline: `src/prosthesis_launch/launch/pipeline.launch.py`
 - EMG-only simplified execution pipeline: `src/prosthesis_launch/launch/simple_emg_grasp.launch.py`
+- EMG/haptic Mia force test with no cameras: `src/prosthesis_launch/launch/mia_haptic_force_test.launch.py`
 - Mock pipeline: `src/prosthesis_launch/launch/mock.launch.py`
 - Digital twin: `src/prosthesis_launch/launch/digital_twin.launch.py`
 - Grasp test and twist test modes: files in `src/prosthesis_launch/launch/`
