@@ -1,0 +1,127 @@
+Makefile
+  s_f2d1a9751d7547::t_c05ebceb8c3912 66
+  s_f2d1a9751d7547::t_ff80cccdc82197 187-189
+  s_f2d1a9751d7547::t_3816d62bd4f45f 191-195
+  s_f2d1a9751d7547::t_6294d8e9fa829c 196
+src/emg_bridge/emg_bridge/scripts/latency_benchmark.py
+  s_f2d1a9751d7547::t_8ac3d43aa796e8 751
+  s_f2d1a9751d7547::t_a7eff35514ca80 540,547,556-575,584
+  s_f2d1a9751d7547::t_ff80cccdc82197 39-40,122,133,138-139,155-156,167-171,173-180,319-321,323,345-346,351,353-357,378-391,460-472,474,483,527,535-536,578,580-583,595-614,626-628,713,732,748-750,752,784-786
+  s_f2d1a9751d7547::t_b49b4eeec9930e 145-154,157-166,494,586-594
+  s_f2d1a9751d7547::t_04f28aa3dc71c1 715-731
+  s_f2d1a9751d7547::t_f03149e897ea6c 681-692
+  s_f2d1a9751d7547::t_49c4d1af57b4b3 209-220,229-236,254-265
+  s_f2d1a9751d7547::t_b1f43a1a7e814a 422-426
+  s_f2d1a9751d7547::t_0a6a71b998c175 445-452
+  s_f2d1a9751d7547::t_a5b7d26dc322d3 322
+  s_f2d1a9751d7547::t_f0bcc00e446392 473
+  s_f2d1a9751d7547::t_2de664f2998622 629
+  s_f2d1a9751d7547::t_dc846e4c1f21d0 352
+  s_f2d1a9751d7547::t_6a30163b11b0c6 787
+  s_f2d1a9751d7547::t_15e0a50b107d56 172
+  s_f2d1a9751d7547::t_ccda105e11f716 342
+  s_f2d1a9751d7547::t_11186e43c380e6 396-401
+data/latency/20260616_145344/latency_samples.csv
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 1-53751
+data/latency/latest/latency_metadata.json
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 1-23
+data/latency/latest/latency_predictions.csv
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 2-962
+data/latency/20260616_150835/latency_predictions.csv
+  s_1b1139e9bd63d9::t_2efc1772b2d491 1-1099
+data/latency/20260616_145344/latency_predictions.csv
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 1-1056
+src/emg_bridge/emg_bridge/prediction_simulator_entry.py
+  s_f2d1a9751d7547::t_eaa569d53c62b8 1-7
+data/latency/latest/latency_samples.csv
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 2-49051
+src/emg_bridge/emg_bridge/latency_analysis.py
+  s_f2d1a9751d7547::t_7079505dcf854f 89-117,281-283,289-296,325-326,343-344
+data/latency/latest/latency_trials.csv
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 2-21
+scripts/emg_latency_workflow.sh
+  s_f2d1a9751d7547::t_e252e767c853c9 21
+  s_f2d1a9751d7547::t_b49b4eeec9930e 24,77-80,86
+  s_f2d1a9751d7547::t_8c52e5a505e056 22,59
+  s_f2d1a9751d7547::t_bf97ce551330bd 30,33,39-44
+  s_f2d1a9751d7547::t_c8faeabf04e7a9 72
+  s_f2d1a9751d7547::t_ff80cccdc82197 87-89
+  s_f2d1a9751d7547::t_e086730b508515 64
+docs/reference/validation-and-workflows.md
+  s_f2d1a9751d7547::t_a9fd0e70d88809 19-20
+  s_f2d1a9751d7547::t_a2ea05bb8acf12 39
+  s_f2d1a9751d7547::t_8c52e5a505e056 72,85
+src/emg_bridge/setup.py
+  s_f2d1a9751d7547::t_ff202dd675d98a 26
+data/latency/20260616_145344/latency_trials.csv
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 1-21
+src/emg_bridge/test/test_latency_benchmark_state.py
+  s_f2d1a9751d7547::t_42810f6def66cc 1-42
+  s_f2d1a9751d7547::t_ad7df4507ff100 43-64
+data/latency/latest/latency_aggregate.csv
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 1-6
+data/latency/20260616_150835/latency_metadata.json
+  s_1b1139e9bd63d9::t_2efc1772b2d491 1-24
+data/latency/20260616_150835/latency_trials.csv
+  s_1b1139e9bd63d9::t_2efc1772b2d491 1-21
+data/latency/20260616_150251/latency_samples.csv
+  s_1b1139e9bd63d9::t_72523eab762318 23652-23741
+  s_1b1139e9bd63d9::t_c32f03d186980b 4652-4681
+  s_1b1139e9bd63d9::t_99c99edac10513 10736-10977
+  s_1b1139e9bd63d9::t_aec267fae0768f 4592-4651
+  s_1b1139e9bd63d9::t_6df0c7e8e2d462 17384-17473
+data/latency/20260616_150835/latency_aggregate.csv
+  s_1b1139e9bd63d9::t_2efc1772b2d491 1-6
+data/latency/20260616_145344/latency_metadata.json
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 1-23
+src/emg_bridge/test/test_latency_analysis.py
+  s_f2d1a9751d7547::t_42810f6def66cc 23,89-107,201-236
+docker/Dockerfile.emg
+  s_f2d1a9751d7547::t_8c52e5a505e056 15,17
+src/emg_bridge/test/test_emg_container_config.py
+  s_f2d1a9751d7547::t_54eb3b5a6abd24 49-62
+  s_f2d1a9751d7547::t_42810f6def66cc 63-70
+  s_f2d1a9751d7547::t_205f1cf84bc022 43-48
+src/emg_bridge/emg_bridge/scripts/collect_data.py
+  s_f2d1a9751d7547::t_37366934c521d4 18,20,22-23,50-87,194-195
+src/emg_bridge/emg_bridge/scripts/prediction_simulator.py
+  s_f2d1a9751d7547::t_1a1a4b6e9e6910 346
+  s_f2d1a9751d7547::t_b67cfa0c0ae2fe 35-39
+  s_f2d1a9751d7547::t_9f5e79f68f69c4 58
+  s_f2d1a9751d7547::t_d5323b683fc9b3 119,122,124,144-153,183-184
+  s_f2d1a9751d7547::t_65da3ceb445d4d 1-34,40-57,59-118,120-121,123,125-143,154-182,185-201,203-234,237-285,289-295,358-359,365-418
+  s_f2d1a9751d7547::t_1cf6264fc951a9 235-236
+  s_f2d1a9751d7547::t_26fababf51d31b 202
+  s_f2d1a9751d7547::t_0183846b9cdfb9 286-288,296-345,347-357,360-364
+data/latency/20260616_145344/latency_aggregate.csv
+  s_1b1139e9bd63d9::t_0ccf616bb819ac 1-6
+data/latency/20260616_150835/latency_samples.csv
+  s_1b1139e9bd63d9::t_2efc1772b2d491 1-55901
+src/emg_bridge/emg_bridge/latency_benchmark_state.py
+  s_f2d1a9751d7547::t_7079505dcf854f 1-13,15-22,32-42
+  s_f2d1a9751d7547::t_83e80ba9f9f214 14,23-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.7",
+  "base_commit_sha": "65413854979b15a1f5dd2d2eb98bf51c20103ecb",
+  "prompts": {},
+  "sessions": {
+    "s_1b1139e9bd63d9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ecf7a-05c3-7d63-a1fb-0991911fc7f6",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    },
+    "s_f2d1a9751d7547": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1348635b1ffe3l9r2dZTL7WwHQ",
+        "model": "gpt-5.4"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
