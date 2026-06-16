@@ -1,21 +1,22 @@
 <CycloneDDS>
     <Domain Id="0">
         <General>
-            <NetworkInterfaceAddress>10.42.0.2</NetworkInterfaceAddress>
+            <Interfaces>
+                <NetworkInterface address="10.42.0.2"/>
+            </Interfaces>
             <AllowMulticast>false</AllowMulticast>
             <MulticastRecvNetworkInterfaceAddresses>none</MulticastRecvNetworkInterfaceAddresses>
+            <FragmentSize>16384B</FragmentSize>
         </General>
         <Discovery>
             <Peers>
                 <Peer address="10.42.0.1"/>
                 <Peer address="10.42.0.2"/>
             </Peers>
-    	</Discovery>
-	<Internal>
-  		<SocketReceiveBufferSize>8388608</SocketReceiveBufferSize>
-  		<SocketSendBufferSize>8388608</SocketSendBufferSize>
-  		<MaximumMessageSize>65536</MaximumMessageSize>
-  		<FragmentSize>16384</FragmentSize>
-	</Internal>
+        </Discovery>
+        <Internal>
+            <SocketReceiveBufferSize min="8MB"/>
+            <SocketSendBufferSize min="8MB"/>
+        </Internal>
     </Domain>
 </CycloneDDS>

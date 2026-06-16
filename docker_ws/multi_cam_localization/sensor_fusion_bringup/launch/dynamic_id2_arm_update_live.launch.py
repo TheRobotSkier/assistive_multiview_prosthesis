@@ -331,7 +331,9 @@ def _setup(context, *args, **kwargs):
         relay_img_hz = str(
             _arg_or_config(context, "relay_img_hz", "5.0")
         )
-        relay_script = str(package_dir / "scripts" / "jetson_relay.py")
+        # Use the bind-mounted source file directly — avoids dependency on
+        # overlay rebuild (scripts/ is not in the share install directory).
+        relay_script = "/miahand_ws/src/multi_cam_localization/sensor_fusion_bringup/scripts/jetson_relay.py"
         actions.append(
             ExecuteProcess(
                 cmd=[
