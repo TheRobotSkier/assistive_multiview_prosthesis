@@ -23,6 +23,7 @@ setup(
             'collect_data = emg_bridge.collect_data_entry:main',
             'train = emg_bridge.train_entry:main',
             'latency_benchmark = emg_bridge.latency_benchmark_entry:main',
+            'prediction_simulator = emg_bridge.prediction_simulator_entry:main',
             'emg_grasp_controller = emg_bridge.emg_grasp_controller:main',
         ],
     },

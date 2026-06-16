@@ -15,8 +15,12 @@ Usage (inside the Docker container):
 from __future__ import annotations
 
 import argparse
+import select
 import sys
+import termios
 import time
+import tty
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -41,6 +45,44 @@ def _green(s: str) -> str:  return f"\033[92m{s}\033[0m"
 def _yellow(s: str) -> str: return f"\033[93m{s}\033[0m"
 def _bold(s: str) -> str:   return f"\033[1m{s}\033[0m"
 def _cyan(s: str) -> str:   return f"\033[96m{s}\033[0m"
+
+
+@contextmanager
+def _raw_keyboard_mode():
+    if not sys.stdin.isatty():
+        yield False
+        return
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)
+        yield True
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
+def _poll_key() -> str | None:
+    ready, _, _ = select.select([sys.stdin], [], [], 0.0)
+    if not ready:
+        return None
+    return sys.stdin.read(1)
+
+
+def _wait_for_space(prompt: str) -> bool:
+    with _raw_keyboard_mode() as raw_mode:
+        while True:
+            print(prompt, flush=True)
+            while True:
+                key = _poll_key() if raw_mode else sys.stdin.read(1)
+                if key is None:
+                    time.sleep(0.05)
+                    continue
+                if key == "q":
+                    return False
+                if key == " ":
+                    return True
+                break
 
 
 # ── Progress bar ──────────────────────────────────────────────────────────────
@@ -149,7 +191,8 @@ def main() -> None:
                 else:
                     print(f"  Perform the {_bold(g_name)} gesture and hold it.")
 
-                input(_yellow("  Press ENTER to start recording …"))
+                if not _wait_for_space(_yellow("  Press SPACE to start recording … (q to abort)")):
+                    raise KeyboardInterrupt
                 print(_cyan(f"  Recording {args.duration} s …"))
 
                 chunk = record_gesture(reader, args.duration, sampling_rate)

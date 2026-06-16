@@ -1,0 +1,23 @@
+{
+  "model_dir": "/app/models",
+  "output_dir": "/app/data/latency/20260616_133647",
+  "repeats": 5,
+  "baseline_s": 1.5,
+  "tail_s": 0.5,
+  "threshold": 0.55,
+  "smooth": 5,
+  "countdown_s": 3,
+  "auto_stop_confidence": 0.7,
+  "auto_stop_hold_s": 1.0,
+  "onset_lookback_windows": 5,
+  "sampling_rate_hz": 500,
+  "window_len": 100,
+  "window_step": 50,
+  "gesture_names": [
+    "REST",
+    "POWER",
+    "OPEN",
+    "FLEXION",
+    "EXTENSION"
+  ]
+}

@@ -63,7 +63,7 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell emg-dev emg-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp emg-latency-workflow
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell emg-dev emg-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp emg-latency-workflow emg-latency-workflow-notrain emg-simulate
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -183,6 +183,16 @@ emg-infer: dev
 emg-latency-workflow: ## EMG collect -> train -> latency benchmark workflow
 	@test -f scripts/emg_latency_workflow.sh || { echo "Missing scripts/emg_latency_workflow.sh"; exit 1; }
 	bash ./scripts/emg_latency_workflow.sh
+
+emg-latency-workflow-notrain: ## Reuse existing EMG model and run latency benchmark only
+	@test -f scripts/emg_latency_workflow.sh || { echo "Missing scripts/emg_latency_workflow.sh"; exit 1; }
+	EMG_SKIP_TRAIN=true bash ./scripts/emg_latency_workflow.sh
+
+emg-simulate: ## Offline prediction simulator — replay raw data with tunable parameters
+	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null; -$(DOCKER_CMD) rm -f emg 2>/dev/null
+	cd $(COMPOSE_DIR) && $(COMPOSE) up -d emg
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis emg /bin/bash -lc 'source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge prediction_simulator --model-dir /app/models --data-root /app/data/latency' || true
+	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null; -$(DOCKER_CMD) rm -f emg 2>/dev/null
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test:

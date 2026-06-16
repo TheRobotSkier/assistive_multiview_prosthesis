@@ -18,20 +18,30 @@ COLLECT_REPS="${EMG_COLLECT_REPS:-3}"
 COLLECT_DURATION="${EMG_COLLECT_DURATION_S:-8}"
 MODEL_DIR="${EMG_MODEL_DIR:-/app/models}"
 DATA_DIR="${EMG_DATA_DIR:-/app/data}"
-RESULT_DIR_NAME="${EMG_LATENCY_RESULT_DIR_NAME:-latest}"
-FETCH_REMOTE="${EMG_FETCH_REMOTE:-true}"
+RESULT_DIR_NAME="${EMG_LATENCY_RESULT_DIR_NAME:-$(date +%Y%m%d_%H%M%S)}"
+FETCH_REMOTE="${EMG_FETCH_REMOTE:-false}"
 PUSH_RESULTS="${EMG_PUSH_RESULTS:-false}"
+EMG_SKIP_TRAIN="${EMG_SKIP_TRAIN:-false}"
 CONTAINER_NAME="emg"
 RESULT_DIR_HOST="${ROOT_DIR}/data/latency/${RESULT_DIR_NAME}"
 
 if command -v podman-compose >/dev/null 2>&1; then
     COMPOSE_CMD=(podman-compose)
+    DOCKER_BIN="podman"
 elif command -v docker >/dev/null 2>&1; then
     COMPOSE_CMD=(docker compose)
+    DOCKER_BIN="docker"
 else
     red "Neither podman-compose nor docker is available."
     exit 1
 fi
+
+cleanup_container() {
+    "$DOCKER_BIN" stop --time 1 "$CONTAINER_NAME" 2>/dev/null || true
+    "$DOCKER_BIN" rm -f "$CONTAINER_NAME" 2>/dev/null || true
+}
+
+trap cleanup_container EXIT
 
 require_clean_branch() {
     local branch
@@ -46,11 +56,12 @@ fetch_branch() {
     if [ "$FETCH_REMOTE" != "true" ]; then
         return
     fi
-    cyan "Fetching origin/asger_dev with gh-authenticated git..."
+    cyan "Fetching origin/asger_dev because EMG_FETCH_REMOTE=true..."
     git -C "$ROOT_DIR" fetch origin asger_dev
 }
 
 ensure_container() {
+    cleanup_container
     cyan "Starting dedicated EMG container if needed..."
     make -C "$ROOT_DIR" emg-dev
 }
@@ -58,16 +69,24 @@ ensure_container() {
 container_exec() {
     (
         cd "$ROOT_DIR/docker"
-        eval "${COMPOSE_CMD[*]} exec --user prosthesis -it ${CONTAINER_NAME} /bin/bash -lc \"$1\""
+        eval "${COMPOSE_CMD[*]} exec --user prosthesis ${CONTAINER_NAME} /bin/bash -lc \"$1\""
     )
 }
 
 run_collection() {
+    if [ "$EMG_SKIP_TRAIN" = "true" ]; then
+        yellow "Skipping EMG data collection and reusing existing files under ${DATA_DIR} and ${MODEL_DIR}."
+        return
+    fi
     bold "Step 1/4: EMG data collection"
     container_exec "source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge collect_data --reps ${COLLECT_REPS} --duration ${COLLECT_DURATION} --output-dir ${DATA_DIR}"
 }
 
 run_training() {
+    if [ "$EMG_SKIP_TRAIN" = "true" ]; then
+        yellow "Skipping EMG model training and reusing files under ${MODEL_DIR}."
+        return
+    fi
     bold "Step 2/4: EMG model training"
     container_exec "source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge train --data-dir ${DATA_DIR} --model-dir ${MODEL_DIR}"
 }

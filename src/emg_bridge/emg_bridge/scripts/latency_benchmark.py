@@ -36,6 +36,8 @@ from emg_bridge.config import (
 )
 from emg_bridge.features import compute_features
 from emg_bridge.latency_analysis import PredictionFrame, measure_latency
+from emg_bridge.latency_analysis import find_sustained_prediction_run
+from emg_bridge.latency_benchmark_state import build_trial_message_lines
 from emg_bridge.latency_protocol import TrialSpec, plan_trials
 from emg_bridge.preprocessing import OnlineFilter, RingBuffer
 
@@ -117,6 +119,7 @@ def _draw_status(
     latest_proportional: float,
     latest_probs: np.ndarray | None,
     elapsed_s: float,
+    message_lines: list[str] | None = None,
 ) -> None:
     gesture_name = _safe_name(latest_label)
     probs_line = ""
@@ -127,14 +130,52 @@ def _draw_status(
     lines = [
         _bold("-" * 64),
         f"trial: {trial.trial_id}  target={_bold(trial.gesture_name)}  stage={_cyan(stage)}  elapsed={elapsed_s:.2f}s",
-        f"pred : label={_green(gesture_name)}  conf={latest_confidence:.2f}  prop={latest_proportional:.2f}",
+        f"pred : label={gesture_name}  conf={latest_confidence:.2f}  prop={latest_proportional:.2f}",
         probs_line or "  probs: n/a",
         _yellow("space=end trial, q=abort session"),
         _bold("-" * 64),
     ]
+    if message_lines:
+        lines.extend(message_lines)
     sys.stdout.write("\033[2J\033[H")
     sys.stdout.write("\n".join(lines) + "\n")
     sys.stdout.flush()
+
+
+def _wait_for_space(
+    *,
+    trial: TrialSpec,
+    latest_label: int,
+    latest_confidence: float,
+    latest_proportional: float,
+    latest_probs: np.ndarray | None,
+    elapsed_s: float,
+    prompt_lines: list[str],
+) -> bool:
+    with _raw_keyboard_mode() as raw_mode:
+        while True:
+            _draw_status(
+                trial=trial,
+                stage="done",
+                latest_label=latest_label,
+                latest_confidence=latest_confidence,
+                latest_proportional=latest_proportional,
+                latest_probs=latest_probs,
+                elapsed_s=elapsed_s,
+                message_lines=prompt_lines,
+            )
+            key = _poll_key() if raw_mode else sys.stdin.read(1)
+            if key == "q":
+                return False
+            if key == " ":
+                return True
+            time.sleep(0.05)
+
+
+def _next_gesture_name(trials: list[TrialSpec], current_index: int) -> str | None:
+    if current_index + 1 >= len(trials):
+        return None
+    return trials[current_index + 1].gesture_name
 
 
 def _write_samples(
@@ -165,6 +206,18 @@ def _write_samples(
         writer.writerow(row)
 
 
+def _compute_n_vote(recent_runs: list[tuple[int, float]], n: int) -> tuple[int, float]:
+    subset = recent_runs[-n:]
+    counts: dict[int, int] = {}
+    for label, _ in subset:
+        counts[label] = counts.get(label, 0) + 1
+    winner = max(counts, key=counts.get)
+    winner_count = counts[winner]
+    if winner_count * 2 > n:
+        return winner, winner_count / n
+    return 0, 0.0
+
+
 def _write_prediction_frame(
     writer: csv.DictWriter,
     *,
@@ -173,6 +226,14 @@ def _write_prediction_frame(
     frame: PredictionFrame,
     raw_probs: np.ndarray,
     proportional: float,
+    vote2_label: int = 0,
+    vote2_conf: float = 0.0,
+    vote3_label: int = 0,
+    vote3_conf: float = 0.0,
+    vote4_label: int = 0,
+    vote4_conf: float = 0.0,
+    vote5_label: int = 0,
+    vote5_conf: float = 0.0,
 ) -> None:
     row = {
         "trial_id": trial.trial_id,
@@ -190,6 +251,18 @@ def _write_prediction_frame(
         "proportional": f"{proportional:.6f}",
         "window_start_sample": frame.window_start_sample,
         "window_end_sample": frame.window_end_sample,
+        "vote2_label": vote2_label,
+        "vote2_name": _safe_name(vote2_label),
+        "vote2_confidence": f"{vote2_conf:.6f}",
+        "vote3_label": vote3_label,
+        "vote3_name": _safe_name(vote3_label),
+        "vote3_confidence": f"{vote3_conf:.6f}",
+        "vote4_label": vote4_label,
+        "vote4_name": _safe_name(vote4_label),
+        "vote4_confidence": f"{vote4_conf:.6f}",
+        "vote5_label": vote5_label,
+        "vote5_name": _safe_name(vote5_label),
+        "vote5_confidence": f"{vote5_conf:.6f}",
     }
     for idx, name in enumerate(GESTURE_NAMES):
         row[f"prob_{name.lower()}"] = f"{raw_probs[idx]:.8f}"
@@ -243,6 +316,11 @@ def _run_trial(
     max_gap_samples: int,
     pre_onset_search_samples: int,
     onset_lookback_windows: int,
+    auto_stop_confidence: float,
+    auto_stop_hold_s: float,
+    countdown_s: int,
+    max_trial_duration_s: float,
+    next_gesture_name: str | None,
 ) -> TrialOutcome:
     filt = OnlineFilter()
     ring = RingBuffer(WINDOW_LEN)
@@ -261,19 +339,22 @@ def _run_trial(
     latest_proportional = 0.0
     total_samples = 0
     frame_index = 0
+    recent_predictions: list[tuple[int, float]] = []
 
     trial_start = time.monotonic()
-    cue_time_s = baseline_s
-    stage = "baseline"
-
-    print()
-    print(_bold(f"Next trial: {trial.gesture_name} repeat {trial.repeat_index}"))
-    print(_yellow("Relax during baseline. When prompted, perform the gesture and press space when done."))
-    time.sleep(1.0)
+    cue_time_s = float(countdown_s)
+    stage = "countdown"
 
     done = False
     aborted = False
     active_end_time: float | None = None
+    stop_frame_idx: int | None = None
+    trial_status = "unresolved"
+    message_lines = build_trial_message_lines(
+        gesture_name=trial.gesture_name,
+        phase="countdown",
+        countdown_value=countdown_s,
+    )
 
     with _raw_keyboard_mode() as raw_mode:
         while not done:
@@ -294,12 +375,29 @@ def _run_trial(
             sample_times.append(chunk_times.copy())
 
             elapsed_s = read_end_time - trial_start
-            if stage == "baseline" and elapsed_s >= baseline_s:
-                stage = "active"
-                print(_green(f"GO: perform {trial.gesture_name} now, then press space when finished."))
+            countdown_remaining = max(0, countdown_s - int(elapsed_s))
+            if stage == "countdown":
+                if elapsed_s >= countdown_s:
+                    stage = "active"
+                    message_lines = build_trial_message_lines(
+                        gesture_name=trial.gesture_name,
+                        phase="active",
+                    )
+                else:
+                    message_lines = build_trial_message_lines(
+                        gesture_name=trial.gesture_name,
+                        phase="countdown",
+                        countdown_value=countdown_remaining,
+                    )
 
             if stage == "tail" and active_end_time is not None and (read_end_time - active_end_time) >= tail_s:
                 done = True
+
+            if stage == "active" and elapsed_s > countdown_s + max_trial_duration_s:
+                stage = "tail"
+                active_end_time = read_end_time
+                done = True
+                trial_status = "timeout"
 
             _write_samples(
                 samples_writer,
@@ -321,6 +419,11 @@ def _run_trial(
                 )
                 smoothed_label = smoother.update(raw_label)
                 proportional = prop_mod.compute_proportional(window, smoothed_label, calibration)
+                recent_predictions.append((raw_label, float(confidence)))
+                v2_l, v2_c = _compute_n_vote(recent_predictions, 2)
+                v3_l, v3_c = _compute_n_vote(recent_predictions, 3)
+                v4_l, v4_c = _compute_n_vote(recent_predictions, 4)
+                v5_l, v5_c = _compute_n_vote(recent_predictions, 5)
                 frame = PredictionFrame(
                     frame_index=frame_index,
                     prediction_time_s=elapsed_s,
@@ -339,12 +442,35 @@ def _run_trial(
                     frame=frame,
                     raw_probs=probs,
                     proportional=proportional,
+                    vote2_label=v2_l,
+                    vote2_conf=v2_c,
+                    vote3_label=v3_l,
+                    vote3_conf=v3_c,
+                    vote4_label=v4_l,
+                    vote4_conf=v4_c,
+                    vote5_label=v5_l,
+                    vote5_conf=v5_c,
                 )
 
                 latest_probs = probs
                 latest_label = smoothed_label
                 latest_confidence = float(confidence)
                 latest_proportional = float(proportional)
+
+                if stage == "active":
+                    sustained_run = find_sustained_prediction_run(
+                        prediction_frames,
+                        target_label=trial.gesture_label,
+                        cue_time_s=cue_time_s,
+                        min_confidence=auto_stop_confidence,
+                        hold_duration_s=auto_stop_hold_s,
+                    )
+                    if sustained_run is not None:
+                        _, stop_frame_idx = sustained_run
+                        stage = "tail"
+                        active_end_time = read_end_time
+                        done = True
+                        trial_status = "ok"
 
             _draw_status(
                 trial=trial,
@@ -354,6 +480,7 @@ def _run_trial(
                 latest_proportional=latest_proportional,
                 latest_probs=latest_probs,
                 elapsed_s=elapsed_s,
+                message_lines=message_lines,
             )
 
             key = _poll_key() if raw_mode else None
@@ -364,6 +491,7 @@ def _run_trial(
             elif key == " " and stage == "active":
                 stage = "tail"
                 active_end_time = read_end_time
+                done = True
 
     raw_samples = np.vstack(raw_trial_chunks) if raw_trial_chunks else np.zeros((0, 8))
     filtered_samples = np.vstack(filtered_trial_chunks) if filtered_trial_chunks else np.zeros((0, 8))
@@ -396,7 +524,7 @@ def _run_trial(
         target_label=trial.gesture_label,
         cue_time_s=cue_time_s,
         sampling_rate_hz=float(reader.sampling_rate),
-        baseline_end_sample=int(baseline_s * reader.sampling_rate),
+        baseline_end_sample=int(max(0.0, cue_time_s - 1.0) * reader.sampling_rate),
         min_confidence=min_confidence,
         smoothing_frames=smoothing_frames,
         min_active_samples=min_active_samples,
@@ -404,18 +532,19 @@ def _run_trial(
         pre_onset_search_samples=pre_onset_search_samples,
         onset_lookback_windows=onset_lookback_windows,
         sample_times_s=relative_sample_times if relative_sample_times.size else None,
+        search_start_sample_override=int(max(0.0, cue_time_s - 1.0) * reader.sampling_rate),
+        support_end_idx_override=stop_frame_idx,
     )
 
     if measurement is None:
-        notes = "No supported onset/prediction match found"
-        return TrialOutcome(
+        outcome = TrialOutcome(
             trial_id=trial.trial_id,
             gesture_label=trial.gesture_label,
             gesture_name=trial.gesture_name,
             repeat_index=trial.repeat_index,
             cue_time_s=cue_time_s,
             end_time_s=end_time_s,
-            status="unresolved",
+            status=trial_status,
             onset_sample_index=None,
             onset_time_s=None,
             prediction_frame_index=None,
@@ -424,27 +553,65 @@ def _run_trial(
             prediction_window_end_sample=None,
             latency_ms=None,
             threshold=None,
-            notes=notes,
+            notes="No supported onset/prediction match found",
+        )
+    else:
+        outcome = TrialOutcome(
+            trial_id=trial.trial_id,
+            gesture_label=trial.gesture_label,
+            gesture_name=trial.gesture_name,
+            repeat_index=trial.repeat_index,
+            cue_time_s=cue_time_s,
+            end_time_s=end_time_s,
+            status=trial_status,
+            onset_sample_index=measurement.onset_sample_index,
+            onset_time_s=measurement.onset_time_s,
+            prediction_frame_index=measurement.prediction_frame_index,
+            prediction_time_s=measurement.prediction_time_s,
+            prediction_window_start_sample=measurement.prediction_window_start_sample,
+            prediction_window_end_sample=measurement.prediction_window_end_sample,
+            latency_ms=measurement.latency_ms,
+            threshold=measurement.threshold,
+            notes="",
         )
 
-    return TrialOutcome(
-        trial_id=trial.trial_id,
-        gesture_label=trial.gesture_label,
+    prompt_lines = build_trial_message_lines(
         gesture_name=trial.gesture_name,
-        repeat_index=trial.repeat_index,
-        cue_time_s=cue_time_s,
-        end_time_s=end_time_s,
-        status="ok",
-        onset_sample_index=measurement.onset_sample_index,
-        onset_time_s=measurement.onset_time_s,
-        prediction_frame_index=measurement.prediction_frame_index,
-        prediction_time_s=measurement.prediction_time_s,
-        prediction_window_start_sample=measurement.prediction_window_start_sample,
-        prediction_window_end_sample=measurement.prediction_window_end_sample,
-        latency_ms=measurement.latency_ms,
-        threshold=measurement.threshold,
-        notes="",
+        phase="done",
+        latency_ms=outcome.latency_ms,
+        next_gesture_name=next_gesture_name,
+        wait_for_continue=next_gesture_name is not None,
+        status=outcome.status,
     )
+    if next_gesture_name is not None and not _wait_for_space(
+        trial=trial,
+        latest_label=latest_label,
+        latest_confidence=latest_confidence,
+        latest_proportional=latest_proportional,
+        latest_probs=latest_probs,
+        elapsed_s=end_time_s,
+        prompt_lines=prompt_lines,
+    ):
+        return TrialOutcome(
+            trial_id=trial.trial_id,
+            gesture_label=trial.gesture_label,
+            gesture_name=trial.gesture_name,
+            repeat_index=trial.repeat_index,
+            cue_time_s=cue_time_s,
+            end_time_s=end_time_s,
+            status="aborted",
+            onset_sample_index=outcome.onset_sample_index,
+            onset_time_s=outcome.onset_time_s,
+            prediction_frame_index=outcome.prediction_frame_index,
+            prediction_time_s=outcome.prediction_time_s,
+            prediction_window_start_sample=outcome.prediction_window_start_sample,
+            prediction_window_end_sample=outcome.prediction_window_end_sample,
+            latency_ms=outcome.latency_ms,
+            threshold=outcome.threshold,
+            notes="User aborted session with q",
+        )
+
+    return outcome
 
 
 def main() -> None:
@@ -456,6 +623,10 @@ def main() -> None:
     parser.add_argument("--tail-s", type=float, default=0.5, help="Additional capture time after user ends the gesture")
     parser.add_argument("--threshold", type=float, default=CONFIDENCE_THRESHOLD, help="Classifier confidence threshold")
     parser.add_argument("--smooth", type=int, default=PREDICTION_SMOOTHING_FRAMES, help="Prediction smoothing frames")
+    parser.add_argument("--countdown-s", type=int, default=3, help="Rest countdown before each gesture cue")
+    parser.add_argument("--auto-stop-confidence", type=float, default=0.70, help="Confidence threshold for automatic trial completion")
+    parser.add_argument("--auto-stop-hold-s", type=float, default=1.0, help="How long the target gesture must be held before automatic trial completion")
+    parser.add_argument("--max-trial-duration-s", type=float, default=15.0, help="Maximum active-phase duration before timeout (excluding countdown)")
     parser.add_argument("--min-active-samples", type=int, default=6, help="Minimum consecutive active samples for onset detection")
     parser.add_argument("--max-gap-samples", type=int, default=2, help="Maximum inactive gap inside one activation run")
     parser.add_argument("--pre-onset-search-samples", type=int, default=20, help="How many samples before prediction support to search for onset")
@@ -507,6 +678,18 @@ def main() -> None:
         "proportional",
         "window_start_sample",
         "window_end_sample",
+        "vote2_label",
+        "vote2_name",
+        "vote2_confidence",
+        "vote3_label",
+        "vote3_name",
+        "vote3_confidence",
+        "vote4_label",
+        "vote4_name",
+        "vote4_confidence",
+        "vote5_label",
+        "vote5_name",
+        "vote5_confidence",
     ]
     frame_fieldnames.extend([f"prob_{name.lower()}" for name in GESTURE_NAMES])
 
@@ -527,9 +710,26 @@ def main() -> None:
 
         print(_green(f"Connected to MindRove board at {reader.sampling_rate} Hz."))
         print(_cyan(f"Running {len(trials)} latency trials across {len(GESTURE_NAMES) - 1} gestures."))
-        print(_yellow("Keep the band still during baseline. Press q during a trial to abort the session."))
+        print(_yellow("Keep the band still during countdown. Press q during a trial to abort the session."))
 
-        for trial in trials:
+        if trials:
+            first_lines = [
+                f"First gesture: {trials[0].gesture_name}",
+                "Press space to continue...",
+            ]
+            if not _wait_for_space(
+                trial=trials[0],
+                latest_label=0,
+                latest_confidence=0.0,
+                latest_proportional=0.0,
+                latest_probs=None,
+                elapsed_s=0.0,
+                prompt_lines=first_lines,
+            ):
+                print(_red("Session aborted before start."))
+                sys.exit(0)
+
+        for trial_index, trial in enumerate(trials):
             outcome = _run_trial(
                 reader=reader,
                 pipe=pipe,
@@ -545,6 +745,11 @@ def main() -> None:
                 max_gap_samples=args.max_gap_samples,
                 pre_onset_search_samples=args.pre_onset_search_samples,
                 onset_lookback_windows=args.onset_lookback_windows,
+                auto_stop_confidence=args.auto_stop_confidence,
+                auto_stop_hold_s=args.auto_stop_hold_s,
+                countdown_s=args.countdown_s,
+                max_trial_duration_s=args.max_trial_duration_s,
+                next_gesture_name=_next_gesture_name(trials, trial_index),
             )
             outcomes.append(outcome)
             trials_writer.writerow(_summary_dict(outcome))
@@ -576,6 +781,10 @@ def main() -> None:
         "tail_s": args.tail_s,
         "threshold": args.threshold,
         "smooth": args.smooth,
+        "countdown_s": args.countdown_s,
+        "auto_stop_confidence": args.auto_stop_confidence,
+        "auto_stop_hold_s": args.auto_stop_hold_s,
+        "max_trial_duration_s": args.max_trial_duration_s,
         "onset_lookback_windows": args.onset_lookback_windows,
         "sampling_rate_hz": SAMPLING_RATE,
         "window_len": WINDOW_LEN,

@@ -40,3 +40,31 @@ def test_docs_describe_emg_service_and_ros_core_base():
     assert "make emg-dev" in validation
     assert "ros:jazzy-ros-core-noble" in validation
     assert "dedicated EMG container" in control
+
+
+def test_workflow_exec_path_does_not_force_dash_it_flags():
+    workflow = (ROOT / "scripts" / "emg_latency_workflow.sh").read_text(encoding="utf-8")
+
+    assert "exec --user prosthesis -it" not in workflow
+
+
+def test_workflow_does_not_fetch_remote_by_default():
+    workflow = (ROOT / "scripts" / "emg_latency_workflow.sh").read_text(encoding="utf-8")
+
+    assert 'FETCH_REMOTE="${EMG_FETCH_REMOTE:-false}"' in workflow
+    assert 'Fetching origin/asger_dev with gh-authenticated git...' not in workflow
+
+
+def test_emg_dockerfile_installs_cyclonedds_rmw_runtime():
+    dockerfile = (ROOT / "docker" / "Dockerfile.emg").read_text(encoding="utf-8")
+
+    assert "ros-jazzy-cyclonedds" in dockerfile
+    assert "ros-jazzy-rmw-cyclonedds-cpp" in dockerfile
+
+
+def test_notrain_workflow_target_reuses_existing_model():
+    workflow = (ROOT / "scripts" / "emg_latency_workflow.sh").read_text(encoding="utf-8")
+    makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+
+    assert 'EMG_SKIP_TRAIN="${EMG_SKIP_TRAIN:-false}"' in workflow
+    assert "emg-latency-workflow-notrain" in makefile

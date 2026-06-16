@@ -16,6 +16,8 @@ Common commands:
 - `make segmentation-cpu` or `make segmentation-cuda`: start segmentation service
 - `make test`: run containerized test target
 - `make emg-latency-workflow`: run EMG collection, training, and interactive latency benchmarking
+- `make emg-latency-workflow-notrain`: skip collection/training, reuse existing model
+- `make emg-simulate`: offline prediction simulator — replay raw data with tunable parameters
 
 ### In-container
 
@@ -34,6 +36,7 @@ Common commands:
 - `ros2 run emg_bridge train`: offline EMG model training
 - `ros2 run emg_bridge run_classifier`: live EMG inference display
 - `ros2 run emg_bridge latency_benchmark`: interactive latency benchmark with CSV export
+- `ros2 run emg_bridge prediction_simulator`: offline simulator with parameter-tuning menu
 
 ## Smoke Test Entry Point
 
@@ -66,7 +69,7 @@ Primary host entrypoint:
 
 Default flow:
 
-1. Fetch `origin/asger_dev`.
+1. Use the current local checkout on `asger_dev`.
 2. Ensure the dedicated EMG container is running.
 3. Build `emg_bridge` in-container.
 4. Run `collect_data`.
@@ -79,6 +82,7 @@ Container details:
 - The EMG workflow now runs in a dedicated `emg` compose service instead of the general `prosthesis` dev container.
 - The dedicated EMG image is built from `ros:jazzy-ros-core-noble` to avoid pulling the larger desktop stack for EMG-only work.
 - The slim image keeps `collect_data`, `train`, `run_classifier`, `latency_benchmark`, and ROS topic publishing support for `/emg/*` topics.
+- The workflow does not fetch from the remote repository by default; set `EMG_FETCH_REMOTE=true` only if you explicitly want a pre-run `git fetch origin asger_dev`.
 
 Key environment variables:
 

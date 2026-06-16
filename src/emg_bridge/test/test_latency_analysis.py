@@ -20,6 +20,7 @@ from latency_analysis import (  # noqa: E402
     build_activation_threshold,
     compute_sample_activity,
     derive_prediction_support_range,
+    find_sustained_prediction_run,
     find_first_prediction_frame,
     find_supporting_onset,
     measure_latency,
@@ -83,6 +84,25 @@ def test_find_first_prediction_frame_filters_by_cue_time_and_confidence():
     )
 
     assert prediction_idx == 2
+
+
+def test_find_sustained_prediction_run_detects_target_hold_interval():
+    frames = [
+        _frame(frame_index=0, prediction_time_s=0.20, raw_label=0, smoothed_label=0, confidence=0.90, window_start_sample=0, window_end_sample=20),
+        _frame(frame_index=1, prediction_time_s=0.40, raw_label=1, smoothed_label=1, confidence=0.72, window_start_sample=20, window_end_sample=40),
+        _frame(frame_index=2, prediction_time_s=0.95, raw_label=1, smoothed_label=1, confidence=0.76, window_start_sample=40, window_end_sample=60),
+        _frame(frame_index=3, prediction_time_s=1.45, raw_label=1, smoothed_label=1, confidence=0.78, window_start_sample=60, window_end_sample=80),
+    ]
+
+    run = find_sustained_prediction_run(
+        frames,
+        target_label=1,
+        cue_time_s=0.30,
+        min_confidence=0.70,
+        hold_duration_s=1.0,
+    )
+
+    assert run == (1, 3)
 
 
 def test_derive_prediction_support_range_uses_smoothing_window():
@@ -178,3 +198,39 @@ def test_measure_latency_can_look_back_across_prior_windows_on_same_channel_sign
     assert result.onset_sample_index == 12
     assert result.prediction_frame_index == 3
     assert abs(result.latency_ms - 280.0) < 1e-6
+
+
+def test_measure_latency_can_search_from_before_cue_until_sustained_hold_stop():
+    raw_samples = np.zeros((300, 2), dtype=float)
+    raw_samples[120:255, 1] = 4.0
+
+    frames = [
+        _frame(frame_index=0, prediction_time_s=1.00, raw_label=0, smoothed_label=0, confidence=0.90, window_start_sample=0, window_end_sample=100),
+        _frame(frame_index=1, prediction_time_s=1.40, raw_label=0, smoothed_label=0, confidence=0.85, window_start_sample=40, window_end_sample=140),
+        _frame(frame_index=2, prediction_time_s=1.80, raw_label=1, smoothed_label=1, confidence=0.80, window_start_sample=80, window_end_sample=180),
+        _frame(frame_index=3, prediction_time_s=2.20, raw_label=1, smoothed_label=1, confidence=0.82, window_start_sample=120, window_end_sample=220),
+        _frame(frame_index=4, prediction_time_s=2.60, raw_label=1, smoothed_label=1, confidence=0.84, window_start_sample=160, window_end_sample=260),
+    ]
+
+    result = measure_latency(
+        raw_samples=raw_samples,
+        frames=frames,
+        target_label=1,
+        cue_time_s=1.50,
+        sampling_rate_hz=100.0,
+        baseline_end_sample=100,
+        min_confidence=0.55,
+        smoothing_frames=2,
+        min_active_samples=4,
+        max_gap_samples=1,
+        pre_onset_search_samples=0,
+        onset_lookback_windows=3,
+        prediction_idx_override=2,
+        support_end_idx_override=4,
+        search_start_sample_override=50,
+    )
+
+    assert result is not None
+    assert result.onset_sample_index == 120
+    assert result.prediction_frame_index == 2
+    assert abs(result.latency_ms - 600.0) < 1e-6

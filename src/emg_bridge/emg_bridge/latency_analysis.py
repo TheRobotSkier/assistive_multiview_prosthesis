@@ -86,6 +86,35 @@ def find_first_prediction_frame(
     return None
 
 
+def find_sustained_prediction_run(
+    frames: list[PredictionFrame],
+    *,
+    target_label: int,
+    cue_time_s: float,
+    min_confidence: float,
+    hold_duration_s: float,
+) -> tuple[int, int] | None:
+    run_start_idx: int | None = None
+
+    for idx, frame in enumerate(frames):
+        matches = (
+            frame.prediction_time_s >= cue_time_s
+            and frame.smoothed_label == target_label
+            and frame.confidence >= min_confidence
+        )
+        if matches:
+            if run_start_idx is None:
+                run_start_idx = idx
+            run_duration = frame.prediction_time_s - frames[run_start_idx].prediction_time_s
+            if run_duration >= hold_duration_s:
+                return run_start_idx, idx
+            continue
+
+        run_start_idx = None
+
+    return None
+
+
 def derive_prediction_support_range(
     frames: list[PredictionFrame],
     *,
@@ -249,17 +278,22 @@ def measure_latency(
     max_gap_samples: int,
     pre_onset_search_samples: int,
     onset_lookback_windows: int | None = None,
+    prediction_idx_override: int | None = None,
+    support_end_idx_override: int | None = None,
+    search_start_sample_override: int | None = None,
     sample_times_s: np.ndarray | None = None,
     threshold_z_score: float = 4.0,
     min_threshold: float = 0.01,
 ) -> LatencyMeasurement | None:
     """Measure end-to-end latency for one prompted gesture trial."""
-    prediction_idx = find_first_prediction_frame(
-        frames,
-        target_label=target_label,
-        cue_time_s=cue_time_s,
-        min_confidence=min_confidence,
-    )
+    prediction_idx = prediction_idx_override
+    if prediction_idx is None:
+        prediction_idx = find_first_prediction_frame(
+            frames,
+            target_label=target_label,
+            cue_time_s=cue_time_s,
+            min_confidence=min_confidence,
+        )
     if prediction_idx is None:
         return None
 
@@ -288,6 +322,8 @@ def measure_latency(
         prediction_idx=prediction_idx,
         smoothing_frames=smoothing_frames,
     )
+    if support_end_idx_override is not None:
+        support_end = frames[support_end_idx_override].window_end_sample
     consistent_channels, lookback_start = _derive_consistent_channel_mask(
         channel_activity,
         channel_thresholds=channel_thresholds,
@@ -304,6 +340,8 @@ def measure_latency(
         return None
 
     search_start = max(0, lookback_start - max(pre_onset_search_samples, 0))
+    if search_start_sample_override is not None:
+        search_start = max(0, search_start_sample_override)
     consistent_activity = np.max(channel_activity[:, consistent_channels], axis=1)
     consistent_threshold = float(np.min(channel_thresholds[consistent_channels]))
 

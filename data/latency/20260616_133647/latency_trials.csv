@@ -1,0 +1,6 @@
+trial_id,gesture_label,gesture_name,repeat_index,cue_time_s,end_time_s,status,onset_sample_index,onset_time_s,prediction_frame_index,prediction_time_s,prediction_window_start_sample,prediction_window_end_sample,latency_ms,threshold,notes
+power_01,1,POWER,1,3.0,53.47165542800212,ok,3788,43.53805738000022,2,36.35269874200094,100,200,-7185.358637999279,22.81084533566009,
+power_02,1,POWER,2,3.0,6.5034131100001105,unresolved,,,,,,,,,No supported onset/prediction match found
+power_03,1,POWER,3,3.0,5.606423903001996,ok,1538,3.0816613940013924,39,4.104628182998567,1950,2050,1022.966788997175,47.34043349331681,
+power_04,1,POWER,4,3.0,17.819579220999003,ok,1599,3.2009338719981315,37,3.9016456059980555,1850,1950,700.711733999924,28.506243465688353,
+power_05,1,POWER,5,3.0,19.228631860998576,aborted,,,,,,,,,User aborted session with q
