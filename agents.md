@@ -49,6 +49,8 @@ High-value code entry points:
 - EMG latency workflow: `scripts/emg_latency_workflow.sh`
 - EMG latency runner: `src/emg_bridge/emg_bridge/scripts/latency_benchmark.py`
 - EMG latency analysis: `src/emg_bridge/emg_bridge/latency_analysis.py`
+- Mia haptic force test: `scripts/mia_haptic_force_test.py`
+- Mia haptic force config: `config/mia_haptic_force_test.yaml`
 
 Use `docs/reference/directory-structure.md` for the full map.
 

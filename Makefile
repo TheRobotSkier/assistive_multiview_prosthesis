@@ -63,7 +63,7 @@ else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
 endif
 
-.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell emg-dev emg-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp emg-latency-workflow emg-latency-workflow-notrain emg-simulate
+.PHONY: build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-jazzy-rviz rebuild dev dev-shell emg-dev emg-shell segmentation segmentation-cuda segmentation-cpu up up-prosthesis up-hw test shell down down-segmentation clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp mia-haptic-force-test up-mia-haptic-force-test down-mia-haptic-force-test logs-mia-haptic-force-test emg-grasp-test print-force emg-infer run-emg-grasp emg-latency-workflow emg-latency-workflow-notrain emg-simulate
 
 # ── Build ──────────────────────────────────────────────────────────────────
 build:
@@ -727,6 +727,74 @@ emg-force-grasp: ## EMG force grasp + wrist: collect (if needed) → train → l
 		-e AUTO_KILL_S="$${AUTO_KILL_S:-60}" \
 		prosthesis:latest \
 		bash /prosthesis_ws/scripts/emg_force_grasp.sh
+
+up-mia-haptic-force-test: ## Start isolated container for Mia haptic force testing
+	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
+	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}" && \
+	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-/dev/ttyUSB1}}" && \
+	echo "[host] Mia haptic force test devices: MIA=$$MIA_PORT WRIST=$$WRIST_PORT" && \
+	if [ ! -e "$$MIA_PORT" ]; then echo "[host] MIA device missing; container will still start and run target will default to MOCK_HARDWARE=true."; fi && \
+	if [ ! -e "$$WRIST_PORT" ]; then echo "[host] Wrist device missing; run target will default to WRIST_ENABLE=false."; fi && \
+	cd $(COMPOSE_DIR) && \
+	MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="$$WRIST_PORT" \
+	$(COMPOSE) --profile mia-haptic-force-test up -d --build mia-haptic-force-test
+
+mia-haptic-force-test: up-mia-haptic-force-test ## Run isolated EMG/haptic force test and CSV logger
+	@echo "=== Mia Hand EMG Haptic Force Test ==="
+	@echo ""
+	@echo "Env overrides (optional):"
+	@echo "  EMG_DATA_DIR=$${EMG_DATA_DIR:-/app/data}              Training data directory"
+	@echo "  EMG_MODEL_DIR=$${EMG_MODEL_DIR:-/app/models}          Model directory"
+	@echo "  CONFIG_PATH=$${CONFIG_PATH:-/prosthesis_ws/config/mia_haptic_force_test.yaml}"
+	@echo "  MIA_PORT=$${MIA_PORT:-<auto-detect>}                  Mia hand serial port"
+	@echo "  WRIST_PORT=$${WRIST_PORT:-<auto-detect>}              Wrist Dynamixel port"
+	@echo "  MOCK_HARDWARE=$${MOCK_HARDWARE:-auto}                 auto=true when Mia is absent"
+	@echo "  WRIST_ENABLE=$${WRIST_ENABLE:-auto}                   auto=false when wrist is absent"
+	@echo "  HAPTIC_ENABLE=$${HAPTIC_ENABLE:-true}                 set false when Vibro8 is absent"
+	@echo "  HAPTIC_BT_ADDR1=$${HAPTIC_BT_ADDR1:-842E1409E14E}     Vibro8 Bluetooth address"
+	@echo "  FORCE_RETRAIN=$${FORCE_RETRAIN:-false}                Re-train classifier"
+	@echo "  AUTO_KILL_S=$${AUTO_KILL_S:-0}                        0 means no timeout"
+	@echo ""
+	@test -f scripts/mia_haptic_force_test.sh || { echo "Missing scripts/mia_haptic_force_test.sh"; exit 1; }
+	@test -f config/mia_haptic_force_test.yaml || { echo "Missing config/mia_haptic_force_test.yaml"; exit 1; }
+	@mkdir -p data models
+	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
+	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}" && \
+	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-/dev/ttyUSB1}}" && \
+	MOCK_MODE="$${MOCK_HARDWARE:-auto}" && \
+	if [ "$$MOCK_MODE" = "auto" ]; then \
+		if [ -e "$$MIA_PORT" ]; then MOCK_MODE=false; else MOCK_MODE=true; fi; \
+	fi && \
+	WRIST_MODE="$${WRIST_ENABLE:-auto}" && \
+	if [ "$$WRIST_MODE" = "auto" ]; then \
+		if [ -e "$$WRIST_PORT" ]; then WRIST_MODE=true; else WRIST_MODE=false; fi; \
+	fi && \
+	HAPTIC_MODE="$${HAPTIC_ENABLE:-true}" && \
+	if [ "$$MOCK_MODE" = "true" ] && [ -z "$${HAPTIC_ENABLE+x}" ]; then HAPTIC_MODE=false; fi && \
+	echo "[host] Executing in mia-haptic-force-test: MIA=$$MIA_PORT WRIST=$$WRIST_PORT MOCK_HARDWARE=$$MOCK_MODE WRIST_ENABLE=$$WRIST_MODE HAPTIC_ENABLE=$$HAPTIC_MODE" && \
+	cd $(COMPOSE_DIR) && \
+	$(COMPOSE) --profile mia-haptic-force-test exec --user prosthesis \
+		-e EMG_DATA_DIR="$${EMG_DATA_DIR:-/app/data}" \
+		-e EMG_MODEL_DIR="$${EMG_MODEL_DIR:-/app/models}" \
+		-e MIA_PORT="$$MIA_PORT" \
+		-e WRIST_PORT="$$WRIST_PORT" \
+		-e CONFIG_PATH="$${CONFIG_PATH:-/prosthesis_ws/config/mia_haptic_force_test.yaml}" \
+		-e WRIST_ENABLE="$$WRIST_MODE" \
+		-e HAPTIC_ENABLE="$$HAPTIC_MODE" \
+		-e EMG_ENABLE="$${EMG_ENABLE:-true}" \
+		-e FORCE_RETRAIN="$${FORCE_RETRAIN:-false}" \
+		-e MOCK_HARDWARE="$$MOCK_MODE" \
+		-e LOG_LEVEL="$${LOG_LEVEL:-info}" \
+		-e AUTO_KILL_S="$${AUTO_KILL_S:-0}" \
+		-e HAPTIC_BT_ADDR1="$${HAPTIC_BT_ADDR1:-842E1409E14E}" \
+		mia-haptic-force-test /bin/bash -lc 'make setup-usb || true; /prosthesis_ws/scripts/mia_haptic_force_test.sh'
+
+down-mia-haptic-force-test: ## Stop and remove the isolated haptic force-test container
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test stop mia-haptic-force-test || true
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test rm -f mia-haptic-force-test || true
+
+logs-mia-haptic-force-test: ## Follow logs for the isolated haptic force-test container
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test logs -f mia-haptic-force-test
 
 emg-grasp-test: ## EMG-driven grasp test: collect → train → launch (set MOCK_HARDWARE=true for CI)
 	@echo "=== EMG-Driven Grasp Test ==="

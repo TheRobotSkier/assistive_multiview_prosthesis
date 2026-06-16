@@ -89,6 +89,7 @@ joint_state_broadcaster:
     interfaces:
       - position
       - velocity
+      - effort
 
 #
 # Position controllers

@@ -66,12 +66,27 @@ Starts:
 
 Use this when changing EMG-triggered closing behavior without needing cameras, segmentation, or grasp planning.
 
+### `mia_haptic_force_test.launch.py`
+
+Bench-test pipeline for the Mia Hand, wrist, EMG classifier, and Vibro8 haptics with no perception stack.
+
+Starts:
+
+- Mia Hand ros2_control stack
+- `run_classifier`
+- optional `wrist_driver_node`
+- optional `haptic_bridge_node`
+- `scripts/mia_haptic_force_test.py`
+
+Use this when testing wrist rotation, force closure, force-hold target adjustment, POWER toggling between force and wrist control, OPEN-stop behavior, haptic mappings, and CSV capture without cameras or the production pipeline manager.
+
 ### Other Launch Files
 
 - `mock.launch.py`: mock pipeline for non-hardware use
 - `digital_twin.launch.py`: digital twin mode
 - `grasp_test.launch.py`: legacy grasp testing path
 - `emg_grasp_test.launch.py`: EMG-focused test path
+- `mia_haptic_force_test.launch.py`: EMG/haptic force test with CSV logging
 - `tf_bridge.launch.py`: TF bridge only
 - `twist_propagation_test.launch.py`: twist/fusion-related testing
 
@@ -100,6 +115,7 @@ Main commands:
 - `make shell`
 - `make run`
 - `make run-emg-grasp`
+- `make mia-haptic-force-test`
 - `make test`
 
 ### In-container workspace
@@ -113,5 +129,6 @@ Main targets:
 - `make pipeline`
 - `make run`
 - `make run-emg-grasp`
+- `make run-mia-haptic-force-test`
 - `make camera-test`
 - `make tonight-*`

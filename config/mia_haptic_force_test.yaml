@@ -1,0 +1,131 @@
+# Mia Hand EMG haptic force test configuration.
+
+runtime: # Runtime loop and startup behavior.
+  control_rate_hz: 20.0 # Default 20.0; state machine, command, haptic, and CSV sample rate in Hz.
+  startup_controller_timeout_s: 30.0 # Default 30.0; max seconds to wait for controller_manager services.
+  status_publish_period_s: 1.0 # Default 1.0; seconds between JSON status topic updates.
+  complete_shutdown_delay_s: 0.2 # Default 0.2; seconds to keep zero haptics published before process exit.
+
+topics: # ROS topic names used by the test node.
+  joint_states: "/joint_states" # Default /joint_states; joint positions, velocities, and normal force efforts.
+  force_data: "data_streams/fingers/forces/data" # Default data_streams/fingers/forces/data; raw normal/tangential force stream.
+  motor_positions: "data_streams/motors/positions/data" # Default data_streams/motors/positions/data; raw motor position stream if present.
+  motor_speeds: "data_streams/motors/speeds/data" # Default data_streams/motors/speeds/data; raw motor speed stream if present.
+  motor_currents: "data_streams/motors/currents/data" # Default data_streams/motors/currents/data; raw motor current stream if present.
+  joint_positions: "data_streams/joints/positions/data" # Default data_streams/joints/positions/data; raw joint position stream if present.
+  joint_speeds: "data_streams/joints/speeds/data" # Default data_streams/joints/speeds/data; raw joint speed stream if present.
+  emg_gesture_label: "/emg/gesture_label" # Default /emg/gesture_label; numeric EMG class.
+  emg_gesture_name: "/emg/gesture_name" # Default /emg/gesture_name; human-readable EMG class.
+  emg_confidence: "/emg/confidence" # Default /emg/confidence; classifier confidence in range 0..1.
+  emg_proportional: "/emg/proportional" # Default /emg/proportional; proportional EMG activation in range 0..1.
+  hand_velocity_commands: "/group_vel_ff_controller/commands" # Default /group_vel_ff_controller/commands; grouped finger velocity commands.
+  hand_position_commands: "/group_pos_ff_controller/commands" # Default /group_pos_ff_controller/commands; grouped finger position commands.
+  wrist_state: "/wrist/state" # Default /wrist/state; wrist position and velocity feedback in degrees.
+  wrist_command: "/wrist/set_position" # Default /wrist/set_position; wrist target and acceleration command.
+  haptic_motors: "/haptic_band/motors" # Default /haptic_band/motors; 8 motor vibration percentages.
+  test_state: "/mia_haptic_force_test/state" # Default /mia_haptic_force_test/state; current state name.
+  test_status: "/mia_haptic_force_test/status" # Default /mia_haptic_force_test/status; JSON status payload.
+
+emg: # EMG gesture labels and acceptance rules.
+  rest_label: 0 # Default 0; REST gesture label.
+  activation_label: 1 # Default 1; POWER gesture starts the test from idle.
+  wrist_toggle_label: 1 # Default 1; POWER gesture toggles force/wrist control during force hold.
+  open_label: 2 # Default 2; OPEN gesture stops the test when held.
+  increase_force_label: 3 # Default 3; FLEXION increases hold force while in force-control mode.
+  decrease_force_label: 4 # Default 4; EXTENSION decreases hold force while in force-control mode.
+  wrist_positive_label: 3 # Default 3; FLEXION increases wrist target while in wrist-control mode.
+  wrist_negative_label: 4 # Default 4; EXTENSION decreases wrist target while in wrist-control mode.
+  confidence_threshold: 0.55 # Default 0.55; minimum confidence for any active non-REST gesture.
+  activation_hold_s: 0.20 # Default 0.20; POWER must be held this long to start the test.
+  open_hold_s: 1.00 # Default 1.00; OPEN must be held this long to stop at any stage.
+  open_proportional_threshold: 0.50 # Default 0.50; minimum proportional OPEN activation for safety stop.
+  power_toggle_hold_s: 0.50 # Default 0.50; POWER hold time for force/wrist mode toggles.
+  power_rearm_s: 0.40 # Default 0.40; minimum seconds between accepted POWER toggles.
+  stale_timeout_s: 1.00 # Default 1.00; EMG older than this is treated as REST.
+
+hand: # Finger controller positions, velocities, and stop criteria.
+  open_positions: # Fully open finger positions in radians.
+    j_thumb_fle: 0.0 # Default 0.0; thumb open command.
+    j_index_fle: 0.0 # Default 0.0; index open command.
+    j_mrl_fle: 0.0 # Default 0.0; middle-ring-little open command.
+  max_closure_positions: # Safety stop if any finger reaches these positions before force contact.
+    j_thumb_fle: 1.5 # Default 1.5; thumb max closure in radians.
+    j_index_fle: 1.5 # Default 1.5; index max closure in radians.
+    j_mrl_fle: 1.5 # Default 1.5; middle-ring-little max closure in radians.
+  open_position_tolerance_rad: 0.08 # Default 0.08; open is complete when all fingers are within this error.
+  opening_min_s: 0.50 # Default 0.50; minimum time to keep open command active before checking completion.
+  opening_timeout_s: 4.00 # Default 4.00; force progress to wrist return after this many opening seconds.
+  closing_velocity_start_rad_s: 0.30 # Default 0.30; initial closure velocity.
+  closing_velocity_end_rad_s: 0.10 # Default 0.10; steady closure velocity after ramp.
+  closing_decay_steps: 5 # Default 5; number of velocity ramp steps.
+  closing_step_interval_s: 0.20 # Default 0.20; seconds between closure ramp steps.
+  hold_deadzone: 20.0 # Default 20.0; raw force error ignored during hold.
+  hold_min_overshoot: 20.0 # Default 20.0; minimum raw force error used for hold velocity scaling.
+  hold_max_overshoot: 150.0 # Default 150.0; raw force error that maps to max hold velocity.
+  hold_max_velocity_rad_s: 0.08 # Default 0.08; maximum finger velocity during force hold.
+
+force: # Force thresholds, target adjustment, and emergency safety.
+  contact_thresholds: # Raw normal force that marks first object contact.
+    j_thumb_fle: 300.0 # Default 300.0; thumb contact threshold in raw ADC units.
+    j_index_fle: 300.0 # Default 300.0; index contact threshold in raw ADC units.
+    j_mrl_fle: 300.0 # Default 300.0; middle-ring-little contact threshold in raw ADC units.
+  initial_hold_targets: # Raw normal force targets when force-hold starts.
+    j_thumb_fle: 300.0 # Default 300.0; thumb initial hold target.
+    j_index_fle: 300.0 # Default 300.0; index initial hold target.
+    j_mrl_fle: 300.0 # Default 300.0; middle-ring-little initial hold target.
+  target_min: 50.0 # Default 50.0; minimum target force allowed.
+  target_max: 500.0 # Default 500.0; maximum target force allowed.
+  adjustment_rate_up: 100.0 # Default 100.0; raw force target increase per second at full EMG proportional.
+  adjustment_rate_down: 200.0 # Default 200.0; raw force target decrease per second at full EMG proportional.
+  emergency_threshold: 800.0 # Default 800.0; immediate backoff if any normal force exceeds this raw value.
+  emergency_backoff_velocity_rad_s: -0.10 # Default -0.10; finger velocity command during emergency backoff.
+  stale_timeout_s: 1.00 # Default 1.00; force data older than this faults closing and hold stages.
+  require_force_data: true # Default true; require live force readings before and during closure.
+  haptic_percent_source: "measured_average" # Default measured_average; one of measured_average, measured_max, target_average.
+
+wrist: # Wrist positions, motion detection, and volitional control.
+  enabled: true # Default true; command and monitor the Dynamixel wrist.
+  horizontal_deg: 180.0 # Default 180.0; starting and return wrist angle for palm-down horizontal.
+  vertical_deg: 90.0 # Default 90.0; wrist angle for vertical open-hand orientation.
+  min_deg: 5.0 # Default 5.0; absolute minimum command sent to the wrist driver.
+  max_deg: 300.0 # Default 300.0; absolute maximum command sent to the wrist driver.
+  acceleration_deg_s2: 180.0 # Default 180.0; wrist acceleration command.
+  control_velocity_deg_s: 45.0 # Default 45.0; wrist-control speed at full EMG proportional.
+  position_tolerance_deg: 4.0 # Default 4.0; target is reached when wrist error is below this.
+  move_timeout_s: 8.0 # Default 8.0; transition after this even if wrist feedback is missing or late.
+  settle_s: 0.20 # Default 0.20; extra settle time after reaching a wrist target.
+  stale_timeout_s: 1.00 # Default 1.00; wrist feedback older than this is treated as stale.
+  assume_target_on_timeout: true # Default true; use move timeout as completion when feedback is absent.
+  return_after_open_delay_s: 3.00 # Default 3.00; wait after opening before rotating back horizontal.
+  vertical_delay_s: 3.00 # Default 3.00; wait after vertical wrist move before force closure.
+
+haptics: # Vibro8 motor mapping and event buzzes.
+  enabled: true # Default true; publish haptic motor commands.
+  motor_count: 8 # Default 8; number of haptic motors expected by the bridge.
+  publish_zero_when_idle: true # Default true; publish zero intensity outside active haptic stages.
+  event_motor_indices: [0, 1, 2, 3, 4, 5, 6, 7] # Default all 8; motors used for event buzzes.
+  activation_buzz_duration_s: 0.12 # Default 0.12; short light buzz after activation.
+  activation_buzz_intensity_pct: 12.0 # Default 12.0; light activation buzz intensity percent.
+  closure_start_buzz_duration_s: 0.15 # Default 0.15; brief buzz before force closure begins.
+  closure_start_buzz_intensity_pct: 22.0 # Default 22.0; closure start buzz intensity percent.
+  contact_buzz_duration_s: 0.20 # Default 0.20; brief buzz when force threshold is crossed.
+  contact_buzz_intensity_pct: 35.0 # Default 35.0; force-hold entry buzz intensity percent.
+  wrist_motor_angles_deg: [0.0, 45.0, 90.0, 135.0, 180.0, 225.0, 270.0, 315.0] # Default 8 evenly spaced motors; angular position of each motor.
+  wrist_thumb_offset_deg: 0.0 # Default 0.0; angular offset aligning wrist angle with the thumb direction on the band.
+  wrist_intensity_pct: 45.0 # Default 45.0; total wrist-position haptic intensity split across up to two motors.
+  wrist_min_motor_pct: 3.0 # Default 3.0; wrist motor intensities below this are set to zero.
+  force_min_grasp_force: 50.0 # Default 50.0; raw force mapped to 0 percent for force haptics.
+  force_max_grasp_force: 500.0 # Default 500.0; raw force mapped to 100 percent for force haptics.
+  force_phase_change_threshold_pct: 40.0 # Default 40.0; percent where mapping changes from adding motors to increasing intensity.
+  force_motor_step_pct: 5.0 # Default 5.0; add one motor per this force percent below phase threshold.
+  force_low_intensity_pct: 18.0 # Default 18.0; low buzz intensity used from 0 to 40 percent force.
+  force_high_intensity_pct: 85.0 # Default 85.0; all-motor intensity at 100 percent force.
+  force_motor_order: [0, 1, 2, 3, 4, 5, 6, 7] # Default natural order; motor activation sequence for 0 to 40 percent force.
+
+logging: # CSV output configuration.
+  output_dir: "/app/data/mia_haptic_force_test" # Default /app/data/mia_haptic_force_test; root output directory.
+  run_name_prefix: "mia_haptic_force_test" # Default mia_haptic_force_test; timestamped run directory prefix.
+  samples_csv: "samples.csv" # Default samples.csv; high-rate time-series file name.
+  events_csv: "events.csv" # Default events.csv; state transition and buzz event file name.
+  config_snapshot_yaml: "config_snapshot.yaml" # Default config_snapshot.yaml; copy of effective startup config.
+  flush_every_rows: 1 # Default 1; flush CSV files every N sample rows for crash-resistant logging.

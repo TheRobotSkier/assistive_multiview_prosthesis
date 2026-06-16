@@ -15,6 +15,7 @@ find_package(rclcpp_lifecycle REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(mia_hand_driver REQUIRED)
+find_package(mia_hand_msgs REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/${PROJECT_NAME}/mia_hand_system_interface.cpp
@@ -26,6 +27,7 @@ ament_target_dependencies(${PROJECT_NAME}
   hardware_interface
   pluginlib
   mia_hand_driver
+  mia_hand_msgs
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC
@@ -73,7 +75,7 @@ if(BUILD_TESTING)
 endif()
 
 ament_export_dependencies(rclcpp rclcpp_lifecycle hardware_interface
-	pluginlib mia_hand_driver)
+	pluginlib mia_hand_driver mia_hand_msgs)
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_package()

@@ -119,6 +119,23 @@ Role:
 - Map wrist angle, finger force, and pipeline state into Vibro8 motor commands
 - Send those commands over Bluetooth
 
+## Mia Haptic Force Test
+
+Main files:
+
+- `scripts/mia_haptic_force_test.py`
+- `config/mia_haptic_force_test.yaml`
+- `src/prosthesis_launch/launch/mia_haptic_force_test.launch.py`
+
+Role:
+
+- Run a no-camera bench test for EMG activation, wrist motion, force closure, force hold, wrist/force mode toggling, and Vibro8 haptic feedback
+- Start from open horizontal, accept EMG POWER activation, rotate to vertical, wait, close until force threshold, then hold force until OPEN is held
+- Publish all haptic output directly to `/haptic_band/motors`; do not launch `haptic_controller_node.py` in this mode because the test node owns the full 8-motor mapping
+- Log high-rate CSV samples and events under `data/mia_haptic_force_test/<run-id>/`
+
+The launch uses `mia_hand_ros2_control` rather than the raw `mia_hand_driver` plus `command_bridge` path. The ros2_control hardware interface now exposes fingertip normal force as joint `effort` and publishes raw normal/tangential force packets on `data_streams/fingers/forces/data` so the test can both control force-hold and record raw force data.
+
 ## EMG Collection, Training, And Latency Benchmarking
 
 Main package: `src/emg_bridge/`
