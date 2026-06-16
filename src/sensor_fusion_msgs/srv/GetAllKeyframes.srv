@@ -1,0 +1,16 @@
+# Query the keyframe buffer for ALL stored keyframes (optionally one camera).
+#
+# Unlike GetKeyframesInROI (which filters by a spherical region around a hit
+# point), this returns every keyframe in the buffer.  It is used by the TSDF
+# scene-preview node, which integrates the full workspace without a hit point
+# or segmentation.
+#
+# Reference: TSDF scene-preview plan (Phase 2).
+
+# Optional camera filter ("head", "arm", or empty for all cameras).
+string camera_id
+---
+# All stored keyframes (filtered by camera_id if non-empty).
+sensor_fusion_msgs/Keyframe[] keyframes
+# Number of keyframes returned (== len(keyframes)).
+int32 count

@@ -26,7 +26,11 @@ import numpy as np
 
 # Pure-logic helpers (ROS-free).
 from keyframe_buffer.keyframe import Keyframe
-from tsdf_fusion.tsdf_fusion_core import fuse_object_cloud, FuseResult
+from tsdf_fusion.tsdf_fusion_core import (
+    fuse_object_cloud,
+    fuse_scene_preview,
+    FuseResult,
+)
 
 
 __all__ = ["create_node", "main"]
@@ -286,6 +290,24 @@ DEFAULT_PARAMS = {
     "dbscan_min_points": 10,
     "output_topic": "/segmentation/object_cloud",
     "world_frame": "marker_map",
+    # ── Depth densification for sparse clouds ───────────────────────────
+    # Sparse keyframe clouds cover only 10-15 % of the image plane after
+    # decimation.  Splatting + hole-filling close intra-surface gaps so the
+    # Open3D TSDF ray-caster produces actual geometry instead of "NO GEOMETRY".
+    "depth_splat_radius_px": 2,
+    "depth_hole_fill_px": 5.0,
+    # ── Preview mode: timer-driven scene-level TSDF fusion ─────────────
+    # When preview_mode is True the node runs a lightweight 1 Hz loop that
+    # integrates ALL keyframes (no hit point, no SAM) and publishes a fused
+    # scene cloud.  See plans/2026-06-16-tsdf-scene-preview-fusion-1.0.md.
+    "preview_mode": False,
+    "preview_rate_hz": 1.0,
+    "preview_output_topic": "/fused_pointcloud",
+    "preview_keyframe_service": "/keyframe_buffer/get_all",
+    "preview_workspace_bbox_min": [-0.5, -0.5, -0.2],
+    "preview_workspace_bbox_max": [0.8, 0.5, 0.6],
+    "preview_enable_bbox_crop": True,
+    "preview_enable_dbscan_cleanup": True,
 }
 
 
@@ -295,9 +317,10 @@ def create_node():
 
     try:
         from sensor_fusion_msgs.srv import (
-            GetKeyframesInROI, TriggerGraspFusion)
+            GetKeyframesInROI, GetAllKeyframes, TriggerGraspFusion)
     except ImportError:
         GetKeyframesInROI = None  # type: ignore
+        GetAllKeyframes = None  # type: ignore
         TriggerGraspFusion = None  # type: ignore
 
     class TsdfFusionNode(Node):
@@ -305,6 +328,12 @@ def create_node():
 
         def __init__(self):
             super().__init__("tsdf_fusion")
+
+            # Reentrant callback group — required for service calls from
+            # inside timer callbacks (e.g. GetAllKeyframes in _preview_tick).
+            from rclpy.callback_groups import ReentrantCallbackGroup
+
+            self._reentrant_group = ReentrantCallbackGroup()
 
             # ── Declare parameters (V6 §6.9) ────────────────────────────
             for key, default in DEFAULT_PARAMS.items():
@@ -320,7 +349,21 @@ def create_node():
             self._dbscan_eps = float(p("dbscan_eps_m"))
             self._dbscan_min = int(p("dbscan_min_points"))
             self._world_frame = str(p("world_frame"))
+            self._depth_splat = int(p("depth_splat_radius_px"))
+            self._depth_hole_fill = float(p("depth_hole_fill_px"))
 
+            # ── Branch: preview mode vs. grasp mode ──────────────────────
+            self._preview_mode = bool(p("preview_mode"))
+
+            if self._preview_mode:
+                self._init_preview_mode(p)
+            else:
+                self._init_grasp_mode(p, TriggerGraspFusion, GetKeyframesInROI)
+
+        # ── Mode initialisers ──────────────────────────────────────────
+
+        def _init_grasp_mode(self, p, TriggerGraspFusion, GetKeyframesInROI):
+            """Initialise the on-demand grasp-fusion path (legacy V6)."""
             # ── SAM client ──────────────────────────────────────────────
             self._sam = SamHttpClient(
                 base_url=str(p("sam_inference_url")),
@@ -351,7 +394,8 @@ def create_node():
             self._kf_client = None
             if GetKeyframesInROI is not None:
                 self._kf_client = self.create_client(
-                    GetKeyframesInROI, str(p("keyframe_service")))
+                    GetKeyframesInROI, str(p("keyframe_service")),
+                    callback_group=self._reentrant_group)
 
             # ── Health check (non-blocking, self-cancelling) ──────────
             self._sam_healthy = None
@@ -360,10 +404,65 @@ def create_node():
                 0.5, self._startup_health_check)
 
             self.get_logger().info(
-                f"TsdfFusionNode ready "
+                f"TsdfFusionNode ready (GRASP mode) "
                 f"(voxel={self._voxel_size}m, trunc={self._sdf_trunc}m, "
                 f"dbscan_eps={self._dbscan_eps}m, "
                 f"shift={self._hit_shift}m)")
+
+        def _init_preview_mode(self, p):
+            """Initialise the timer-driven scene-preview path.
+
+            No SAM client, no TriggerGraspFusion service — just a periodic
+            loop that fetches all keyframes and integrates them.
+            """
+            self._sam = None
+            self._sam_healthy = None
+            self._health_done = True
+            self._health_timer = None
+
+            # Preview-specific parameters.
+            self._preview_rate_hz = float(p("preview_rate_hz"))
+            preview_output_topic = str(p("preview_output_topic"))
+            self._preview_enable_bbox_crop = bool(p("preview_enable_bbox_crop"))
+            self._preview_enable_dbscan = bool(p("preview_enable_dbscan_cleanup"))
+
+            if self._preview_enable_bbox_crop:
+                self._preview_bbox_min = np.asarray(
+                    p("preview_workspace_bbox_min"), dtype=np.float64).reshape(3)
+                self._preview_bbox_max = np.asarray(
+                    p("preview_workspace_bbox_max"), dtype=np.float64).reshape(3)
+            else:
+                self._preview_bbox_min = None
+                self._preview_bbox_max = None
+
+            # ── Publisher (replaces the legacy fusion's output topic) ────
+            self._pub = self.create_publisher(
+                PointCloud2, preview_output_topic, 10)
+
+            # ── GetAllKeyframes service client ──────────────────────────
+            self._kf_all_client = None
+            if GetAllKeyframes is not None:
+                self._kf_all_client = self.create_client(
+                    GetAllKeyframes,
+                    str(p("preview_keyframe_service")),
+                    callback_group=self._reentrant_group)
+            else:
+                self.get_logger().warn(
+                    "sensor_fusion_msgs not available — GetAllKeyframes "
+                    "client disabled (build sensor_fusion_msgs first)")
+
+            # ── Preview timer ───────────────────────────────────────────
+            period = 1.0 / max(self._preview_rate_hz, 1e-3)
+            self._preview_timer = self.create_timer(
+                period, self._preview_tick,
+                callback_group=self._reentrant_group)
+
+            self.get_logger().info(
+                f"TsdfFusionNode ready (PREVIEW mode) "
+                f"(rate={self._preview_rate_hz} Hz, "
+                f"output={preview_output_topic}, "
+                f"bbox_crop={self._preview_enable_bbox_crop}, "
+                f"dbscan={self._preview_enable_dbscan})")
 
         # ── Health check ───────────────────────────────────────────────
 
@@ -437,6 +536,8 @@ def create_node():
                 dbscan_min_points=self._dbscan_min,
                 hit_point_shift=self._hit_shift,
                 mask_dilation=self._mask_dilation,
+                depth_splat_radius_px=self._depth_splat,
+                depth_hole_fill_px=self._depth_hole_fill,
             )
 
             elapsed_ms = (time.monotonic() - t0) * 1000.0
@@ -488,18 +589,106 @@ def create_node():
 
             try:
                 future = self._kf_client.call_async(req)
-                rclpy.spin_until_complete(self, future, timeout_sec=10.0)
+                start = time.monotonic()
+                while not future.done():
+                    if time.monotonic() - start > 10.0:
+                        self.get_logger().error(
+                            "Keyframe service call timed out.",
+                            throttle_duration_sec=10.0)
+                        return None
+                    time.sleep(0.05)
             except Exception as exc:
                 self.get_logger().error(f"Keyframe service call failed: {exc}")
-                return None
-
-            if future.result() is None:
-                self.get_logger().error("Keyframe service call timed out.")
                 return None
 
             resp = future.result()
             keyframes = [_keyframe_from_msg(m) for m in resp.keyframes]
             return keyframes
+
+        def _fetch_all_keyframes(self) -> Optional[List[Keyframe]]:
+            """Call ``GetAllKeyframes`` and deserialise the result.
+
+            Used by the preview timer.  Returns ``None`` on service failure,
+            or a (possibly empty) list of keyframes on success.
+            """
+            if self._kf_all_client is None:
+                self.get_logger().error(
+                    "GetAllKeyframes client not created.", throttle_duration_sec=10.0)
+                return None
+            if not self._kf_all_client.service_is_ready():
+                if not self._kf_all_client.wait_for_service(timeout_sec=2.0):
+                    self.get_logger().error(
+                        "GetAllKeyframes service not available.",
+                        throttle_duration_sec=10.0)
+                    return None
+
+            req = GetAllKeyframes.Request()
+            # Empty camera_id → all cameras.
+            req.camera_id = ""
+
+            try:
+                future = self._kf_all_client.call_async(req)
+                start = time.monotonic()
+                while not future.done():
+                    if time.monotonic() - start > 10.0:
+                        self.get_logger().error(
+                            "GetAllKeyframes call timed out.",
+                            throttle_duration_sec=10.0)
+                        return None
+                    time.sleep(0.05)
+            except Exception as exc:
+                self.get_logger().error(
+                    f"GetAllKeyframes call failed: {exc}",
+                    throttle_duration_sec=10.0)
+                return None
+
+            resp = future.result()
+            keyframes = [_keyframe_from_msg(m) for m in resp.keyframes]
+            return keyframes
+
+        # ── Preview timer callback ─────────────────────────────────────
+
+        def _preview_tick(self):
+            """One cycle of scene-preview fusion (timer-driven)."""
+            t0 = time.monotonic()
+
+            keyframes = self._fetch_all_keyframes()
+            if keyframes is None:
+                # Service error already logged (throttled).
+                return
+
+            if len(keyframes) == 0:
+                self.get_logger().debug(
+                    "Preview: no keyframes yet — waiting for data.")
+                return
+
+            result = fuse_scene_preview(
+                keyframes=keyframes,
+                voxel_size=self._voxel_size,
+                sdf_trunc=self._sdf_trunc,
+                workspace_bbox_min=self._preview_bbox_min,
+                workspace_bbox_max=self._preview_bbox_max,
+                dbscan_eps=self._dbscan_eps,
+                dbscan_min_points=self._dbscan_min,
+                enable_dbscan_cleanup=self._preview_enable_dbscan,
+                depth_splat_radius_px=self._depth_splat,
+                depth_hole_fill_px=self._depth_hole_fill,
+            )
+
+            elapsed_ms = (time.monotonic() - t0) * 1000.0
+
+            if result.success and result.xyz.shape[0] > 0:
+                header = self._make_header()
+                cloud_msg = _build_xyzrgb_cloud(result.xyz, result.rgb, header)
+                self._pub.publish(cloud_msg)
+                self.get_logger().info(
+                    f"Preview: fused {result.xyz.shape[0]} points from "
+                    f"{len(keyframes)} keyframes in {elapsed_ms:.0f}ms")
+            else:
+                self.get_logger().info(
+                    f"Preview: NO GEOMETRY (success={result.success}, "
+                    f"points={result.xyz.shape[0]}, msg='{result.message}') "
+                    f"from {len(keyframes)} keyframes in {elapsed_ms:.0f}ms")
 
         @staticmethod
         def _pose_for_camera(keyframes: List[Keyframe], camera_id: str,
@@ -525,13 +714,21 @@ def create_node():
 
 
 def main(args=None):
-    """Entry point for the ``tsdf_fusion_node`` console script."""
+    """Entry point for the ``tsdf_fusion_node`` console script.
+
+    Uses a MultiThreadedExecutor so that service calls from inside timer
+    callbacks can be processed on a different thread.
+    """
     (rclpy, *_rest) = _import_ros()
     rclpy.init(args=args)
     NodeClass = create_node()
     node = NodeClass()
     try:
-        rclpy.spin(node)
+        from rclpy.executors import MultiThreadedExecutor
+
+        executor = MultiThreadedExecutor(num_threads=2)
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:

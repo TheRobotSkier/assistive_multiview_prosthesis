@@ -163,6 +163,14 @@ class OpenVINSOdomTFRelay(Node):
         # running the V6 GTSAM tracker with broadcast_tf=true so the two
         # nodes don't fight over the same TF edges (V6 §6.3).
         self.declare_parameter("publish_dynamic_tf", True)
+        # When True, the relay looks up the ArUco-corrected TF frames
+        # (marker_map -> *_imu_openvins_corrected) and rebroadcasts them
+        # as the raw *_imu edges.  This gives downstream consumers the
+        # more stable ArUco-corrected trajectory instead of raw VIO.
+        # Only takes effect when publish_dynamic_tf is also True.
+        # Falls back to publishing from raw odom if the corrected frame
+        # is not available in the TF buffer.
+        self.declare_parameter("use_corrected_tf", False)
 
         # ── Read parameters ───────────────────────────────────────────────
         head_odom_topic = self.get_parameter("head_odom_topic").value
@@ -199,6 +207,7 @@ class OpenVINSOdomTFRelay(Node):
         self._max_pose_norm_m = self.get_parameter("max_pose_norm_m").value
         self._max_pose_jump_m = self.get_parameter("max_pose_jump_m").value
         self._publish_dynamic_tf = self.get_parameter("publish_dynamic_tf").value
+        self._use_corrected_tf = self.get_parameter("use_corrected_tf").value
 
         # ── TF2 buffer for self-calibration lookups ───────────────────────
         self._tf_buffer = Buffer()
@@ -306,7 +315,8 @@ class OpenVINSOdomTFRelay(Node):
             f"(via {head_odom_topic}), "
             f"{self._target_frame} -> {self._arm_imu} "
             f"(via {arm_odom_topic}), "
-            f"publish_dynamic_tf={self._publish_dynamic_tf}"
+            f"publish_dynamic_tf={self._publish_dynamic_tf}, "
+            f"use_corrected_tf={self._use_corrected_tf}"
         )
 
     def _on_head_odom(self, msg: Odometry):
@@ -430,7 +440,36 @@ class OpenVINSOdomTFRelay(Node):
                     f"Relay #{count} ({name}): publish_dynamic_tf=False — "
                     f"deferring {parent} -> {child} to GTSAM tracker"
                 )
-        else:
+            return
+
+        # ── Corrected TF republishing ───────────────────────────────────
+        # When use_corrected_tf=True, look up the ArUco-corrected frame
+        # (e.g. marker_map -> head_imu_openvins_corrected) and rebroadcast
+        # it as the raw frame name.  This replaces the jumping raw VIO
+        # trajectory with the more stable ArUco-corrected one transparently.
+        corrected_frame = f"{child}_openvins_corrected"
+        published_corrected = False
+        if self._use_corrected_tf:
+            try:
+                host_stamp = self.get_clock().now().to_msg()
+                # Look up the corrected transform.
+                tf_corrected = self._tf_buffer.lookup_transform(
+                    parent, corrected_frame, rclpy.time.Time(),
+                    timeout=rclpy.duration.Duration(seconds=0.1))
+                # Rebroadcast the corrected transform under the raw child frame.
+                rebroadcast = TransformStamped()
+                rebroadcast.header.stamp = host_stamp
+                rebroadcast.header.frame_id = parent
+                rebroadcast.child_frame_id = child
+                rebroadcast.transform = tf_corrected.transform
+                self._tf_broadcaster.sendTransform(rebroadcast)
+                published_corrected = True
+            except Exception:
+                # Corrected frame not available; fall through to raw odom path.
+                pass
+
+        # ── Raw odom TF broadcast (fallback when corrected unavailable) ──
+        if not published_corrected:
             # Stamp with the host clock so all edges in the TF chain
             # (relay, bridge, camera mounts) share the same time domain.
             # Using the Jetson odom timestamp created a ~10s clock gap that

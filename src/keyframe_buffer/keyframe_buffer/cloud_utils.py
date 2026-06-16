@@ -32,8 +32,10 @@ __all__ = [
     "mask_unorganized_cloud",
     "mask_organized_cloud",
     "build_depth_image",
+    "fill_depth_holes",
     "project_3d_to_2d",
     "lookup_depth_3d",
+    "lookup_depth_from_image",
     "project_points_to_pixels",
 ]
 
@@ -191,6 +193,7 @@ def build_depth_image(
     H: int,
     W: int,
     mask: np.ndarray | None = None,
+    splat_radius_px: int = 0,
 ) -> np.ndarray:
     """Rasterise an unorganised cloud into an ``(H, W)`` float32 depth image.
 
@@ -210,6 +213,11 @@ def build_depth_image(
     mask : ndarray (H, W) or None
         Optional pre-mask to reduce work.  When provided, points whose
         projected pixel is outside the mask are discarded *before* rasterising.
+    splat_radius_px : int
+        When > 0, each point is splatted into a small disk of this radius
+        (in pixels) instead of a single pixel.  This dramatically improves
+        fill-rate for sparse clouds (e.g. decimated keyframe clouds that
+        cover only 10-15 % of the image plane).  Default 0 (single pixel).
 
     Returns
     -------
@@ -237,8 +245,85 @@ def build_depth_image(
 
     # Z-buffer: sort far-to-near so near overwrites far.
     order = np.argsort(-z)
-    depth[v[order], u[order]] = z[order].astype(np.float32)
+    u_o = u[order]
+    v_o = v[order]
+    z_o = z[order].astype(np.float32)
+
+    if splat_radius_px <= 0:
+        depth[v_o, u_o] = z_o
+    else:
+        # Splat each point into a small disk.  Process far-to-near so near
+        # points always overwrite far ones (correct z-buffer behaviour).
+        r = int(splat_radius_px)
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                if dx * dx + dy * dy > r * r:
+                    continue
+                vi = np.clip(v_o + dy, 0, H - 1)
+                ui = np.clip(u_o + dx, 0, W - 1)
+                depth[vi, ui] = z_o
     return depth
+
+
+# ---------------------------------------------------------------------------
+# Depth-image hole filling (for TSDF integration of sparse clouds)
+# ---------------------------------------------------------------------------
+
+def fill_depth_holes(
+    depth: np.ndarray,
+    max_fill_distance_px: float = 5.0,
+) -> np.ndarray:
+    """Fill zero-depth pixels using nearest-neighbour propagation.
+
+    Sparse point clouds rasterised by :func:`build_depth_image` leave many
+    pixels at zero depth.  The Open3D TSDF integrator casts a ray through
+    every pixel — rays hitting zero-depth pixels produce no surface update,
+    so the volume stays empty ("NO GEOMETRY").
+
+    This function propagates the depth of the nearest valid pixel into each
+    hole, up to *max_fill_distance_px* Euclidean pixels away.  Holes farther
+    than the threshold are left at zero (they are likely genuine gaps, not
+    sampling artefacts).
+
+    Uses :func:`scipy.ndimage.distance_transform_edt` — O(H×W), no Python
+    loops.
+
+    Parameters
+    ----------
+    depth : ndarray (H, W)
+        Depth image in metres (0 = no depth).
+    max_fill_distance_px : float
+        Maximum Euclidean pixel distance to propagate a depth value.  Holes
+        farther than this from any valid pixel remain at zero.  Set to 0 or
+        negative to disable filling.  Default 5.0.
+
+    Returns
+    -------
+    filled : ndarray (H, W) float32
+        Depth image with small holes filled.
+    """
+    depth = np.asarray(depth, dtype=np.float32)
+    valid = depth > 0
+
+    # Trivial cases — nothing to fill.
+    if np.all(valid) or not np.any(valid):
+        return depth
+
+    if max_fill_distance_px <= 0:
+        return depth
+
+    from scipy.ndimage import distance_transform_edt
+
+    # distance_transform_edt(~valid): for each hole pixel (True in ~valid),
+    # returns the distance to and index of the nearest valid pixel (False in
+    # ~valid, i.e. where depth > 0).
+    dists, (nearest_v, nearest_u) = distance_transform_edt(
+        ~valid, return_indices=True)
+
+    holes = (~valid) & (dists <= float(max_fill_distance_px))
+    filled = depth.copy()
+    filled[holes] = depth[nearest_v[holes], nearest_u[holes]]
+    return filled
 
 
 # ---------------------------------------------------------------------------
@@ -369,3 +454,59 @@ def lookup_depth_3d(
     best = np.argmin(perp)
     idx_front = np.where(front)[0]
     return pts[idx_front[best]]
+
+
+# ---------------------------------------------------------------------------
+# Depth lookup from a depth image (for SIFT keypoint depth)
+# ---------------------------------------------------------------------------
+
+def lookup_depth_from_image(
+    depth_image: np.ndarray,
+    u: int,
+    v: int,
+    K: np.ndarray,
+    max_depth_m: float = 10.0,
+) -> np.ndarray | None:
+    """Get the 3-D point at pixel ``(u, v)`` from a depth image.
+
+    This is the preferred method when depth images are available directly
+    (e.g. from a Jetson depth relay).  No ray-casting is needed — the depth
+    at pixel (u,v) is read directly and back-projected into 3-D.
+
+    Parameters
+    ----------
+    depth_image : ndarray (H, W)
+        Depth image in metres (float32 or float64).  0 or NaN means no depth.
+    u, v : int
+        Pixel coordinates.
+    K : ndarray (3, 3)
+        Camera intrinsics::
+
+            K = [[fx,  0,  cx],
+                 [ 0, fy,  cy],
+                 [ 0,  0,   1]]
+
+    max_depth_m : float
+        Maximum valid depth (metres).  Default 10.0.
+
+    Returns
+    -------
+    point : ndarray (3,) or None
+        3-D point in the camera optical frame (``(x, y, z)`` with z along
+        the optical axis), or ``None`` if the depth is invalid / too far.
+    """
+    H, W = depth_image.shape[:2]
+    if not (0 <= v < H and 0 <= u < W):
+        return None
+
+    z = float(depth_image[v, u])
+    if z <= 0.0 or not np.isfinite(z) or z > max_depth_m:
+        return None
+
+    fx, fy = float(K[0, 0]), float(K[1, 1])
+    cx, cy = float(K[0, 2]), float(K[1, 2])
+
+    x = (u - cx) * z / fx
+    y = (v - cy) * z / fy
+
+    return np.array([x, y, z], dtype=np.float64)

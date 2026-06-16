@@ -1,0 +1,476 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-16-13-49-02-504739-KingBob-6344
+[INFO] [launch]: Default logging verbosity is set to INFO
+[pipeline] fusion_mode='tsdf_preview'
+[pipeline] fusion_mode='tsdf_preview' — launching tsdf_fusion (preview_mode=True)
+[INFO] [pipeline_manager_node-1]: process started with pid [6348]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [6349]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [6350]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [6351]
+[INFO] [odom_to_pose_relay-5]: process started with pid [6352]
+[INFO] [openvins_odom_tf_relay-6]: process started with pid [6353]
+[INFO] [pipeline_diagnostics_node-7]: process started with pid [6354]
+[INFO] [gtsam_tracker_node-8]: process started with pid [6355]
+[INFO] [keyframe_buffer_node-9]: process started with pid [6356]
+[INFO] [sift_feature_node-10]: process started with pid [6357]
+[INFO] [tsdf_fusion_node-11]: process started with pid [6358]
+[INFO] [twist_propagation_node-12]: process started with pid [6359]
+[INFO] [preshaping_service_bridge_node-13]: process started with pid [6360]
+[INFO] [grasp_proximity_controller_node.py-14]: process started with pid [6361]
+[INFO] [rviz2-15]: process started with pid [6362]
+[preshaping_service_bridge_node-13] [INFO] [1781617743.185107089] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-13] [INFO] [1781617743.188688100] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-15] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[pipeline_manager_node-1] [INFO] [1781617744.212489013] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781617744.214457377] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tsdf_fusion_node-11] [INFO] [1781617744.546419549] [tsdf_fusion]: TsdfFusionNode ready (PREVIEW mode) (rate=1.0 Hz, output=/fused_pointcloud, bbox_crop=True, dbscan=True)
+[openvins_odom_tf_relay-6] [WARN] [1781617744.814240090] [openvins_odom_tf_relay]: OpenVINS odometry TF relay active: marker_map -> head_imu (via /jetson/head/odom), marker_map -> arm_imu (via /jetson/arm/odom), publish_dynamic_tf=False
+[tf_pipeline_diagnostics-4] [INFO] [1781617744.955514919] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[pipeline_diagnostics_node-7] Exception ignored in: <function TransformListener.__del__ at 0x73a4c86667a0>
+[pipeline_diagnostics_node-7] Traceback (most recent call last):
+[pipeline_diagnostics_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/tf2_ros/transform_listener.py", line 106, in __del__
+[pipeline_diagnostics_node-7]     self.unregister()
+[pipeline_diagnostics_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/tf2_ros/transform_listener.py", line 112, in unregister
+[pipeline_diagnostics_node-7]     self.node.destroy_subscription(self.tf_static_sub)
+[pipeline_diagnostics_node-7]     ^^^^^^^^^
+[pipeline_diagnostics_node-7] AttributeError: 'TransformListener' object has no attribute 'node'
+[pipeline_diagnostics_node-7] Traceback (most recent call last):
+[pipeline_diagnostics_node-7]   File "/prosthesis_ws/install/camera/lib/camera/pipeline_diagnostics_node", line 33, in <module>
+[pipeline_diagnostics_node-7]     sys.exit(load_entry_point('camera==0.1.0', 'console_scripts', 'pipeline_diagnostics_node')())
+[pipeline_diagnostics_node-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pipeline_diagnostics_node-7]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/pipeline_diagnostics_node.py", line 418, in main
+[pipeline_diagnostics_node-7]     node = NodeClass()
+[pipeline_diagnostics_node-7]            ^^^^^^^^^^^
+[pipeline_diagnostics_node-7]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/pipeline_diagnostics_node.py", line 170, in __init__
+[pipeline_diagnostics_node-7]     self._tf_listener = TransformListener(self._tf_buffer)
+[pipeline_diagnostics_node-7]                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pipeline_diagnostics_node-7] TypeError: TransformListener.__init__() missing 1 required positional argument: 'node'
+[pipeline_manager_node-1] [INFO] [1781617745.216675951] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[keyframe_buffer_node-9] [INFO] [1781617745.284361956] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_in_roi
+[keyframe_buffer_node-9] [INFO] [1781617745.287025450] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_all
+[keyframe_buffer_node-9] [INFO] [1781617745.298853074] [keyframe_buffer]: KeyframeBufferNode ready (max_kf/cam=50, gate_t=0.1m, gate_r=15.0deg)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781617745.377847700] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781617745.378827358] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[ERROR] [pipeline_diagnostics_node-7]: process has died [pid 6354, exit code 1, cmd '/prosthesis_ws/install/camera/lib/camera/pipeline_diagnostics_node --ros-args -r __node:=pipeline_diagnostics --params-file /tmp/launch_params_cji_2x9j'].
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781617745.480849948] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781617745.482628138] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781617745.483462079] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[tsdf_fusion_node-11] [ERROR] [1781617745.499310058] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617745.500824647] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[camera_mount_tf_publisher-3] [INFO] [1781617745.527539907] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1781617745.530928827] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[gtsam_tracker_node-8] [INFO] [1781617745.596262528] [gtsam_tracker]: TF broadcasting enabled (marker_map → head_imu, arm_imu)
+[gtsam_tracker_node-8] [INFO] [1781617745.620927415] [gtsam_tracker]: GtsamTrackerNode ready (rate=15.0Hz, lag=15.0s, head_source=odom, broadcast_tf=True)
+[grasp_proximity_controller_node.py-14] [INFO] [1781617745.666368396] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-14] [INFO] [1781617745.700900752] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[twist_propagation_node-12] [INFO] [1781617745.821370116] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-12] [INFO] [1781617745.868910506] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-12] [INFO] [1781617745.871451414] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[sift_feature_node-10] [INFO] [1781617745.954165225] [cross_camera_features]: SiftFeatureNode ready (backend=sift, min_matches=5, slop=0.05s)
+[keyframe_buffer_node-9] [INFO] [1781617746.499799709] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[rviz2-15] [INFO] [1781617746.731336938] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781617746.731541037] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[rviz2-15] [INFO] [1781617746.807089328] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781617746.996468801] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781617746.997440130] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781617747.041862684] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781617747.043117833] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781617747.192490053] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781617747.259174158] [rviz2]: Stereo is NOT SUPPORTED
+[keyframe_buffer_node-9] [INFO] [1781617747.498687825] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617748.494048208] [keyframe_buffer]: arm cloud: height=1 -> UNORGANIZED
+[keyframe_buffer_node-9] [INFO] [1781617748.499414315] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617748.508599993] [keyframe_buffer]: head cloud: height=1 -> UNORGANIZED
+[keyframe_buffer_node-9] [INFO] [1781617749.501348198] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617750.502077234] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617751.506240934] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617752.500815069] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617753.499953280] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617754.504526689] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617754.790184347] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[tsdf_fusion_node-11] [ERROR] [1781617755.501099131] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617755.502016704] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617755.619390420] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[sift_feature_node-10] [INFO] [1781617755.939913951] [cross_camera_features]: frames=5, published=0
+[keyframe_buffer_node-9] [INFO] [1781617756.500204077] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[tf_pipeline_diagnostics-4] [WARN] [1781617756.974683705] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[keyframe_buffer_node-9] [INFO] [1781617757.504224254] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617758.500188902] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617759.518996282] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617760.500029495] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617761.523139964] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617762.500023276] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617763.500312258] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617764.501863097] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617764.789772901] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[keyframe_buffer_node-9] [INFO] [1781617765.500112778] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617765.619294967] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[sift_feature_node-10] [INFO] [1781617765.935762564] [cross_camera_features]: frames=11, published=0
+[tsdf_fusion_node-11] [ERROR] [1781617766.499689988] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617766.499907444] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[tf_pipeline_diagnostics-4] [WARN] [1781617766.971391418] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[keyframe_buffer_node-9] [INFO] [1781617767.502138377] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617768.508709263] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617769.504706159] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617770.501851101] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617771.499330148] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617772.499697587] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617773.476013439] [openvins_odom_tf_relay]: head: OpenVINS initialized (covariance), publishing TF marker_map -> head_imu (p=(0.125, 0.052, 0.138), cov_trace=1.46e-04, pos_norm=0.193m, elapsed=28.7s, actual_imu_frame='head_imu')
+[keyframe_buffer_node-9] [INFO] [1781617773.501356384] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617774.504680118] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 2 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617774.794242965] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: OK (166 msgs), arm: WAITING (0 msgs)
+[tf_pipeline_diagnostics-4] [INFO] [1781617774.940029191] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[keyframe_buffer_node-9] [INFO] [1781617775.512396040] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 3 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617775.624033149] [gtsam_tracker]: Stats: published=20 odom(head=196, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.623m, arm=-1.000m) clock_offset(head=0.023s, arm=-1.000s)
+[sift_feature_node-10] [INFO] [1781617775.941451838] [cross_camera_features]: frames=19, published=0
+[tsdf_fusion_node-11] [ERROR] [1781617776.501581615] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617776.521788629] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 4 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617777.533597038] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 7 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617778.542850773] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 9 keyframes
+[gtsam_tracker_node-8] [WARN] [1781617779.356726328] [gtsam_tracker]: No ArUco messages received after 5s — running on odometry + visual factors only
+[keyframe_buffer_node-9] [INFO] [1781617779.544393117] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 11 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617780.569698344] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 14 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617781.584796271] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 16 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617782.572599735] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 19 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617783.592699505] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 21 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617784.581618984] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 23 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617784.789224305] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: OK (3340 msgs), arm: WAITING (0 msgs)
+[tf_pipeline_diagnostics-4] [INFO] [1781617784.940083187] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617785.631061059] [gtsam_tracker]: Stats: published=150 odom(head=1801, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.597m, arm=-1.000m) clock_offset(head=0.028s, arm=-1.000s)
+[keyframe_buffer_node-9] [INFO] [1781617785.633432468] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 25 keyframes
+[sift_feature_node-10] [INFO] [1781617785.935981955] [cross_camera_features]: frames=19, published=0
+[tsdf_fusion_node-11] [ERROR] [1781617786.502346579] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617786.648105050] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 26 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617787.594674485] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 28 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617788.591783288] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 29 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617789.653561968] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 30 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617790.607809721] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 30 keyframes
+[sift_feature_node-10] [WARN] [1781617791.515491715] [cross_camera_features]: Consistently < 5 SIFT matches (0). Consider SuperPoint upgrade.
+[keyframe_buffer_node-9] [INFO] [1781617791.575339320] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 31 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617791.887442473] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.059, 0.007, 0.227), cov_trace=1.08e-02, pos_norm=0.235m, elapsed=47.1s, actual_imu_frame='arm_imu')
+[grasp_proximity_controller_node.py-14] [INFO] [1781617791.893237867] [proximity_controller]: Received first hand pose — control loop now active
+[keyframe_buffer_node-9] [INFO] [1781617792.602398554] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 31 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617793.582561599] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 32 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617793.687133901] [openvins_odom_tf_relay]: arm odom pose jumped 1.064m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [WARN] [1781617793.760468638] [gtsam_tracker]: Rejecting odometry delta — head jump 0.002m, arm jump 1.063m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[keyframe_buffer_node-9] [INFO] [1781617794.693418182] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 32 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617794.937654175] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617795.623282277] [gtsam_tracker]: Stats: published=149 odom(head=3265, arm=312) visual=1 delta_rejects=1 resets=0 pose_norm(head=0.628m, arm=0.600m) clock_offset(head=0.050s, arm=0.063s)
+[keyframe_buffer_node-9] [INFO] [1781617795.626021789] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 34 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617795.689769124] [openvins_odom_tf_relay]: arm odom pose jumped 1.069m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781617795.935655117] [cross_camera_features]: frames=21, published=1
+[tsdf_fusion_node-11] [ERROR] [1781617796.505412292] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617796.609447272] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 34 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617797.664272822] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 38 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617797.716019058] [openvins_odom_tf_relay]: arm odom pose jumped 1.099m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617798.681442593] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 39 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617799.652481005] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 39 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617799.717771193] [openvins_odom_tf_relay]: arm odom pose jumped 1.090m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617800.688690836] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 41 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617801.620951651] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 42 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617801.723969195] [openvins_odom_tf_relay]: arm odom pose jumped 1.152m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617802.657951323] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 42 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617803.652820444] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 43 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617803.735535879] [openvins_odom_tf_relay]: arm odom pose jumped 1.211m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617804.657866728] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 44 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617804.938701260] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617805.644036346] [gtsam_tracker]: Stats: published=137 odom(head=4235, arm=1294) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.567m, arm=0.625m) clock_offset(head=0.129s, arm=0.140s)
+[keyframe_buffer_node-9] [INFO] [1781617805.684128977] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 44 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617805.736386455] [openvins_odom_tf_relay]: arm odom pose jumped 1.118m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781617805.941874154] [cross_camera_features]: frames=21, published=1
+[keyframe_buffer_node-9] [INFO] [1781617806.630833346] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 45 keyframes
+[tsdf_fusion_node-11] [ERROR] [1781617807.500310265] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617807.669297768] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 46 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617807.738098129] [openvins_odom_tf_relay]: arm odom pose jumped 1.131m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617808.638407366] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 46 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617809.669207370] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 46 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617809.741735368] [openvins_odom_tf_relay]: arm odom pose jumped 1.183m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617810.658888585] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617811.685509409] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[rviz2-15] [INFO] [1781617811.696602413] [rviz2]: Subscribing to: /jetson/head/points
+[rviz2-15] 
+[openvins_odom_tf_relay-6] [WARN] [1781617811.743447680] [openvins_odom_tf_relay]: arm odom pose jumped 1.202m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617812.771959865] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[rviz2-15] [INFO] [1781617813.016562493] [rviz2]: Subscribing to: /jetson/arm/points
+[rviz2-15] 
+[keyframe_buffer_node-9] [INFO] [1781617813.706656940] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617813.764143071] [openvins_odom_tf_relay]: arm odom pose jumped 1.199m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617814.763242308] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617814.938102191] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617815.623549614] [gtsam_tracker]: Stats: published=131 odom(head=5305, arm=2388) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.568m, arm=0.657m) clock_offset(head=0.042s, arm=0.043s)
+[keyframe_buffer_node-9] [INFO] [1781617815.759412674] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617815.764444947] [openvins_odom_tf_relay]: arm odom pose jumped 1.199m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781617815.938248088] [cross_camera_features]: frames=21, published=1
+[keyframe_buffer_node-9] [INFO] [1781617816.679484046] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tsdf_fusion_node-11] [ERROR] [1781617817.502908466] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617817.695365530] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617817.766430418] [openvins_odom_tf_relay]: arm odom pose jumped 1.204m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617818.659135039] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617819.656207578] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617819.782629459] [openvins_odom_tf_relay]: arm odom pose jumped 1.111m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617820.632899605] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617821.691910337] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617821.794023259] [openvins_odom_tf_relay]: arm odom pose jumped 1.048m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617822.711586181] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617823.692103387] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617823.887051810] [openvins_odom_tf_relay]: arm odom pose jumped 1.063m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617824.680316290] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617824.948017026] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[keyframe_buffer_node-9] [INFO] [1781617825.685704098] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617825.752741252] [gtsam_tracker]: Stats: published=121 odom(head=6171, arm=3268) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.569m, arm=0.548m) clock_offset(head=0.194s, arm=0.195s)
+[openvins_odom_tf_relay-6] [WARN] [1781617825.915545794] [openvins_odom_tf_relay]: arm odom pose jumped 1.051m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781617825.936575332] [cross_camera_features]: frames=21, published=1
+[keyframe_buffer_node-9] [INFO] [1781617826.712560960] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617827.715113684] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617827.917723164] [openvins_odom_tf_relay]: arm odom pose jumped 1.050m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-11] [ERROR] [1781617828.500422671] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617828.706388532] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617829.644003027] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617829.920321717] [openvins_odom_tf_relay]: arm odom pose jumped 1.063m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617830.665221181] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617831.651944304] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617831.924396352] [openvins_odom_tf_relay]: arm odom pose jumped 1.056m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617832.684557645] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617833.636262308] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617833.925279795] [openvins_odom_tf_relay]: arm odom pose jumped 0.960m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617834.667162958] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617834.938009586] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617835.627151951] [gtsam_tracker]: Stats: published=118 odom(head=7098, arm=4202) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.566m, arm=0.552m) clock_offset(head=0.098s, arm=0.090s)
+[keyframe_buffer_node-9] [INFO] [1781617835.677682982] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617835.925923250] [openvins_odom_tf_relay]: arm odom pose jumped 1.074m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781617835.936530132] [cross_camera_features]: frames=21, published=1
+[keyframe_buffer_node-9] [INFO] [1781617836.650274190] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617837.691311935] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617837.958217569] [openvins_odom_tf_relay]: arm odom pose jumped 1.129m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-11] [ERROR] [1781617838.503065247] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617838.725691809] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617839.707391392] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617839.970420200] [openvins_odom_tf_relay]: arm odom pose jumped 1.138m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617840.666685471] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617841.651593400] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617841.989815555] [openvins_odom_tf_relay]: arm odom pose jumped 1.137m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617842.666020726] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617843.674917575] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617843.990349971] [openvins_odom_tf_relay]: arm odom pose jumped 1.127m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617844.721944324] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617844.939498007] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[keyframe_buffer_node-9] [INFO] [1781617845.680351223] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617845.705800587] [gtsam_tracker]: Stats: published=104 odom(head=7870, arm=4997) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.591m, arm=0.614m) clock_offset(head=0.226s, arm=0.227s)
+[sift_feature_node-10] [INFO] [1781617845.935764471] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617846.000562338] [openvins_odom_tf_relay]: arm odom pose jumped 1.130m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617846.671666918] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 50 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617847.839615997] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617848.002607921] [openvins_odom_tf_relay]: arm odom pose jumped 1.147m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-11] [ERROR] [1781617848.565110387] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617848.709386187] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617849.645740853] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617850.019860100] [openvins_odom_tf_relay]: arm odom pose jumped 1.137m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617850.693727727] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617851.716109992] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617852.031508098] [openvins_odom_tf_relay]: arm odom pose jumped 1.132m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617852.653424453] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617853.705800666] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617854.035267538] [openvins_odom_tf_relay]: arm odom pose jumped 1.120m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617854.708524756] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617854.938962014] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617855.658136896] [gtsam_tracker]: Stats: published=99 odom(head=8543, arm=5662) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.583m, arm=0.591m) clock_offset(head=0.276s, arm=0.273s)
+[keyframe_buffer_node-9] [INFO] [1781617855.694277917] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[sift_feature_node-10] [INFO] [1781617855.935729921] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617856.069229393] [openvins_odom_tf_relay]: arm odom pose jumped 1.129m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617856.655845313] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617857.672632910] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617858.113857118] [openvins_odom_tf_relay]: arm odom pose jumped 1.124m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617858.685615672] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[tsdf_fusion_node-11] [ERROR] [1781617859.502714062] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617859.676383466] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617860.117901146] [openvins_odom_tf_relay]: arm odom pose jumped 1.152m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617860.661869419] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617861.682069591] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617862.150043817] [openvins_odom_tf_relay]: arm odom pose jumped 1.139m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617862.668388169] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617863.710299426] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617864.162716941] [openvins_odom_tf_relay]: arm odom pose jumped 1.150m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617864.684711049] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617864.940616139] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617865.629236494] [gtsam_tracker]: Stats: published=89 odom(head=9208, arm=6336) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.573m, arm=0.620m) clock_offset(head=0.157s, arm=0.153s)
+[keyframe_buffer_node-9] [INFO] [1781617865.779514857] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[sift_feature_node-10] [INFO] [1781617865.935557764] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617866.167072868] [openvins_odom_tf_relay]: arm odom pose jumped 1.141m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617866.693317861] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617867.670244049] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617868.182300204] [openvins_odom_tf_relay]: arm odom pose jumped 1.170m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617868.679312358] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617869.688258511] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617870.191729194] [openvins_odom_tf_relay]: arm odom pose jumped 1.168m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-11] [ERROR] [1781617870.505684229] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617870.682457461] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617871.651049279] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617872.191981831] [openvins_odom_tf_relay]: arm odom pose jumped 1.159m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617872.661945780] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617873.666521675] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617874.193107996] [openvins_odom_tf_relay]: arm odom pose jumped 1.181m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617874.665066901] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617874.943625207] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[keyframe_buffer_node-9] [INFO] [1781617875.680600978] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617875.890209654] [gtsam_tracker]: Stats: published=88 odom(head=9989, arm=7126) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.577m, arm=0.647m) clock_offset(head=0.335s, arm=0.327s)
+[sift_feature_node-10] [INFO] [1781617875.937402682] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617876.194266372] [openvins_odom_tf_relay]: arm odom pose jumped 1.208m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617876.698772908] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617877.657948836] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617878.215879436] [openvins_odom_tf_relay]: arm odom pose jumped 1.207m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617878.743546839] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617879.751133409] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617880.223421839] [openvins_odom_tf_relay]: arm odom pose jumped 1.196m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617880.716682731] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[tsdf_fusion_node-11] [ERROR] [1781617881.499325406] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617881.674868085] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617882.264065820] [openvins_odom_tf_relay]: arm odom pose jumped 1.202m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617882.689743769] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617883.741897030] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617884.272048430] [openvins_odom_tf_relay]: arm odom pose jumped 1.209m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617884.671083642] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617884.938198266] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617885.625743636] [gtsam_tracker]: Stats: published=80 odom(head=10658, arm=7784) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.597m, arm=0.636m) clock_offset(head=0.039s, arm=0.048s)
+[keyframe_buffer_node-9] [INFO] [1781617885.678196895] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[sift_feature_node-10] [INFO] [1781617885.936445293] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617886.279031638] [openvins_odom_tf_relay]: arm odom pose jumped 1.159m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617886.724931156] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617887.676231204] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617888.287622609] [openvins_odom_tf_relay]: arm odom pose jumped 1.167m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617888.665136848] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617889.677154180] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617890.310746736] [openvins_odom_tf_relay]: arm odom pose jumped 1.183m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617890.762430082] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[tsdf_fusion_node-11] [ERROR] [1781617891.560398903] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617891.768505980] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617892.310955701] [openvins_odom_tf_relay]: arm odom pose jumped 1.173m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617892.718682742] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617893.682372963] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617894.313575469] [openvins_odom_tf_relay]: arm odom pose jumped 1.178m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617894.704307714] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617894.938522606] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[keyframe_buffer_node-9] [INFO] [1781617895.673590422] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617895.836567580] [gtsam_tracker]: Stats: published=79 odom(head=11246, arm=8372) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.579m, arm=0.623m) clock_offset(head=0.298s, arm=0.293s)
+[sift_feature_node-10] [INFO] [1781617895.935371015] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617896.314615518] [openvins_odom_tf_relay]: arm odom pose jumped 1.153m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617896.672884268] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617897.661849898] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617898.316136591] [openvins_odom_tf_relay]: arm odom pose jumped 1.179m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617898.674462840] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 51 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617899.658524387] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617900.334729383] [openvins_odom_tf_relay]: arm odom pose jumped 1.204m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617900.743218214] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617901.707274207] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617902.363273908] [openvins_odom_tf_relay]: arm odom pose jumped 1.207m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-11] [ERROR] [1781617902.507684948] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617902.686808620] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617903.717574984] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617904.367570317] [openvins_odom_tf_relay]: arm odom pose jumped 1.203m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617904.678921789] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617904.937380958] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617905.646857226] [gtsam_tracker]: Stats: published=76 odom(head=11821, arm=8946) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.603m, arm=0.668m) clock_offset(head=0.101s, arm=0.099s)
+[keyframe_buffer_node-9] [INFO] [1781617905.702516003] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[sift_feature_node-10] [INFO] [1781617905.946186190] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617906.393251642] [openvins_odom_tf_relay]: arm odom pose jumped 1.167m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617906.730956524] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617907.763161627] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617908.448668778] [openvins_odom_tf_relay]: arm odom pose jumped 1.209m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617908.845938198] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617909.690331421] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617910.451595778] [openvins_odom_tf_relay]: arm odom pose jumped 1.196m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617910.720200843] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617911.682900093] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617912.454405215] [openvins_odom_tf_relay]: arm odom pose jumped 1.216m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617912.687763960] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[tsdf_fusion_node-11] [ERROR] [1781617913.499179722] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617913.670781221] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617914.464004844] [openvins_odom_tf_relay]: arm odom pose jumped 1.198m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617914.700416088] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617914.936861837] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[keyframe_buffer_node-9] [INFO] [1781617915.747428061] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617915.909045369] [gtsam_tracker]: Stats: published=80 odom(head=12483, arm=9620) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.604m, arm=0.653m) clock_offset(head=0.348s, arm=0.352s)
+[sift_feature_node-10] [INFO] [1781617915.939608224] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617916.549578463] [openvins_odom_tf_relay]: arm odom pose jumped 1.202m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617916.712687841] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617917.751471174] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 52 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617918.579232292] [openvins_odom_tf_relay]: arm odom pose jumped 1.204m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617918.712006260] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617919.658985624] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617920.588471425] [openvins_odom_tf_relay]: arm odom pose jumped 1.125m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617920.692028131] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617921.685378371] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617922.589464085] [openvins_odom_tf_relay]: arm odom pose jumped 0.795m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617922.683485674] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617923.669827346] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[tsdf_fusion_node-11] [ERROR] [1781617924.500113511] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[openvins_odom_tf_relay-6] [WARN] [1781617924.605911809] [openvins_odom_tf_relay]: arm odom pose jumped 0.931m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617924.690781764] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617924.940651187] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[keyframe_buffer_node-9] [INFO] [1781617925.760591312] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617925.842927192] [gtsam_tracker]: Stats: published=73 odom(head=13090, arm=10205) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.596m, arm=0.533m) clock_offset(head=0.104s, arm=0.109s)
+[sift_feature_node-10] [INFO] [1781617925.941780197] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617926.610194568] [openvins_odom_tf_relay]: arm odom pose jumped 0.958m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617926.699984922] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617927.689207648] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617928.645148364] [openvins_odom_tf_relay]: arm odom pose jumped 0.944m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617928.689073238] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617929.716958032] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617930.647791452] [openvins_odom_tf_relay]: arm odom pose jumped 0.909m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617930.671156538] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617931.669251560] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617932.650154247] [openvins_odom_tf_relay]: arm odom pose jumped 0.898m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617932.711258586] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617933.686959329] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[tsdf_fusion_node-11] [ERROR] [1781617934.502095543] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[openvins_odom_tf_relay-6] [WARN] [1781617934.650453645] [openvins_odom_tf_relay]: arm odom pose jumped 0.892m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617934.732376255] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617934.944033495] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781617935.627411593] [gtsam_tracker]: Stats: published=66 odom(head=13715, arm=10830) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.563m, arm=0.461m) clock_offset(head=0.086s, arm=0.086s)
+[keyframe_buffer_node-9] [INFO] [1781617935.694416423] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 53 keyframes
+[sift_feature_node-10] [INFO] [1781617935.936684692] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617936.653853036] [openvins_odom_tf_relay]: arm odom pose jumped 0.891m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617936.753181594] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617937.785075559] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617938.659122380] [openvins_odom_tf_relay]: arm odom pose jumped 0.890m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617938.698578045] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617939.679742199] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617940.661656058] [openvins_odom_tf_relay]: arm odom pose jumped 0.887m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617940.715288811] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617941.705624683] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617942.662952170] [openvins_odom_tf_relay]: arm odom pose jumped 0.888m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617942.674666244] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617943.723556049] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617944.670101611] [openvins_odom_tf_relay]: arm odom pose jumped 0.885m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617944.701096911] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617944.938564667] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[tsdf_fusion_node-11] [ERROR] [1781617945.499256562] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[keyframe_buffer_node-9] [INFO] [1781617945.726262055] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[gtsam_tracker_node-8] [INFO] [1781617945.754400773] [gtsam_tracker]: Stats: published=68 odom(head=14324, arm=11443) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.564m, arm=0.453m) clock_offset(head=0.379s, arm=0.374s)
+[sift_feature_node-10] [INFO] [1781617945.946155196] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617946.670199872] [openvins_odom_tf_relay]: arm odom pose jumped 0.882m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617946.690521072] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617947.741809430] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617948.675450252] [openvins_odom_tf_relay]: arm odom pose jumped 0.881m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617948.681399396] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 54 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617949.700217502] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617950.677967201] [openvins_odom_tf_relay]: arm odom pose jumped 0.879m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617950.685355629] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617951.734359789] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617952.705873646] [openvins_odom_tf_relay]: arm odom pose jumped 0.878m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617952.709356862] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes
+[keyframe_buffer_node-9] [INFO] [1781617953.692923275] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617954.706526351] [openvins_odom_tf_relay]: arm odom pose jumped 0.877m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617954.716303290] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781617954.943146266] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[tsdf_fusion_node-11] [ERROR] [1781617955.585046501] [tsdf_fusion]: GetAllKeyframes call failed: Executor is already spinning
+[gtsam_tracker_node-8] [INFO] [1781617955.647233958] [gtsam_tracker]: Stats: published=65 odom(head=14843, arm=11965) visual=0 delta_rejects=0 resets=0 pose_norm(head=1.954m, arm=0.442m) clock_offset(head=0.134s, arm=0.131s)
+[openvins_odom_tf_relay-6] [WARN] [1781617955.665219158] [openvins_odom_tf_relay]: head odom pose norm 2.00m exceeds max 2.0m — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617955.930718083] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes
+[sift_feature_node-10] [INFO] [1781617955.935505286] [cross_camera_features]: frames=21, published=1
+[openvins_odom_tf_relay-6] [WARN] [1781617956.712280277] [openvins_odom_tf_relay]: arm odom pose jumped 0.875m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617956.829800357] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781617957.670049321] [openvins_odom_tf_relay]: head odom pose norm 3.53m exceeds max 2.0m — suppressing TF
+[keyframe_buffer_node-9] [INFO] [1781617957.746471221] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 55 keyframes

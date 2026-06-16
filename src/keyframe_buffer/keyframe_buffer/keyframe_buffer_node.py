@@ -108,7 +108,8 @@ DEFAULT_PARAMS = {
     "max_keyframes_per_camera": 50,
     "spatial_gate_translation_m": 0.10,
     "spatial_gate_rotation_deg": 15.0,
-    "pose_max_age_s": 0.05,
+    "pose_max_age_s": 0.10,
+    "cloud_timestamp_source": "header",  # "header" or "receive_time"
 }
 
 
@@ -529,9 +530,11 @@ def create_node():
     try:
         from sensor_fusion_msgs.msg import Keyframe as KeyframeMsg
         from sensor_fusion_msgs.srv import GetKeyframesInROI
+        from sensor_fusion_msgs.srv import GetAllKeyframes
     except ImportError:
         KeyframeMsg = None  # type: ignore
         GetKeyframesInROI = None  # type: ignore
+        GetAllKeyframes = None  # type: ignore
     from builtin_interfaces.msg import Time
     from geometry_msgs.msg import Pose
 
@@ -583,7 +586,7 @@ def create_node():
                     PoseWithCovarianceStamped, pose_topic,
                     lambda msg, c=cam: self._on_pose(msg, c), 10)
 
-            # ── Service ──────────────────────────────────────────────────
+            # ── Service: GetKeyframesInROI ────────────────────────────
             if GetKeyframesInROI is not None:
                 self._srv = self.create_service(
                     GetKeyframesInROI,
@@ -598,16 +601,36 @@ def create_node():
                     "sensor_fusion_msgs not available — GetKeyframesInROI "
                     "service disabled (build sensor_fusion_msgs first)")
 
+            # ── Service: GetAllKeyframes (scene-preview fusion) ─────────
+            if GetAllKeyframes is not None:
+                self._srv_all = self.create_service(
+                    GetAllKeyframes,
+                    "~/get_all",
+                    self._handle_get_all_keyframes,
+                )
+                self.get_logger().info(
+                    "Service advertised: /keyframe_buffer/get_all")
+            else:
+                self._srv_all = None
+                self.get_logger().warn(
+                    "sensor_fusion_msgs not available — GetAllKeyframes "
+                    "service disabled (build sensor_fusion_msgs first)")
+
             # ── Diagnostics publisher ────────────────────────────────────
             self._diag_pub = self.create_publisher(
                 DiagnosticArray, "~/diagnostics", 10)
             self.create_timer(5.0, self._publish_diagnostics)
 
+            self._use_receive_time = (
+                str(p("cloud_timestamp_source")).strip().lower() == "receive_time"
+            )
+
             self.get_logger().info(
                 f"KeyframeBufferNode ready "
                 f"(max_kf/cam={self._core.max_keyframes_per_camera}, "
                 f"gate_t={self._core.spatial_gate_translation_m}m, "
-                f"gate_r={np.rad2deg(self._core.spatial_gate_rotation_rad):.1f}deg)")
+                f"gate_r={np.rad2deg(self._core.spatial_gate_rotation_rad):.1f}deg, "
+                f"cloud_ts={'RECEIVE_TIME' if self._use_receive_time else 'header'})")
 
         # ── Callbacks ──────────────────────────────────────────────────
 
@@ -625,7 +648,10 @@ def create_node():
                     f"{camera_id} cloud: height={msg.height} -> "
                     f"{'ORGANIZED' if organized else 'UNORGANIZED'}")
 
-            stamp = _stamp_to_float(msg.header.stamp)
+            stamp = (
+                time.time() if self._use_receive_time
+                else _stamp_to_float(msg.header.stamp)
+            )
             self._core._state[camera_id].cloud = msg
             self._core._state[camera_id].cloud_stamp = stamp
 
@@ -694,6 +720,28 @@ def create_node():
             self.get_logger().info(
                 f"GetKeyframesInROI(center={center.tolist()}, "
                 f"r={radius:.3f}) -> {response.count} keyframes")
+            return response
+
+        def _handle_get_all_keyframes(self, request, response):
+            """Return all stored keyframes (optionally one camera).
+
+            Used by the TSDF scene-preview node, which integrates the full
+            workspace without a hit point.
+            """
+            camera_id = str(request.camera_id).strip() if request.camera_id else None
+            keyframes = self._core.all_keyframes(camera_id=camera_id)
+
+            if KeyframeMsg is not None:
+                response.keyframes = [
+                    _keyframe_to_msg(
+                        kf, KeyframeMsg, PointCloud2, PointField, Image,
+                        CameraInfo, Pose, Time)
+                    for kf in keyframes
+                ]
+            response.count = len(keyframes)
+            self.get_logger().info(
+                f"GetAllKeyframes(camera_id={camera_id!r}) -> "
+                f"{response.count} keyframes")
             return response
 
         # ── Diagnostics ────────────────────────────────────────────────

@@ -14,6 +14,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Keyframe.msg"
   "msg/MarkerPoseObservation.msg"
   "srv/GetKeyframesInROI.srv"
+  "srv/GetAllKeyframes.srv"
   "srv/TriggerGraspFusion.srv"
   DEPENDENCIES builtin_interfaces geometry_msgs std_msgs sensor_msgs
 )

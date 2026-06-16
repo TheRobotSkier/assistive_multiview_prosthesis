@@ -118,14 +118,14 @@ run: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
 	cd /prosthesis_ws && \
 	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	$(ROS_WORKSPACE_SETUP) && \
-	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
+	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview
 
 run-camera: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
 	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	$(ROS_WORKSPACE_SETUP) && \
-	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview
 
 run-camera-log: ## Same as run-camera but tees all output to logs/host-log-<timestamp>.txt
 	@$(ROS_SETUP) && \
@@ -135,7 +135,17 @@ run-camera-log: ## Same as run-camera but tees all output to logs/host-log-<time
 	mkdir -p /prosthesis_ws/logs && \
 	LOG_FILE=/prosthesis_ws/logs/host-log-$$(date +%Y%m%d_%H%M%S).txt && \
 	echo "=== Logging to $$LOG_FILE ===" && \
-	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true 2>&1 | tee $$LOG_FILE
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview 2>&1 | tee $$LOG_FILE
+
+run-camera-log-debug: ## Same as run-camera-log but launches the pipeline_diagnostics node (TF jump / rate / divergence monitor)
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
+	mkdir -p /prosthesis_ws/logs && \
+	LOG_FILE=/prosthesis_ws/logs/host-log-$$(date +%Y%m%d_%H%M%S).txt && \
+	echo "=== Logging to $$LOG_FILE (with pipeline_diagnostics) ===" && \
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview debug_monitor:=true 2>&1 | tee $$LOG_FILE
 
 # ── Rosbag recording (in-container) ─────────────────────────────────────────
 # These targets run entirely inside the container — no host involvement, so

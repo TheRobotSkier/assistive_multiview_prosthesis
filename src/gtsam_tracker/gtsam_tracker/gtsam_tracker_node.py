@@ -683,23 +683,27 @@ def create_node():
         def _publish_poses(self):
             """Query the graph and publish head/arm poses.
 
-            Poses are stamped with the latest sensor time (not host publish
-            time) so downstream consumers (keyframe_buffer, pointcloud_fusion)
-            can align them with sensor data under chrony time sync.
+            Each pose is stamped with its own camera's latest sensor time (not
+            host publish time) so downstream consumers (keyframe_buffer,
+            pointcloud_fusion) can align them with sensor data under chrony
+            time sync.  Using per-camera stamps (rather than ``max(head,arm)``)
+            prevents TF extrapolation errors when one camera's odom stamp is
+            ahead of the other's cloud stamp.
             """
             kh = self._graph._make_key("h", max(self._key_idx - 1, 0))
             ka = self._graph._make_key("a", max(self._key_idx - 1, 0))
 
-            # Use the most recent sensor stamp available so the published pose
-            # is temporally consistent with the sensor data that produced it.
-            sensor_stamp_f = max(self._head_stamp, self._arm_stamp)
-            if sensor_stamp_f <= 0.0:
-                sensor_stamp_f = time.time()
+            # Use each camera's own latest sensor stamp so the published pose
+            # is temporally consistent with that camera's sensor data.
+            head_stamp_f = (self._head_stamp
+                            if self._head_stamp > 0 else time.time())
+            arm_stamp_f = (self._arm_stamp
+                           if self._arm_stamp > 0 else time.time())
 
             try:
                 head_pose3 = self._graph.get_pose(kh)
                 self._publish_pose(
-                    head_pose3, self._head_pub, sensor_stamp_f,
+                    head_pose3, self._head_pub, head_stamp_f,
                     child_frame=self._head_child_frame)
             except Exception:
                 pass  # Key may not exist yet
@@ -707,7 +711,7 @@ def create_node():
             try:
                 arm_pose3 = self._graph.get_pose(ka)
                 self._publish_pose(
-                    arm_pose3, self._arm_pub, sensor_stamp_f,
+                    arm_pose3, self._arm_pub, arm_stamp_f,
                     child_frame=self._arm_child_frame)
             except Exception:
                 pass

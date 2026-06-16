@@ -89,6 +89,24 @@ def _launch_setup(context, *args, **kwargs):
     model_dir = LaunchConfiguration("model_dir").perform(context)
     require_dual_openvins = _as_bool(context, "require_dual_openvins")
     use_tsdf_fusion = _as_bool(context, "use_tsdf_fusion")
+    debug_monitor = _as_bool(context, "debug_monitor")
+
+    # ── Resolve fusion_mode (with backward-compat for use_tsdf_fusion) ──
+    # fusion_mode controls which fusion pipeline runs:
+    #   "legacy"      → pointcloud_fusion + segmentation_bridge (default)
+    #   "tsdf_preview"→ tsdf_fusion in preview mode (no hit point / SAM),
+    #                   replaces pointcloud_fusion on /fused_pointcloud
+    #   "tsdf_grasp"  → tsdf_fusion in grasp mode (on-demand, needs SAM),
+    #                   keeps pointcloud_fusion for the live cloud
+    fusion_mode = LaunchConfiguration("fusion_mode").perform(context)
+    if use_tsdf_fusion and fusion_mode == "legacy":
+        # Backward compat: use_tsdf_fusion=true maps to tsdf_grasp.
+        fusion_mode = "tsdf_grasp"
+    if fusion_mode not in ("legacy", "tsdf_preview", "tsdf_grasp"):
+        print(f"[pipeline] WARNING: unknown fusion_mode={fusion_mode!r}, "
+              f"falling back to 'legacy'")
+        fusion_mode = "legacy"
+    print(f"[pipeline] fusion_mode={fusion_mode!r}")
 
     if require_dual_openvins:
         print("[pipeline] INFO: require_dual_openvins=true — "
@@ -279,13 +297,6 @@ def _launch_setup(context, *args, **kwargs):
         camera_nodes.extend(
             [
                 Node(
-                    package="pointcloud_fusion",
-                    executable="pointcloud_fusion_node",
-                    name="pointcloud_fusion",
-                    parameters=[fusion_params],
-                    output="screen",
-                ),
-                Node(
                     package="camera",
                     executable="odom_to_pose_relay",
                     name="odom_to_pose_relay",
@@ -313,7 +324,38 @@ def _launch_setup(context, *args, **kwargs):
             ]
         )
 
+        # ── Legacy pointcloud fusion ────────────────────────────────────
+        # In tsdf_preview mode the tsdf_fusion node publishes the fused cloud
+        # on /fused_pointcloud, so the legacy node is skipped.  In tsdf_grasp
+        # mode the legacy node provides the live cloud for twist propagation
+        # while tsdf_fusion handles on-demand grasp reconstruction.
+        if fusion_mode in ("legacy", "tsdf_grasp"):
+            camera_nodes.append(
+                Node(
+                    package="pointcloud_fusion",
+                    executable="pointcloud_fusion_node",
+                    name="pointcloud_fusion",
+                    parameters=[fusion_params],
+                    output="screen",
+                )
+            )
+
         # ── V6 Phase 4: new perception nodes ──────────────────────────
+        # Pipeline diagnostics — passive cross-node TF/topic monitor.
+        # Watches /tf, /tf_static, and key topics, logging periodic
+        # summaries of TF jumps, staleness, topic rates, pose divergence,
+        # and chain connectivity.  Enabled with debug_monitor:=true.
+        if debug_monitor:
+            camera_nodes.append(
+                Node(
+                    package="camera",
+                    executable="pipeline_diagnostics_node",
+                    name="pipeline_diagnostics",
+                    parameters=[_node_params(config, "pipeline_diagnostics")],
+                    output="screen",
+                )
+            )
+
         # GTSAM trajectory tracker (factor graph smoother)
         camera_nodes.append(
             Node(
@@ -347,26 +389,30 @@ def _launch_setup(context, *args, **kwargs):
             )
         )
 
-        # TSDF fusion node (replaces segmentation_bridge when enabled)
-        if use_tsdf_fusion:
+        # TSDF fusion node
+        # - tsdf_preview: preview_mode=true (timer-driven, no SAM)
+        # - tsdf_grasp:   preview_mode=false (on-demand, needs SAM)
+        if fusion_mode in ("tsdf_preview", "tsdf_grasp"):
+            tsdf_params = _node_params(config, "tsdf_fusion")
+            tsdf_params["preview_mode"] = (fusion_mode == "tsdf_preview")
             camera_nodes.append(
                 Node(
                     package="tsdf_fusion",
                     executable="tsdf_fusion_node",
                     name="tsdf_fusion",
-                    parameters=[_node_params(config, "tsdf_fusion")],
+                    parameters=[tsdf_params],
                     output="screen",
                 )
             )
-            print("[pipeline] use_tsdf_fusion=true — launching tsdf_fusion "
-                  "instead of segmentation_bridge")
+            print(f"[pipeline] fusion_mode={fusion_mode!r} — launching "
+                  f"tsdf_fusion (preview_mode={tsdf_params['preview_mode']})")
 
         nodes.extend(camera_nodes)
 
     # Segmentation ROS bridge (talks to inference server over HTTP)
     # Subscribes directly to /fused_pointcloud via remapping.
-    # When use_tsdf_fusion=true, the tsdf_fusion node replaces this.
-    if not use_tsdf_fusion:
+    # Skipped in both tsdf modes (tsdf_fusion replaces it).
+    if fusion_mode == "legacy":
         nodes.append(
             Node(
                 package="segmentation_bridge",
@@ -561,6 +607,25 @@ def generate_launch_description():
                             "segmentation bridge. When true, launches "
                             "tsdf_fusion, keyframe_buffer, gtsam_tracker, and "
                             "cross_camera_features nodes.",
+            ),
+            DeclareLaunchArgument(
+                "fusion_mode",
+                default_value="legacy",
+                description="Fusion mode: 'legacy' (pointcloud_fusion + "
+                            "segmentation_bridge), 'tsdf_preview' (TSDF scene "
+                            "preview at ~1 Hz, no hit point / SAM), "
+                            "'tsdf_grasp' (on-demand TSDF at grasp time). "
+                            "When use_tsdf_fusion=true and fusion_mode=legacy, "
+                            "fusion_mode is overridden to 'tsdf_grasp' for "
+                            "backward compatibility.",
+            ),
+            DeclareLaunchArgument(
+                "debug_monitor",
+                default_value="false",
+                description="Launch the pipeline_diagnostics node — a passive "
+                            "observer that logs TF jump detection, topic rates, "
+                            "pose divergence, clock offset, and TF chain "
+                            "connectivity every 5 seconds.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]

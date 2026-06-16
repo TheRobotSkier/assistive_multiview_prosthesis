@@ -254,7 +254,7 @@ class PointCloudFusionNode(Node):
         # cloud stamp and the TF stamp are in the same time domain.  A small
         # tolerance accommodates the case where a cloud arrives slightly
         # before its corresponding TF has been broadcast (V6 §6.3).
-        self.declare_parameter("transform_tolerance_s", 0.1)
+        self.declare_parameter("transform_tolerance_s", 0.15)
         # When True, measure cloud age by the cloud's header stamp (sensor
         # time) rather than arrival time.  Requires chrony time sync between
         # Jetson and host so the clocks share a time domain.  This makes the

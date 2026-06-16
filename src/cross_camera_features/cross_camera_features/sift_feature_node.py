@@ -21,7 +21,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 # Pure-logic helpers (Phase 1 Task B + C).
-from keyframe_buffer.cloud_utils import lookup_depth_3d
+from keyframe_buffer.cloud_utils import lookup_depth_3d, lookup_depth_from_image
 from gtsam_tracker.umeyama import umeyama
 
 
@@ -161,7 +161,9 @@ def match_and_align(
     min_matches: int = 5,
     top_k: int = 100,
     ratio_threshold: float = 0.8,
-    depth_search_radius_m: float = 0.02,
+    depth_search_radius_m: float = 0.10,
+    head_depth_image: np.ndarray | None = None,
+    arm_depth_image: np.ndarray | None = None,
 ) -> AlignResult:
     """Pure-logic SIFT match + depth lookup + Umeyama alignment.  No ROS.
 
@@ -184,6 +186,10 @@ def match_and_align(
         Lowe's ratio test threshold.
     depth_search_radius_m : float
         Ray search radius for unorganised depth lookup.
+    head_depth_image, arm_depth_image : ndarray (H, W) or None
+        Optional depth images in metres.  When provided, depth is read
+        directly from the image (pixel-indexed) instead of ray-casting
+        the point cloud.  Prefer this path when depth images are available.
 
     Returns
     -------
@@ -219,16 +225,27 @@ def match_and_align(
         u_a = int(round(kp_arm[t_idx].pt[0]))
         v_a = int(round(kp_arm[t_idx].pt[1]))
 
-        p3d_h = lookup_depth_3d(
-            head_cloud, head_organized, u_h, v_h,
-            K=head_K if not head_organized else None,
-            pose=head_pose if not head_organized else None,
-            search_radius_m=depth_search_radius_m)
-        p3d_a = lookup_depth_3d(
-            arm_cloud, arm_organized, u_a, v_a,
-            K=arm_K if not arm_organized else None,
-            pose=arm_pose if not arm_organized else None,
-            search_radius_m=depth_search_radius_m)
+        # Depth lookup: prefer depth images if available (direct pixel lookup),
+        # otherwise fall back to ray-casting on the point cloud.
+        if head_depth_image is not None:
+            p3d_cam = lookup_depth_from_image(head_depth_image, u_h, v_h, head_K)
+            p3d_h = (head_pose[:3, :3] @ p3d_cam + head_pose[:3, 3]) if p3d_cam is not None else None
+        else:
+            p3d_h = lookup_depth_3d(
+                head_cloud, head_organized, u_h, v_h,
+                K=head_K if not head_organized else None,
+                pose=head_pose if not head_organized else None,
+                search_radius_m=depth_search_radius_m)
+
+        if arm_depth_image is not None:
+            p3d_cam = lookup_depth_from_image(arm_depth_image, u_a, v_a, arm_K)
+            p3d_a = (arm_pose[:3, :3] @ p3d_cam + arm_pose[:3, 3]) if p3d_cam is not None else None
+        else:
+            p3d_a = lookup_depth_3d(
+                arm_cloud, arm_organized, u_a, v_a,
+                K=arm_K if not arm_organized else None,
+                pose=arm_pose if not arm_organized else None,
+                search_radius_m=depth_search_radius_m)
 
         if p3d_h is not None and p3d_a is not None:
             p_head_list.append(np.asarray(p3d_h, dtype=np.float64))
@@ -266,6 +283,8 @@ DEFAULT_PARAMS = {
     "arm_image_topic": "/jetson/arm/image",
     "head_cloud_topic": "/jetson/head/points",
     "arm_cloud_topic": "/jetson/arm/points",
+    "head_depth_image_topic": "/jetson/head/depth",
+    "arm_depth_image_topic": "/jetson/arm/depth",
     "head_info_topic": "/jetson/head/camera_info",
     "arm_info_topic": "/jetson/arm/camera_info",
     "head_pose_topic": "/gtsam/head_pose",
@@ -276,7 +295,7 @@ DEFAULT_PARAMS = {
     "min_matches": 5,
     "top_k_matches": 100,
     "ratio_threshold": 0.8,
-    "depth_search_radius_m": 0.02,
+    "depth_search_radius_m": 0.10,
     "backend": "sift",
     "world_frame": "marker_map",
 }
@@ -478,6 +497,8 @@ def create_node():
             self._arm_K = None
             self._head_pose = None
             self._arm_pose = None
+            self._head_depth = None  # (H, W) float32 depth image
+            self._arm_depth = None
 
             # Cloud / info / pose subscriptions (independent, like the
             # keyframe buffer).  BEST_EFFORT — Jetson relay publishes BEST_EFFORT.
@@ -496,6 +517,9 @@ def create_node():
                 self.create_subscription(
                     PoseWithCovarianceStamped, str(p(f"{cam}_pose_topic")),
                     lambda msg, c=cam: self._on_pose(msg, c), best_effort)
+                self.create_subscription(
+                    Image, str(p(f"{cam}_depth_image_topic")),
+                    lambda msg, c=cam: self._on_depth(msg, c), best_effort)
 
             # ── Synced image pair (ApproximateTimeSynchronizer) ─────────
             sync_slop = float(p("sync_slop_s"))
@@ -542,6 +566,22 @@ def create_node():
             else:
                 self._arm_K = K
 
+        def _on_depth(self, msg: Image, cam: str):
+            """Cache depth image (16-bit mono, metres)."""
+            import numpy as np
+            raw = np.frombuffer(bytes(msg.data), dtype=np.uint8)
+            if msg.encoding in ("16UC1", "mono16"):
+                arr = raw.view(np.uint16).reshape(msg.height, msg.width)
+                depth_m = arr.astype(np.float32) * 0.001  # mm -> m
+            elif msg.encoding in ("32FC1",):
+                depth_m = raw.view(np.float32).reshape(msg.height, msg.width)
+            else:
+                return  # unsupported encoding
+            if cam == "head":
+                self._head_depth = depth_m
+            else:
+                self._arm_depth = depth_m
+
         def _on_pose(self, msg: PoseWithCovarianceStamped, cam: str):
             T = _pose_to_matrix(msg)
             if cam == "head":
@@ -579,6 +619,8 @@ def create_node():
                 top_k=self._top_k,
                 ratio_threshold=self._ratio,
                 depth_search_radius_m=self._depth_radius,
+                head_depth_image=self._head_depth,
+                arm_depth_image=self._arm_depth,
             )
 
             if result.T is not None and result.num_matches >= self._min_matches:

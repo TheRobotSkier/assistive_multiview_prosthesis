@@ -28,6 +28,7 @@ import numpy as np
 # These modules have ZERO ROS imports.
 from keyframe_buffer.cloud_utils import (
     build_depth_image,
+    fill_depth_holes,
     mask_organized_cloud,
     mask_unorganized_cloud,
     project_3d_to_2d,
@@ -36,6 +37,7 @@ from keyframe_buffer.cloud_utils import (
 __all__ = [
     "shift_inward",
     "fuse_object_cloud",
+    "fuse_scene_preview",
     "FuseResult",
 ]
 
@@ -147,6 +149,8 @@ def fuse_object_cloud(
     dbscan_min_points: int = 10,
     hit_point_shift: float = 0.015,
     mask_dilation: int = 15,
+    depth_splat_radius_px: int = 2,
+    depth_hole_fill_px: float = 5.0,
 ) -> FuseResult:
     """Pure-logic TSDF fusion.  No ROS imports.
 
@@ -176,6 +180,15 @@ def fuse_object_cloud(
         Inward shift distance (metres) for the SAM prompt.
     mask_dilation : int
         Dilation (pixels) passed to ``sam_segment_fn``.
+    depth_splat_radius_px : int
+        Each rasterised cloud point is splatted into a disk of this radius
+        (pixels) in the depth image.  Sparse clouds cover only 10-15 % of the
+        image plane; splatting closes intra-surface gaps so the TSDF
+        integrator's rays hit valid depth.  Default 2.  Set 0 to disable.
+    depth_hole_fill_px : float
+        After splatting, remaining zero-depth pixels within this Euclidean
+        distance (pixels) of a valid pixel are filled by nearest-neighbour
+        propagation.  Default 5.0.  Set 0 or negative to disable.
 
     Returns
     -------
@@ -256,9 +269,15 @@ def fuse_object_cloud(
             continue
 
         # 4d. Build a depth image by rasterising the masked points.
-        depth = build_depth_image(masked_xyz, K, pose, H, W)
+        #     Splat each point into a small disk so sparse clouds fill enough
+        #     pixels for the TSDF ray-caster, then nearest-neighbour fill the
+        #     remaining small holes.
+        depth = build_depth_image(
+            masked_xyz, K, pose, H, W,
+            splat_radius_px=int(depth_splat_radius_px))
         if not np.any(depth > 0):
             continue
+        depth = fill_depth_holes(depth, max_fill_distance_px=float(depth_hole_fill_px))
 
         # 4e. Create the RGBD image (RGB from keyframe, depth from cloud).
         rgb_image = np.ascontiguousarray(image.astype(np.uint8))
@@ -365,6 +384,230 @@ def fuse_object_cloud(
     clean_rgb = np.clip(clean_cols * 255.0, 0, 255).astype(np.uint8)
 
     # ── Step 7 — return the cleaned cloud ───────────────────────────────
+    return FuseResult(
+        clean_xyz,
+        clean_rgb,
+        True,
+        f"fused {clean_xyz.shape[0]} points from {integrated_count} keyframes",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Scene-level preview fusion (no hit point, no SAM segmentation)
+# ---------------------------------------------------------------------------
+
+def fuse_scene_preview(
+    keyframes: Sequence,
+    voxel_size: float = 0.005,
+    sdf_trunc: float = 0.02,
+    workspace_bbox_min: Optional[np.ndarray] = None,
+    workspace_bbox_max: Optional[np.ndarray] = None,
+    dbscan_eps: float = 0.02,
+    dbscan_min_points: int = 10,
+    enable_dbscan_cleanup: bool = True,
+    depth_splat_radius_px: int = 2,
+    depth_hole_fill_px: float = 5.0,
+) -> FuseResult:
+    """Pure-logic scene-level TSDF fusion — no hit point, no SAM.
+
+    A mask-free variant of :func:`fuse_object_cloud` that integrates the
+    **full** cloud from each keyframe into a fresh TSDF volume, producing a
+    volumetrically fused reconstruction of the whole workspace.  This is the
+    core of the live preview node: it exercises the full GTSAM + keyframe
+    buffer + Open3D TSDF stack without requiring a hit point or an inference
+    server.
+
+    Parameters
+    ----------
+    keyframes : list of Keyframe
+        Keyframes (from the keyframe buffer) to fuse.  Each must expose
+        ``.cloud_xyz``, ``.cloud_rgb``, ``.image``, ``.K``, ``.pose``,
+        ``.organized`` (matching :class:`keyframe_buffer.keyframe.Keyframe`).
+    voxel_size : float
+        TSDF voxel length in metres.
+    sdf_trunc : float
+        TSDF truncation distance in metres.
+    workspace_bbox_min, workspace_bbox_max : ndarray (3,) or None
+        Axis-aligned bounding box (in the world frame) used to crop each
+        keyframe's cloud before integration.  When *either* is ``None`` no
+        cropping is applied (the entire cloud is integrated).
+    dbscan_eps : float
+        DBSCAN neighbourhood radius (metres) for noise removal.
+    dbscan_min_points : int
+        DBSCAN minimum cluster size.
+    enable_dbscan_cleanup : bool
+        When ``True``, points labelled as DBSCAN noise (label == -1) are
+        removed but **all** clusters are kept (unlike
+        :func:`fuse_object_cloud` which keeps only the cluster nearest the
+        hit point).  When ``False`` the raw extracted cloud is returned.
+    depth_splat_radius_px : int
+        Each rasterised cloud point is splatted into a disk of this radius
+        (pixels) in the depth image.  Sparse clouds cover only 10-15 % of the
+        image plane; splatting closes intra-surface gaps so the TSDF
+        integrator's rays hit valid depth.  Default 2.  Set 0 to disable.
+    depth_hole_fill_px : float
+        After splatting, remaining zero-depth pixels within this Euclidean
+        distance (pixels) of a valid pixel are filled by nearest-neighbour
+        propagation.  Default 5.0.  Set 0 or negative to disable.
+
+    Returns
+    -------
+    FuseResult
+        ``(xyz (M,3) float32, rgb (M,3) uint8, success, message)``.
+    """
+    # ── Open3D is required for the TSDF volume — import lazily ──────────
+    import open3d as o3d  # noqa: WPS433 — lazy import on purpose
+
+    # ── Step 0 — guard: empty keyframe list ─────────────────────────────
+    if keyframes is None or len(keyframes) == 0:
+        return FuseResult(
+            np.zeros((0, 3), dtype=np.float32),
+            np.zeros((0, 3), dtype=np.uint8),
+            False, "empty keyframe list",
+        )
+
+    # Pre-resolve the workspace bbox (vectorised AABB crop).
+    do_crop = (workspace_bbox_min is not None
+               and workspace_bbox_max is not None)
+    if do_crop:
+        bmin = np.asarray(workspace_bbox_min, dtype=np.float64).reshape(3)
+        bmax = np.asarray(workspace_bbox_max, dtype=np.float64).reshape(3)
+
+    # ── Step 1 — initialise the TSDF volume ─────────────────────────────
+    volume = o3d.pipelines.integration.ScalableTSDFVolume(
+        voxel_length=float(voxel_size),
+        sdf_trunc=float(sdf_trunc),
+        color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8,
+    )
+
+    integrated_count = 0
+
+    # ── Step 2 — per-keyframe loop (mask-free) ──────────────────────────
+    for kf in keyframes:
+        K = np.asarray(kf.K, dtype=np.float64).reshape(3, 3)
+        pose = np.asarray(kf.pose, dtype=np.float64).reshape(4, 4)
+        image = np.asarray(kf.image)
+        H, W = int(image.shape[0]), int(image.shape[1])
+
+        # 2a. Full cloud (no SAM mask).  Flatten organised clouds.
+        cloud_xyz = np.asarray(kf.cloud_xyz).reshape(-1, 3)
+        cloud_rgb = np.asarray(kf.cloud_rgb).reshape(-1, 3)
+
+        # 2b. Optional workspace AABB crop (analogous to the legacy fusion's
+        #     distance filter — limits integration volume without segmentation).
+        if do_crop and cloud_xyz.shape[0] > 0:
+            keep = (np.all(cloud_xyz >= bmin, axis=1)
+                    & np.all(cloud_xyz <= bmax, axis=1))
+            cloud_xyz = cloud_xyz[keep]
+            cloud_rgb = cloud_rgb[keep]
+
+        if cloud_xyz.shape[0] == 0:
+            continue
+
+        # 2c. Build a depth image by rasterising the full cloud (no mask).
+        #     Splat + hole-fill so sparse clouds produce a dense-enough depth
+        #     map for the TSDF ray-caster.
+        depth = build_depth_image(
+            cloud_xyz, K, pose, H, W,
+            splat_radius_px=int(depth_splat_radius_px))
+        if not np.any(depth > 0):
+            continue
+        depth = fill_depth_holes(depth, max_fill_distance_px=float(depth_hole_fill_px))
+
+        # 2d. Create the RGBD image (RGB from keyframe, depth from cloud).
+        rgb_image = np.ascontiguousarray(image.astype(np.uint8))
+        depth_f32 = np.ascontiguousarray(depth.astype(np.float32))
+        o3d_rgb = o3d.geometry.Image(rgb_image)
+        o3d_depth = o3d.geometry.Image(depth_f32)
+        rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
+            o3d_rgb, o3d_depth,
+            depth_scale=1.0,
+            depth_trunc=float(max(sdf_trunc * 10.0, 0.5)),
+            convert_rgb_to_intensity=False,
+        )
+
+        # 2e. Integrate into the TSDF volume.
+        intrinsic = o3d.camera.PinholeCameraIntrinsic(
+            W, H,
+            float(K[0, 0]), float(K[1, 1]),
+            float(K[0, 2]), float(K[1, 2]),
+        )
+        extrinsic = np.linalg.inv(pose)
+        volume.integrate(rgbd, intrinsic, extrinsic)
+        integrated_count += 1
+
+    # ── No keyframe integrated anything → empty result ──────────────────
+    if integrated_count == 0:
+        return FuseResult(
+            np.zeros((0, 3), dtype=np.float32),
+            np.zeros((0, 3), dtype=np.uint8),
+            False, "no keyframe produced visible geometry",
+        )
+
+    # ── Step 3 — extract mesh → point cloud ─────────────────────────────
+    mesh = volume.extract_triangle_mesh()
+    pts = np.asarray(mesh.vertices, dtype=np.float32)
+    cols = np.asarray(mesh.vertex_colors, dtype=np.float32)
+
+    if pts.shape[0] == 0:
+        return FuseResult(
+            np.zeros((0, 3), dtype=np.float32),
+            np.zeros((0, 3), dtype=np.uint8),
+            False, "TSDF extraction yielded no vertices",
+        )
+
+    # ── Step 4 — optional DBSCAN noise removal (keep ALL clusters) ──────
+    if not enable_dbscan_cleanup:
+        rgb_out = np.clip(cols * 255.0, 0, 255).astype(np.uint8)
+        return FuseResult(
+            np.ascontiguousarray(pts),
+            rgb_out,
+            True,
+            f"fused {pts.shape[0]} points from {integrated_count} keyframes "
+            f"(DBSCAN disabled)",
+        )
+
+    o3d_cloud = o3d.geometry.PointCloud()
+    o3d_cloud.points = o3d.utility.Vector3dVector(pts)
+    o3d_cloud.colors = o3d.utility.Vector3dVector(cols)
+
+    labels = np.array(
+        o3d_cloud.cluster_dbscan(
+            eps=float(dbscan_eps),
+            min_points=int(dbscan_min_points),
+            print_progress=False,
+        ),
+        dtype=np.int64,
+    )
+
+    if labels.size == 0:
+        rgb_out = np.clip(cols * 255.0, 0, 255).astype(np.uint8)
+        return FuseResult(
+            np.ascontiguousarray(pts),
+            rgb_out,
+            True,
+            f"fused {pts.shape[0]} points from {integrated_count} keyframes "
+            f"(no DBSCAN clusters)",
+        )
+
+    # Remove noise (label == -1) but keep ALL valid clusters.
+    valid = labels >= 0
+    if not np.any(valid):
+        # Everything classified as noise — fall back to the raw cloud.
+        rgb_out = np.clip(cols * 255.0, 0, 255).astype(np.uint8)
+        return FuseResult(
+            np.ascontiguousarray(pts),
+            rgb_out,
+            True,
+            f"fused {pts.shape[0]} points from {integrated_count} keyframes "
+            f"(all DBSCAN noise, kept raw)",
+        )
+
+    clean_xyz = np.ascontiguousarray(pts[valid])
+    clean_cols = cols[valid]
+    clean_rgb = np.clip(clean_cols * 255.0, 0, 255).astype(np.uint8)
+
+    # ── Step 5 — return the cleaned scene cloud ─────────────────────────
     return FuseResult(
         clean_xyz,
         clean_rgb,

@@ -16,6 +16,7 @@ from keyframe_buffer.cloud_utils import (
     mask_unorganized_cloud,
     mask_organized_cloud,
     build_depth_image,
+    fill_depth_holes,
     project_3d_to_2d,
     lookup_depth_3d,
     project_points_to_pixels,
@@ -225,6 +226,126 @@ class TestDepthRasterization:
         depth = build_depth_image(pts, intrinsics, identity_pose, H, W)
         assert depth.shape == (H, W)
         assert depth.dtype == np.float32
+
+
+# ---------------------------------------------------------------------------
+# Depth splatting (sparse-cloud densification)
+# ---------------------------------------------------------------------------
+
+class TestDepthSplatting:
+    def test_splat_increases_fill_rate(self, intrinsics, identity_pose, img_dims):
+        """Splatting a sparse cloud must produce more non-zero pixels than
+        single-pixel rasterisation."""
+        H, W = img_dims
+        rng = np.random.default_rng(42)
+        N = 2000
+        pts = np.column_stack([
+            rng.uniform(-0.6, 0.6, N),
+            rng.uniform(-0.45, 0.45, N),
+            np.full(N, 1.0),
+        ])
+        depth_base = build_depth_image(pts, intrinsics, identity_pose, H, W,
+                                       splat_radius_px=0)
+        depth_splat = build_depth_image(pts, intrinsics, identity_pose, H, W,
+                                        splat_radius_px=2)
+        fill_base = float(np.mean(depth_base > 0))
+        fill_splat = float(np.mean(depth_splat > 0))
+        assert fill_splat > fill_base * 3, (
+            f"Splatting should increase fill-rate significantly "
+            f"({fill_splat:.3f} vs {fill_base:.3f})")
+
+    def test_splat_preserves_z_buffer(self, intrinsics, identity_pose, img_dims):
+        """With splatting, the nearest point must still win the z-buffer."""
+        H, W = img_dims
+        cloud = np.array([
+            [0.0, 0.0, 5.0],
+            [0.0, 0.0, 1.0],
+        ])
+        depth = build_depth_image(cloud, intrinsics, identity_pose, H, W,
+                                  splat_radius_px=2)
+        u_c, v_c = 320, 240
+        assert abs(depth[v_c, u_c] - 1.0) < 0.001, \
+            "Nearest point should win z-buffer even with splatting"
+
+    def test_splat_radius_zero_matches_baseline(self, intrinsics, identity_pose,
+                                                 img_dims):
+        """splat_radius_px=0 must produce identical output to the old path."""
+        H, W = img_dims
+        rng = np.random.default_rng(99)
+        N = 100
+        pts = np.column_stack([
+            rng.uniform(-0.5, 0.5, N),
+            rng.uniform(-0.4, 0.4, N),
+            rng.uniform(0.5, 3.0, N),
+        ])
+        depth_default = build_depth_image(pts, intrinsics, identity_pose, H, W)
+        depth_zero = build_depth_image(pts, intrinsics, identity_pose, H, W,
+                                       splat_radius_px=0)
+        np.testing.assert_array_equal(depth_default, depth_zero)
+
+
+# ---------------------------------------------------------------------------
+# Depth hole filling
+# ---------------------------------------------------------------------------
+
+class TestDepthHoleFilling:
+    def test_fills_small_holes(self):
+        """A single valid pixel surrounded by holes — neighbours get filled."""
+        depth = np.zeros((10, 10), dtype=np.float32)
+        depth[5, 5] = 2.0
+        filled = fill_depth_holes(depth, max_fill_distance_px=2.0)
+        assert filled[5, 5] == 2.0, "Valid pixel must not change"
+        assert filled[5, 6] == 2.0, "Adjacent hole must be filled"
+        assert filled[6, 5] == 2.0, "Adjacent hole must be filled"
+
+    def test_leaves_far_holes_empty(self):
+        """Holes farther than the threshold must remain at zero."""
+        depth = np.zeros((20, 20), dtype=np.float32)
+        depth[10, 10] = 1.0
+        filled = fill_depth_holes(depth, max_fill_distance_px=2.0)
+        assert filled[0, 0] == 0.0, "Far hole must not be filled"
+
+    def test_all_zero_unchanged(self):
+        """An all-zero depth image must return all-zero."""
+        depth = np.zeros((5, 5), dtype=np.float32)
+        filled = fill_depth_holes(depth)
+        np.testing.assert_array_equal(filled, depth)
+
+    def test_all_valid_unchanged(self):
+        """A fully-valid depth image must be returned unchanged."""
+        depth = np.full((5, 5), 1.5, dtype=np.float32)
+        filled = fill_depth_holes(depth)
+        np.testing.assert_array_equal(filled, depth)
+
+    def test_disabled_when_threshold_zero(self):
+        """max_fill_distance_px <= 0 must return the input unchanged."""
+        depth = np.zeros((10, 10), dtype=np.float32)
+        depth[5, 5] = 3.0
+        filled = fill_depth_holes(depth, max_fill_distance_px=0.0)
+        np.testing.assert_array_equal(filled, depth)
+
+    def test_combined_splat_and_fill_increases_density(self, intrinsics,
+                                                       identity_pose, img_dims):
+        """End-to-end: splat + fill should give >>10x the baseline fill-rate
+        for a sparse cloud."""
+        H, W = img_dims
+        rng = np.random.default_rng(7)
+        N = 2000
+        pts = np.column_stack([
+            rng.uniform(-0.6, 0.6, N),
+            rng.uniform(-0.45, 0.45, N),
+            np.full(N, 1.0),
+        ])
+        depth_base = build_depth_image(pts, intrinsics, identity_pose, H, W)
+        depth_dense = fill_depth_holes(
+            build_depth_image(pts, intrinsics, identity_pose, H, W,
+                              splat_radius_px=2),
+            max_fill_distance_px=5.0)
+        fill_base = float(np.mean(depth_base > 0))
+        fill_dense = float(np.mean(depth_dense > 0))
+        assert fill_dense > fill_base * 10, (
+            f"Splat+fill should give >>10x fill-rate "
+            f"({fill_dense:.3f} vs {fill_base:.3f})")
 
 
 # ---------------------------------------------------------------------------

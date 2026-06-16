@@ -19,7 +19,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /jetson/head/points
       Size (Pixels): 3
       Use Fixed Frame: true
@@ -33,7 +33,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /jetson/arm/points
       Size (Pixels): 3
       Use Fixed Frame: true
@@ -44,7 +44,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /jetson/head/image
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -52,7 +52,7 @@ Visualization Manager:
       Topic:
         Depth: 5
         Durability Policy: Volatile
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /jetson/arm/image
     - Class: rviz_default_plugins/Odometry
       Enabled: true

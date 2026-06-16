@@ -353,7 +353,7 @@ Visualization Manager:
     - Alpha: 1
       Axes Length: 0.1
       Axes Radius: 0.01
-      Class: rviz_default_plugins/Pose
+      Class: rviz_default_plugins/PoseWithCovariance
       Color: 0; 255; 0
       Enabled: true
       Head Length: 0.1
@@ -370,7 +370,7 @@ Visualization Manager:
     - Alpha: 1
       Axes Length: 0.1
       Axes Radius: 0.01
-      Class: rviz_default_plugins/Pose
+      Class: rviz_default_plugins/PoseWithCovariance
       Color: 255; 0; 0
       Enabled: true
       Head Length: 0.1
@@ -384,72 +384,6 @@ Visualization Manager:
         Reliability Policy: Reliable
         Value: /gtsam/arm_pose
       Value: true
-    - Alpha: 0.5
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/PointCloud2
-      Color: 100; 200; 255
-      Color Transformer: RGB8
-      Decay Time: 0
-      Enabled: false
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: PCHeadRaw
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 2
-      Size (m): 0.009999999776482582
-      Style: Points
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Best Effort
-        Value: /jetson/head/points
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: false
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz_default_plugins/PointCloud2
-      Color: 255; 200; 100
-      Color Transformer: RGB8
-      Decay Time: 0
-      Enabled: false
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 4096
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: PCArmRaw
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 2
-      Size (m): 0.009999999776482582
-      Style: Points
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Best Effort
-        Value: /jetson/arm/points
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: false
     - Class: rviz_default_plugins/MarkerArray
       Enabled: false
       Name: Grasp Visualization
@@ -473,7 +407,7 @@ Visualization Manager:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /jetson/head/trackhist
       Value: true
     - Class: rviz_default_plugins/Image
@@ -487,7 +421,7 @@ Visualization Manager:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /jetson/arm/trackhist
       Value: true
     - Class: rviz_default_plugins/Marker

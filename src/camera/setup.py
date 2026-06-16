@@ -21,6 +21,7 @@ setup(
             "odom_to_pose_relay = camera.odom_to_pose_relay:main",
             "openvins_realsense_tf_bridge_node = camera.openvins_realsense_tf_bridge_node:main",
             "openvins_odom_tf_relay = camera.openvins_odom_tf_relay:main",
+            "pipeline_diagnostics_node = camera.pipeline_diagnostics_node:main",
         ],
     },
     data_files=[

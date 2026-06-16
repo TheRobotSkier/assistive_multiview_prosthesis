@@ -266,7 +266,7 @@ pointcloud_fusion:
         # header stamp (sensor time) instead of host arrival time.
         # Requires chrony time sync between Jetson and host.
         use_header_stamp_age: true
-        transform_tolerance_s: 0.1
+        transform_tolerance_s: 0.15
 
 openvins_odom_tf_relay:
     ros__parameters:
@@ -320,7 +320,8 @@ openvins_odom_tf_relay:
         # marker_map -> *_imu TF edges.  Instead, the GTSAM tracker owns
         # those edges (broadcast_tf=true) so downstream nodes consume the
         # smoothed FGO trajectory rather than raw, diverging VIO.
-        publish_dynamic_tf: false
+        publish_dynamic_tf: true
+        use_corrected_tf: true
 
 openvins_realsense_tf_bridge:
     ros__parameters:
@@ -436,6 +437,31 @@ emg_grasp_controller:
 # V6 Localization Nodes (Phase 0–3)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Pipeline Diagnostics — passive cross-node TF/topic monitor.
+# Launched when debug_monitor:=true (see run-camera-log-debug target).
+pipeline_diagnostics:
+    ros__parameters:
+        summary_interval_s: 5.0
+        tf_jump_threshold_m: 0.05
+        pose_norm_warn_m: 1.0
+        pose_norm_critical_m: 2.0
+        clock_offset_warn_s: 0.15
+        rate_window_s: 5.0
+        # Cloud delivery stall / plateau detection (V6 post-run analysis fix).
+        # Warns when a previously-flowing topic goes silent (Jetson-side cloud
+        # plateau: 60 clouds then stalls after ~45s).
+        cloud_stall_threshold_s: 5.0
+        cloud_plateau_window_s: 4.0
+        head_odom_topic: "/jetson/head/odom"
+        arm_odom_topic: "/jetson/arm/odom"
+        head_cloud_topic: "/jetson/head/points"
+        arm_cloud_topic: "/jetson/arm/points"
+        head_pose_topic: "/gtsam/head_pose"
+        arm_pose_topic: "/gtsam/arm_pose"
+        visual_factor_topic: "/vis/head_arm_pose"
+        head_image_topic: "/jetson/head/image"
+        arm_image_topic: "/jetson/arm/image"
+
 gtsam_tracker:
     ros__parameters:
         # Odometry topics
@@ -473,7 +499,7 @@ gtsam_tracker:
         # rviz, and other consumers use the FGO trajectory instead of the
         # raw VIO relay.  The relay's publish_dynamic_tf must be set to
         # false to avoid two publishers fighting over the same edges.
-        broadcast_tf: true
+        broadcast_tf: false
         head_child_frame: "head_imu"
         arm_child_frame: "arm_imu"
 
@@ -495,8 +521,15 @@ keyframe_buffer:
         spatial_gate_rotation_deg: 15.0
         # Maximum age between a cloud stamp and its pose stamp for the
         # keyframe to be accepted.  RealSense clouds and OpenVINS poses
-        # may not be perfectly time-synchronised.
-        pose_max_age_s: 0.05
+        # may not be perfectly time-synchronised.  Increased from 0.05 to
+        # 0.10 to accommodate per-camera stamp differences (head vs arm
+        # odom rates differ slightly).
+        pose_max_age_s: 0.10
+        # Timestamp source for age-gating clouds against poses.
+        # "header": use the cloud's header stamp (Jetson sensor clock).
+        # "receive_time": use the host system time when the cloud arrives.
+        #   Recommended as defence-in-depth when clock drift is suspected.
+        cloud_timestamp_source: "header"
 
 cross_camera_features:
     ros__parameters:
@@ -505,6 +538,8 @@ cross_camera_features:
         arm_image_topic: "/jetson/arm/image"
         head_cloud_topic: "/jetson/head/points"
         arm_cloud_topic: "/jetson/arm/points"
+        head_depth_image_topic: "/jetson/head/depth"
+        arm_depth_image_topic: "/jetson/arm/depth"
         head_info_topic: "/jetson/head/camera_info"
         arm_info_topic: "/jetson/arm/camera_info"
         # Pose topics (from gtsam_tracker)
@@ -518,7 +553,7 @@ cross_camera_features:
         min_matches: 5
         top_k_matches: 100
         ratio_threshold: 0.8
-        depth_search_radius_m: 0.02
+        depth_search_radius_m: 0.10
         # Feature backend: "sift" (default) or "superpoint" (future)
         backend: "sift"
         world_frame: "marker_map"
@@ -538,9 +573,28 @@ tsdf_fusion:
         sdf_trunc_m: 0.02
         dbscan_eps_m: 0.02
         dbscan_min_points: 10
+        # Depth densification for sparse keyframe clouds (V6 §6.5 fix).
+        # Splat each cloud point into a disk of this radius (pixels) and
+        # nearest-neighbour fill remaining holes up to this distance (pixels).
+        # Sparse clouds cover only 10-15 % of the image plane; without this the
+        # TSDF ray-caster produces "NO GEOMETRY".
+        depth_splat_radius_px: 2
+        depth_hole_fill_px: 5.0
         # Output
         output_topic: "/segmentation/object_cloud"
         world_frame: "marker_map"
+        # Preview mode: timer-driven scene-level TSDF fusion (no hit point / SAM needed)
+        # When preview_mode is true, the node runs a low-FPS loop that integrates
+        # ALL keyframes and publishes a fused scene cloud.  See
+        # plans/2026-06-16-tsdf-scene-preview-fusion-1.0.md.
+        preview_mode: false
+        preview_rate_hz: 1.0
+        preview_output_topic: "/fused_pointcloud"
+        preview_keyframe_service: "/keyframe_buffer/get_all"
+        preview_workspace_bbox_min: [-0.5, -0.5, -0.2]
+        preview_workspace_bbox_max: [0.8, 0.5, 0.6]
+        preview_enable_bbox_crop: true
+        preview_enable_dbscan_cleanup: true
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Flat Reference Sections (used by test scripts and documentation)

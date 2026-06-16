@@ -1,0 +1,746 @@
+Starting >>> mia_hand_msgs
+Starting >>> sensor_fusion_msgs
+Starting >>> camera
+Starting >>> emg_bridge
+Starting >>> grasp_preshaping
+Starting >>> mia_hand_description
+Starting >>> pointcloud_fusion
+Starting >>> segmentation_bridge
+Starting >>> wrist_driver
+Starting >>> sensor_fusion_bringup
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+Finished <<< grasp_preshaping [2.71s]
+Finished <<< mia_hand_description [2.71s]
+Finished <<< sensor_fusion_msgs [2.87s]
+Finished <<< mia_hand_msgs [2.93s]
+Starting >>> keyframe_buffer
+Starting >>> mia_hand_driver
+Starting >>> command_bridge
+Starting >>> force_controller
+Starting >>> gtsam_tracker
+Starting >>> haptic_bridge
+Finished <<< sensor_fusion_bringup [2.78s]
+Starting >>> pipeline_manager
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+Finished <<< mia_hand_driver [2.48s]
+Starting >>> twist_propagation
+--- stderr: emg_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< emg_bridge [6.19s]
+Starting >>> mia_hand_ros2_control
+Finished <<< camera [6.31s]
+Finished <<< pointcloud_fusion [6.21s]
+Finished <<< mia_hand_ros2_control [0.29s]
+Finished <<< segmentation_bridge [6.42s]
+--- stderr: wrist_driver
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< wrist_driver [6.47s]
+Finished <<< force_controller [4.21s]
+--- stderr: command_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< command_bridge [4.28s]
+Finished <<< keyframe_buffer [4.31s]
+Starting >>> tsdf_fusion
+--- stderr: haptic_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< haptic_bridge [4.27s]
+Finished <<< gtsam_tracker [4.30s]
+Starting >>> cross_camera_features
+--- stderr: pipeline_manager
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< pipeline_manager [4.90s]
+Finished <<< twist_propagation [2.54s]
+Starting >>> prosthesis_launch
+Finished <<< cross_camera_features [1.95s]
+Finished <<< tsdf_fusion [2.01s]
+Finished <<< prosthesis_launch [1.75s]
+
+Summary: 22 packages finished [9.93s]
+  5 packages had stderr output: command_bridge emg_bridge haptic_bridge pipeline_manager wrist_driver
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-16-13-13-55-340129-KingBob-3703
+[INFO] [launch]: Default logging verbosity is set to INFO
+[pipeline] fusion_mode='tsdf_preview'
+[pipeline] fusion_mode='tsdf_preview' — launching tsdf_fusion (preview_mode=True)
+[INFO] [pipeline_manager_node-1]: process started with pid [4337]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [4338]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [4339]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [4340]
+[INFO] [odom_to_pose_relay-5]: process started with pid [4341]
+[INFO] [openvins_odom_tf_relay-6]: process started with pid [4342]
+[INFO] [gtsam_tracker_node-7]: process started with pid [4343]
+[INFO] [keyframe_buffer_node-8]: process started with pid [4344]
+[INFO] [sift_feature_node-9]: process started with pid [4345]
+[INFO] [tsdf_fusion_node-10]: process started with pid [4346]
+[INFO] [twist_propagation_node-11]: process started with pid [4347]
+[INFO] [preshaping_service_bridge_node-12]: process started with pid [4348]
+[INFO] [grasp_proximity_controller_node.py-13]: process started with pid [4349]
+[INFO] [rviz2-14]: process started with pid [4350]
+[preshaping_service_bridge_node-12] [INFO] [1781615635.897121242] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-12] [INFO] [1781615635.905217261] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-14] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[keyframe_buffer_node-8] [INFO] [1781615637.212613194] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_in_roi
+[keyframe_buffer_node-8] [INFO] [1781615637.215709874] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_all
+[keyframe_buffer_node-8] [INFO] [1781615637.235901230] [keyframe_buffer]: KeyframeBufferNode ready (max_kf/cam=50, gate_t=0.1m, gate_r=15.0deg)
+[pipeline_manager_node-1] [INFO] [1781615637.462832759] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781615637.463991081] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tf_pipeline_diagnostics-4] [INFO] [1781615637.607121147] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615637.694176450] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615637.694824032] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615637.796447033] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615637.800950201] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615637.801835186] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[tsdf_fusion_node-10] [INFO] [1781615637.852663317] [tsdf_fusion]: TsdfFusionNode ready (PREVIEW mode) (rate=1.0 Hz, output=/fused_pointcloud, bbox_crop=True, dbscan=True)
+[camera_mount_tf_publisher-3] [INFO] [1781615637.966902515] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1781615637.969677321] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[openvins_odom_tf_relay-6] [WARN] [1781615638.054689218] [openvins_odom_tf_relay]: OpenVINS odometry TF relay active: marker_map -> head_imu (via /jetson/head/odom), marker_map -> arm_imu (via /jetson/arm/odom), publish_dynamic_tf=False
+[gtsam_tracker_node-7] [INFO] [1781615638.119421844] [gtsam_tracker]: TF broadcasting enabled (marker_map → head_imu, arm_imu)
+[gtsam_tracker_node-7] [INFO] [1781615638.135775775] [gtsam_tracker]: GtsamTrackerNode ready (rate=15.0Hz, lag=15.0s, head_source=odom, broadcast_tf=True)
+[grasp_proximity_controller_node.py-13] [INFO] [1781615638.304502768] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-13] [INFO] [1781615638.329161330] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[twist_propagation_node-11] [INFO] [1781615638.385971747] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-11] [INFO] [1781615638.445598064] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-11] [INFO] [1781615638.449611839] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[pipeline_manager_node-1] [INFO] [1781615638.472104065] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[sift_feature_node-9] [INFO] [1781615638.594394967] [cross_camera_features]: SiftFeatureNode ready (backend=sift, min_matches=5, slop=0.05s)
+[tsdf_fusion_node-10] [ERROR] [1781615638.825883029] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615638.825996581] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[rviz2-14] [INFO] [1781615639.385851933] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-14] [INFO] [1781615639.386027951] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[rviz2-14] [INFO] [1781615639.454751619] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-14] [INFO] [1781615639.750132411] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-14]
+[rviz2-14] [INFO] [1781615639.756322733] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-14]
+[keyframe_buffer_node-8] [INFO] [1781615639.827610812] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[rviz2-14] [INFO] [1781615639.893288640] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-14]
+[rviz2-14] [INFO] [1781615639.896924263] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-14]
+[rviz2-14] [INFO] [1781615640.125525096] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-14] [INFO] [1781615640.197930870] [rviz2]: Stereo is NOT SUPPORTED
+[keyframe_buffer_node-8] [INFO] [1781615640.825774189] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615641.825753957] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615642.825542731] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615643.826893684] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615644.825546013] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615645.828981820] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615646.825613085] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615647.826182748] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615648.031872772] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[gtsam_tracker_node-7] [INFO] [1781615648.139372199] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[preshaping_service_bridge_node-12] [INFO] [1781615648.356121322] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[tf_pipeline_diagnostics-4] Traceback (most recent call last):
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-4]     main()
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 147, in main
+[tf_pipeline_diagnostics-4]     rclpy.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[tf_pipeline_diagnostics-4]     _shutdown(context=context)
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[tf_pipeline_diagnostics-4]     context.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[tf_pipeline_diagnostics-4]     self.__context.shutdown()
+[tf_pipeline_diagnostics-4] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[camera_mount_tf_publisher-3] Traceback (most recent call last):
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[INFO] [preshaping_service_bridge_node-12]: process has finished cleanly [pid 4348]
+[camera_mount_tf_publisher-3]     main()
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-3]     rclpy.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-3]     _shutdown(context=context)
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-3]     context.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-3]     self.__context.shutdown()
+[camera_mount_tf_publisher-3] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[ERROR] [tf_pipeline_diagnostics-4]: process has died [pid 4340, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 4337]
+[INFO] [odom_to_pose_relay-5]: process has finished cleanly [pid 4341]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process has finished cleanly [pid 4338]
+[ERROR] [camera_mount_tf_publisher-3]: process has died [pid 4339, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[INFO] [sift_feature_node-9]: process has finished cleanly [pid 4345]
+[INFO] [keyframe_buffer_node-8]: process has finished cleanly [pid 4344]
+[INFO] [gtsam_tracker_node-7]: process has finished cleanly [pid 4343]
+[INFO] [tsdf_fusion_node-10]: process has finished cleanly [pid 4346]
+[INFO] [rviz2-14]: process has finished cleanly [pid 4350]
+[INFO] [openvins_odom_tf_relay-6]: process has finished cleanly [pid 4342]
+[INFO] [grasp_proximity_controller_node.py-13]: process has finished cleanly [pid 4349]
+[INFO] [twist_propagation_node-11]: process has finished cleanly [pid 4347]
+
+prosthesis@KingBob:/prosthesis_ws$ make run-camera
+Starting >>> mia_hand_msgs
+Starting >>> sensor_fusion_msgs
+Starting >>> camera
+Starting >>> emg_bridge
+Starting >>> grasp_preshaping
+Starting >>> mia_hand_description
+Starting >>> pointcloud_fusion
+Starting >>> segmentation_bridge
+Starting >>> wrist_driver
+Starting >>> sensor_fusion_bringup
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+Finished <<< mia_hand_description [2.61s]
+Finished <<< grasp_preshaping [2.65s]
+Finished <<< sensor_fusion_msgs [2.74s]
+Starting >>> keyframe_buffer
+Starting >>> gtsam_tracker
+Starting >>> twist_propagation
+Finished <<< mia_hand_msgs [2.82s]
+Finished <<< sensor_fusion_bringup [2.73s]
+Starting >>> mia_hand_driver
+Starting >>> command_bridge
+Starting >>> force_controller
+Starting >>> haptic_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+Finished <<< mia_hand_driver [2.94s]
+Starting >>> pipeline_manager
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+--- stderr: wrist_driver
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< wrist_driver [6.63s]
+Starting >>> mia_hand_ros2_control
+Finished <<< segmentation_bridge [6.69s]
+Finished <<< camera [6.80s]
+Finished <<< mia_hand_ros2_control [0.27s]
+--- stderr: emg_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< emg_bridge [6.98s]
+Finished <<< pointcloud_fusion [6.96s]
+Finished <<< keyframe_buffer [4.76s]
+Starting >>> tsdf_fusion
+--- stderr: command_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< command_bridge [5.03s]
+--- stderr: haptic_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< haptic_bridge [5.02s]
+Finished <<< force_controller [5.05s]
+Finished <<< twist_propagation [5.17s]
+Finished <<< gtsam_tracker [5.22s]
+Starting >>> cross_camera_features
+--- stderr: pipeline_manager
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< pipeline_manager [2.26s]
+Starting >>> prosthesis_launch
+Finished <<< tsdf_fusion [1.93s]
+Finished <<< prosthesis_launch [2.06s]
+Finished <<< cross_camera_features [2.15s]
+
+Summary: 22 packages finished [10.3s]
+  5 packages had stderr output: command_bridge emg_bridge haptic_bridge pipeline_manager wrist_driver
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-16-13-15-11-989968-KingBob-4687
+[INFO] [launch]: Default logging verbosity is set to INFO
+[pipeline] fusion_mode='tsdf_preview'
+[pipeline] fusion_mode='tsdf_preview' — launching tsdf_fusion (preview_mode=True)
+[INFO] [pipeline_manager_node-1]: process started with pid [5319]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [5320]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [5321]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [5322]
+[INFO] [odom_to_pose_relay-5]: process started with pid [5323]
+[INFO] [openvins_odom_tf_relay-6]: process started with pid [5324]
+[INFO] [gtsam_tracker_node-7]: process started with pid [5325]
+[INFO] [keyframe_buffer_node-8]: process started with pid [5326]
+[INFO] [sift_feature_node-9]: process started with pid [5327]
+[INFO] [tsdf_fusion_node-10]: process started with pid [5328]
+[INFO] [twist_propagation_node-11]: process started with pid [5329]
+[INFO] [preshaping_service_bridge_node-12]: process started with pid [5330]
+[INFO] [grasp_proximity_controller_node.py-13]: process started with pid [5331]
+[INFO] [rviz2-14]: process started with pid [5336]
+[rviz2-14] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[preshaping_service_bridge_node-12] [INFO] [1781615712.349936417] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-12] [INFO] [1781615712.350863939] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[keyframe_buffer_node-8] [INFO] [1781615713.509092987] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_in_roi
+[keyframe_buffer_node-8] [INFO] [1781615713.513110626] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_all
+[keyframe_buffer_node-8] [INFO] [1781615713.520728815] [keyframe_buffer]: KeyframeBufferNode ready (max_kf/cam=50, gate_t=0.1m, gate_r=15.0deg)
+[pipeline_manager_node-1] [INFO] [1781615713.636141684] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781615713.639499356] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tsdf_fusion_node-10] [INFO] [1781615714.019487331] [tsdf_fusion]: TsdfFusionNode ready (PREVIEW mode) (rate=1.0 Hz, output=/fused_pointcloud, bbox_crop=True, dbscan=True)
+[openvins_odom_tf_relay-6] [WARN] [1781615714.133108005] [openvins_odom_tf_relay]: OpenVINS odometry TF relay active: marker_map -> head_imu (via /jetson/head/odom), marker_map -> arm_imu (via /jetson/arm/odom), publish_dynamic_tf=False
+[gtsam_tracker_node-7] [INFO] [1781615714.327158467] [gtsam_tracker]: TF broadcasting enabled (marker_map → head_imu, arm_imu)
+[gtsam_tracker_node-7] [INFO] [1781615714.340953258] [gtsam_tracker]: GtsamTrackerNode ready (rate=15.0Hz, lag=15.0s, head_source=odom, broadcast_tf=True)
+[tf_pipeline_diagnostics-4] [INFO] [1781615714.459046834] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[pipeline_manager_node-1] [INFO] [1781615714.638786285] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[camera_mount_tf_publisher-3] [INFO] [1781615714.653969939] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1781615714.656631588] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615714.754737071] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615714.755423113] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615714.857853235] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615714.859855214] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781615714.860569840] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[grasp_proximity_controller_node.py-13] [INFO] [1781615714.885827063] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-13] [INFO] [1781615714.915877241] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[sift_feature_node-9] [INFO] [1781615714.953946383] [cross_camera_features]: SiftFeatureNode ready (backend=sift, min_matches=5, slop=0.05s)
+[rviz2-14] [INFO] [1781615714.969378586] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-14] [INFO] [1781615714.969676373] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[tsdf_fusion_node-10] [ERROR] [1781615714.994665219] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615714.995261290] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[twist_propagation_node-11] [INFO] [1781615715.000715082] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[rviz2-14] [INFO] [1781615715.045389586] [rviz2]: Stereo is NOT SUPPORTED
+[twist_propagation_node-11] [INFO] [1781615715.049954279] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-11] [INFO] [1781615715.052020139] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[rviz2-14] [INFO] [1781615715.165982781] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-14]
+[rviz2-14] [INFO] [1781615715.168383930] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-14]
+[rviz2-14] [INFO] [1781615715.217953370] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-14]
+[rviz2-14] [INFO] [1781615715.219664684] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-14]
+[rviz2-14] [INFO] [1781615715.336355489] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-14] [INFO] [1781615715.414890148] [rviz2]: Stereo is NOT SUPPORTED
+[keyframe_buffer_node-8] [INFO] [1781615715.996319510] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615716.950549463] [keyframe_buffer]: arm cloud: height=1 -> UNORGANIZED
+[keyframe_buffer_node-8] [INFO] [1781615716.979503371] [keyframe_buffer]: head cloud: height=1 -> UNORGANIZED
+[keyframe_buffer_node-8] [INFO] [1781615716.997330803] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615718.019221166] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615718.994999424] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615719.996901470] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615720.995519635] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615721.998848102] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615723.013285147] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615723.997018429] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615724.111209592] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[gtsam_tracker_node-7] [INFO] [1781615724.355195233] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[sift_feature_node-9] [INFO] [1781615724.931546093] [cross_camera_features]: frames=5, published=0
+[keyframe_buffer_node-8] [INFO] [1781615724.994865576] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615725.998216093] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615725.998241079] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[tf_pipeline_diagnostics-4] [WARN] [1781615726.472741726] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[keyframe_buffer_node-8] [INFO] [1781615726.998046918] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615728.001479221] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615728.997624943] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615729.994874014] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615730.998496613] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615731.995110836] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 0 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615732.193212541] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.067, 0.023, 0.151), cov_trace=1.48e-02, pos_norm=0.167m, elapsed=18.1s, actual_imu_frame='arm_imu')
+[grasp_proximity_controller_node.py-13] [INFO] [1781615732.195904109] [proximity_controller]: Received first hand pose — control loop now active
+[keyframe_buffer_node-8] [INFO] [1781615733.007811237] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 2 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615734.012588356] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 4 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615734.110778973] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: OK (572 msgs)
+[gtsam_tracker_node-7] [INFO] [1781615734.340556297] [gtsam_tracker]: Stats: published=24 odom(head=0, arm=286) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=0.248m) clock_offset(head=-1.000s, arm=0.624s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615734.448656098] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-6] [WARN] [1781615734.686446939] [openvins_odom_tf_relay]: arm odom pose jumped 0.603m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-7] [WARN] [1781615734.742093100] [gtsam_tracker]: Rejecting odometry delta — head jump 0.000m, arm jump 0.602m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[sift_feature_node-9] [INFO] [1781615734.932011509] [cross_camera_features]: frames=11, published=0
+[keyframe_buffer_node-8] [INFO] [1781615735.018332840] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 4 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615735.469106046] [openvins_odom_tf_relay]: head: OpenVINS initialized (covariance), publishing TF marker_map -> head_imu (p=(0.015, 0.026, 0.080), cov_trace=5.69e-05, pos_norm=0.086m, elapsed=21.4s, actual_imu_frame='head_imu')
+[keyframe_buffer_node-8] [INFO] [1781615736.031662116] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 7 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615736.688180089] [openvins_odom_tf_relay]: arm odom pose jumped 0.610m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-10] [ERROR] [1781615737.000099000] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[gtsam_tracker_node-7] [WARN] [1781615737.079295730] [gtsam_tracker]: Rejecting odometry delta — head jump 0.576m, arm jump 0.009m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[keyframe_buffer_node-8] [INFO] [1781615737.095529918] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 10 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615738.024647086] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 11 keyframes
+[sift_feature_node-9] [WARN] [1781615738.101368682] [cross_camera_features]: Consistently < 5 SIFT matches (0). Consider SuperPoint upgrade.
+[gtsam_tracker_node-7] [WARN] [1781615738.280451067] [gtsam_tracker]: No ArUco messages received after 5s — running on odometry + visual factors only
+[openvins_odom_tf_relay-6] [WARN] [1781615738.689037409] [openvins_odom_tf_relay]: arm odom pose jumped 0.626m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615739.064775281] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 15 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615740.076269739] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 18 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615740.691189952] [openvins_odom_tf_relay]: arm odom pose jumped 0.631m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615741.105225330] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 20 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615742.074912625] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 21 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615742.694055403] [openvins_odom_tf_relay]: head odom pose jumped 0.549m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615743.081472295] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 24 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615744.122439279] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 26 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615744.344147166] [gtsam_tracker]: Stats: published=143 odom(head=969, arm=1599) visual=0 delta_rejects=2 resets=0 pose_norm(head=0.676m, arm=0.588m) clock_offset(head=0.020s, arm=0.033s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615744.444907038] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-6] [WARN] [1781615744.709059887] [openvins_odom_tf_relay]: head odom pose jumped 0.544m (> 0.5m) — suppressing TF
+[sift_feature_node-9] [INFO] [1781615744.952246049] [cross_camera_features]: frames=14, published=0
+[keyframe_buffer_node-8] [INFO] [1781615745.122500367] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 27 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615746.158471070] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 27 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615746.712297734] [openvins_odom_tf_relay]: head odom pose jumped 0.549m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615747.147133839] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 27 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615748.001869850] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615748.136044729] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 27 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615748.733308263] [openvins_odom_tf_relay]: head odom pose jumped 0.570m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615749.109760482] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 28 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615750.140389569] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 28 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615750.734378567] [openvins_odom_tf_relay]: head odom pose jumped 0.575m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615751.134353904] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 30 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615752.157584097] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 32 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615752.736224055] [openvins_odom_tf_relay]: head odom pose jumped 0.578m (> 0.5m) — suppressing TF
+[rviz2-14] [INFO] [1781615752.942067850] [rviz2]: Subscribing to: /jetson/head/points
+[rviz2-14]
+[keyframe_buffer_node-8] [INFO] [1781615753.110136623] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 33 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615754.170550260] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 33 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615754.347868114] [gtsam_tracker]: Stats: published=143 odom(head=2110, arm=2754) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.702m, arm=0.612m) clock_offset(head=0.056s, arm=0.054s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615754.445471460] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-6] [WARN] [1781615754.737301108] [openvins_odom_tf_relay]: arm odom pose jumped 0.634m (> 0.5m) — suppressing TF
+[sift_feature_node-9] [INFO] [1781615754.934944357] [cross_camera_features]: frames=17, published=0
+[keyframe_buffer_node-8] [INFO] [1781615755.132137448] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 33 keyframes
+[rviz2-14] [INFO] [1781615755.873568262] [rviz2]: Subscribing to: /jetson/arm/points
+[rviz2-14]
+[keyframe_buffer_node-8] [INFO] [1781615756.159523511] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 36 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615756.737866661] [openvins_odom_tf_relay]: arm odom pose jumped 0.628m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615757.152556288] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 39 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615758.029164425] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615758.140702197] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 39 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615758.753909685] [openvins_odom_tf_relay]: head odom pose jumped 0.622m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615759.174422065] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 40 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615760.156214499] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 40 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615760.763542966] [openvins_odom_tf_relay]: head odom pose jumped 0.631m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615761.183611390] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 40 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615762.158417093] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 40 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615762.764335191] [openvins_odom_tf_relay]: head odom pose jumped 0.627m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615763.153464488] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 42 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615764.146374298] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 42 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615764.348398462] [gtsam_tracker]: Stats: published=142 odom(head=3258, arm=3867) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.725m, arm=0.610m) clock_offset(head=0.101s, arm=0.089s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615764.445015113] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-6] [WARN] [1781615764.764618059] [openvins_odom_tf_relay]: arm odom pose jumped 0.616m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615765.123864560] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 42 keyframes
+[rviz2-14] [INFO] [1781615765.684978410] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-14]
+[sift_feature_node-9] [INFO] [1781615765.816300532] [cross_camera_features]: frames=19, published=0
+[keyframe_buffer_node-8] [INFO] [1781615766.176465711] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 42 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615766.766686133] [openvins_odom_tf_relay]: head odom pose jumped 0.638m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615767.179423297] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 43 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615768.167430838] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 43 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615768.769229509] [openvins_odom_tf_relay]: arm odom pose jumped 0.617m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-10] [ERROR] [1781615768.995414369] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615769.211005122] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 44 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615770.163087219] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 44 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615770.771336532] [openvins_odom_tf_relay]: head odom pose jumped 0.628m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615771.135335874] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 44 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615772.208056086] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 45 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615772.774891680] [openvins_odom_tf_relay]: head odom pose jumped 0.627m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615773.179220938] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 45 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615774.207858901] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 45 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615774.345234638] [gtsam_tracker]: Stats: published=128 odom(head=4324, arm=4954) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.711m, arm=0.608m) clock_offset(head=0.077s, arm=0.077s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615774.446322500] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-6] [WARN] [1781615774.776837027] [openvins_odom_tf_relay]: arm odom pose jumped 0.616m (> 0.5m) — suppressing TF
+[sift_feature_node-9] [INFO] [1781615774.932605326] [cross_camera_features]: frames=19, published=0
+[keyframe_buffer_node-8] [INFO] [1781615775.169798597] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 46 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615776.167806945] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615776.776671527] [openvins_odom_tf_relay]: head odom pose jumped 0.632m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615777.151646458] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615778.182764796] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615778.816192063] [openvins_odom_tf_relay]: head odom pose jumped 0.632m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-10] [ERROR] [1781615778.996262775] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615779.178208000] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615780.193934315] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615780.816481353] [openvins_odom_tf_relay]: arm odom pose jumped 0.620m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615781.237195250] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615782.267492058] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615782.817445587] [openvins_odom_tf_relay]: arm odom pose jumped 0.621m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615783.199793627] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615784.170392408] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615784.448142934] [gtsam_tracker]: Stats: published=125 odom(head=5361, arm=6005) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.722m, arm=0.615m) clock_offset(head=0.237s, arm=0.224s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615784.447165987] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-6] [WARN] [1781615784.821333199] [openvins_odom_tf_relay]: head odom pose jumped 0.640m (> 0.5m) — suppressing TF
+[sift_feature_node-9] [INFO] [1781615784.932942347] [cross_camera_features]: frames=19, published=0
+[keyframe_buffer_node-8] [INFO] [1781615785.409672057] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615786.317890261] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615786.825649731] [openvins_odom_tf_relay]: head odom pose jumped 0.627m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615787.335562453] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615788.482548609] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615788.826323606] [openvins_odom_tf_relay]: head odom pose jumped 0.627m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615789.247414490] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615790.116497449] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615790.428587218] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615790.834557955] [openvins_odom_tf_relay]: head odom pose jumped 0.630m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615791.272811603] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615792.361434699] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615792.835103146] [openvins_odom_tf_relay]: head odom pose jumped 0.616m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615793.334622126] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615794.385685534] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781615794.444970956] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-7] [INFO] [1781615794.463619612] [gtsam_tracker]: Stats: published=105 odom(head=6127, arm=6781) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.715m, arm=0.693m) clock_offset(head=0.208s, arm=0.197s)
+[openvins_odom_tf_relay-6] [WARN] [1781615794.836225459] [openvins_odom_tf_relay]: arm odom pose jumped 0.730m (> 0.5m) — suppressing TF
+[sift_feature_node-9] [INFO] [1781615794.931915541] [cross_camera_features]: frames=20, published=0
+[keyframe_buffer_node-8] [INFO] [1781615795.216480980] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615796.160458153] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615796.837278486] [openvins_odom_tf_relay]: head odom pose jumped 0.620m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615797.321355424] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615798.465284063] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615798.839732485] [openvins_odom_tf_relay]: head odom pose jumped 0.604m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615799.413730258] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615800.246071340] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615800.849957417] [openvins_odom_tf_relay]: head odom pose jumped 0.614m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-10] [ERROR] [1781615801.041120021] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615801.193112699] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615802.226591274] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615802.853830649] [openvins_odom_tf_relay]: head odom pose jumped 0.612m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615803.199388870] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615804.146647359] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615804.427188199] [gtsam_tracker]: Stats: published=106 odom(head=6911, arm=7573) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.719m, arm=0.687m) clock_offset(head=0.094s, arm=0.088s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615804.462937415] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-6] [WARN] [1781615804.854222741] [openvins_odom_tf_relay]: arm odom pose jumped 0.731m (> 0.5m) — suppressing TF
+[sift_feature_node-9] [INFO] [1781615804.933328902] [cross_camera_features]: frames=20, published=0
+[keyframe_buffer_node-8] [INFO] [1781615805.183691799] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615806.218696090] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615806.869788940] [openvins_odom_tf_relay]: head odom pose jumped 0.621m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615807.166013647] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615808.165411016] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615808.870255075] [openvins_odom_tf_relay]: arm odom pose jumped 0.722m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615809.266905049] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615810.246421622] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615810.871303519] [openvins_odom_tf_relay]: arm odom pose jumped 0.713m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615811.263442004] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615811.998528823] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615812.294993662] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615812.875420381] [openvins_odom_tf_relay]: head odom pose jumped 0.607m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615813.303794151] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615814.166341188] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 47 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615814.344915257] [gtsam_tracker]: Stats: published=94 odom(head=7631, arm=8313) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.724m, arm=0.674m) clock_offset(head=0.057s, arm=0.056s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615814.445270828] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-6] [WARN] [1781615814.879069740] [openvins_odom_tf_relay]: head odom pose jumped 0.612m (> 0.5m) — suppressing TF
+[sift_feature_node-9] [INFO] [1781615814.932318291] [cross_camera_features]: frames=20, published=0
+[keyframe_buffer_node-8] [INFO] [1781615815.170943335] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615816.160038542] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615816.879914362] [openvins_odom_tf_relay]: arm odom pose jumped 0.709m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615817.179421078] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615818.203354969] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615818.903786334] [openvins_odom_tf_relay]: head odom pose jumped 0.607m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615819.162972060] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615820.145466562] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615820.937825596] [openvins_odom_tf_relay]: head odom pose jumped 0.608m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615821.235023202] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615822.003022847] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615822.161764480] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615822.938701499] [openvins_odom_tf_relay]: head odom pose jumped 0.610m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615823.185698810] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615824.208515847] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781615824.446869340] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-7] [INFO] [1781615824.472169841] [gtsam_tracker]: Stats: published=91 odom(head=8352, arm=9077) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.712m, arm=0.660m) clock_offset(head=0.227s, arm=0.243s)
+[sift_feature_node-9] [INFO] [1781615824.932514665] [cross_camera_features]: frames=20, published=0
+[openvins_odom_tf_relay-6] [WARN] [1781615824.940001367] [openvins_odom_tf_relay]: arm odom pose jumped 0.707m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615825.177172127] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615826.303096028] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615826.941477391] [openvins_odom_tf_relay]: head odom pose jumped 0.590m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615827.333982128] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615828.217330734] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615828.945255532] [openvins_odom_tf_relay]: head odom pose jumped 0.585m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615829.186796270] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615830.174170744] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615830.970941686] [openvins_odom_tf_relay]: head odom pose jumped 0.588m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615831.183355954] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615832.191563285] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615832.983043020] [openvins_odom_tf_relay]: head odom pose jumped 0.590m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-10] [ERROR] [1781615833.002216180] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615833.165013190] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615834.174178710] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615834.355042091] [gtsam_tracker]: Stats: published=89 odom(head=8964, arm=9696) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.699m, arm=0.661m) clock_offset(head=0.162s, arm=0.166s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615834.449739216] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[sift_feature_node-9] [INFO] [1781615834.932210800] [cross_camera_features]: frames=20, published=0
+[openvins_odom_tf_relay-6] [WARN] [1781615834.984505774] [openvins_odom_tf_relay]: head odom pose jumped 0.588m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615835.145164954] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615836.156316476] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615837.073530074] [openvins_odom_tf_relay]: head odom pose jumped 0.584m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615837.148129467] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615838.150333398] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615839.084455819] [openvins_odom_tf_relay]: head odom pose jumped 0.592m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615839.163300692] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615840.166840297] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615841.090912589] [openvins_odom_tf_relay]: head odom pose jumped 0.586m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615841.217224400] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615842.166832356] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615843.016782163] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[openvins_odom_tf_relay-6] [WARN] [1781615843.097677465] [openvins_odom_tf_relay]: head odom pose jumped 0.584m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615843.201062420] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615844.149078275] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781615844.446285824] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-7] [INFO] [1781615844.521343902] [gtsam_tracker]: Stats: published=83 odom(head=9557, arm=10281) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.672m, arm=0.653m) clock_offset(head=0.288s, arm=0.286s)
+[sift_feature_node-9] [INFO] [1781615844.931607162] [cross_camera_features]: frames=20, published=0
+[openvins_odom_tf_relay-6] [WARN] [1781615845.100026562] [openvins_odom_tf_relay]: head odom pose jumped 0.590m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615845.183640145] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615846.145104189] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615847.150353879] [openvins_odom_tf_relay]: head odom pose jumped 0.577m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615847.170348822] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615848.146923052] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615849.150814930] [openvins_odom_tf_relay]: head odom pose jumped 0.556m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615849.166657762] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615850.168812483] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615851.152133482] [openvins_odom_tf_relay]: arm odom pose jumped 0.702m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615851.198512739] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615852.159179134] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615853.152470505] [openvins_odom_tf_relay]: head odom pose jumped 0.563m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615853.158830558] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615854.025587787] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615854.225951150] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781615854.446032825] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-7] [INFO] [1781615854.563721275] [gtsam_tracker]: Stats: published=83 odom(head=10225, arm=10924) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.653m, arm=0.662m) clock_offset(head=0.374s, arm=0.362s)
+[sift_feature_node-9] [INFO] [1781615854.933196079] [cross_camera_features]: frames=20, published=0
+[openvins_odom_tf_relay-6] [WARN] [1781615855.153490519] [openvins_odom_tf_relay]: head odom pose jumped 0.568m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615855.214424903] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615856.175018757] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615857.155425868] [openvins_odom_tf_relay]: head odom pose jumped 0.569m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615857.217979358] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615858.235436114] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615859.158064212] [openvins_odom_tf_relay]: arm odom pose jumped 0.689m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615859.189659222] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615860.182374928] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615861.180323031] [openvins_odom_tf_relay]: head odom pose jumped 0.582m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615861.214407018] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615862.211243834] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615863.200597078] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615863.231978305] [openvins_odom_tf_relay]: head odom pose jumped 0.593m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615864.215570593] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781615864.446592019] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-7] [INFO] [1781615864.450574035] [gtsam_tracker]: Stats: published=73 odom(head=10815, arm=11508) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.673m, arm=0.649m) clock_offset(head=0.143s, arm=0.118s)
+[sift_feature_node-9] [INFO] [1781615864.932874314] [cross_camera_features]: frames=20, published=0
+[tsdf_fusion_node-10] [ERROR] [1781615864.995235076] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615865.174207657] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615865.250716178] [openvins_odom_tf_relay]: head odom pose jumped 0.586m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615866.148885132] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615867.158424250] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615867.255595874] [openvins_odom_tf_relay]: head odom pose jumped 0.584m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615868.161824538] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615869.229142023] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615869.255946983] [openvins_odom_tf_relay]: arm odom pose jumped 0.684m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615870.171404231] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615871.134583738] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615871.257272394] [openvins_odom_tf_relay]: arm odom pose jumped 0.694m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615872.204642045] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615873.191751785] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615873.298287690] [openvins_odom_tf_relay]: head odom pose jumped 0.583m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615874.233047589] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615874.366696145] [gtsam_tracker]: Stats: published=72 odom(head=11412, arm=12120) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.716m, arm=0.631m) clock_offset(head=0.064s, arm=0.050s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615874.445389180] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[sift_feature_node-9] [INFO] [1781615874.932598516] [cross_camera_features]: frames=20, published=0
+[tsdf_fusion_node-10] [ERROR] [1781615874.995295252] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615875.168496634] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615875.298518805] [openvins_odom_tf_relay]: arm odom pose jumped 0.694m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615876.184116461] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615877.148406639] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615877.334010443] [openvins_odom_tf_relay]: head odom pose jumped 0.588m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615878.208317209] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615879.182310349] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615879.337053489] [openvins_odom_tf_relay]: head odom pose jumped 0.601m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615880.162806240] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615881.190187791] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615881.337882572] [openvins_odom_tf_relay]: head odom pose jumped 0.602m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615882.196366868] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615883.256413049] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615883.338840992] [openvins_odom_tf_relay]: head odom pose jumped 0.603m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615884.291217740] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615884.391945846] [gtsam_tracker]: Stats: published=68 odom(head=11885, arm=12582) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.733m, arm=0.623m) clock_offset(head=0.351s, arm=0.346s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615884.444907611] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[sift_feature_node-9] [INFO] [1781615884.941270468] [cross_camera_features]: frames=20, published=0
+[tsdf_fusion_node-10] [ERROR] [1781615885.048952518] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615885.208640755] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615885.340441852] [openvins_odom_tf_relay]: head odom pose jumped 0.611m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615886.222847001] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615887.181823395] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615887.341638780] [openvins_odom_tf_relay]: arm odom pose jumped 0.708m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615888.236973195] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615889.180401415] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615889.343382051] [openvins_odom_tf_relay]: head odom pose jumped 0.603m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615890.172329210] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 48 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615891.171576543] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615891.351168196] [openvins_odom_tf_relay]: head odom pose jumped 0.613m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615892.163887301] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615893.175130888] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615893.352603199] [openvins_odom_tf_relay]: head odom pose jumped 0.605m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615894.179143820] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[gtsam_tracker_node-7] [INFO] [1781615894.415104288] [gtsam_tracker]: Stats: published=69 odom(head=12487, arm=13172) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.723m, arm=0.666m) clock_offset(head=0.410s, arm=0.402s)
+[tf_pipeline_diagnostics-4] [INFO] [1781615894.445569626] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[sift_feature_node-9] [INFO] [1781615894.932410363] [cross_camera_features]: frames=20, published=0
+[keyframe_buffer_node-8] [INFO] [1781615895.187165525] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615895.353498344] [openvins_odom_tf_relay]: arm odom pose jumped 0.783m (> 0.5m) — suppressing TF
+[tsdf_fusion_node-10] [ERROR] [1781615896.000530703] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615896.218049329] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615897.184303492] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615897.355705875] [openvins_odom_tf_relay]: head odom pose jumped 0.614m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615898.154815546] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615899.250090398] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615899.398792048] [openvins_odom_tf_relay]: head odom pose jumped 0.612m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615900.149376220] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615901.166630347] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615901.415801417] [openvins_odom_tf_relay]: head odom pose jumped 0.600m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615902.226123670] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615903.160621948] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615903.438874114] [openvins_odom_tf_relay]: head odom pose jumped 0.596m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615904.177405133] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[tf_pipeline_diagnostics-4] [INFO] [1781615904.447085448] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-7] [INFO] [1781615904.519811230] [gtsam_tracker]: Stats: published=69 odom(head=13022, arm=13713) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.700m, arm=0.682m) clock_offset(head=0.273s, arm=0.261s)
+[sift_feature_node-9] [INFO] [1781615904.934058700] [cross_camera_features]: frames=20, published=0
+[keyframe_buffer_node-8] [INFO] [1781615905.193475869] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615905.451155401] [openvins_odom_tf_relay]: head odom pose jumped 0.594m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615906.148550305] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[tsdf_fusion_node-10] [ERROR] [1781615906.996536585] [tsdf_fusion]: GetAllKeyframes call failed: module 'rclpy' has no attribute 'spin_until_complete'
+[keyframe_buffer_node-8] [INFO] [1781615907.176123883] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615907.452292686] [openvins_odom_tf_relay]: arm odom pose jumped 0.758m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615908.161358194] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615909.304966165] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[openvins_odom_tf_relay-6] [WARN] [1781615909.454018004] [openvins_odom_tf_relay]: arm odom pose jumped 0.755m (> 0.5m) — suppressing TF
+[keyframe_buffer_node-8] [INFO] [1781615910.437966726] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615911.271595206] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615912.129789055] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[keyframe_buffer_node-8] [INFO] [1781615913.102200541] [keyframe_buffer]: GetAllKeyframes(camera_id=None) -> 49 keyframes
+[twist_propagation_node-11] [INFO] [1781615913.215497814] [twist_propagation]: External twist stale: age=2.017s > max=2.000s
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[preshaping_service_bridge_node-12] [INFO] [1781615913.994515933] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[INFO] [rviz2-14]: process has finished cleanly [pid 5336]
+[camera_mount_tf_publisher-3] Traceback (most recent call last):
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-3]     main()
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-3]     rclpy.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-3]     _shutdown(context=context)
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-3]     context.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-3]     self.__context.shutdown()
+[camera_mount_tf_publisher-3] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[tf_pipeline_diagnostics-4] Traceback (most recent call last):
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-4]     main()
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 147, in main
+[tf_pipeline_diagnostics-4]     rclpy.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[tf_pipeline_diagnostics-4]     _shutdown(context=context)
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[tf_pipeline_diagnostics-4]     context.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[tf_pipeline_diagnostics-4]     self.__context.shutdown()
+[tf_pipeline_diagnostics-4] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[INFO] [preshaping_service_bridge_node-12]: process has finished cleanly [pid 5330]
+[INFO] [openvins_odom_tf_relay-6]: process has finished cleanly [pid 5324]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process has finished cleanly [pid 5320]
+[ERROR] [camera_mount_tf_publisher-3]: process has died [pid 5321, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[INFO] [keyframe_buffer_node-8]: process has finished cleanly [pid 5326]
+[ERROR] [tf_pipeline_diagnostics-4]: process has died [pid 5322, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[INFO] [sift_feature_node-9]: process has finished cleanly [pid 5327]
+[INFO] [tsdf_fusion_node-10]: process has finished cleanly [pid 5328]
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 5319]
+[INFO] [odom_to_pose_relay-5]: process has finished cleanly [pid 5323]
+[INFO] [twist_propagation_node-11]: process has finished cleanly [pid 5329]
+[INFO] [gtsam_tracker_node-7]: process has finished cleanly [pid 5325]
+[INFO] [grasp_proximity_controller_node.py-13]: process has finished cleanly [pid 5331]

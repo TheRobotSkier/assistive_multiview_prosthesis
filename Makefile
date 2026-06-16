@@ -99,7 +99,7 @@ else
   COMPOSE_PROFILE_FLAG := --profile mobile-sam-gpu
 endif
 
-.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-v6 record-v6-mock record-v6-pipeline inspect-bag run-camera-log
+.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-v6 record-v6-mock record-v6-pipeline inspect-bag run-camera-log run-camera-log-debug
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -145,6 +145,7 @@ help:
 	@echo "    make mock-v6                Launch V6 mock pipeline (TSDF fusion + synthetic data)"
 	@echo "    make pipeline-v6            Launch V6 hardware pipeline (use_tsdf_fusion:=true)"
 	@echo "    make run-camera-log         Camera pipeline + auto-save log to logs/host-log-*.txt"
+	@echo "    make run-camera-log-debug   Same + pipeline_diagnostics node (TF/rate/divergence monitor)"
 	@echo "    make record-v6              Record all V6 topics to data/bags/ (needs running container)"
 	@echo "    make record-v6-mock         Record mock pipeline topics (needs running container)"
 	@echo "    make inspect-bag            Show topic list + counts for latest bag"
@@ -364,6 +365,11 @@ camera-test: dev
 # Output is teed to logs/host-log-<timestamp>.txt (mounted from host ./logs).
 run-camera-log: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-camera-log'
+
+# Same as run-camera-log but launches the pipeline_diagnostics node for
+# richer logs (TF jump detection, topic rates, pose divergence, clock offset).
+run-camera-log-debug: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-camera-log-debug'
 
 collect-data: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make collect-data'
