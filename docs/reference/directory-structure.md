@@ -76,6 +76,7 @@ Use this as the primary navigation map for the repository.
 - Latency analysis logic: `src/emg_bridge/emg_bridge/latency_analysis.py`
 - Host workflow wrapper: `scripts/emg_latency_workflow.sh`
 - Host command: `make emg-latency-workflow`
+- Dedicated EMG container: `docker/Dockerfile.emg`, compose service `emg`
 
 ### Change point cloud fusion
 

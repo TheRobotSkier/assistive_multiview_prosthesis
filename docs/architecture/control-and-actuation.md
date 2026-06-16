@@ -135,6 +135,11 @@ Host workflow wrapper:
 - `scripts/emg_latency_workflow.sh`
 - `make emg-latency-workflow`
 
+Container path:
+
+- The host EMG workflow uses a dedicated EMG container instead of the broader prosthesis development container.
+- That dedicated EMG container is built from `ros:jazzy-ros-core-noble` and only carries the ROS/Python dependencies needed for EMG collection, training, live inference, latency benchmarking, and `/emg/*` ROS topic publishing.
+
 Latency benchmark role:
 
 - reuse the production EMG preprocessing, feature extraction, classifier, smoothing, and proportional-control path

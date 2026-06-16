@@ -10,6 +10,8 @@ Common commands:
 
 - `make dev`: start the prosthesis container
 - `make shell`: shell into the running container
+- `make emg-dev`: start the dedicated EMG container
+- `make emg-shell`: shell into the dedicated EMG container
 - `make build-prosthesis`: build main runtime container
 - `make segmentation-cpu` or `make segmentation-cuda`: start segmentation service
 - `make test`: run containerized test target
@@ -65,12 +67,18 @@ Primary host entrypoint:
 Default flow:
 
 1. Fetch `origin/asger_dev`.
-2. Ensure the `prosthesis` dev container is running.
+2. Ensure the dedicated EMG container is running.
 3. Build `emg_bridge` in-container.
 4. Run `collect_data`.
 5. Run `train`.
 6. Run `latency_benchmark` interactively.
 7. Optionally commit and push generated `data/` and `models/` artifacts on `asger_dev` only.
+
+Container details:
+
+- The EMG workflow now runs in a dedicated `emg` compose service instead of the general `prosthesis` dev container.
+- The dedicated EMG image is built from `ros:jazzy-ros-core-noble` to avoid pulling the larger desktop stack for EMG-only work.
+- The slim image keeps `collect_data`, `train`, `run_classifier`, `latency_benchmark`, and ROS topic publishing support for `/emg/*` topics.
 
 Key environment variables:
 

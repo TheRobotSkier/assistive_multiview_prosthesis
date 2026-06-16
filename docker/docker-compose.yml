@@ -23,6 +23,33 @@
 #   Default auto-detects podman-compose first, then docker compose.
 
 services:
+    emg:
+        container_name: emg
+        image: prosthesis-emg:latest
+        build:
+            context: ..
+            dockerfile: docker/Dockerfile.emg
+            args:
+                USER_UID: ${USER_UID:-1000}
+                USER_GID: ${USER_GID:-1000}
+        environment:
+            - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+            - ROS_DOMAIN_ID=0
+        network_mode: host
+        userns_mode: "keep-id"
+        volumes:
+            - ../src/emg_bridge:/prosthesis_ws/src/emg_bridge:rw
+            - ../scripts:/prosthesis_ws/scripts:rw
+            - ../Makefile.workspace:/prosthesis_ws/Makefile:ro
+            - emg-build:/prosthesis_ws/build
+            - emg-install:/prosthesis_ws/install
+            - emg-log:/prosthesis_ws/log
+            - ../data:/app/data:rw
+            - ../models:/app/models:rw
+        privileged: true
+        stdin_open: true
+        tty: true
+
     # ── Main ROS 2 development container ──────────────────────────────────────
     # Uses the 'base' Dockerfile stage — no source copied, no colcon build.
     # Source is mounted as bind volumes; build artifacts live in named volumes.
@@ -161,7 +188,9 @@ services:
 
 # ── Named volumes ────────────────────────────────────────────────────────────
 volumes:
+    emg-build:
+    emg-install:
+    emg-log:
     prosthesis-build:
     prosthesis-install:
     prosthesis-log:
-

@@ -60,6 +60,7 @@ Use `docs/reference/directory-structure.md` for the full map.
 - Be careful around cross-package contracts: topics, services, TF frames, and controller ownership.
 - For EMG work, prefer reusing the existing `collect_data`, `train`, `run_classifier`, and `latency_benchmark` entry points instead of adding parallel workflows.
 - For EMG latency work, keep onset logic tied to the same recent target-predicting window history that supports the accepted classifier output, including per-channel consistency when looking back across multiple windows.
+- For EMG container/runtime work, prefer the dedicated `emg` compose service and `docker/Dockerfile.emg` rather than expanding the general `prosthesis` dev container unless the change truly affects the whole workspace.
 - If changing vendored dependencies in `src/open_vins/` or `src/realsense-ros/`, confirm that the task really requires it.
 
 ## Required Documentation Update Rule

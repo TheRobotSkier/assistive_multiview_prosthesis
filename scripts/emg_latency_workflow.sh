@@ -21,7 +21,7 @@ DATA_DIR="${EMG_DATA_DIR:-/app/data}"
 RESULT_DIR_NAME="${EMG_LATENCY_RESULT_DIR_NAME:-latest}"
 FETCH_REMOTE="${EMG_FETCH_REMOTE:-true}"
 PUSH_RESULTS="${EMG_PUSH_RESULTS:-false}"
-CONTAINER_NAME="prosthesis"
+CONTAINER_NAME="emg"
 RESULT_DIR_HOST="${ROOT_DIR}/data/latency/${RESULT_DIR_NAME}"
 
 if command -v podman-compose >/dev/null 2>&1; then
@@ -51,8 +51,8 @@ fetch_branch() {
 }
 
 ensure_container() {
-    cyan "Starting prosthesis dev container if needed..."
-    make -C "$ROOT_DIR" dev
+    cyan "Starting dedicated EMG container if needed..."
+    make -C "$ROOT_DIR" emg-dev
 }
 
 container_exec() {

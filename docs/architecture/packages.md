@@ -63,6 +63,7 @@ This is the fast package map for everything under `src/`.
 
 - Purpose: EMG collection, training, inference, and ROS publication
 - Key files: `src/emg_bridge/emg_bridge/*.py`, `src/emg_bridge/scripts/*`
+- Dedicated EMG container: `docker/Dockerfile.emg`, `docker/docker-compose.yml` service `emg`
 - Important entry points:
   - `ros2 run emg_bridge collect_data`
   - `ros2 run emg_bridge train`
