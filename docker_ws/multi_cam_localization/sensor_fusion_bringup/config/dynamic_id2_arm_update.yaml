@@ -17,6 +17,11 @@ launch:
   # samples when image processing or Jetson load spikes.
   hold_back_imu_for_frames: true
   verbosity: INFO
+  # JPEG-compress images over the Jetson→Laptop relay (reduces bandwidth ~10×).
+  relay_img_compress: true
+  # Pointcloud relay throttle Hz for the Jetson->Laptop relay node.
+  # Empty or unset falls back to pointcloud.max_rate_hz.
+  relay_pc_hz: 5.0
 
 pointcloud:
   # Keep the 30 Hz RGB stream for OpenVINS. Pointclouds are opt-in for grasping
