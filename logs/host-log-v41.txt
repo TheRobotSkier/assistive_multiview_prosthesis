@@ -1,0 +1,355 @@
+prosthesis@KingBob:/prosthesis_ws$ make start
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-15-10-07-38-060564-KingBob-3013
+[INFO] [launch]: Default logging verbosity is set to INFO
+[pipeline] use_tsdf_fusion=true — launching tsdf_fusion instead of segmentation_bridge
+[INFO] [pipeline_manager_node-1]: process started with pid [3055]
+[INFO] [mia_hand_driver_node-2]: process started with pid [3056]
+[INFO] [command_bridge_node-3]: process started with pid [3057]
+[INFO] [wrist_driver_node-4]: process started with pid [3058]
+[INFO] [run_classifier-5]: process started with pid [3059]
+[INFO] [emg_grasp_controller-6]: process started with pid [3060]
+[INFO] [bridge_node-7]: process started with pid [3061]
+[INFO] [haptic_controller_node-8]: process started with pid [3062]
+[INFO] [openvins_realsense_tf_bridge_node-9]: process started with pid [3063]
+[INFO] [camera_mount_tf_publisher-10]: process started with pid [3064]
+[INFO] [tf_pipeline_diagnostics-11]: process started with pid [3065]
+[INFO] [pointcloud_fusion_node-12]: process started with pid [3066]
+[INFO] [odom_to_pose_relay-13]: process started with pid [3069]
+[INFO] [openvins_odom_tf_relay-14]: process started with pid [3073]
+[INFO] [gtsam_tracker_node-15]: process started with pid [3074]
+[INFO] [keyframe_buffer_node-16]: process started with pid [3075]
+[INFO] [sift_feature_node-17]: process started with pid [3076]
+[INFO] [tsdf_fusion_node-18]: process started with pid [3077]
+[INFO] [twist_propagation_node-19]: process started with pid [3078]
+[INFO] [preshaping_service_bridge_node-20]: process started with pid [3079]
+[INFO] [grasp_proximity_controller_node.py-21]: process started with pid [3080]
+[INFO] [force_controller_node-22]: process started with pid [3082]
+[INFO] [rviz2-23]: process started with pid [3083]
+[rviz2-23] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[preshaping_service_bridge_node-20] [INFO] [1781518059.968537975] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-20] [INFO] [1781518059.984506845] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[mia_hand_driver_node-2] [ERROR] [1781518060.273548102] [mia_hand_driver]: Failed to open /dev/ttyMiaHand serial port
+[rviz2-23] [INFO] [1781518060.749565596] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-23] [INFO] [1781518060.751219129] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[mia_hand_driver_node-2] terminate called after throwing an instance of 'LibSerial::NotOpen'
+[mia_hand_driver_node-2]   what():  Serial port not open.
+[haptic_controller_node-8] [INFO] [1781518060.958488831] [haptic_controller]: Force streaming enabled.
+[haptic_controller_node-8] [INFO] [1781518060.961748590] [haptic_controller]: Force feedback enabled.
+[rviz2-23] [INFO] [1781518061.177532377] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-23] [INFO] [1781518061.711019703] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-23]
+[rviz2-23] [INFO] [1781518061.773168124] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-23]
+[rviz2-23] [INFO] [1781518061.837560930] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-23]
+[rviz2-23] [INFO] [1781518061.856817704] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-23]
+[rviz2-23] [INFO] [1781518062.358460773] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-23] [INFO] [1781518062.555190964] [rviz2]: Stereo is NOT SUPPORTED
+[wrist_driver_node-4] Traceback (most recent call last):
+[wrist_driver_node-4]   File "/usr/local/lib/python3.12/dist-packages/serial/serialposix.py", line 322, in open
+[wrist_driver_node-4]     self.fd = os.open(self.portstr, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
+[wrist_driver_node-4]               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4] FileNotFoundError: [Errno 2] No such file or directory: '/dev/ttyDynamixel'
+[wrist_driver_node-4]
+[wrist_driver_node-4] During handling of the above exception, another exception occurred:
+[wrist_driver_node-4]
+[wrist_driver_node-4] Traceback (most recent call last):
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/wrist_driver/wrist_driver_node", line 33, in <module>
+[wrist_driver_node-4]     sys.exit(load_entry_point('wrist_driver==0.1.0', 'console_scripts', 'wrist_driver_node')())
+[wrist_driver_node-4]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/python3.12/site-packages/wrist_driver/wrist_driver_node.py", line 225, in main
+[wrist_driver_node-4]     node = WristDriverNode()
+[wrist_driver_node-4]            ^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/prosthesis_ws/install/wrist_driver/lib/python3.12/site-packages/wrist_driver/wrist_driver_node.py", line 95, in __init__
+[wrist_driver_node-4]     if not self._port_handler.openPort():
+[wrist_driver_node-4]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/usr/local/lib/python3.12/dist-packages/dynamixel_sdk/port_handler.py", line 44, in openPort
+[wrist_driver_node-4]     return self.setBaudRate(self.baudrate)
+[wrist_driver_node-4]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/usr/local/lib/python3.12/dist-packages/dynamixel_sdk/port_handler.py", line 68, in setBaudRate
+[wrist_driver_node-4]     return self.setupPort(baud)
+[wrist_driver_node-4]            ^^^^^^^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/usr/local/lib/python3.12/dist-packages/dynamixel_sdk/port_handler.py", line 114, in setupPort
+[wrist_driver_node-4]     self.ser = serial.Serial(
+[wrist_driver_node-4]                ^^^^^^^^^^^^^^
+[wrist_driver_node-4]   File "/usr/local/lib/python3.12/dist-packages/serial/serialutil.py", line 244, in __init__
+[wrist_driver_node-4]     self.open()
+[wrist_driver_node-4]   File "/usr/local/lib/python3.12/dist-packages/serial/serialposix.py", line 325, in open
+[wrist_driver_node-4]     raise SerialException(msg.errno, "could not open port {}: {}".format(self._port, msg))
+[wrist_driver_node-4] serial.serialutil.SerialException: [Errno 2] could not open port /dev/ttyDynamixel: [Errno 2] No such file or directory: '/dev/ttyDynamixel'
+[ERROR] [wrist_driver_node-4]: process has died [pid 3058, exit code 1, cmd '/prosthesis_ws/install/wrist_driver/lib/wrist_driver/wrist_driver_node --ros-args -r __node:=wrist_driver --params-file /tmp/launch_params_5efxpoml'].
+[bridge_node-7] [INFO] [1781518063.414983798] [haptic_bridge]: Device address: 84:2E:14:09:E1:4E
+[bridge_node-7] [INFO] [1781518063.425110169] [haptic_bridge]: Subscribed to /haptic_band/motors (Float32MultiArray with 8 values, 0.0-100.0)
+[bridge_node-7] [INFO] [1781518063.427828791] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 1)
+[bridge_node-7] [WARN] [1781518063.428809742] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[ERROR] [mia_hand_driver_node-2]: process has died [pid 3056, exit code -6, cmd '/prosthesis_ws/install/mia_hand_driver/lib/mia_hand_driver/mia_hand_driver_node --ros-args -r __node:=mia_hand_driver --params-file /tmp/launch_params_84jwzyhl'].
+[emg_grasp_controller-6] [INFO] [1781518064.360013594] [emg_grasp_controller]: EMG grasp controller started — rate=20.0 Hz, stale_timeout=1.0s
+[bridge_node-7] [INFO] [1781518066.430311469] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 2)
+[bridge_node-7] [WARN] [1781518066.431960373] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[keyframe_buffer_node-16] [INFO] [1781518066.566020346] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_in_roi
+[keyframe_buffer_node-16] [INFO] [1781518066.597468477] [keyframe_buffer]: KeyframeBufferNode ready (max_kf/cam=50, gate_t=0.1m, gate_r=15.0deg)
+[keyframe_buffer_node-16] [INFO] [1781518066.613573596] [keyframe_buffer]: head cloud: height=1 -> UNORGANIZED
+[keyframe_buffer_node-16] [INFO] [1781518066.650759561] [keyframe_buffer]: arm cloud: height=1 -> UNORGANIZED
+[tf_pipeline_diagnostics-11] [INFO] [1781518066.816918219] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[camera_mount_tf_publisher-10] [INFO] [1781518067.570764205] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-10] [INFO] [1781518067.574503345] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[tsdf_fusion_node-18] [INFO] [1781518067.715068633] [tsdf_fusion]: Service advertised: /tsdf_fusion/trigger
+[tsdf_fusion_node-18] [INFO] [1781518067.724597105] [tsdf_fusion]: TsdfFusionNode ready (voxel=0.005m, trunc=0.02m, dbscan_eps=0.02m, shift=0.015m)
+[openvins_realsense_tf_bridge_node-9] [INFO] [1781518067.756225682] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-9] [INFO] [1781518067.758377958] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-9] [INFO] [1781518067.867847648] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-9] [INFO] [1781518067.870625588] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-9] [INFO] [1781518067.871512752] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[force_controller_node-22] [INFO] [1781518067.965999673] [force_controller]: Running without controller_manager — using per-finger position commands.
+[force_controller_node-22] [INFO] [1781518068.023847097] [force_controller]: Force controller started (velocity-based). Target default=300.0 raw, range=[50.0, 340.0] raw, rate=20.0 Hz, close_vel=1.0→0.25 rad/s, hold_deadzone=20.0, hold_max_v=0.08
+[tsdf_fusion_node-18] [INFO] [1781518068.246183196] [tsdf_fusion]: MobileSAM server reachable.
+[pipeline_manager_node-1] [INFO] [1781518068.299178484] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781518068.301711608] [pipeline_manager]: Pipeline manager started — state: IDLE
+[command_bridge_node-3] [INFO] [1781518068.456569139] [command_bridge]: Command bridge started — speed=80%, joint_states → /joint_states
+[pointcloud_fusion_node-12] [INFO] [1781518068.562628453] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-12] [INFO] [1781518068.564066735] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-12] [INFO] [1781518068.630760721] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-12] [WARN] [1781518068.650322426] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-12] [INFO] [1781518068.652783483] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-12] [INFO] [1781518068.655461674] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[grasp_proximity_controller_node.py-21] [INFO] [1781518068.840599411] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-21] [INFO] [1781518068.965461479] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[run_classifier-5] ROS 2 bridge active — publishing on /emg/* topics.
+[run_classifier-5]
+[run_classifier-5] ====================================================
+[run_classifier-5]     EMG Classifier — Live
+[run_classifier-5] ====================================================
+[run_classifier-5] Loading classifier from /app/models …
+[run_classifier-5] /usr/local/lib/python3.12/dist-packages/sklearn/base.py:525: InconsistentVersionWarning: Trying to unpickle estimator StandardScaler from version 1.8.0 when using version 1.9.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+[run_classifier-5] https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+[run_classifier-5]   warnings.warn(
+[run_classifier-5] /usr/local/lib/python3.12/dist-packages/sklearn/base.py:525: InconsistentVersionWarning: Trying to unpickle estimator LinearDiscriminantAnalysis from version 1.8.0 when using version 1.9.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+[run_classifier-5] https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+[run_classifier-5]   warnings.warn(
+[run_classifier-5] /usr/local/lib/python3.12/dist-packages/sklearn/base.py:525: InconsistentVersionWarning: Trying to unpickle estimator Pipeline from version 1.8.0 when using version 1.9.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+[run_classifier-5] https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+[run_classifier-5]   warnings.warn(
+[run_classifier-5] Models loaded.
+[run_classifier-5]
+[run_classifier-5] Connecting to MindRove WiFi board …
+[run_classifier-5] [2026-06-15 10:07:49.263] [board_logger] [info] incoming json: {
+[run_classifier-5]     "file": "",
+[run_classifier-5]     "file_anc": "",
+[run_classifier-5]     "file_aux": "",
+[run_classifier-5]     "ip_address": "",
+[run_classifier-5]     "ip_address_anc": "",
+[run_classifier-5]     "ip_address_aux": "",
+[run_classifier-5]     "ip_port": 0,
+[run_classifier-5]     "ip_port_anc": 0,
+[run_classifier-5]     "ip_port_aux": 0,
+[run_classifier-5]     "ip_protocol": 0,
+[run_classifier-5]     "mac_address": "",
+[run_classifier-5]     "master_board": -100,
+[run_classifier-5]     "other_info": "",
+[run_classifier-5]     "serial_number": "",
+[run_classifier-5]     "serial_port": "",
+[run_classifier-5]     "timeout": 0
+[run_classifier-5] }
+[run_classifier-5] [2026-06-15 10:07:49.264] [board_logger] [info] Target address is set to : 192.168.4.1::4210
+[run_classifier-5] Connected!  500 Hz  8 channels
+[run_classifier-5]
+[pipeline_manager_node-1] [INFO] [1781518069.316885464] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[run_classifier-5] Filling buffer …
+[sift_feature_node-17] [INFO] [1781518069.329267695] [cross_camera_features]: SiftFeatureNode ready (backend=sift, min_matches=5, slop=0.05s)
+[gtsam_tracker_node-15] [INFO] [1781518069.344407595] [gtsam_tracker]: GtsamTrackerNode ready (rate=15.0Hz, lag=15.0s, head_source=odom)
+[twist_propagation_node-19] [INFO] [1781518069.371917198] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[bridge_node-7] [INFO] [1781518069.433257718] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 3)
+[bridge_node-7] [WARN] [1781518069.442522919] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[twist_propagation_node-19] [INFO] [1781518069.556669637] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-19] [INFO] [1781518069.564688215] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[grasp_proximity_controller_node.py-21] [INFO] [1781518070.308342130] [proximity_controller]: Received first hand pose — control loop now active
+[openvins_odom_tf_relay-14] [WARN] [1781518070.354184711] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.070, 0.069, 0.313), cov_trace=1.16e-02, pos_norm=0.328m, elapsed=5.3s, actual_imu_frame='arm_imu')
+[pointcloud_fusion_node-12] [WARN] [1781518070.651650046] [pointcloud_fusion]: TF tree connected via 'arm_d435i_arm_depth_optical_frame' — starting point cloud fusion (waited 2.0s since node startup)
+[openvins_odom_tf_relay-14] [WARN] [1781518072.003027561] [openvins_odom_tf_relay]: arm odom pose norm 2.00m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518072.451154205] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 4)
+[bridge_node-7] [WARN] [1781518072.452306543] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518074.003481879] [openvins_odom_tf_relay]: arm odom pose norm 6.13m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-14] [WARN] [1781518074.981684110] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: OK (236 msgs)
+[gtsam_tracker_node-15] [WARN] [1781518075.266586813] [gtsam_tracker]: No ArUco messages received after 5s — running on odometry + visual factors only
+[bridge_node-7] [INFO] [1781518075.456745815] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 5)
+[bridge_node-7] [WARN] [1781518075.468123561] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518076.014465642] [openvins_odom_tf_relay]: arm odom pose norm 5.28m exceeds max 2.0m — suppressing TF
+[tf_pipeline_diagnostics-11] [WARN] [1781518077.789806688] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-14] [WARN] [1781518078.018332008] [openvins_odom_tf_relay]: arm odom pose norm 10.47m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518078.471025553] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 6)
+[bridge_node-7] [WARN] [1781518078.476480021] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[pointcloud_fusion_node-12] [INFO] [1781518078.643278684] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-12] [WARN] [1781518078.652469927] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: stale (9.5s); cam2: stale (8.9s)
+[sift_feature_node-17] [INFO] [1781518079.306568791] [cross_camera_features]: frames=46, published=0
+[openvins_odom_tf_relay-14] [WARN] [1781518080.020202159] [openvins_odom_tf_relay]: arm odom pose norm 18.82m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518081.503985969] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 7)
+[bridge_node-7] [WARN] [1781518081.505741047] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518082.020521730] [openvins_odom_tf_relay]: arm odom pose norm 32.00m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-14] [WARN] [1781518084.029012471] [openvins_odom_tf_relay]: arm odom pose norm 50.68m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518084.551030746] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 8)
+[bridge_node-7] [WARN] [1781518084.552276537] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518084.981181000] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: OK (236 msgs)
+[openvins_odom_tf_relay-14] [WARN] [1781518086.050331204] [openvins_odom_tf_relay]: arm odom pose norm 76.20m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518087.553989985] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 9)
+[bridge_node-7] [WARN] [1781518087.589617163] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[tf_pipeline_diagnostics-11] [WARN] [1781518087.795606681] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-14] [WARN] [1781518088.051949142] [openvins_odom_tf_relay]: arm odom pose norm 119.68m exceeds max 2.0m — suppressing TF
+[pointcloud_fusion_node-12] [INFO] [1781518088.642489733] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-12] [WARN] [1781518088.643380267] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: stale (19.5s); cam2: stale (18.9s)
+[sift_feature_node-17] [INFO] [1781518089.292458519] [cross_camera_features]: frames=81, published=0
+[openvins_odom_tf_relay-14] [WARN] [1781518090.052908372] [openvins_odom_tf_relay]: arm odom pose norm 161.96m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518090.590638691] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 10)
+[bridge_node-7] [WARN] [1781518090.591895744] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[gtsam_tracker_node-15] [ERROR] [1781518091.013755169] [gtsam_tracker]: Graph update failed:
+[gtsam_tracker_node-15] Indeterminant linear system detected while working near variable
+[gtsam_tracker_node-15] 6989586621679010071 (Symbol: a279).
+[gtsam_tracker_node-15]
+[gtsam_tracker_node-15] Thrown when a linear system is ill-posed.  The most common cause for this
+[gtsam_tracker_node-15] error is having underconstrained variables.  Mathematically, the system is
+[gtsam_tracker_node-15] underdetermined.  See the GTSAM Doxygen documentation at
+[gtsam_tracker_node-15] http://borg.cc.gatech.edu/ on gtsam::IndeterminantLinearSystemException for
+[gtsam_tracker_node-15] more information.
+[gtsam_tracker_node-15] [ERROR] [1781518091.069536028] [gtsam_tracker]: Failed to add odometry factor: Requested variable 'h294' is not in this VectorValues.
+[openvins_odom_tf_relay-14] [WARN] [1781518092.075670266] [openvins_odom_tf_relay]: arm odom pose norm 212.21m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518093.598358178] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 11)
+[bridge_node-7] [WARN] [1781518093.609126935] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518094.085261779] [openvins_odom_tf_relay]: arm odom pose norm 266.52m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-14] [WARN] [1781518094.986068405] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: OK (236 msgs)
+[openvins_odom_tf_relay-14] [WARN] [1781518096.089192105] [openvins_odom_tf_relay]: arm odom pose norm 325.19m exceeds max 2.0m — suppressing TF
+[gtsam_tracker_node-15] [ERROR] [1781518096.115032203] [gtsam_tracker]: Failed to add odometry factor: Requested variable 'h294' is not in this VectorValues.
+[bridge_node-7] [INFO] [1781518096.617097282] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 12)
+[bridge_node-7] [WARN] [1781518096.618108236] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[tf_pipeline_diagnostics-11] [WARN] [1781518097.802391382] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-14] [WARN] [1781518098.090347099] [openvins_odom_tf_relay]: arm odom pose norm 386.48m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-14] [WARN] [1781518098.341140671] [openvins_odom_tf_relay]: head: OpenVINS initialized (covariance), publishing TF marker_map -> head_imu (p=(0.460, -0.083, 0.278), cov_trace=2.98e-02, pos_norm=0.544m, elapsed=33.4s, actual_imu_frame='head_imu')
+[pointcloud_fusion_node-12] [INFO] [1781518098.694619070] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.0s
+[pointcloud_fusion_node-12] [WARN] [1781518098.723215432] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: stale (29.5s); cam2: stale (28.9s)
+[sift_feature_node-17] [INFO] [1781518099.307758304] [cross_camera_features]: frames=122, published=0
+[bridge_node-7] [INFO] [1781518099.622053661] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 13)
+[bridge_node-7] [WARN] [1781518099.623043906] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518100.127391402] [openvins_odom_tf_relay]: arm odom pose norm 451.20m exceeds max 2.0m — suppressing TF
+[gtsam_tracker_node-15] [ERROR] [1781518101.128906290] [gtsam_tracker]: Failed to add odometry factor: Requested variable 'h294' is not in this VectorValues.
+[openvins_odom_tf_relay-14] [WARN] [1781518102.128167911] [openvins_odom_tf_relay]: arm odom pose norm 517.48m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518102.636476373] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 14)
+[bridge_node-7] [WARN] [1781518102.637867226] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518103.860814457] [openvins_odom_tf_relay]: head odom pose jumped 1.725m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-14] [WARN] [1781518104.132151341] [openvins_odom_tf_relay]: arm odom pose norm 581.35m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518105.646730679] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 15)
+[bridge_node-7] [WARN] [1781518105.659625021] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518106.136762845] [openvins_odom_tf_relay]: head odom pose norm 9.94m exceeds max 2.0m — suppressing TF
+[gtsam_tracker_node-15] [ERROR] [1781518106.139223480] [gtsam_tracker]: Failed to add odometry factor: Requested variable 'h294' is not in this VectorValues.
+[tf_pipeline_diagnostics-11] [INFO] [1781518106.803081261] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-14] [WARN] [1781518108.138115776] [openvins_odom_tf_relay]: head odom pose norm 25.95m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518108.669217406] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 16)
+[pointcloud_fusion_node-12] [INFO] [1781518108.672984068] [pointcloud_fusion]: Stats: published=3 (dual=0, cam1_only=6) dist_removed=377743 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=7.8s
+[bridge_node-7] [WARN] [1781518108.679555735] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[sift_feature_node-17] [INFO] [1781518109.291630066] [cross_camera_features]: frames=179, published=0
+[openvins_odom_tf_relay-14] [WARN] [1781518110.151022172] [openvins_odom_tf_relay]: arm odom pose norm 761.55m exceeds max 2.0m — suppressing TF
+[gtsam_tracker_node-15] [ERROR] [1781518111.199305205] [gtsam_tracker]: Failed to add odometry factor: Requested variable 'h294' is not in this VectorValues.
+[bridge_node-7] [INFO] [1781518111.682603512] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 17)
+[bridge_node-7] [WARN] [1781518111.684546182] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518112.152956813] [openvins_odom_tf_relay]: arm odom pose norm 810.71m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-14] [WARN] [1781518114.156537010] [openvins_odom_tf_relay]: head odom pose norm 137.57m exceeds max 2.0m — suppressing TF
+[bridge_node-7] [INFO] [1781518114.706701952] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 18)
+[bridge_node-7] [WARN] [1781518114.707546048] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518116.189443774] [openvins_odom_tf_relay]: head odom pose norm 206.01m exceeds max 2.0m — suppressing TF
+[gtsam_tracker_node-15] [ERROR] [1781518116.204284247] [gtsam_tracker]: Failed to add odometry factor: Requested variable 'h294' is not in this VectorValues.
+[tf_pipeline_diagnostics-11] [INFO] [1781518116.782311779] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[bridge_node-7] [INFO] [1781518117.710448625] [haptic_bridge]: [dev1] Connecting to 84:2E:14:09:E1:4E … (attempt 19)
+[bridge_node-7] [WARN] [1781518117.715158469] [haptic_bridge]: [dev1] Connection failed: [Errno 113] No route to host. Retrying in 3.0s …
+[openvins_odom_tf_relay-14] [WARN] [1781518118.194676416] [openvins_odom_tf_relay]: arm odom pose norm 918.97m exceeds max 2.0m — suppressing TF
+[pointcloud_fusion_node-12] [INFO] [1781518118.647818208] [pointcloud_fusion]: Stats: published=3 (dual=0, cam1_only=17) dist_removed=1627966 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=3.6s
+[sift_feature_node-17] [INFO] [1781518119.285843091] [cross_camera_features]: frames=254, published=0
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[sift_feature_node-17] Exception ignored in: <function Future.__del__ at 0x7a3604f2d1c0>
+[sift_feature_node-17] Traceback (most recent call last):
+[sift_feature_node-17]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 56, in __del__
+[sift_feature_node-17]     if self._exception is not None and not self._exception_fetched:
+[sift_feature_node-17]        ^^^^^^^^^^^^^^^
+[sift_feature_node-17] AttributeError: 'Task' object has no attribute '_exception'
+[preshaping_service_bridge_node-20] [INFO] [1781518119.727546096] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[rviz2-23] [INFO] [1781518119.727952923] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[run_classifier-5] Traceback (most recent call last):
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/emg_bridge/run_classifier", line 33, in <module>
+[run_classifier-5]     sys.exit(load_entry_point('emg_bridge==0.1.0', 'console_scripts', 'run_classifier')())
+[run_classifier-5]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/python3.12/site-packages/emg_bridge/run_classifier_entry.py", line 74, in main
+[run_classifier-5]     classifier_main()
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/python3.12/site-packages/emg_bridge/scripts/run_classifier.py", line 256, in main
+[run_classifier-5]     chunk = reader.read(WINDOW_STEP)
+[run_classifier-5]             ^^^^^^^^^^^^^^^^^^^^^^^^
+[run_classifier-5]   File "/prosthesis_ws/install/emg_bridge/lib/python3.12/site-packages/emg_bridge/board_reader.py", line 74, in read
+[run_classifier-5]     time.sleep(0.001)
+[run_classifier-5] KeyboardInterrupt
+[camera_mount_tf_publisher-10] Traceback (most recent call last):
+[camera_mount_tf_publisher-10]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-10]     main()
+[camera_mount_tf_publisher-10]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-10]     rclpy.shutdown()
+[camera_mount_tf_publisher-10]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-10]     _shutdown(context=context)
+[camera_mount_tf_publisher-10]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-10]     context.shutdown()
+[camera_mount_tf_publisher-10]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-10]     self.__context.shutdown()
+[camera_mount_tf_publisher-10] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[bridge_node-7] Traceback (most recent call last):
+[bridge_node-7]   File "/prosthesis_ws/install/haptic_bridge/lib/haptic_bridge/bridge_node", line 33, in <module>
+[bridge_node-7]     sys.exit(load_entry_point('haptic_bridge==0.1.0', 'console_scripts', 'bridge_node')())
+[bridge_node-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[bridge_node-7]   File "/prosthesis_ws/install/haptic_bridge/lib/python3.12/site-packages/haptic_bridge/bridge_node.py", line 210, in main
+[bridge_node-7]     rclpy.shutdown()
+[bridge_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[bridge_node-7]     _shutdown(context=context)
+[bridge_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[bridge_node-7]     context.shutdown()
+[bridge_node-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[bridge_node-7]     self.__context.shutdown()
+[bridge_node-7] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[tf_pipeline_diagnostics-11] Traceback (most recent call last):
+[tf_pipeline_diagnostics-11]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-11]     main()
+[tf_pipeline_diagnostics-11]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 147, in main
+[tf_pipeline_diagnostics-11]     rclpy.shutdown()
+[tf_pipeline_diagnostics-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[tf_pipeline_diagnostics-11]     _shutdown(context=context)
+[tf_pipeline_diagnostics-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[tf_pipeline_diagnostics-11]     context.shutdown()
+[tf_pipeline_diagnostics-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[tf_pipeline_diagnostics-11]     self.__context.shutdown()
+[tf_pipeline_diagnostics-11] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[INFO] [preshaping_service_bridge_node-20]: process has finished cleanly [pid 3079]
+[haptic_controller_node-8] Traceback (most recent call last):
+[haptic_controller_node-8]   File "/prosthesis_ws/install/haptic_bridge/lib/haptic_bridge/haptic_controller_node", line 33, in <module>
+[haptic_controller_node-8]     sys.exit(load_entry_point('haptic_bridge==0.1.0', 'console_scripts', 'haptic_controller_node')())
+[haptic_controller_node-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[haptic_controller_node-8]   File "/prosthesis_ws/install/haptic_bridge/lib/python3.12/site-packages/haptic_bridge/haptic_controller_node.py", line 185, in main
+[haptic_controller_node-8]     rclpy.shutdown()
+[haptic_controller_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[haptic_controller_node-8]     _shutdown(context=context)
+[haptic_controller_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[haptic_controller_node-8]     context.shutdown()
+[haptic_controller_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[haptic_controller_node-8]     self.__context.shutdown()
+[haptic_controller_node-8] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[INFO] [pointcloud_fusion_node-12]: process has finished cleanly [pid 3066]
+[INFO] [emg_grasp_controller-6]: process has finished cleanly [pid 3060]
+[ERROR] [camera_mount_tf_publisher-10]: process has died [pid 3064, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[INFO] [openvins_odom_tf_relay-14]: process has finished cleanly [pid 3073]
+[INFO] [rviz2-23]: process has finished cleanly [pid 3083]
+[ERROR] [bridge_node-7]: process has died [pid 3061, exit code 1, cmd '/prosthesis_ws/install/haptic_bridge/lib/haptic_bridge/bridge_node --ros-args -r __node:=haptic_bridge'].
+[ERROR] [tf_pipeline_diagnostics-11]: process has died [pid 3065, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[INFO] [tsdf_fusion_node-18]: process has finished cleanly [pid 3077]
+[INFO] [keyframe_buffer_node-16]: process has finished cleanly [pid 3075]
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 3055]
+[ERROR] [haptic_controller_node-8]: process has died [pid 3062, exit code 1, cmd '/prosthesis_ws/install/haptic_bridge/lib/haptic_bridge/haptic_controller_node --ros-args -r __node:=haptic_controller --params-file /tmp/launch_params_gezdbaxx'].
+[INFO] [sift_feature_node-17]: process has finished cleanly [pid 3076]
+[INFO] [gtsam_tracker_node-15]: process has finished cleanly [pid 3074]
+[INFO] [odom_to_pose_relay-13]: process has finished cleanly [pid 3069]
+[INFO] [openvins_realsense_tf_bridge_node-9]: process has finished cleanly [pid 3063]
+[INFO] [command_bridge_node-3]: process has finished cleanly [pid 3057]
+[INFO] [force_controller_node-22]: process has finished cleanly [pid 3082]
+[INFO] [twist_propagation_node-19]: process has finished cleanly [pid 3078]
+[INFO] [grasp_proximity_controller_node.py-21]: process has finished cleanly [pid 3080]
+[ERROR] [run_classifier-5]: process has died [pid 3059, exit code -2, cmd '/prosthesis_ws/install/emg_bridge/lib/emg_bridge/run_classifier --model-dir /app/models --ros-args -r __node:=emg_bridge'].

@@ -211,6 +211,72 @@ class TestMarginalization:
 
 
 # ---------------------------------------------------------------------------
+# Reset (recovery from corrupted ISAM2 state)
+# ---------------------------------------------------------------------------
+
+class TestReset:
+    def test_reset_clears_state(self):
+        """After reset(), the graph behaves like a fresh instance — the next
+        odometry factor seeds a new prior rather than chaining off the old
+        trajectory."""
+        graph = TrajectoryFactorGraph(lag_s=100.0)
+        noise = default_odom_noise(sigma_t=0.01, sigma_r=0.01)
+
+        # Build up a trajectory
+        for i in range(5):
+            delta = np.eye(4)
+            delta[0, 3] = 0.1
+            graph.add_odometry_factor(
+                key_head=i, key_arm=i, stamp=i * 0.1,
+                delta_head=delta, delta_arm=delta.copy(),
+                noise_head=noise, noise_arm=noise,
+            )
+            graph.update()
+
+        # Old keys should be queryable
+        old_key = gtsam.symbol('h', 4)
+        assert graph.get_pose(old_key) is not None
+
+        # Reset
+        graph.reset()
+
+        # After reset, old keys should no longer be queryable
+        with pytest.raises(Exception):
+            graph.get_pose(old_key)
+
+        # The next odometry factor should seed a fresh prior at the origin
+        delta_fresh = np.eye(4)
+        delta_fresh[0, 3] = 0.5
+        graph.add_odometry_factor(
+            key_head=0, key_arm=0, stamp=0.0,
+            delta_head=delta_fresh, delta_arm=delta_fresh.copy(),
+            noise_head=noise, noise_arm=noise,
+        )
+        graph.update()
+
+        new_key = gtsam.symbol('h', 0)
+        pose = graph.get_pose(new_key)
+        t = pose.translation()
+        # Fresh prior should be at the delta origin (0.5m in x)
+        assert abs(t[0] - 0.5) < 0.01, f"Post-reset pose at {t[0]:.3f}, expected ~0.5"
+
+    def test_reset_repeated(self):
+        """reset() can be called multiple times without error."""
+        graph = TrajectoryFactorGraph(lag_s=5.0)
+        for _ in range(3):
+            graph.reset()
+        # Should still work normally
+        noise = default_odom_noise(sigma_t=0.01, sigma_r=0.01)
+        graph.add_odometry_factor(
+            key_head=0, key_arm=0, stamp=0.0,
+            delta_head=np.eye(4), delta_arm=np.eye(4),
+            noise_head=noise, noise_arm=noise,
+        )
+        graph.update()
+        assert graph.get_pose(gtsam.symbol('h', 0)) is not None
+
+
+# ---------------------------------------------------------------------------
 # Range factor
 # ---------------------------------------------------------------------------
 

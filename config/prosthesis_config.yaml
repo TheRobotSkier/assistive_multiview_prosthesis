@@ -244,8 +244,8 @@ preshaping_service:
 pointcloud_fusion:
     ros__parameters:
         target_frame: "marker_map"
-        cam1_topic: "/head/d435i_head/depth/color/points"
-        cam2_topic: "/arm/d435i_arm/depth/color/points"
+        cam1_topic: "/jetson/head/points"
+        cam2_topic: "/jetson/arm/points"
         arm_frame: "arm_d435i_arm_depth_frame"
         max_distance: 2.0
         voxel_size: 0.005
@@ -262,11 +262,16 @@ pointcloud_fusion:
         # 40-80s of failed TF lookups during OpenVINS startup.
         wait_for_tf: true
         tf_ready_check_interval: 2.0
+        # V6 §6.3 — when true, cloud age and TF lookup use the cloud's
+        # header stamp (sensor time) instead of host arrival time.
+        # Requires chrony time sync between Jetson and host.
+        use_header_stamp_age: true
+        transform_tolerance_s: 0.1
 
 openvins_odom_tf_relay:
     ros__parameters:
-        head_odom_topic: "/ov_msckf/odomimu"
-        arm_odom_topic: "/ov_msckf_arm/odomimu"
+        head_odom_topic: "/jetson/head/odom"
+        arm_odom_topic: "/jetson/arm/odom"
         target_frame: "marker_map"
         head_imu_frame: "head_imu"
         arm_imu_frame: "arm_imu"
@@ -311,6 +316,11 @@ openvins_odom_tf_relay:
         extrinsics_topic: ""
         max_pose_norm_m: 2.0
         max_pose_jump_m: 0.50
+        # V6 §6.3 — when false, the relay does NOT broadcast the dynamic
+        # marker_map -> *_imu TF edges.  Instead, the GTSAM tracker owns
+        # those edges (broadcast_tf=true) so downstream nodes consume the
+        # smoothed FGO trajectory rather than raw, diverging VIO.
+        publish_dynamic_tf: false
 
 openvins_realsense_tf_bridge:
     ros__parameters:
@@ -429,8 +439,8 @@ emg_grasp_controller:
 gtsam_tracker:
     ros__parameters:
         # Odometry topics
-        head_odom_topic: "/ov_msckf/odomimu"
-        arm_odom_topic: "/ov_msckf_arm/odomimu"
+        head_odom_topic: "/jetson/head/odom"
+        arm_odom_topic: "/jetson/arm/odom"
         # Head pose source: "odom" (subscribe to odom topic) or "tf"
         # (look up marker_map -> head_imu via TF2).
         head_pose_source: "odom"
@@ -458,16 +468,24 @@ gtsam_tracker:
         arm_pose_topic: "/gtsam/arm_pose"
         # Output frame
         world_frame: "marker_map"
+        # V6 §6.3 — broadcast the smoothed head/arm poses as dynamic TF
+        # edges (marker_map -> head_imu / arm_imu) so pointcloud_fusion,
+        # rviz, and other consumers use the FGO trajectory instead of the
+        # raw VIO relay.  The relay's publish_dynamic_tf must be set to
+        # false to avoid two publishers fighting over the same edges.
+        broadcast_tf: true
+        head_child_frame: "head_imu"
+        arm_child_frame: "arm_imu"
 
 keyframe_buffer:
     ros__parameters:
         # Per-camera topic names
-        head_image_topic: "/head/d435i_head/color/image_raw"
-        arm_image_topic: "/arm/d435i_arm/color/image_raw"
-        head_cloud_topic: "/head/d435i_head/depth/color/points"
-        arm_cloud_topic: "/arm/d435i_arm/depth/color/points"
-        head_info_topic: "/head/d435i_head/color/camera_info"
-        arm_info_topic: "/arm/d435i_arm/color/camera_info"
+        head_image_topic: "/jetson/head/image"
+        arm_image_topic: "/jetson/arm/image"
+        head_cloud_topic: "/jetson/head/points"
+        arm_cloud_topic: "/jetson/arm/points"
+        head_info_topic: "/jetson/head/camera_info"
+        arm_info_topic: "/jetson/arm/camera_info"
         # Pose topics (from gtsam_tracker)
         head_pose_topic: "/gtsam/head_pose"
         arm_pose_topic: "/gtsam/arm_pose"
@@ -483,12 +501,12 @@ keyframe_buffer:
 cross_camera_features:
     ros__parameters:
         # Per-camera topic names
-        head_image_topic: "/head/d435i_head/color/image_raw"
-        arm_image_topic: "/arm/d435i_arm/color/image_raw"
-        head_cloud_topic: "/head/d435i_head/depth/color/points"
-        arm_cloud_topic: "/arm/d435i_arm/depth/color/points"
-        head_info_topic: "/head/d435i_head/color/camera_info"
-        arm_info_topic: "/arm/d435i_arm/color/camera_info"
+        head_image_topic: "/jetson/head/image"
+        arm_image_topic: "/jetson/arm/image"
+        head_cloud_topic: "/jetson/head/points"
+        arm_cloud_topic: "/jetson/arm/points"
+        head_info_topic: "/jetson/head/camera_info"
+        arm_info_topic: "/jetson/arm/camera_info"
         # Pose topics (from gtsam_tracker)
         head_pose_topic: "/gtsam/head_pose"
         arm_pose_topic: "/gtsam/arm_pose"

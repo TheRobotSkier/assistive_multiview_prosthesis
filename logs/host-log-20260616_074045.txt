@@ -1,0 +1,1006 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-16-07-40-47-574157-KingBob-559
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [565]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [566]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [567]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [568]
+[INFO] [pointcloud_fusion_node-5]: process started with pid [569]
+[INFO] [odom_to_pose_relay-6]: process started with pid [570]
+[INFO] [openvins_odom_tf_relay-7]: process started with pid [571]
+[INFO] [gtsam_tracker_node-8]: process started with pid [572]
+[INFO] [keyframe_buffer_node-9]: process started with pid [573]
+[INFO] [sift_feature_node-10]: process started with pid [574]
+[INFO] [segmentation_ros2_node-11]: process started with pid [575]
+[INFO] [twist_propagation_node-12]: process started with pid [576]
+[INFO] [preshaping_service_bridge_node-13]: process started with pid [577]
+[INFO] [grasp_proximity_controller_node.py-14]: process started with pid [578]
+[INFO] [rviz2-15]: process started with pid [579]
+[preshaping_service_bridge_node-13] [INFO] [1781595648.745702804] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-13] [INFO] [1781595648.751005378] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-15] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[pipeline_manager_node-1] [INFO] [1781595649.909493853] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781595649.912511053] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tf_pipeline_diagnostics-4] [INFO] [1781595650.211786945] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[keyframe_buffer_node-9] [INFO] [1781595650.486873399] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_in_roi
+[keyframe_buffer_node-9] [INFO] [1781595650.501910506] [keyframe_buffer]: KeyframeBufferNode ready (max_kf/cam=50, gate_t=0.1m, gate_r=15.0deg)
+[camera_mount_tf_publisher-3] [INFO] [1781595650.760033505] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1781595650.761966541] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781595650.781987178] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781595650.783228744] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781595650.886210126] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781595650.890076911] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781595650.891607184] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[pipeline_manager_node-1] [INFO] [1781595650.915721658] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pointcloud_fusion_node-5] [INFO] [1781595650.943402725] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-5] [INFO] [1781595650.944693509] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-5] [INFO] [1781595650.969243987] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-5] [WARN] [1781595650.970779800] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[pointcloud_fusion_node-5] [INFO] [1781595650.972821902] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-5] [INFO] [1781595650.975027082] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[gtsam_tracker_node-8] [INFO] [1781595651.020208925] [gtsam_tracker]: TF broadcasting enabled (marker_map → head_imu, arm_imu)
+[gtsam_tracker_node-8] [INFO] [1781595651.042537044] [gtsam_tracker]: GtsamTrackerNode ready (rate=15.0Hz, lag=15.0s, head_source=odom, broadcast_tf=True)
+[segmentation_ros2_node-11] [INFO] [1781595651.402473491] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[grasp_proximity_controller_node.py-14] [INFO] [1781595651.494549919] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-14] [INFO] [1781595651.530872014] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[twist_propagation_node-12] [INFO] [1781595651.605332698] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-12] [INFO] [1781595651.657160150] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-12] [INFO] [1781595651.659886426] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[sift_feature_node-10] [INFO] [1781595652.921519773] [cross_camera_features]: SiftFeatureNode ready (backend=sift, min_matches=5, slop=0.05s)
+[pointcloud_fusion_node-5] [WARN] [1781595652.974687138] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[pointcloud_fusion_node-5] [WARN] [1781595654.977792961] [pointcloud_fusion]: TF wait gate: not connected after 4s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[rviz2-15] [INFO] [1781595657.848091649] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781595657.848285066] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[rviz2-15] [INFO] [1781595658.131131234] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781595658.583643138] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781595658.642294248] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781595658.860865582] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781595658.875337837] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781595659.382013027] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781595659.468553458] [rviz2]: Stereo is NOT SUPPORTED
+[openvins_odom_tf_relay-7] [WARN] [1781595660.307768875] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781595660.973769405] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-5] [WARN] [1781595660.978522040] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-5] [WARN] [1781595660.986686964] [pointcloud_fusion]: TF wait gate: not connected after 10s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781595661.045700956] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[tf_pipeline_diagnostics-4] [WARN] [1781595662.219633757] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [INFO] [1781595662.891487376] [cross_camera_features]: frames=0, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595670.210422706] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781595670.974498787] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-5] [WARN] [1781595670.978474540] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-5] [WARN] [1781595670.987334950] [pointcloud_fusion]: TF wait gate: not connected after 20s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781595671.045996576] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[tf_pipeline_diagnostics-4] [WARN] [1781595672.197771239] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [INFO] [1781595672.893360591] [cross_camera_features]: frames=0, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595680.208439998] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781595680.982458839] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.0s
+[pointcloud_fusion_node-5] [WARN] [1781595680.986499801] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-5] [WARN] [1781595680.991687918] [pointcloud_fusion]: TF wait gate: not connected after 30s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781595681.046926279] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[tf_pipeline_diagnostics-4] [WARN] [1781595682.199316713] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [INFO] [1781595682.892260465] [cross_camera_features]: frames=0, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595690.210850432] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781595690.974939025] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=40.0s
+[pointcloud_fusion_node-5] [WARN] [1781595690.981087164] [pointcloud_fusion]: Stall diagnostic (no publish for 40s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-5] [WARN] [1781595690.989235489] [pointcloud_fusion]: TF wait gate: not connected after 40s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781595691.046072267] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[tf_pipeline_diagnostics-4] [WARN] [1781595692.197822823] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [INFO] [1781595692.890291417] [cross_camera_features]: frames=0, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595700.213413640] [openvins_odom_tf_relay]: [RELAY-STATUS] 50s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781595700.971954404] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=50.0s
+[pointcloud_fusion_node-5] [WARN] [1781595700.972786386] [pointcloud_fusion]: Stall diagnostic (no publish for 50s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-5] [WARN] [1781595700.974478232] [pointcloud_fusion]: TF wait gate: not connected after 50s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781595701.045960961] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[tf_pipeline_diagnostics-4] [WARN] [1781595702.198854957] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [INFO] [1781595702.890887360] [cross_camera_features]: frames=0, published=0
+[keyframe_buffer_node-9] [INFO] [1781595710.028536796] [keyframe_buffer]: head cloud: height=1 -> UNORGANIZED
+[keyframe_buffer_node-9] [INFO] [1781595710.206588563] [keyframe_buffer]: arm cloud: height=1 -> UNORGANIZED
+[openvins_odom_tf_relay-7] [WARN] [1781595710.208728597] [openvins_odom_tf_relay]: [RELAY-STATUS] 60s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781595710.970587674] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=2, cam2=4) last_cloud_age(cam1=1.0s, cam2=0.6s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=60.0s
+[pointcloud_fusion_node-5] [WARN] [1781595710.971450490] [pointcloud_fusion]: Stall diagnostic (no publish for 60s): cam1: stale (1.0s); cam2: stale (0.6s)
+[pointcloud_fusion_node-5] [WARN] [1781595710.973576311] [pointcloud_fusion]: TF wait gate: not connected after 60s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781595711.043829363] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[tf_pipeline_diagnostics-4] [WARN] [1781595712.181746496] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [INFO] [1781595712.889492024] [cross_camera_features]: frames=54, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595720.210554260] [openvins_odom_tf_relay]: [RELAY-STATUS] 70s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781595720.971307200] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=9) last_cloud_age(cam1=7.0s, cam2=5.8s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=70.0s
+[pointcloud_fusion_node-5] [WARN] [1781595720.975388668] [pointcloud_fusion]: Stall diagnostic (no publish for 70s): cam1: stale (7.0s); cam2: stale (5.8s)
+[pointcloud_fusion_node-5] [WARN] [1781595720.981352213] [pointcloud_fusion]: TF wait gate: not connected after 70s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781595721.043506903] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[tf_pipeline_diagnostics-4] [WARN] [1781595722.203448347] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [INFO] [1781595722.889519233] [cross_camera_features]: frames=201, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595730.209244494] [openvins_odom_tf_relay]: [RELAY-STATUS] 80s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781595730.972927003] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=9) last_cloud_age(cam1=17.0s, cam2=15.8s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=80.0s
+[pointcloud_fusion_node-5] [WARN] [1781595730.975810225] [pointcloud_fusion]: Stall diagnostic (no publish for 80s): cam1: stale (17.0s); cam2: stale (15.8s)
+[pointcloud_fusion_node-5] [WARN] [1781595730.979250613] [pointcloud_fusion]: TF wait gate: not connected after 80s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781595731.043233666] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[tf_pipeline_diagnostics-4] [WARN] [1781595732.197318976] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [INFO] [1781595732.891499151] [cross_camera_features]: frames=286, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595740.209365294] [openvins_odom_tf_relay]: [RELAY-STATUS] 90s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[openvins_odom_tf_relay-7] [WARN] [1781595740.860402622] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(0.023, -0.165, 0.192), cov_trace=3.62e-04, pos_norm=0.254m, elapsed=90.7s, actual_imu_frame='arm_imu')
+[grasp_proximity_controller_node.py-14] [INFO] [1781595740.867477256] [proximity_controller]: Received first hand pose — control loop now active
+[pointcloud_fusion_node-5] [INFO] [1781595740.972083707] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=9) last_cloud_age(cam1=27.0s, cam2=25.8s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=90.0s
+[pointcloud_fusion_node-5] [WARN] [1781595740.973455232] [pointcloud_fusion]: Stall diagnostic (no publish for 90s): cam1: stale (27.0s); cam2: stale (25.8s)
+[pointcloud_fusion_node-5] [WARN] [1781595740.975996082] [pointcloud_fusion]: TF tree connected via 'arm_d435i_arm_depth_optical_frame' — starting point cloud fusion (waited 90.0s since node startup)
+[gtsam_tracker_node-8] [INFO] [1781595741.054374749] [gtsam_tracker]: Stats: published=3 odom(head=0, arm=20) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=0.406m) clock_offset(head=-1.000s, arm=0.034s)
+[openvins_odom_tf_relay-7] [WARN] [1781595741.182714159] [openvins_odom_tf_relay]: head: OpenVINS initialized (covariance), publishing TF marker_map -> head_imu (p=(0.166, -0.110, 0.162), cov_trace=3.27e-03, pos_norm=0.257m, elapsed=91.0s, actual_imu_frame='head_imu')
+[tf_pipeline_diagnostics-4] [WARN] [1781595742.203693372] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[gtsam_tracker_node-8] [WARN] [1781595742.325825192] [gtsam_tracker]: Rejecting odometry delta — head jump 0.006m, arm jump 1.207m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[sift_feature_node-10] [WARN] [1781595743.068283065] [cross_camera_features]: Consistently < 5 SIFT matches (0). Consider SuperPoint upgrade.
+[sift_feature_node-10] [INFO] [1781595743.082098219] [cross_camera_features]: frames=370, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595745.789161319] [openvins_odom_tf_relay]: arm odom pose jumped 1.046m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [WARN] [1781595746.046229336] [gtsam_tracker]: No ArUco messages received after 5s — running on odometry + visual factors only
+[openvins_odom_tf_relay-7] [WARN] [1781595747.798627366] [openvins_odom_tf_relay]: arm odom pose jumped 1.016m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595749.807026929] [openvins_odom_tf_relay]: arm odom pose jumped 1.011m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595750.180835023] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595750.971028418] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=9) last_cloud_age(cam1=37.0s, cam2=35.8s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=100.0s
+[pointcloud_fusion_node-5] [WARN] [1781595750.980153111] [pointcloud_fusion]: Stall diagnostic (no publish for 100s): cam1: stale (37.0s); cam2: stale (35.8s)
+[gtsam_tracker_node-8] [INFO] [1781595751.058131921] [gtsam_tracker]: Stats: published=148 odom(head=1139, arm=1100) visual=0 delta_rejects=1 resets=0 pose_norm(head=0.468m, arm=0.550m) clock_offset(head=0.055s, arm=0.057s)
+[openvins_odom_tf_relay-7] [WARN] [1781595751.817724962] [openvins_odom_tf_relay]: arm odom pose jumped 1.003m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595753.007381323] [openvins_odom_tf_relay]: head odom pose norm 2.01m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595753.825294141] [openvins_odom_tf_relay]: arm odom pose jumped 1.020m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595754.581936698] [cross_camera_features]: frames=377, published=0
+[gtsam_tracker_node-8] [WARN] [1781595755.383119923] [gtsam_tracker]: Rejecting odometry delta — head jump 6.802m, arm jump 0.001m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[openvins_odom_tf_relay-7] [WARN] [1781595755.829822065] [openvins_odom_tf_relay]: head odom pose jumped 1.820m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595757.832681492] [openvins_odom_tf_relay]: arm odom pose jumped 1.011m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595759.836896705] [openvins_odom_tf_relay]: head odom pose jumped 1.748m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595760.182655771] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595760.972493300] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=9) last_cloud_age(cam1=47.0s, cam2=45.8s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=110.0s
+[pointcloud_fusion_node-5] [WARN] [1781595760.973824664] [pointcloud_fusion]: Stall diagnostic (no publish for 110s): cam1: stale (47.0s); cam2: stale (45.8s)
+[gtsam_tracker_node-8] [INFO] [1781595761.062520459] [gtsam_tracker]: Stats: published=144 odom(head=2180, arm=2273) visual=0 delta_rejects=1 resets=0 pose_norm(head=0.672m, arm=0.548m) clock_offset(head=0.110s, arm=0.055s)
+[openvins_odom_tf_relay-7] [WARN] [1781595761.853229262] [openvins_odom_tf_relay]: head odom pose jumped 1.733m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595762.891294284] [cross_camera_features]: frames=378, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595763.873556021] [openvins_odom_tf_relay]: arm odom pose jumped 1.012m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595765.884914404] [openvins_odom_tf_relay]: arm odom pose jumped 0.985m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595767.885512774] [openvins_odom_tf_relay]: arm odom pose jumped 1.000m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595769.913555527] [openvins_odom_tf_relay]: arm odom pose jumped 0.998m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595770.180294769] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595770.971408755] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=9) last_cloud_age(cam1=57.0s, cam2=55.8s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=120.0s
+[pointcloud_fusion_node-5] [WARN] [1781595770.973927904] [pointcloud_fusion]: Stall diagnostic (no publish for 120s): cam1: stale (57.0s); cam2: stale (55.8s)
+[gtsam_tracker_node-8] [INFO] [1781595771.063107619] [gtsam_tracker]: Stats: published=139 odom(head=3163, arm=3314) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.660m, arm=0.540m) clock_offset(head=0.106s, arm=0.071s)
+[openvins_odom_tf_relay-7] [WARN] [1781595772.031744927] [openvins_odom_tf_relay]: arm odom pose jumped 0.997m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595772.891215462] [cross_camera_features]: frames=380, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781595774.117790952] [openvins_odom_tf_relay]: arm odom pose jumped 0.993m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [ERROR] [1781595776.033637103] [gtsam_tracker]: Graph update failed (1x): 
+[gtsam_tracker_node-8] Indeterminant linear system detected while working near variable
+[gtsam_tracker_node-8] 7493989779944505672 (Symbol: h328).
+[gtsam_tracker_node-8] 
+[gtsam_tracker_node-8] Thrown when a linear system is ill-posed.  The most common cause for this
+[gtsam_tracker_node-8] error is having underconstrained variables.  Mathematically, the system is
+[gtsam_tracker_node-8] underdetermined.  See the GTSAM Doxygen documentation at
+[gtsam_tracker_node-8] http://borg.cc.gatech.edu/ on gtsam::IndeterminantLinearSystemException for
+[gtsam_tracker_node-8] more information.
+[openvins_odom_tf_relay-7] [WARN] [1781595776.129705433] [openvins_odom_tf_relay]: arm odom pose jumped 0.984m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [ERROR] [1781595776.180067065] [gtsam_tracker]: Failed to add odometry factor (3x): Requested variable 'h501' is not in this VectorValues.
+[gtsam_tracker_node-8] [WARN] [1781595776.193543287] [gtsam_tracker]: Factor graph reset (#1). Re-seeding from current poses — expect a small pose discontinuity.
+[gtsam_tracker_node-8] [WARN] [1781595776.248201803] [gtsam_tracker]: Rejecting odometry delta — head jump 0.672m, arm jump 0.549m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[rviz2-15] [INFO] [1781595776.636068745] [rviz2]: Subscribing to: /arm/d435i_arm/depth/color/points
+[rviz2-15] 
+[rviz2-15] [INFO] [1781595777.441508435] [rviz2]: Subscribing to: /head/d435i_head/depth/color/points
+[rviz2-15] 
+[openvins_odom_tf_relay-7] [WARN] [1781595778.130021961] [openvins_odom_tf_relay]: arm odom pose jumped 0.984m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595780.131941039] [openvins_odom_tf_relay]: head odom pose jumped 1.753m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595780.986651936] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=9) last_cloud_age(cam1=67.0s, cam2=65.8s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=130.0s
+[pointcloud_fusion_node-5] [WARN] [1781595780.997455401] [pointcloud_fusion]: Stall diagnostic (no publish for 130s): cam1: stale (67.0s); cam2: stale (65.8s)
+[openvins_odom_tf_relay-7] [WARN] [1781595782.132164345] [openvins_odom_tf_relay]: head odom pose jumped 1.780m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] Traceback (most recent call last):
+[gtsam_tracker_node-8]   File "/prosthesis_ws/install/gtsam_tracker/lib/gtsam_tracker/gtsam_tracker_node", line 33, in <module>
+[gtsam_tracker_node-8]     sys.exit(load_entry_point('gtsam_tracker==0.1.0', 'console_scripts', 'gtsam_tracker_node')())
+[gtsam_tracker_node-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[gtsam_tracker_node-8]   File "/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker/gtsam_tracker_node.py", line 784, in main
+[gtsam_tracker_node-8]     rclpy.spin(node)
+[gtsam_tracker_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[gtsam_tracker_node-8]     executor.spin_once()
+[gtsam_tracker_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[gtsam_tracker_node-8]     self._spin_once_impl(timeout_sec)
+[gtsam_tracker_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[gtsam_tracker_node-8]     raise handler.exception()
+[gtsam_tracker_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[gtsam_tracker_node-8]     result = coro.send(None)
+[gtsam_tracker_node-8]              ^^^^^^^^^^^^^^^
+[gtsam_tracker_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 592, in handler
+[gtsam_tracker_node-8]     await call_coroutine()
+[gtsam_tracker_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 480, in _execute
+[gtsam_tracker_node-8]     await await_or_execute(sub.callback, *msg_tuple)
+[gtsam_tracker_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 115, in await_or_execute
+[gtsam_tracker_node-8]     return callback(*args)
+[gtsam_tracker_node-8]            ^^^^^^^^^^^^^^^
+[gtsam_tracker_node-8]   File "/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker/gtsam_tracker_node.py", line 429, in _on_visual_factor
+[gtsam_tracker_node-8]     T_head_arm = pose_to_matrix(msg.pose)
+[gtsam_tracker_node-8]                  ^^^^^^^^^^^^^^^^^^^^^^^^
+[gtsam_tracker_node-8]   File "/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker/se3_helpers.py", line 153, in pose_to_matrix
+[gtsam_tracker_node-8]     p = pose_msg.position
+[gtsam_tracker_node-8]         ^^^^^^^^^^^^^^^^^
+[gtsam_tracker_node-8] AttributeError: 'PoseWithCovariance' object has no attribute 'position'
+[tf_pipeline_diagnostics-4] [INFO] [1781595782.878522008] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[ERROR] [gtsam_tracker_node-8]: process has died [pid 572, exit code 1, cmd '/prosthesis_ws/install/gtsam_tracker/lib/gtsam_tracker/gtsam_tracker_node --ros-args -r __node:=gtsam_tracker --params-file /tmp/launch_params_e8apeyie'].
+[openvins_odom_tf_relay-7] [WARN] [1781595784.170876223] [openvins_odom_tf_relay]: head odom pose jumped 1.779m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595785.604541626] [cross_camera_features]: frames=382, published=2
+[openvins_odom_tf_relay-7] [WARN] [1781595786.172153347] [openvins_odom_tf_relay]: arm odom pose jumped 0.985m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595788.175265177] [openvins_odom_tf_relay]: head odom pose jumped 1.771m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595790.177084021] [openvins_odom_tf_relay]: arm odom pose jumped 0.988m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595790.181775355] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595790.971813911] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=9) last_cloud_age(cam1=77.0s, cam2=75.8s) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=140.0s
+[pointcloud_fusion_node-5] [WARN] [1781595790.974314661] [pointcloud_fusion]: Stall diagnostic (no publish for 140s): cam1: stale (77.0s); cam2: stale (75.8s)
+[openvins_odom_tf_relay-7] [WARN] [1781595792.177831355] [openvins_odom_tf_relay]: arm odom pose jumped 0.959m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595792.889858583] [cross_camera_features]: frames=382, published=2
+[openvins_odom_tf_relay-7] [WARN] [1781595794.179965969] [openvins_odom_tf_relay]: arm odom pose jumped 0.936m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595796.218372802] [openvins_odom_tf_relay]: head odom pose jumped 1.785m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595798.222009026] [openvins_odom_tf_relay]: head odom pose jumped 1.819m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [WARN] [1781595798.323511836] [pointcloud_fusion]: Clock skew 1.6s exceeds threshold 1.0s — chrony sync appears broken. Falling back to arrival-time stamping for cloud age and TF lookups. Fix with 'make timesync-check' and restart.
+[tf_pipeline_diagnostics-4] [INFO] [1781595800.177965984] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595800.227266564] [openvins_odom_tf_relay]: head odom pose jumped 1.796m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595800.976581435] [pointcloud_fusion]: Stats: published=3 (dual=0, cam1_only=7) received(cam1=7, cam2=10) last_cloud_age(cam1=87.0s, cam2=2.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=10080 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=0.3s
+[openvins_odom_tf_relay-7] [WARN] [1781595802.233305213] [openvins_odom_tf_relay]: head odom pose jumped 1.793m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595804.233967853] [openvins_odom_tf_relay]: arm odom pose jumped 0.940m (> 0.5m) — suppressing TF
+[rviz2-15] [WARN] [1781595806.085691570] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.345343 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086219400] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.348718 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086252111] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.349504 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086269040] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.350101 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086285473] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.357415 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086303235] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.359601 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086319848] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.364605 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086335192] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.399562 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086429373] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.400299 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086453710] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.400796 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086474593] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.401084 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086490653] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.402206 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086508657] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.402960 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.086526503] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.406583 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095403470] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.482658 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095593052] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.495016 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095613336] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.500288 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095629966] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.505276 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095717463] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.510041 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095823727] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.515223 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095850910] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.520375 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095869084] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.553874 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095886724] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.556822 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095903394] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.558630 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095921624] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.559641 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095937978] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.562642 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095955619] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.566695 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095970692] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.570666 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.095986347] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.598944 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096003960] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.600279 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096020087] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.600634 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096036742] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.600931 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096207312] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.601264 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096230197] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.601700 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096247308] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.606283 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096287760] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.614033 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096322186] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.655118 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096340873] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.660358 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096358822] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.668365 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096375254] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.670199 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096391490] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.678550 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096406723] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.681756 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096422592] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.696007 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096549950] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.700958 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096691408] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.708514 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595806.096710957] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595795.710835 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[openvins_odom_tf_relay-7] [WARN] [1781595806.236878047] [openvins_odom_tf_relay]: head odom pose jumped 1.758m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595806.578194081] [cross_camera_features]: frames=384, published=4
+[rviz2-15] [WARN] [1781595807.693434277] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.318979 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.695559121] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.319720 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.695661837] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.320202 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.695778584] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.322915 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.808335424] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.330006 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.808438877] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.331648 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.808526354] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.340758 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.808546828] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.342056 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.808564274] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.347670 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.808582321] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.353940 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.808603836] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.366806 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.970740009] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.396453 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.971192227] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.397010 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.971253128] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.405371 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.971556397] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.407107 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.972654106] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.411690 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.972993295] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.416002 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595807.973069814] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.416319 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.043056114] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.407107 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.045618646] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.416002 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.047021923] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.416319 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[openvins_odom_tf_relay-7] [WARN] [1781595808.242786630] [openvins_odom_tf_relay]: head odom pose jumped 1.809m (> 0.5m) — suppressing TF
+[rviz2-15] [WARN] [1781595808.454356422] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.421467 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.600769982] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.421980 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.600919788] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.422992 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.600939933] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.423612 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.600957337] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.428281 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.601029770] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.443621 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.601047927] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.447269 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.601065190] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.453385 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.602317743] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.459259 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.602452783] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.462272 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.602473746] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.466931 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.605530539] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.494632 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.605642824] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.508765 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.605662859] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.509924 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.605682470] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.510310 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608054123] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.553900 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608108464] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.557283 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608120823] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.605764 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608138569] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.608182 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608512185] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.617220 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608545241] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.623569 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608563890] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.627482 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608622471] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.632725 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608639793] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.637458 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608657503] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.650931 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608675665] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.657209 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608696059] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.662310 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608715039] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.667248 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608734159] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.692658 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608775038] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.693193 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.608976658] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.694395 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.609864233] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.695650 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.609905427] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.700035 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.609922336] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.702826 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.609938257] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.708689 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.609956801] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.713861 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.609973061] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.718082 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.609987973] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.722641 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.610004013] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.730851 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.610076227] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.742557 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.610093359] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.747481 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.610108566] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.753669 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615506865] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.799734 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615595934] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.800199 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615618314] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.800969 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615636580] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.803063 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615653050] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.808474 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615670397] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.814466 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615686517] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.849547 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615703445] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.853056 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615793240] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.853914 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615815908] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.854944 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615835405] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.856077 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615851798] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.856403 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615867611] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.857686 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615880296] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.895415 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615954938] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.910487 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615975019] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.917290 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.615993703] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.919985 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616026032] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.923694 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616045951] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.931134 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616065285] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.943012 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616085091] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.948741 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616105710] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.953279 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616126045] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.958378 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616144126] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.963250 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616163940] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.972736 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616221916] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.974694 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616252931] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.011799 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616280154] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.014283 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616303304] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.017066 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616323317] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.021359 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616345278] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.040464 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616365168] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.041192 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616409093] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.042405 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616431354] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.042970 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616451395] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.043364 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616473560] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.043711 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616494125] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.057169 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616517444] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.063572 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616540124] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.069147 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616559800] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.101516 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616581118] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.102181 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616600524] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.102645 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616621570] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.103382 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616642130] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.104664 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616661685] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.105499 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616681193] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.108494 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616701029] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.115353 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616720337] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.120028 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616739136] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.124904 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616796874] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.129208 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595808.616843643] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.144887 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.611508040] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.494632 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.617721613] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.799734 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.633026131] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.854944 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.634893728] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.856077 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.636005255] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595796.856403 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.662285899] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.011799 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.663860539] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.014283 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.669906330] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.017066 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.678735316] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.021359 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.688455920] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.108494 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595808.695628826] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.115353 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[tf_pipeline_diagnostics-4] [INFO] [1781595810.180889894] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595810.250649937] [openvins_odom_tf_relay]: head odom pose jumped 1.808m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595810.973963533] [pointcloud_fusion]: Stats: published=4 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=97.0s, cam2=12.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=9.8s
+[openvins_odom_tf_relay-7] [WARN] [1781595812.252663741] [openvins_odom_tf_relay]: arm odom pose jumped 0.979m (> 0.5m) — suppressing TF
+[rviz2-15] [WARN] [1781595812.883909683] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.149559 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595812.883980303] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.153754 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595812.883997746] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.159975 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.936046309] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.149559 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.938283649] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.153754 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.939960360] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.159975 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.942198909] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.163389 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.944342372] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.169151 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.946388856] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.174592 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.948532784] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.208245 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.951533085] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.210623 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.953683706] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.213179 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.957067697] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.214068 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.960405543] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.215416 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.965849208] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.219095 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.970671549] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.247456 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.973732180] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.248746 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595812.976046937] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.249435 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[sift_feature_node-10] [INFO] [1781595813.975158899] [cross_camera_features]: frames=386, published=6
+[openvins_odom_tf_relay-7] [WARN] [1781595814.255359695] [openvins_odom_tf_relay]: arm odom pose jumped 0.990m (> 0.5m) — suppressing TF
+[rviz2-15] [WARN] [1781595816.151137174] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.163389 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.151402303] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.169151 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.151443726] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.174592 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.151574862] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.208245 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.151596723] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.210623 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.151614609] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.213179 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.151632332] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.214068 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.151649381] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.215416 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.152063949] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.278837 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.153624256] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.280019 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.154380872] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.288806 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.155955686] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595799.319107 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.158892586] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595799.608572 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.161329328] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595799.613528 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.163774312] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595799.623419 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.167124456] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595799.646419 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[pointcloud_fusion_node-5] [WARN] [1781595816.186678252] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595801.467693 according to authority default_authority
+[pointcloud_fusion_node-5] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.154758435] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.219095 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.154966623] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.353756 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.155670724] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595797.358781 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.160719063] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.265068 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.160859853] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.270090 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.160991272] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.275115 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.161013256] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.280637 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.161031897] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.294954 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.161051098] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.300069 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.161069452] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.305119 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171155846] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.310673 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171514439] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.315273 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171557749] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.346910 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171582485] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.347507 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171602675] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.347939 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171622921] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.351055 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171643189] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.355232 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171661925] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.359977 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171681088] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.365019 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.171700564] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.396747 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.172712350] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.398588 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.178758689] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595800.400113 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.178898746] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595801.417673 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[rviz2-15] [WARN] [1781595816.181975540] []: TF_OLD_DATA ignoring data from the past for frame head_cam0 at time 1781595803.416490 according to authority Authority undetectable
+[rviz2-15] Possible reasons are listed at http://wiki.ros.org/tf/Errors%20explained
+[openvins_odom_tf_relay-7] [WARN] [1781595816.256707083] [openvins_odom_tf_relay]: arm odom pose jumped 0.993m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595818.257241907] [openvins_odom_tf_relay]: head odom pose jumped 1.757m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595820.177301916] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595820.260561592] [openvins_odom_tf_relay]: head odom pose jumped 1.787m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595820.972864912] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=107.0s, cam2=22.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=19.8s
+[pointcloud_fusion_node-5] [WARN] [1781595820.974514088] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: stale (107.0s); cam2: stale (22.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595822.260710732] [openvins_odom_tf_relay]: head odom pose jumped 1.809m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595824.261142047] [openvins_odom_tf_relay]: head odom pose jumped 1.810m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595826.287969488] [openvins_odom_tf_relay]: head odom pose jumped 1.815m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595827.121756682] [cross_camera_features]: frames=391, published=11
+[openvins_odom_tf_relay-7] [WARN] [1781595828.376037271] [openvins_odom_tf_relay]: arm odom pose jumped 1.004m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595830.179106984] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595830.381107665] [openvins_odom_tf_relay]: arm odom pose jumped 0.996m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595830.975337269] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=117.0s, cam2=32.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=29.8s
+[pointcloud_fusion_node-5] [WARN] [1781595830.982017518] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: stale (117.0s); cam2: stale (32.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595832.381367149] [openvins_odom_tf_relay]: arm odom pose jumped 0.998m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595834.385478740] [openvins_odom_tf_relay]: arm odom pose jumped 0.980m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595834.771229665] [cross_camera_features]: frames=394, published=14
+[openvins_odom_tf_relay-7] [WARN] [1781595836.388369677] [openvins_odom_tf_relay]: head odom pose jumped 1.854m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595838.399674813] [openvins_odom_tf_relay]: head odom pose jumped 1.823m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595840.177641889] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595840.400809690] [openvins_odom_tf_relay]: head odom pose jumped 1.832m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595840.972743149] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=127.0s, cam2=42.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=39.8s
+[pointcloud_fusion_node-5] [WARN] [1781595840.974632936] [pointcloud_fusion]: Stall diagnostic (no publish for 40s): cam1: stale (127.0s); cam2: stale (42.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595842.406673546] [openvins_odom_tf_relay]: head odom pose jumped 1.834m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595843.524834616] [cross_camera_features]: frames=398, published=18
+[openvins_odom_tf_relay-7] [WARN] [1781595844.413513887] [openvins_odom_tf_relay]: arm odom pose jumped 0.978m (> 0.5m) — suppressing TF
+[twist_propagation_node-12] [INFO] [1781595845.337830978] [twist_propagation]: External twist stale: age=2.015s > max=2.000s
+[openvins_odom_tf_relay-7] [WARN] [1781595846.416581094] [openvins_odom_tf_relay]: arm odom pose jumped 0.979m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595848.417719573] [openvins_odom_tf_relay]: head odom pose jumped 1.837m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595850.177298024] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595850.421874592] [openvins_odom_tf_relay]: head odom pose jumped 1.832m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595850.975507593] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=137.0s, cam2=52.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=49.8s
+[pointcloud_fusion_node-5] [WARN] [1781595850.982177180] [pointcloud_fusion]: Stall diagnostic (no publish for 50s): cam1: stale (137.0s); cam2: stale (52.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595852.422053036] [openvins_odom_tf_relay]: arm odom pose jumped 0.978m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595853.339656246] [cross_camera_features]: frames=402, published=22
+[openvins_odom_tf_relay-7] [WARN] [1781595854.423367298] [openvins_odom_tf_relay]: head odom pose jumped 1.833m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595856.459030023] [openvins_odom_tf_relay]: head odom pose jumped 1.832m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595858.461103812] [openvins_odom_tf_relay]: arm odom pose jumped 0.977m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595860.177205962] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595860.480791748] [openvins_odom_tf_relay]: arm odom pose jumped 0.977m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595860.973343631] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=147.0s, cam2=62.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=59.8s
+[pointcloud_fusion_node-5] [WARN] [1781595860.979229563] [pointcloud_fusion]: Stall diagnostic (no publish for 60s): cam1: stale (147.0s); cam2: stale (62.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595862.483267295] [openvins_odom_tf_relay]: head odom pose jumped 1.833m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595864.173530189] [cross_camera_features]: frames=407, published=27
+[openvins_odom_tf_relay-7] [WARN] [1781595864.490227714] [openvins_odom_tf_relay]: head odom pose jumped 1.829m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595866.512364310] [openvins_odom_tf_relay]: head odom pose jumped 1.831m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595868.513257751] [openvins_odom_tf_relay]: head odom pose jumped 1.831m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595870.180678354] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595870.513667917] [openvins_odom_tf_relay]: head odom pose jumped 1.830m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595870.974815507] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=157.0s, cam2=72.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=69.8s
+[pointcloud_fusion_node-5] [WARN] [1781595870.986220560] [pointcloud_fusion]: Stall diagnostic (no publish for 70s): cam1: stale (157.0s); cam2: stale (72.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595872.514695324] [openvins_odom_tf_relay]: head odom pose jumped 1.834m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595874.515487048] [openvins_odom_tf_relay]: head odom pose jumped 1.831m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595874.794856945] [cross_camera_features]: frames=412, published=32
+[openvins_odom_tf_relay-7] [WARN] [1781595877.756820538] [openvins_odom_tf_relay]: head odom pose jumped 1.836m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595879.757680406] [openvins_odom_tf_relay]: head odom pose jumped 1.834m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595880.183900978] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595880.971561943] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=167.0s, cam2=82.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=79.8s
+[pointcloud_fusion_node-5] [WARN] [1781595880.974124600] [pointcloud_fusion]: Stall diagnostic (no publish for 80s): cam1: stale (167.0s); cam2: stale (82.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595881.758307186] [openvins_odom_tf_relay]: head odom pose jumped 1.835m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595883.759360010] [openvins_odom_tf_relay]: arm odom pose jumped 0.976m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595884.567144402] [cross_camera_features]: frames=416, published=36
+[openvins_odom_tf_relay-7] [WARN] [1781595885.763466796] [openvins_odom_tf_relay]: head odom pose jumped 1.833m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595887.771774651] [openvins_odom_tf_relay]: arm odom pose jumped 0.976m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595889.774689453] [openvins_odom_tf_relay]: head odom pose jumped 1.834m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595890.181271972] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595890.971376386] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=177.0s, cam2=92.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=89.8s
+[pointcloud_fusion_node-5] [WARN] [1781595890.978308572] [pointcloud_fusion]: Stall diagnostic (no publish for 90s): cam1: stale (177.0s); cam2: stale (92.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595891.778968856] [openvins_odom_tf_relay]: head odom pose jumped 1.837m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595893.782590098] [openvins_odom_tf_relay]: arm odom pose jumped 0.976m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595894.470665888] [cross_camera_features]: frames=421, published=41
+[openvins_odom_tf_relay-7] [WARN] [1781595895.786318329] [openvins_odom_tf_relay]: head odom pose jumped 1.835m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595897.791331598] [openvins_odom_tf_relay]: arm odom pose jumped 0.976m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595899.792801974] [openvins_odom_tf_relay]: arm odom pose jumped 0.977m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595900.180045234] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595900.979241674] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=187.0s, cam2=102.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=99.8s
+[pointcloud_fusion_node-5] [WARN] [1781595900.982494842] [pointcloud_fusion]: Stall diagnostic (no publish for 100s): cam1: stale (187.0s); cam2: stale (102.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595901.795443972] [openvins_odom_tf_relay]: head odom pose jumped 1.819m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595903.018279644] [cross_camera_features]: frames=424, published=44
+[openvins_odom_tf_relay-7] [WARN] [1781595903.807421916] [openvins_odom_tf_relay]: head odom pose jumped 1.814m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595905.812095392] [openvins_odom_tf_relay]: arm odom pose jumped 0.991m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595907.812238693] [openvins_odom_tf_relay]: arm odom pose jumped 0.978m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595909.815825608] [openvins_odom_tf_relay]: head odom pose jumped 1.818m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595910.178900799] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595910.972004091] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=197.0s, cam2=112.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=109.8s
+[pointcloud_fusion_node-5] [WARN] [1781595910.976408582] [pointcloud_fusion]: Stall diagnostic (no publish for 110s): cam1: stale (197.0s); cam2: stale (112.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595911.816311402] [openvins_odom_tf_relay]: head odom pose jumped 1.817m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595913.315140044] [cross_camera_features]: frames=431, published=51
+[openvins_odom_tf_relay-7] [WARN] [1781595913.823902794] [openvins_odom_tf_relay]: head odom pose jumped 1.870m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595915.826309798] [openvins_odom_tf_relay]: head odom pose jumped 1.830m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595917.833378328] [openvins_odom_tf_relay]: head odom pose jumped 1.835m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595919.834428793] [openvins_odom_tf_relay]: head odom pose jumped 1.750m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595920.178874504] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595920.976416712] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=207.0s, cam2=122.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=119.8s
+[pointcloud_fusion_node-5] [WARN] [1781595920.980229547] [pointcloud_fusion]: Stall diagnostic (no publish for 120s): cam1: stale (207.0s); cam2: stale (122.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595921.842982763] [openvins_odom_tf_relay]: head odom pose jumped 2.210m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595923.880334742] [openvins_odom_tf_relay]: arm odom pose jumped 0.964m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595924.088511387] [cross_camera_features]: frames=435, published=55
+[openvins_odom_tf_relay-7] [WARN] [1781595925.882945974] [openvins_odom_tf_relay]: head odom pose jumped 1.630m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595927.884183045] [openvins_odom_tf_relay]: arm odom pose jumped 0.959m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595929.884574575] [openvins_odom_tf_relay]: head odom pose jumped 1.583m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595930.180459955] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595930.975704752] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=217.0s, cam2=132.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=129.8s
+[pointcloud_fusion_node-5] [WARN] [1781595930.986815552] [pointcloud_fusion]: Stall diagnostic (no publish for 130s): cam1: stale (217.0s); cam2: stale (132.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595931.886431217] [openvins_odom_tf_relay]: arm odom pose jumped 0.976m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595932.891478688] [cross_camera_features]: frames=439, published=59
+[openvins_odom_tf_relay-7] [WARN] [1781595933.910534329] [openvins_odom_tf_relay]: arm odom pose jumped 0.981m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595935.921817868] [openvins_odom_tf_relay]: head odom pose jumped 1.495m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595937.922988369] [openvins_odom_tf_relay]: arm odom pose jumped 0.976m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595939.924373225] [openvins_odom_tf_relay]: head odom pose jumped 1.425m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595940.179692738] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[twist_propagation_node-12] [INFO] [1781595940.877284582] [twist_propagation]: External twist stale: age=2.016s > max=2.000s
+[pointcloud_fusion_node-5] [INFO] [1781595940.974095557] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=227.0s, cam2=142.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=139.8s
+[pointcloud_fusion_node-5] [WARN] [1781595940.981435786] [pointcloud_fusion]: Stall diagnostic (no publish for 140s): cam1: stale (227.0s); cam2: stale (142.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595941.926643153] [openvins_odom_tf_relay]: head odom pose jumped 1.420m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595942.891354505] [cross_camera_features]: frames=442, published=62
+[openvins_odom_tf_relay-7] [WARN] [1781595943.928683175] [openvins_odom_tf_relay]: arm odom pose jumped 0.963m (> 0.5m) — suppressing TF
+[twist_propagation_node-12] [INFO] [1781595945.884468803] [twist_propagation]: External twist stale: age=7.017s > max=2.000s
+[openvins_odom_tf_relay-7] [WARN] [1781595945.929484801] [openvins_odom_tf_relay]: arm odom pose jumped 0.963m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595947.934322613] [openvins_odom_tf_relay]: head odom pose jumped 1.285m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595949.935996296] [openvins_odom_tf_relay]: arm odom pose jumped 0.964m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595950.182465935] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595950.973028153] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=237.0s, cam2=152.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=149.8s
+[pointcloud_fusion_node-5] [WARN] [1781595950.974164936] [pointcloud_fusion]: Stall diagnostic (no publish for 150s): cam1: stale (237.0s); cam2: stale (152.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595951.937742200] [openvins_odom_tf_relay]: head odom pose jumped 1.246m (> 0.5m) — suppressing TF
+[twist_propagation_node-12] [INFO] [1781595952.317175847] [twist_propagation]: External twist stale: age=2.017s > max=2.000s
+[openvins_odom_tf_relay-7] [WARN] [1781595953.946966615] [openvins_odom_tf_relay]: head odom pose jumped 1.223m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595954.275493483] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595954.275653072] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595954.275670137] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595954.357080736] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[sift_feature_node-10] [INFO] [1781595954.650730774] [cross_camera_features]: frames=446, published=66
+[keyframe_buffer_node-9] [WARN] [1781595954.829102136] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595954.829689218] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595954.829763444] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595954.829777423] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595955.419236834] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595955.420591794] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595955.421490325] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595955.422600143] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[grasp_proximity_controller_node.py-14] [WARN] [1781595955.582383537] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[grasp_proximity_controller_node.py-14] [WARN] [1781595955.582584878] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[grasp_proximity_controller_node.py-14] [WARN] [1781595955.582602314] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[grasp_proximity_controller_node.py-14] [WARN] [1781595955.582617371] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595955.670383190] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595955.670693068] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595955.670808933] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595955.670837363] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595955.670822305] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595955.670990072] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595955.671282360] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595955.671371107] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595955.671646855] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595955.673593065] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595955.674226533] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595955.674454841] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595955.949006491] [openvins_odom_tf_relay]: arm odom pose jumped 0.963m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [WARN] [1781595956.880925803] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[sift_feature_node-10] [WARN] [1781595956.881223102] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[sift_feature_node-10] [WARN] [1781595956.881520797] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[sift_feature_node-10] [WARN] [1781595956.881627519] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595957.958094147] [openvins_odom_tf_relay]: head odom pose jumped 1.179m (> 0.5m) — suppressing TF
+[twist_propagation_node-12] [WARN] [1781595958.942086820] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[twist_propagation_node-12] [WARN] [1781595958.943044242] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[twist_propagation_node-12] [WARN] [1781595958.943063867] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[twist_propagation_node-12] [WARN] [1781595958.943075322] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595959.971924184] [openvins_odom_tf_relay]: head odom pose jumped 1.158m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595960.177119942] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[preshaping_service_bridge_node-13] [WARN] [1781595960.708918152] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[preshaping_service_bridge_node-13] [WARN] [1781595960.709167283] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[preshaping_service_bridge_node-13] [WARN] [1781595960.709198929] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[preshaping_service_bridge_node-13] [WARN] [1781595960.709222493] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [INFO] [1781595960.970894278] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=247.0s, cam2=162.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=159.8s
+[pointcloud_fusion_node-5] [WARN] [1781595960.972196443] [pointcloud_fusion]: Stall diagnostic (no publish for 160s): cam1: stale (247.0s); cam2: stale (162.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595962.019020175] [openvins_odom_tf_relay]: head odom pose jumped 1.135m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595963.169186256] [cross_camera_features]: frames=450, published=70
+[tf_pipeline_diagnostics-4] [WARN] [1781595963.670110966] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[odom_to_pose_relay-6] [WARN] [1781595963.671575880] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595963.672227344] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595963.691262465] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595963.691570454] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595963.691608845] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595964.020353508] [openvins_odom_tf_relay]: head odom pose jumped 1.113m (> 0.5m) — suppressing TF
+[rviz2-15] [WARN] [1781595964.693016993] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[odom_to_pose_relay-6] [WARN] [1781595964.695842365] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[odom_to_pose_relay-6] [WARN] [1781595964.695976867] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[odom_to_pose_relay-6] [WARN] [1781595964.696002376] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[tf_pipeline_diagnostics-4] [WARN] [1781595964.697579780] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[tf_pipeline_diagnostics-4] [WARN] [1781595964.697698940] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[tf_pipeline_diagnostics-4] [WARN] [1781595964.697757754] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[rviz2-15] [WARN] [1781595964.718195542] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[rviz2-15] [WARN] [1781595964.718277261] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[rviz2-15] [WARN] [1781595964.718298726] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595966.028047492] [openvins_odom_tf_relay]: arm odom pose jumped 0.962m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595968.030151638] [openvins_odom_tf_relay]: arm odom pose jumped 0.961m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595970.035029527] [openvins_odom_tf_relay]: head odom pose jumped 1.057m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595970.185866449] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595970.971288019] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=257.0s, cam2=172.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=169.8s
+[pointcloud_fusion_node-5] [WARN] [1781595970.972551163] [pointcloud_fusion]: Stall diagnostic (no publish for 170s): cam1: stale (257.0s); cam2: stale (172.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595972.036141524] [openvins_odom_tf_relay]: arm odom pose jumped 0.961m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595973.286660902] [cross_camera_features]: frames=455, published=75
+[openvins_odom_tf_relay-7] [WARN] [1781595973.685238580] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595973.685333163] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595973.704859226] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595973.704986435] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595973.704999593] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595973.705587852] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595973.705653110] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595973.705664275] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595974.043370297] [openvins_odom_tf_relay]: head odom pose jumped 1.033m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595976.046925866] [openvins_odom_tf_relay]: head odom pose jumped 1.012m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595978.134771643] [openvins_odom_tf_relay]: head odom pose jumped 0.991m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595980.134965641] [openvins_odom_tf_relay]: arm odom pose jumped 0.962m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595980.263574419] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781595980.971328846] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=267.0s, cam2=182.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=179.8s
+[pointcloud_fusion_node-5] [WARN] [1781595980.972701393] [pointcloud_fusion]: Stall diagnostic (no publish for 180s): cam1: stale (267.0s); cam2: stale (182.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595982.147777436] [openvins_odom_tf_relay]: head odom pose jumped 0.964m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595983.418942297] [cross_camera_features]: frames=460, published=80
+[openvins_odom_tf_relay-7] [WARN] [1781595984.167527120] [openvins_odom_tf_relay]: head odom pose jumped 0.951m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595986.227656559] [openvins_odom_tf_relay]: arm odom pose jumped 0.963m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595988.265155349] [openvins_odom_tf_relay]: head odom pose jumped 0.964m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781595990.178905005] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781595990.271647732] [openvins_odom_tf_relay]: head odom pose jumped 0.916m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781595990.972993591] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=277.0s, cam2=192.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=189.8s
+[pointcloud_fusion_node-5] [WARN] [1781595990.977373014] [pointcloud_fusion]: Stall diagnostic (no publish for 190s): cam1: stale (277.0s); cam2: stale (192.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781595992.274480287] [openvins_odom_tf_relay]: head odom pose jumped 0.839m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781595993.601174452] [cross_camera_features]: frames=464, published=84
+[odom_to_pose_relay-6] [WARN] [1781595993.739979633] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595993.761468279] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595993.761694614] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595993.761737109] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595994.306675111] [openvins_odom_tf_relay]: arm odom pose jumped 0.961m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781595994.554122691] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595994.554695372] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595994.554757813] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595994.554768215] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595994.591268922] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595994.591365095] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595994.591376727] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[odom_to_pose_relay-6] [WARN] [1781595994.591993389] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[odom_to_pose_relay-6] [WARN] [1781595994.592054794] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[odom_to_pose_relay-6] [WARN] [1781595994.592066141] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595994.593183118] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[keyframe_buffer_node-9] [WARN] [1781595994.595744759] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595994.595198500] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pipeline_manager_node-1] [WARN] [1781595994.595515059] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595994.595337536] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[odom_to_pose_relay-6] [WARN] [1781595994.596652127] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[tf_pipeline_diagnostics-4] [WARN] [1781595994.609722917] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[tf_pipeline_diagnostics-4] [WARN] [1781595994.609790520] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[tf_pipeline_diagnostics-4] [WARN] [1781595994.609804203] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[tf_pipeline_diagnostics-4] [WARN] [1781595994.609831935] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[tf_pipeline_diagnostics-4] [WARN] [1781595994.609841643] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595995.585301161] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595995.585349552] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595995.585422344] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595995.585443367] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595995.587552023] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595995.587617382] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595996.318745022] [openvins_odom_tf_relay]: arm odom pose jumped 0.961m (> 0.5m) — suppressing TF
+[grasp_proximity_controller_node.py-14] [WARN] [1781595997.589642959] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[grasp_proximity_controller_node.py-14] [WARN] [1781595997.589723754] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[grasp_proximity_controller_node.py-14] [WARN] [1781595997.589733558] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[twist_propagation_node-12] [WARN] [1781595997.597009400] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[twist_propagation_node-12] [WARN] [1781595997.597276544] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[twist_propagation_node-12] [WARN] [1781595997.597471806] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[sift_feature_node-10] [WARN] [1781595997.597420323] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[sift_feature_node-10] [WARN] [1781595997.597588961] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[twist_propagation_node-12] [WARN] [1781595997.597683640] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[twist_propagation_node-12] [WARN] [1781595997.597804718] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[sift_feature_node-10] [WARN] [1781595997.598092814] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[sift_feature_node-10] [WARN] [1781595997.599070975] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[sift_feature_node-10] [WARN] [1781595997.599942701] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595997.595272214] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[pointcloud_fusion_node-5] [WARN] [1781595997.600403485] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595997.601375520] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[openvins_realsense_tf_bridge_node-2] [WARN] [1781595997.601568804] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[grasp_proximity_controller_node.py-14] [WARN] [1781595997.604808045] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[grasp_proximity_controller_node.py-14] [WARN] [1781595997.605157801] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595997.605901716] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595997.606577578] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595997.606626246] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595997.606640795] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[segmentation_ros2_node-11] [WARN] [1781595997.606650972] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595997.729148965] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595997.729548919] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/head/d435i_head/depth/color/points' with type 'sensor_msgs::msg::dds_::PointCloud2_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595997.729579995] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595997.729594295] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[camera_mount_tf_publisher-3] [WARN] [1781595997.729604801] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[openvins_odom_tf_relay-7] [WARN] [1781595998.323952486] [openvins_odom_tf_relay]: arm odom pose jumped 0.961m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781596000.178163845] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781596000.325499939] [openvins_odom_tf_relay]: arm odom pose jumped 0.961m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781596000.972499418] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=7, cam2=10) last_cloud_age(cam1=287.0s, cam2=202.7s) [CLOCK SKEW DETECTED — using arrival-time fallback] dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=199.8s
+[pointcloud_fusion_node-5] [WARN] [1781596000.973976026] [pointcloud_fusion]: Stall diagnostic (no publish for 200s): cam1: stale (287.0s); cam2: stale (202.7s)
+[openvins_odom_tf_relay-7] [WARN] [1781596002.328491375] [openvins_odom_tf_relay]: head odom pose jumped 0.845m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781596002.889894788] [cross_camera_features]: frames=466, published=86
+[openvins_odom_tf_relay-7] [WARN] [1781596004.331311528] [openvins_odom_tf_relay]: head odom pose jumped 0.842m (> 0.5m) — suppressing TF
+[twist_propagation_node-12] [INFO] [1781596007.175750839] [twist_propagation]: External twist stale: age=2.001s > max=2.000s

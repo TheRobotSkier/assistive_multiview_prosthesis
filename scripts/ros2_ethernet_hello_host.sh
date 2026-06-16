@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# ros2_ethernet_hello_host.sh — Launch ROS 2 tools in a temp container on the
+# host network for Jetson Ethernet communication testing and RViz monitoring.
+#
+# NETWORK NOTE: When monitoring topics over the Jetson Ethernet link,
+# always append --qos-reliability best_effort to ros2 topic echo/hz/bw
+# to avoid saturating the link with RELIABLE ACK/NACK traffic.
+# Pipeline nodes MUST use RELIABLE; monitoring tools should use BEST_EFFORT.
+#
+# See: plans/2026-06-16-network-buffer-tuning-host-v2.md
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,6 +73,18 @@ if [[ -t 0 && -t 1 ]]; then
   tty_args=(-it)
 fi
 
+# ── WSL2 GPU acceleration ──────────────────────────────────────────────────
+# On WSL2, OpenGL is accelerated via Mesa's d3d12 Gallium driver, which talks
+# to the Windows GPU through /dev/dxg and the libraries under /usr/lib/wsl.
+# Detect that environment and expose the right flags to the container.
+# On native Linux these stay empty, so the script stays portable.
+gpu_device_args=()
+gpu_env_args=()
+if [[ -e /dev/dxg && -f /usr/lib/wsl/lib/libdxcore.so ]]; then
+  gpu_device_args=(--device /dev/dri --device /dev/dxg -v /usr/lib/wsl:/usr/lib/wsl:ro)
+  gpu_env_args+=(-e GALLIUM_DRIVER=d3d12 -e LD_LIBRARY_PATH=/usr/lib/wsl/lib -e MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA)
+fi
+
 container_cmd() {
   local name="$1"
   shift
@@ -89,8 +110,10 @@ container_cmd() {
     --name "$name" \
     --network host \
     --ipc host \
+    "${gpu_device_args[@]}" \
     "${runtime_args[@]}" \
     "${env_args[@]}" \
+    "${gpu_env_args[@]}" \
     -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
     -e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
     -e ROS_DOMAIN_ID="$ROS_DOMAIN_ID_VALUE" \
@@ -116,7 +139,7 @@ case "$command" in
     container_cmd "$CONTAINER_PREFIX-shell" "$ros_prefix exec bash"
     ;;
   listen-jetson)
-    container_cmd "$CONTAINER_PREFIX-listen-jetson" "$ros_prefix ros2 topic echo /jetson_hello std_msgs/msg/String"
+    container_cmd "$CONTAINER_PREFIX-listen-jetson" "$ros_prefix ros2 topic echo --qos-reliability best_effort /jetson_hello std_msgs/msg/String"
     ;;
   pub-host)
     container_cmd "$CONTAINER_PREFIX-pub-host" "$ros_prefix ros2 topic pub /host_hello std_msgs/msg/String \"{data: 'hello from host'}\" -r 1"

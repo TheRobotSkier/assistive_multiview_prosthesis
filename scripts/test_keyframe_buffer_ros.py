@@ -94,11 +94,11 @@ def main():
 
     # Publishers for head camera
     pub_cloud = test_node.create_publisher(
-        PointCloud2, "/head/d435i_head/depth/color/points", reliable)
+        PointCloud2, "/jetson/head/points", reliable)
     pub_image = test_node.create_publisher(
-        Image, "/head/d435i_head/color/image_raw", reliable)
+        Image, "/jetson/head/image", reliable)
     pub_info = test_node.create_publisher(
-        CameraInfo, "/head/d435i_head/color/camera_info", reliable)
+        CameraInfo, "/jetson/head/camera_info", reliable)
     pub_pose = test_node.create_publisher(
         PoseWithCovarianceStamped, "/gtsam/head_pose", 10)
 

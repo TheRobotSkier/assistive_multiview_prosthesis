@@ -16,9 +16,9 @@ multi-edge TF chain composes correctly for bbox removal lookups.
 Parameters
 ----------
 head_odom_topic          str   input Odometry topic for head camera
-                                (default: /ov_msckf/odomimu)
+                                (default: /jetson/head/odom)
 arm_odom_topic           str   input Odometry topic for arm camera
-                                (default: /ov_msckf_arm/odomimu)
+                                (default: /jetson/arm/odom)
 target_frame             str   parent frame of the dynamic TF (default: marker_map)
 head_imu_frame           str   child frame for head (default: head_imu)
 arm_imu_frame            str   child frame for arm  (default: arm_imu)
@@ -116,8 +116,8 @@ class OpenVINSOdomTFRelay(Node):
         super().__init__("openvins_odom_tf_relay")
 
         # ── Declare parameters ────────────────────────────────────────────
-        self.declare_parameter("head_odom_topic", "/ov_msckf/odomimu")
-        self.declare_parameter("arm_odom_topic", "/ov_msckf_arm/odomimu")
+        self.declare_parameter("head_odom_topic", "/jetson/head/odom")
+        self.declare_parameter("arm_odom_topic", "/jetson/arm/odom")
         self.declare_parameter("target_frame", "marker_map")
         self.declare_parameter("head_imu_frame", "head_imu")
         self.declare_parameter("arm_imu_frame", "arm_imu")
@@ -155,6 +155,14 @@ class OpenVINSOdomTFRelay(Node):
         self.declare_parameter("extrinsics_topic", "")
         self.declare_parameter("max_pose_norm_m", 2.0)
         self.declare_parameter("max_pose_jump_m", 0.50)
+        # When True (default), the relay broadcasts the dynamic
+        # marker_map -> *_imu TF edges from raw VIO.  When False, only the
+        # static *_imu -> *_cam0 edges are published and the dynamic edges
+        # are left to another publisher (e.g. the GTSAM tracker, which
+        # broadcasts the smoothed trajectory).  Set this to False when
+        # running the V6 GTSAM tracker with broadcast_tf=true so the two
+        # nodes don't fight over the same TF edges (V6 §6.3).
+        self.declare_parameter("publish_dynamic_tf", True)
 
         # ── Read parameters ───────────────────────────────────────────────
         head_odom_topic = self.get_parameter("head_odom_topic").value
@@ -190,6 +198,7 @@ class OpenVINSOdomTFRelay(Node):
         self._extrinsics_topic = self.get_parameter("extrinsics_topic").value
         self._max_pose_norm_m = self.get_parameter("max_pose_norm_m").value
         self._max_pose_jump_m = self.get_parameter("max_pose_jump_m").value
+        self._publish_dynamic_tf = self.get_parameter("publish_dynamic_tf").value
 
         # ── TF2 buffer for self-calibration lookups ───────────────────────
         self._tf_buffer = Buffer()
@@ -291,12 +300,13 @@ class OpenVINSOdomTFRelay(Node):
                 self._liveness_timer = self.create_timer(0.5, self._liveness_tick)
             else:
                 self._liveness_timer = None
-        self.get_logger().info(
+        self.get_logger().warn(
             f"OpenVINS odometry TF relay active: "
             f"{self._target_frame} -> {self._head_imu} "
             f"(via {head_odom_topic}), "
             f"{self._target_frame} -> {self._arm_imu} "
-            f"(via {arm_odom_topic})"
+            f"(via {arm_odom_topic}), "
+            f"publish_dynamic_tf={self._publish_dynamic_tf}"
         )
 
     def _on_head_odom(self, msg: Odometry):
@@ -400,17 +410,38 @@ class OpenVINSOdomTFRelay(Node):
         else:
             self._last_arm_pos = (x, y, z)
 
-        # Stamp with the host clock so all edges in the TF chain
-        # (relay, bridge, camera mounts) share the same time domain.
-        # Using the Jetson odom timestamp created a ~10s clock gap that
-        # prevented TF2 from composing the multi-edge chain for bbox
-        # removal lookups ("extrapolation into the past" errors).
-        host_stamp = self.get_clock().now().to_msg()
-        tf_msg = _make_transform(
-            parent, child, x, y, z, qx, qy, qz, qw,
-            host_stamp,
-        )
-        self._tf_broadcaster.sendTransform(tf_msg)
+        # ── Dynamic TF broadcast ──────────────────────────────────────────
+        # When ``publish_dynamic_tf`` is False (e.g. when the V6 GTSAM tracker
+        # owns the dynamic TF tree via broadcast_tf=true), skip broadcasting
+        # the marker_map -> *_imu edge.  The relay still runs its init guard,
+        # outlier suppression, and self-calibration so that the odometry is
+        # validated and the static *_imu -> *_cam0 extrinsics are maintained,
+        # but the smoothed trajectory from GTSAM is what feeds downstream TF
+        # consumers (V6 §6.3).
+        if not self._publish_dynamic_tf:
+            # Throttled log so the operator knows the relay is alive but
+            # deferring to GTSAM for the dynamic TF.
+            count_attr = f"_{name}_count"
+            count = getattr(self, count_attr)
+            count += 1
+            setattr(self, count_attr, count)
+            if count % 200 == 1:
+                self.get_logger().info(
+                    f"Relay #{count} ({name}): publish_dynamic_tf=False — "
+                    f"deferring {parent} -> {child} to GTSAM tracker"
+                )
+        else:
+            # Stamp with the host clock so all edges in the TF chain
+            # (relay, bridge, camera mounts) share the same time domain.
+            # Using the Jetson odom timestamp created a ~10s clock gap that
+            # prevented TF2 from composing the multi-edge chain for bbox
+            # removal lookups ("extrapolation into the past" errors).
+            host_stamp = self.get_clock().now().to_msg()
+            tf_msg = _make_transform(
+                parent, child, x, y, z, qx, qy, qz, qw,
+                host_stamp,
+            )
+            self._tf_broadcaster.sendTransform(tf_msg)
 
         # ── Self-calibration attempt (once per camera) ────────────────────
         if (self._self_calibrate and not getattr(self, calibrated_attr)

@@ -1,0 +1,173 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-15-13-08-46-860877-KingBob-5782
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [5786]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [5787]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [5788]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [5789]
+[INFO] [pointcloud_fusion_node-5]: process started with pid [5790]
+[INFO] [odom_to_pose_relay-6]: process started with pid [5791]
+[INFO] [openvins_odom_tf_relay-7]: process started with pid [5792]
+[INFO] [gtsam_tracker_node-8]: process started with pid [5793]
+[INFO] [keyframe_buffer_node-9]: process started with pid [5794]
+[INFO] [sift_feature_node-10]: process started with pid [5795]
+[INFO] [segmentation_ros2_node-11]: process started with pid [5796]
+[INFO] [twist_propagation_node-12]: process started with pid [5797]
+[INFO] [preshaping_service_bridge_node-13]: process started with pid [5798]
+[INFO] [grasp_proximity_controller_node.py-14]: process started with pid [5799]
+[INFO] [rviz2-15]: process started with pid [5800]
+[preshaping_service_bridge_node-13] [INFO] [1781528927.311412444] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-13] [INFO] [1781528927.312282820] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-15] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[rviz2-15] [INFO] [1781528927.822887995] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781528927.823114527] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-15] [INFO] [1781528927.917691108] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781528928.109961547] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781528928.117545653] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781528928.150141105] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781528928.157956134] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-15] 
+[rviz2-15] [INFO] [1781528928.387425666] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781528928.518284982] [rviz2]: Stereo is NOT SUPPORTED
+[pipeline_manager_node-1] [INFO] [1781528928.764748147] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781528928.766205933] [pipeline_manager]: Pipeline manager started — state: IDLE
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781528928.928319057] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781528928.929993507] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781528929.030570504] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781528929.032127904] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781528929.032730676] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[pointcloud_fusion_node-5] [INFO] [1781528929.223541606] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-5] [INFO] [1781528929.224427325] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-5] [INFO] [1781528929.241756222] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-5] [WARN] [1781528929.243988384] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[pointcloud_fusion_node-5] [INFO] [1781528929.245277699] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-5] [INFO] [1781528929.246196446] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[pipeline_manager_node-1] [INFO] [1781528929.769741437] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[tf_pipeline_diagnostics-4] [INFO] [1781528929.826387203] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[camera_mount_tf_publisher-3] [INFO] [1781528929.939910817] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1781528929.942181152] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[gtsam_tracker_node-8] [INFO] [1781528930.084921044] [gtsam_tracker]: TF broadcasting enabled (marker_map → head_imu, arm_imu)
+[gtsam_tracker_node-8] [INFO] [1781528930.111998684] [gtsam_tracker]: GtsamTrackerNode ready (rate=15.0Hz, lag=15.0s, head_source=odom, broadcast_tf=True)
+[segmentation_ros2_node-11] [INFO] [1781528930.190943826] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[keyframe_buffer_node-9] [INFO] [1781528930.487135221] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_in_roi
+[keyframe_buffer_node-9] [INFO] [1781528930.498287506] [keyframe_buffer]: KeyframeBufferNode ready (max_kf/cam=50, gate_t=0.1m, gate_r=15.0deg)
+[twist_propagation_node-12] [INFO] [1781528930.595447811] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[grasp_proximity_controller_node.py-14] [INFO] [1781528930.608031690] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-14] [INFO] [1781528930.652201766] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[twist_propagation_node-12] [INFO] [1781528930.679839219] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-12] [INFO] [1781528930.683924616] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[sift_feature_node-10] [INFO] [1781528930.724048263] [cross_camera_features]: SiftFeatureNode ready (backend=sift, min_matches=5, slop=0.05s)
+[pointcloud_fusion_node-5] [WARN] [1781528931.245497642] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[pointcloud_fusion_node-5] [WARN] [1781528933.248022971] [pointcloud_fusion]: TF wait gate: not connected after 4s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[keyframe_buffer_node-9] [INFO] [1781528937.889324831] [keyframe_buffer]: arm cloud: height=1 -> UNORGANIZED
+[keyframe_buffer_node-9] [INFO] [1781528937.913288543] [keyframe_buffer]: head cloud: height=1 -> UNORGANIZED
+[openvins_odom_tf_relay-7] [WARN] [1781528938.960197891] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781528939.244444862] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=0.490s, cam2=1.124s) last_publish_ago=10.0s
+[pointcloud_fusion_node-5] [WARN] [1781528939.245758084] [pointcloud_fusion]: Clock offset > 0.5s detected — chrony time sync may be broken. Timestamp-based TF lookups will fail. Run 'make timesync-check' to verify host/Jetson clock alignment.
+[pointcloud_fusion_node-5] [WARN] [1781528939.247604286] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: fresh (0.49s); cam1 TF: "marker_map" passed to lookupTransform argument target_frame does not exist. ; cam2: stale (1.1s)
+[pointcloud_fusion_node-5] [WARN] [1781528939.259610352] [pointcloud_fusion]: TF wait gate: not connected after 10s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781528940.111368565] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[sift_feature_node-10] [INFO] [1781528940.706993178] [cross_camera_features]: frames=54, published=0
+[tf_pipeline_diagnostics-4] [WARN] [1781528941.836556646] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1781528948.922681988] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781528949.243802199] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=7.624s, cam2=5.954s) last_publish_ago=20.0s
+[pointcloud_fusion_node-5] [WARN] [1781528949.246312072] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: stale (7.6s); cam2: stale (6.0s)
+[pointcloud_fusion_node-5] [WARN] [1781528949.248210372] [pointcloud_fusion]: TF wait gate: not connected after 20s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781528950.112042260] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[sift_feature_node-10] [INFO] [1781528950.690792566] [cross_camera_features]: frames=219, published=0
+[tf_pipeline_diagnostics-4] [WARN] [1781528951.819585457] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1781528958.919662476] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pointcloud_fusion_node-5] [INFO] [1781528959.244276286] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=17.624s, cam2=15.955s) last_publish_ago=30.0s
+[pointcloud_fusion_node-5] [WARN] [1781528959.246177535] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: stale (17.6s); cam2: stale (16.0s)
+[pointcloud_fusion_node-5] [WARN] [1781528959.248401946] [pointcloud_fusion]: TF wait gate: not connected after 30s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[gtsam_tracker_node-8] [INFO] [1781528960.111175505] [gtsam_tracker]: Stats: published=0 odom(head=0, arm=0) visual=0 delta_rejects=0 resets=0 pose_norm(head=-1.000m, arm=-1.000m) clock_offset(head=-1.000s, arm=-1.000s)
+[openvins_odom_tf_relay-7] [WARN] [1781528960.672722146] [openvins_odom_tf_relay]: head: OpenVINS initialized (covariance), publishing TF marker_map -> head_imu (p=(0.217, -0.042, 0.171), cov_trace=2.15e-02, pos_norm=0.280m, elapsed=31.8s, actual_imu_frame='head_imu')
+[sift_feature_node-10] [INFO] [1781528960.690723315] [cross_camera_features]: frames=347, published=0
+[pointcloud_fusion_node-5] [WARN] [1781528961.247900130] [pointcloud_fusion]: TF tree connected via 'head_d435i_head_depth_optical_frame' — starting point cloud fusion (waited 32.0s since node startup)
+[tf_pipeline_diagnostics-4] [WARN] [1781528961.828156227] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[sift_feature_node-10] [WARN] [1781528962.004917536] [cross_camera_features]: Consistently < 5 SIFT matches (0). Consider SuperPoint upgrade.
+[openvins_odom_tf_relay-7] [WARN] [1781528963.620303743] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.090, 0.091, 0.255), cov_trace=1.28e-03, pos_norm=0.285m, elapsed=34.7s, actual_imu_frame='arm_imu')
+[grasp_proximity_controller_node.py-14] [INFO] [1781528963.625064733] [proximity_controller]: Received first hand pose — control loop now active
+[openvins_odom_tf_relay-7] [WARN] [1781528965.613827986] [openvins_odom_tf_relay]: arm odom pose norm 2.01m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528966.189087262] [openvins_odom_tf_relay]: arm odom pose jumped 2.464m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [WARN] [1781528966.257391123] [gtsam_tracker]: Rejecting odometry delta — head jump 0.003m, arm jump 2.568m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[gtsam_tracker_node-8] [WARN] [1781528966.328239196] [gtsam_tracker]: No ArUco messages received after 5s — running on odometry + visual factors only
+[openvins_odom_tf_relay-7] [WARN] [1781528968.190043011] [openvins_odom_tf_relay]: arm odom pose jumped 2.437m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781528969.305382677] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=27.684s, cam2=26.015s) last_publish_ago=40.1s
+[pointcloud_fusion_node-5] [WARN] [1781528969.321179564] [pointcloud_fusion]: Clock offset > 0.5s detected — chrony time sync may be broken. Timestamp-based TF lookups will fail. Run 'make timesync-check' to verify host/Jetson clock alignment.
+[pointcloud_fusion_node-5] [WARN] [1781528969.354600306] [pointcloud_fusion]: Stall diagnostic (no publish for 40s): cam1: stale (27.7s); cam2: stale (26.0s)
+[tf_pipeline_diagnostics-4] [INFO] [1781528969.804853650] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781528970.194951699] [openvins_odom_tf_relay]: arm odom pose jumped 2.454m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [INFO] [1781528970.241947711] [gtsam_tracker]: Stats: published=133 odom(head=1077, arm=691) visual=0 delta_rejects=1 resets=0 pose_norm(head=0.681m, arm=0.594m) clock_offset(head=0.125s, arm=0.140s)
+[sift_feature_node-10] [INFO] [1781528971.207635226] [cross_camera_features]: frames=353, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781528972.197460014] [openvins_odom_tf_relay]: arm odom pose jumped 2.440m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528974.197953472] [openvins_odom_tf_relay]: arm odom pose jumped 2.534m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528976.202184033] [openvins_odom_tf_relay]: arm odom pose jumped 2.475m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528978.208947655] [openvins_odom_tf_relay]: arm odom pose jumped 2.489m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781528979.249688412] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=37.629s, cam2=35.960s) last_publish_ago=50.0s
+[pointcloud_fusion_node-5] [WARN] [1781528979.267996303] [pointcloud_fusion]: Stall diagnostic (no publish for 50s): cam1: stale (37.6s); cam2: stale (36.0s)
+[tf_pipeline_diagnostics-4] [INFO] [1781528979.802018717] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781528980.147766763] [gtsam_tracker]: Stats: published=131 odom(head=1961, arm=1605) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.651m, arm=0.604m) clock_offset(head=0.125s, arm=0.143s)
+[openvins_odom_tf_relay-7] [WARN] [1781528980.380871248] [openvins_odom_tf_relay]: arm odom pose jumped 2.502m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528982.388727899] [openvins_odom_tf_relay]: arm odom pose jumped 2.429m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781528983.629665834] [cross_camera_features]: frames=357, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781528984.394550487] [openvins_odom_tf_relay]: arm odom pose jumped 2.434m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528986.395154115] [openvins_odom_tf_relay]: arm odom pose jumped 2.520m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528988.397516487] [openvins_odom_tf_relay]: arm odom pose jumped 2.537m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781528989.259749767] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=47.625s, cam2=45.955s) last_publish_ago=60.0s
+[pointcloud_fusion_node-5] [WARN] [1781528989.271970707] [pointcloud_fusion]: Stall diagnostic (no publish for 60s): cam1: stale (47.6s); cam2: stale (46.0s)
+[tf_pipeline_diagnostics-4] [INFO] [1781528989.803937394] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781528990.240922741] [gtsam_tracker]: Stats: published=133 odom(head=3068, arm=2797) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.681m, arm=0.633m) clock_offset(head=0.221s, arm=0.108s)
+[openvins_odom_tf_relay-7] [WARN] [1781528990.399861430] [openvins_odom_tf_relay]: arm odom pose jumped 2.533m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528992.410146445] [openvins_odom_tf_relay]: arm odom pose jumped 2.532m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781528992.919168761] [cross_camera_features]: frames=360, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781528994.415038326] [openvins_odom_tf_relay]: arm odom pose jumped 2.528m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528996.417373652] [openvins_odom_tf_relay]: arm odom pose jumped 2.496m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781528998.425638998] [openvins_odom_tf_relay]: arm odom pose jumped 2.507m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781528999.243546762] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=57.624s, cam2=8.882s) last_publish_ago=70.0s
+[pointcloud_fusion_node-5] [WARN] [1781528999.245274080] [pointcloud_fusion]: Stall diagnostic (no publish for 70s): cam1: stale (57.6s); cam2: stale (8.9s)
+[tf_pipeline_diagnostics-4] [INFO] [1781528999.802847246] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781529000.161134612] [gtsam_tracker]: Stats: published=111 odom(head=3816, arm=3572) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.645m, arm=0.592m) clock_offset(head=0.068s, arm=0.064s)
+[openvins_odom_tf_relay-7] [WARN] [1781529000.425623980] [openvins_odom_tf_relay]: arm odom pose jumped 2.487m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781529002.428477677] [cross_camera_features]: frames=363, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781529002.444682211] [openvins_odom_tf_relay]: arm odom pose jumped 2.496m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529004.508357836] [openvins_odom_tf_relay]: arm odom pose jumped 2.516m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529006.509894000] [openvins_odom_tf_relay]: arm odom pose jumped 2.539m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529008.519425443] [openvins_odom_tf_relay]: arm odom pose jumped 2.532m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781529009.243844831] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=67.624s, cam2=18.882s) last_publish_ago=80.0s
+[pointcloud_fusion_node-5] [WARN] [1781529009.246311985] [pointcloud_fusion]: Clock offset > 0.5s detected — chrony time sync may be broken. Timestamp-based TF lookups will fail. Run 'make timesync-check' to verify host/Jetson clock alignment.
+[pointcloud_fusion_node-5] [WARN] [1781529009.248763184] [pointcloud_fusion]: Stall diagnostic (no publish for 80s): cam1: stale (67.6s); cam2: stale (18.9s)
+[tf_pipeline_diagnostics-4] [INFO] [1781529009.810197991] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781529010.187879165] [gtsam_tracker]: Stats: published=113 odom(head=4646, arm=4440) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.667m, arm=0.625m) clock_offset(head=0.113s, arm=0.089s)
+[openvins_odom_tf_relay-7] [WARN] [1781529010.522181805] [openvins_odom_tf_relay]: arm odom pose jumped 2.532m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781529011.302501003] [cross_camera_features]: frames=365, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781529012.524237964] [openvins_odom_tf_relay]: arm odom pose jumped 2.529m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529014.525162908] [openvins_odom_tf_relay]: arm odom pose jumped 2.527m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529016.528303859] [openvins_odom_tf_relay]: arm odom pose jumped 2.487m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529018.560773442] [openvins_odom_tf_relay]: arm odom pose jumped 2.460m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781529019.251116858] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=77.631s, cam2=28.889s) last_publish_ago=90.0s
+[pointcloud_fusion_node-5] [WARN] [1781529019.253274481] [pointcloud_fusion]: Stall diagnostic (no publish for 90s): cam1: stale (77.6s); cam2: stale (28.9s)
+[tf_pipeline_diagnostics-4] [INFO] [1781529019.804961151] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781529020.248027626] [gtsam_tracker]: Stats: published=114 odom(head=5583, arm=5321) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.628m, arm=0.555m) clock_offset(head=0.179s, arm=0.175s)
+[openvins_odom_tf_relay-7] [WARN] [1781529020.711718745] [openvins_odom_tf_relay]: arm odom pose jumped 2.471m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529022.712372754] [openvins_odom_tf_relay]: arm odom pose jumped 2.506m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781529023.240409790] [cross_camera_features]: frames=368, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781529024.720212510] [openvins_odom_tf_relay]: arm odom pose jumped 2.405m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529026.773367106] [openvins_odom_tf_relay]: arm odom pose jumped 2.405m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529028.773563477] [openvins_odom_tf_relay]: arm odom pose jumped 2.407m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781529029.340220416] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 clock_offset(cam1=87.719s, cam2=38.977s) last_publish_ago=100.1s
+[pointcloud_fusion_node-5] [WARN] [1781529029.353334442] [pointcloud_fusion]: Stall diagnostic (no publish for 100s): cam1: stale (87.7s); cam2: stale (39.0s)
+[tf_pipeline_diagnostics-4] [INFO] [1781529029.827160852] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[gtsam_tracker_node-8] [INFO] [1781529030.234946192] [gtsam_tracker]: Stats: published=100 odom(head=6333, arm=6086) visual=0 delta_rejects=0 resets=0 pose_norm(head=0.818m, arm=0.419m) clock_offset(head=0.081s, arm=0.082s)
+[openvins_odom_tf_relay-7] [WARN] [1781529030.787014603] [openvins_odom_tf_relay]: arm odom pose jumped 2.409m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529032.218713770] [openvins_odom_tf_relay]: head odom pose norm 2.00m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529032.807636731] [openvins_odom_tf_relay]: arm odom pose jumped 2.411m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [WARN] [1781529033.483571284] [gtsam_tracker]: Rejecting odometry delta — head jump 0.615m, arm jump 0.000m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[sift_feature_node-10] [INFO] [1781529033.613583186] [cross_camera_features]: frames=373, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781529034.221042678] [openvins_odom_tf_relay]: head odom pose norm 4.34m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529034.824693789] [openvins_odom_tf_relay]: arm odom pose jumped 2.411m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [WARN] [1781529035.844420783] [gtsam_tracker]: Rejecting odometry delta — head jump 0.626m, arm jump 0.001m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[openvins_odom_tf_relay-7] [WARN] [1781529036.429558177] [openvins_odom_tf_relay]: head odom pose norm 7.47m exceeds max 2.0m — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781529037.021611497] [openvins_odom_tf_relay]: arm odom pose jumped 2.411m (> 0.5m) — suppressing TF

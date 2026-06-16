@@ -13,8 +13,8 @@ if [ -f /prosthesis_ws/install/setup.bash ]; then
     source /prosthesis_ws/install/setup.bash
 fi
 
-HEAD_ODOM="/ov_msckf/odomimu"
-ARM_ODOM="/ov_msckf_arm/odomimu"
+HEAD_ODOM="/jetson/head/odom"
+ARM_ODOM="/jetson/arm/odom"
 TIMEOUT_S="${1:-10}"
 
 echo "[preflight-openvins] Checking OpenVINS odometry topics (timeout=${TIMEOUT_S}s)..."

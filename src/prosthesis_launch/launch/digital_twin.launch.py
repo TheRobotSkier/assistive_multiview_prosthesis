@@ -72,7 +72,7 @@ def _launch_setup(context, *args, **kwargs):
     inference_url = LaunchConfiguration("inference_url").perform(context)
 
     if camera_enabled:
-        cloud_topic = "/head/d435i_head/depth/color/points"
+        cloud_topic = "/jetson/head/points"
         cam1_frame = "d435i_head_depth_optical_frame"
         cam1_link = "d435i_head_link"
         cam1_color_frame = "d435i_head_color_optical_frame"
@@ -160,8 +160,8 @@ def _launch_setup(context, *args, **kwargs):
                 name='pointcloud_fusion',
                 parameters=[{
                     'target_frame': 'world',
-                    'cam1_topic': '/head/d435i_head/depth/color/points',
-                    'cam2_topic': '/arm/d435i_arm/depth/color/points',
+                    'cam1_topic': '/jetson/head/points',
+                    'cam2_topic': '/jetson/arm/points',
                     'arm_frame': 'wrist_link',
                     'max_distance': 2.0,
                     'voxel_size': 0.005,

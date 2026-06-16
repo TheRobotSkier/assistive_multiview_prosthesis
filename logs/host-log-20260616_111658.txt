@@ -1,0 +1,259 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-16-11-16-59-414092-KingBob-680
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [686]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [687]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [688]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [689]
+[INFO] [pointcloud_fusion_node-5]: process started with pid [690]
+[INFO] [odom_to_pose_relay-6]: process started with pid [691]
+[INFO] [openvins_odom_tf_relay-7]: process started with pid [692]
+[INFO] [gtsam_tracker_node-8]: process started with pid [693]
+[INFO] [keyframe_buffer_node-9]: process started with pid [694]
+[INFO] [sift_feature_node-10]: process started with pid [695]
+[INFO] [segmentation_ros2_node-11]: process started with pid [696]
+[INFO] [twist_propagation_node-12]: process started with pid [697]
+[INFO] [preshaping_service_bridge_node-13]: process started with pid [698]
+[INFO] [grasp_proximity_controller_node.py-14]: process started with pid [699]
+[INFO] [rviz2-15]: process started with pid [700]
+[preshaping_service_bridge_node-13] 1781608619.745454 [0] preshaping: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[preshaping_service_bridge_node-13] [ERROR] [1781608619.745734894] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[preshaping_service_bridge_node-13] terminate called after throwing an instance of 'rclcpp::exceptions::RCLError'
+[preshaping_service_bridge_node-13]   what():  failed to initialize rcl node: error not set, at ./src/rcl/node.c:252
+[rviz2-15] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[rviz2-15] 1781608619.977218 [0]      rviz2: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[rviz2-15] [ERROR] [1781608619.977353220] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[rviz2-15] terminate called after throwing an instance of 'rclcpp::exceptions::RCLError'
+[rviz2-15]   what():  failed to initialize rcl node: error not set, at ./src/rcl/node.c:252
+[ERROR] [preshaping_service_bridge_node-13]: process has died [pid 698, exit code -6, cmd '/prosthesis_ws/install/grasp_preshaping/lib/grasp_preshaping/preshaping_service_bridge_node --ros-args -r __node:=preshaping_service --params-file /tmp/launch_params_klqx_uoq'].
+[pipeline_manager_node-1] 1781608620.649386 [0] pipeline_m: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[pipeline_manager_node-1] [ERROR] [1781608620.649655096] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[pipeline_manager_node-1] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[pipeline_manager_node-1]   self.__node = _rclpy.Node(
+[pipeline_manager_node-1] Traceback (most recent call last):
+[pipeline_manager_node-1]   File "/prosthesis_ws/install/pipeline_manager/lib/pipeline_manager/pipeline_manager_node", line 33, in <module>
+[pipeline_manager_node-1]     sys.exit(load_entry_point('pipeline_manager==0.1.0', 'console_scripts', 'pipeline_manager_node')())
+[pipeline_manager_node-1]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pipeline_manager_node-1]   File "/prosthesis_ws/install/pipeline_manager/lib/python3.12/site-packages/pipeline_manager/pipeline_manager_node.py", line 751, in main
+[pipeline_manager_node-1]     node = PipelineManagerNode()
+[pipeline_manager_node-1]            ^^^^^^^^^^^^^^^^^^^^^
+[pipeline_manager_node-1]   File "/prosthesis_ws/install/pipeline_manager/lib/python3.12/site-packages/pipeline_manager/pipeline_manager_node.py", line 97, in __init__
+[pipeline_manager_node-1]     super().__init__('pipeline_manager')
+[pipeline_manager_node-1]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[pipeline_manager_node-1]     self.__node = _rclpy.Node(
+[pipeline_manager_node-1]                   ^^^^^^^^^^^^
+[pipeline_manager_node-1] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[odom_to_pose_relay-6] 1781608620.881442 [0] odom_to_po: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[odom_to_pose_relay-6] [ERROR] [1781608620.882515403] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[odom_to_pose_relay-6] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[odom_to_pose_relay-6]   self.__node = _rclpy.Node(
+[odom_to_pose_relay-6] Traceback (most recent call last):
+[odom_to_pose_relay-6]   File "/prosthesis_ws/install/camera/lib/camera/odom_to_pose_relay", line 33, in <module>
+[odom_to_pose_relay-6]     sys.exit(load_entry_point('camera==0.1.0', 'console_scripts', 'odom_to_pose_relay')())
+[odom_to_pose_relay-6]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[odom_to_pose_relay-6]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/odom_to_pose_relay.py", line 91, in main
+[odom_to_pose_relay-6]     node = OdomToPoseRelay()
+[odom_to_pose_relay-6]            ^^^^^^^^^^^^^^^^^
+[odom_to_pose_relay-6]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/odom_to_pose_relay.py", line 34, in __init__
+[odom_to_pose_relay-6]     super().__init__("odom_to_pose_relay")
+[odom_to_pose_relay-6]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[odom_to_pose_relay-6]     self.__node = _rclpy.Node(
+[odom_to_pose_relay-6]                   ^^^^^^^^^^^^
+[odom_to_pose_relay-6] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[ERROR] [pipeline_manager_node-1]: process has died [pid 686, exit code 1, cmd '/prosthesis_ws/install/pipeline_manager/lib/pipeline_manager/pipeline_manager_node --ros-args -r __node:=pipeline_manager --params-file /tmp/launch_params_r1evgcbu'].
+[keyframe_buffer_node-9] 1781608620.962444 [0] keyframe_b: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[keyframe_buffer_node-9] [ERROR] [1781608620.962560309] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[keyframe_buffer_node-9] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[keyframe_buffer_node-9]   self.__node = _rclpy.Node(
+[keyframe_buffer_node-9] Traceback (most recent call last):
+[keyframe_buffer_node-9]   File "/prosthesis_ws/install/keyframe_buffer/lib/keyframe_buffer/keyframe_buffer_node", line 33, in <module>
+[keyframe_buffer_node-9]     sys.exit(load_entry_point('keyframe_buffer==0.1.0', 'console_scripts', 'keyframe_buffer_node')())
+[keyframe_buffer_node-9]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[keyframe_buffer_node-9]   File "/prosthesis_ws/install/keyframe_buffer/lib/python3.12/site-packages/keyframe_buffer/keyframe_buffer_node.py", line 753, in main
+[keyframe_buffer_node-9]     node = NodeClass()
+[keyframe_buffer_node-9]            ^^^^^^^^^^^
+[keyframe_buffer_node-9]   File "/prosthesis_ws/install/keyframe_buffer/lib/python3.12/site-packages/keyframe_buffer/keyframe_buffer_node.py", line 542, in __init__
+[keyframe_buffer_node-9]     super().__init__("keyframe_buffer")
+[keyframe_buffer_node-9]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[keyframe_buffer_node-9]     self.__node = _rclpy.Node(
+[keyframe_buffer_node-9]                   ^^^^^^^^^^^^
+[keyframe_buffer_node-9] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[ERROR] [rviz2-15]: process has died [pid 700, exit code -6, cmd '/opt/ros/jazzy/lib/rviz2/rviz2 -d /prosthesis_ws/rviz/prosthesis.rviz --ros-args -r __node:=rviz2'].
+[ERROR] [keyframe_buffer_node-9]: process has died [pid 694, exit code 1, cmd '/prosthesis_ws/install/keyframe_buffer/lib/keyframe_buffer/keyframe_buffer_node --ros-args -r __node:=keyframe_buffer --params-file /tmp/launch_params_expaze2c'].
+[ERROR] [odom_to_pose_relay-6]: process has died [pid 691, exit code 1, cmd '/prosthesis_ws/install/camera/lib/camera/odom_to_pose_relay --ros-args --log-level warn --ros-args -r __node:=odom_to_pose_relay --params-file /tmp/launch_params_x_zs7r7o'].
+[openvins_realsense_tf_bridge_node-2] 1781608621.183406 [0] openvins_r: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[openvins_realsense_tf_bridge_node-2] [ERROR] [1781608621.183564615] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[openvins_realsense_tf_bridge_node-2] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[openvins_realsense_tf_bridge_node-2]   self.__node = _rclpy.Node(
+[openvins_realsense_tf_bridge_node-2] Traceback (most recent call last):
+[openvins_realsense_tf_bridge_node-2]   File "/prosthesis_ws/install/camera/lib/camera/openvins_realsense_tf_bridge_node", line 33, in <module>
+[openvins_realsense_tf_bridge_node-2]     sys.exit(load_entry_point('camera==0.1.0', 'console_scripts', 'openvins_realsense_tf_bridge_node')())
+[openvins_realsense_tf_bridge_node-2]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_realsense_tf_bridge_node-2]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/openvins_realsense_tf_bridge_node.py", line 497, in main
+[openvins_realsense_tf_bridge_node-2]     node = OpenVinsRealSenseTfBridge()
+[openvins_realsense_tf_bridge_node-2]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_realsense_tf_bridge_node-2]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/openvins_realsense_tf_bridge_node.py", line 213, in __init__
+[openvins_realsense_tf_bridge_node-2]     super().__init__("openvins_realsense_tf_bridge")
+[openvins_realsense_tf_bridge_node-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[openvins_realsense_tf_bridge_node-2]     self.__node = _rclpy.Node(
+[openvins_realsense_tf_bridge_node-2]                   ^^^^^^^^^^^^
+[openvins_realsense_tf_bridge_node-2] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[openvins_odom_tf_relay-7] 1781608621.206251 [0] openvins_o: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[openvins_odom_tf_relay-7] [ERROR] [1781608621.206474663] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[openvins_odom_tf_relay-7] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[openvins_odom_tf_relay-7]   self.__node = _rclpy.Node(
+[openvins_odom_tf_relay-7] Traceback (most recent call last):
+[openvins_odom_tf_relay-7]   File "/prosthesis_ws/install/camera/lib/camera/openvins_odom_tf_relay", line 33, in <module>
+[openvins_odom_tf_relay-7]     sys.exit(load_entry_point('camera==0.1.0', 'console_scripts', 'openvins_odom_tf_relay')())
+[openvins_odom_tf_relay-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/openvins_odom_tf_relay.py", line 760, in main
+[openvins_odom_tf_relay-7]     node = OpenVINSOdomTFRelay()
+[openvins_odom_tf_relay-7]            ^^^^^^^^^^^^^^^^^^^^^
+[openvins_odom_tf_relay-7]   File "/prosthesis_ws/install/camera/lib/python3.12/site-packages/camera/openvins_odom_tf_relay.py", line 116, in __init__
+[openvins_odom_tf_relay-7]     super().__init__("openvins_odom_tf_relay")
+[openvins_odom_tf_relay-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[openvins_odom_tf_relay-7]     self.__node = _rclpy.Node(
+[openvins_odom_tf_relay-7]                   ^^^^^^^^^^^^
+[openvins_odom_tf_relay-7] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[camera_mount_tf_publisher-3] 1781608621.219612 [0]    python3: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[camera_mount_tf_publisher-3] [ERROR] [1781608621.219789743] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[camera_mount_tf_publisher-3] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[camera_mount_tf_publisher-3]   self.__node = _rclpy.Node(
+[camera_mount_tf_publisher-3] Traceback (most recent call last):
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-3]     main()
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 421, in main
+[camera_mount_tf_publisher-3]     node = CameraMountTFPublisher(config_path, mount_name=args.mount,
+[camera_mount_tf_publisher-3]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 159, in __init__
+[camera_mount_tf_publisher-3]     super().__init__("camera_mount_tf_publisher")
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[camera_mount_tf_publisher-3]     self.__node = _rclpy.Node(
+[camera_mount_tf_publisher-3]                   ^^^^^^^^^^^^
+[camera_mount_tf_publisher-3] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[ERROR] [openvins_realsense_tf_bridge_node-2]: process has died [pid 687, exit code 1, cmd '/prosthesis_ws/install/camera/lib/camera/openvins_realsense_tf_bridge_node --ros-args -r __node:=openvins_realsense_tf_bridge --params-file /tmp/launch_params_kwsb4b7s'].
+[segmentation_ros2_node-11] 1781608621.387525 [0] segmentati: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[segmentation_ros2_node-11] [ERROR] [1781608621.387681072] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[segmentation_ros2_node-11] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[segmentation_ros2_node-11]   self.__node = _rclpy.Node(
+[segmentation_ros2_node-11] Traceback (most recent call last):
+[segmentation_ros2_node-11]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-11]     sys.exit(load_entry_point('segmentation_bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-11]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-11]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 357, in main
+[segmentation_ros2_node-11]     node = SegmentationNode()
+[segmentation_ros2_node-11]            ^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-11]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 114, in __init__
+[segmentation_ros2_node-11]     super().__init__("segmentation_node")
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[segmentation_ros2_node-11]     self.__node = _rclpy.Node(
+[segmentation_ros2_node-11]                   ^^^^^^^^^^^^
+[segmentation_ros2_node-11] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[ERROR] [camera_mount_tf_publisher-3]: process has died [pid 688, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[ERROR] [openvins_odom_tf_relay-7]: process has died [pid 692, exit code 1, cmd '/prosthesis_ws/install/camera/lib/camera/openvins_odom_tf_relay --ros-args --log-level warn --ros-args -r __node:=openvins_odom_tf_relay --params-file /tmp/launch_params_xqpctc1k'].
+[tf_pipeline_diagnostics-4] 1781608621.420639 [0]    python3: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[tf_pipeline_diagnostics-4] [ERROR] [1781608621.420838892] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[tf_pipeline_diagnostics-4] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[tf_pipeline_diagnostics-4]   self.__node = _rclpy.Node(
+[tf_pipeline_diagnostics-4] Traceback (most recent call last):
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-4]     main()
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 141, in main
+[tf_pipeline_diagnostics-4]     node = TFPipelineDiagnostics()
+[tf_pipeline_diagnostics-4]            ^^^^^^^^^^^^^^^^^^^^^^^
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 29, in __init__
+[tf_pipeline_diagnostics-4]     super().__init__("tf_pipeline_diagnostics")
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[tf_pipeline_diagnostics-4]     self.__node = _rclpy.Node(
+[tf_pipeline_diagnostics-4]                   ^^^^^^^^^^^^
+[tf_pipeline_diagnostics-4] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[gtsam_tracker_node-8] 1781608621.483852 [0] gtsam_trac: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[gtsam_tracker_node-8] [ERROR] [1781608621.483989475] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[gtsam_tracker_node-8] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[gtsam_tracker_node-8]   self.__node = _rclpy.Node(
+[gtsam_tracker_node-8] Traceback (most recent call last):
+[gtsam_tracker_node-8]   File "/prosthesis_ws/install/gtsam_tracker/lib/gtsam_tracker/gtsam_tracker_node", line 33, in <module>
+[gtsam_tracker_node-8]     sys.exit(load_entry_point('gtsam_tracker==0.1.0', 'console_scripts', 'gtsam_tracker_node')())
+[gtsam_tracker_node-8]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[gtsam_tracker_node-8]   File "/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker/gtsam_tracker_node.py", line 782, in main
+[gtsam_tracker_node-8]     node = NodeClass()
+[gtsam_tracker_node-8]            ^^^^^^^^^^^
+[gtsam_tracker_node-8]   File "/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker/gtsam_tracker_node.py", line 181, in __init__
+[gtsam_tracker_node-8]     super().__init__("gtsam_tracker")
+[gtsam_tracker_node-8]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[gtsam_tracker_node-8]     self.__node = _rclpy.Node(
+[gtsam_tracker_node-8]                   ^^^^^^^^^^^^
+[gtsam_tracker_node-8] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[pointcloud_fusion_node-5] 1781608621.488177 [0] pointcloud: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[pointcloud_fusion_node-5] [ERROR] [1781608621.488383787] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[pointcloud_fusion_node-5] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[pointcloud_fusion_node-5]   self.__node = _rclpy.Node(
+[pointcloud_fusion_node-5] Traceback (most recent call last):
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/pointcloud_fusion/pointcloud_fusion_node", line 33, in <module>
+[pointcloud_fusion_node-5]     sys.exit(load_entry_point('pointcloud_fusion==0.1.0', 'console_scripts', 'pointcloud_fusion_node')())
+[pointcloud_fusion_node-5]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 1087, in main
+[pointcloud_fusion_node-5]     node = PointCloudFusionNode()
+[pointcloud_fusion_node-5]            ^^^^^^^^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 227, in __init__
+[pointcloud_fusion_node-5]     super().__init__("pointcloud_fusion")
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[pointcloud_fusion_node-5]     self.__node = _rclpy.Node(
+[pointcloud_fusion_node-5]                   ^^^^^^^^^^^^
+[pointcloud_fusion_node-5] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[ERROR] [tf_pipeline_diagnostics-4]: process has died [pid 689, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[ERROR] [segmentation_ros2_node-11]: process has died [pid 696, exit code 1, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_yyf24jn5 -r /segmentation/input_cloud:=/fused_pointcloud'].
+[ERROR] [gtsam_tracker_node-8]: process has died [pid 693, exit code 1, cmd '/prosthesis_ws/install/gtsam_tracker/lib/gtsam_tracker/gtsam_tracker_node --ros-args -r __node:=gtsam_tracker --params-file /tmp/launch_params_rtyg_1b3'].
+[ERROR] [pointcloud_fusion_node-5]: process has died [pid 690, exit code 1, cmd '/prosthesis_ws/install/pointcloud_fusion/lib/pointcloud_fusion/pointcloud_fusion_node --ros-args -r __node:=pointcloud_fusion --params-file /tmp/launch_params_jt6lk9ci'].
+[sift_feature_node-10] 1781608621.683920 [0] sift_featu: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[sift_feature_node-10] [ERROR] [1781608621.684077701] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[sift_feature_node-10] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[sift_feature_node-10]   self.__node = _rclpy.Node(
+[sift_feature_node-10] Traceback (most recent call last):
+[sift_feature_node-10]   File "/prosthesis_ws/install/cross_camera_features/lib/cross_camera_features/sift_feature_node", line 33, in <module>
+[sift_feature_node-10]     sys.exit(load_entry_point('cross_camera_features==0.1.0', 'console_scripts', 'sift_feature_node')())
+[sift_feature_node-10]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[sift_feature_node-10]   File "/prosthesis_ws/install/cross_camera_features/lib/python3.12/site-packages/cross_camera_features/sift_feature_node.py", line 606, in main
+[sift_feature_node-10]     node = NodeClass()
+[sift_feature_node-10]            ^^^^^^^^^^^
+[sift_feature_node-10]   File "/prosthesis_ws/install/cross_camera_features/lib/python3.12/site-packages/cross_camera_features/sift_feature_node.py", line 443, in __init__
+[sift_feature_node-10]     super().__init__("cross_camera_features")
+[sift_feature_node-10]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[sift_feature_node-10]     self.__node = _rclpy.Node(
+[sift_feature_node-10]                   ^^^^^^^^^^^^
+[sift_feature_node-10] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[grasp_proximity_controller_node.py-14] 1781608621.697873 [0]    python3: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[grasp_proximity_controller_node.py-14] [ERROR] [1781608621.698061137] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[grasp_proximity_controller_node.py-14] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[grasp_proximity_controller_node.py-14]   self.__node = _rclpy.Node(
+[grasp_proximity_controller_node.py-14] Traceback (most recent call last):
+[grasp_proximity_controller_node.py-14]   File "/prosthesis_ws/install/grasp_preshaping/lib/grasp_preshaping/grasp_proximity_controller_node.py", line 690, in <module>
+[grasp_proximity_controller_node.py-14]     main()
+[grasp_proximity_controller_node.py-14]   File "/prosthesis_ws/install/grasp_preshaping/lib/grasp_preshaping/grasp_proximity_controller_node.py", line 678, in main
+[grasp_proximity_controller_node.py-14]     node = GraspProximityControllerNode()
+[grasp_proximity_controller_node.py-14]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[grasp_proximity_controller_node.py-14]   File "/prosthesis_ws/install/grasp_preshaping/lib/grasp_preshaping/grasp_proximity_controller_node.py", line 77, in __init__
+[grasp_proximity_controller_node.py-14]     super().__init__("grasp_proximity_controller")
+[grasp_proximity_controller_node.py-14]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[grasp_proximity_controller_node.py-14]     self.__node = _rclpy.Node(
+[grasp_proximity_controller_node.py-14]                   ^^^^^^^^^^^^
+[grasp_proximity_controller_node.py-14] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[ERROR] [sift_feature_node-10]: process has died [pid 695, exit code 1, cmd '/prosthesis_ws/install/cross_camera_features/lib/cross_camera_features/sift_feature_node --ros-args -r __node:=cross_camera_features --params-file /tmp/launch_params_nszh6oos'].
+[ERROR] [grasp_proximity_controller_node.py-14]: process has died [pid 699, exit code 1, cmd '/prosthesis_ws/install/grasp_preshaping/lib/grasp_preshaping/grasp_proximity_controller_node.py --ros-args -r __node:=proximity_controller --params-file /tmp/launch_params_awhtw1dx'].
+[twist_propagation_node-12] 1781608621.864007 [0] twist_prop: config: //CycloneDDS/Domain/General: MaximumMessageSize: unknown element (/tmp/cyclonedds_peer.xml line 20)
+[twist_propagation_node-12] [ERROR] [1781608621.864101264] [rmw_cyclonedds_cpp]: rmw_create_node: failed to create domain, error Error
+[twist_propagation_node-12] /opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py:188: RuntimeWarning: Failed to fini rosout publisher: rcl node implementation is invalid, at ./src/rcl/node.c:390
+[twist_propagation_node-12]   self.__node = _rclpy.Node(
+[twist_propagation_node-12] Traceback (most recent call last):
+[twist_propagation_node-12]   File "/prosthesis_ws/install/twist_propagation/lib/twist_propagation/twist_propagation_node", line 33, in <module>
+[twist_propagation_node-12]     sys.exit(load_entry_point('twist_propagation==0.2.0', 'console_scripts', 'twist_propagation_node')())
+[twist_propagation_node-12]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-12]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 1956, in main
+[twist_propagation_node-12]     node = TwistPropagationNode()
+[twist_propagation_node-12]            ^^^^^^^^^^^^^^^^^^^^^^
+[twist_propagation_node-12]   File "/prosthesis_ws/install/twist_propagation/lib/python3.12/site-packages/twist_propagation/twist_propagation_node.py", line 465, in __init__
+[twist_propagation_node-12]     super().__init__("twist_propagation")
+[twist_propagation_node-12]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py", line 188, in __init__
+[twist_propagation_node-12]     self.__node = _rclpy.Node(
+[twist_propagation_node-12]                   ^^^^^^^^^^^^
+[twist_propagation_node-12] rclpy._rclpy_pybind11.RCLError: error creating node: error not set, at ./src/rcl/node.c:252
+[ERROR] [twist_propagation_node-12]: process has died [pid 697, exit code 1, cmd '/prosthesis_ws/install/twist_propagation/lib/twist_propagation/twist_propagation_node --ros-args -r __node:=twist_propagation --params-file /tmp/launch_params_gn37d_52'].

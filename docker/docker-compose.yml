@@ -64,6 +64,10 @@ services:
             - prosthesis-build:/prosthesis_ws/build
             - prosthesis-install:/prosthesis_ws/install
             - prosthesis-log:/prosthesis_ws/log
+            # Run logs + rosbags — bind-mounted so they persist to the host
+            # filesystem and survive container removal.
+            - ../logs:/prosthesis_ws/logs:rw
+            - ../data:/prosthesis_ws/data:rw
             # EMG training data and trained models — persist across container restarts
             - ../data:/app/data:rw
             - ../models:/app/models:rw

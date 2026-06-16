@@ -6,8 +6,8 @@ topics with a slowly drifting trajectory.  This lets the ``gtsam_tracker``
 node be exercised in mock mode.
 
 Publishes:
-    /ov_msckf/odomimu       (nav_msgs/Odometry) — head odometry
-    /ov_msckf_arm/odomimu   (nav_msgs/Odometry) — arm odometry
+    /jetson/head/odom      (nav_msgs/Odometry) — head odometry
+    /jetson/arm/odom       (nav_msgs/Odometry) — arm odometry
 
 Optionally publishes fake GTSAM poses so the keyframe_buffer and
 cross_camera_features nodes can be tested without the tracker:
@@ -31,8 +31,8 @@ class MockOdomPublisher(Node):
         super().__init__("mock_odom_publisher")
 
         self.declare_parameter("publish_hz", 15.0)
-        self.declare_parameter("head_odom_topic", "/ov_msckf/odomimu")
-        self.declare_parameter("arm_odom_topic", "/ov_msckf_arm/odomimu")
+        self.declare_parameter("head_odom_topic", "/jetson/head/odom")
+        self.declare_parameter("arm_odom_topic", "/jetson/arm/odom")
         self.declare_parameter("head_pose_topic", "/gtsam/head_pose")
         self.declare_parameter("arm_pose_topic", "/gtsam/arm_pose")
         self.declare_parameter("publish_gtsam_poses", True)

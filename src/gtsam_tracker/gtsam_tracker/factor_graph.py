@@ -279,6 +279,35 @@ class TrajectoryFactorGraph:
         )
 
     # ------------------------------------------------------------------
+    # Reset (recovery from corrupted ISAM2 state)
+    # ------------------------------------------------------------------
+
+    def reset(self) -> None:
+        """Reinitialize the ISAM2 smoother, discarding all factors and values.
+
+        Call this after an ``IndeterminantLinearSystemException`` (or any other
+        corruption) leaves the graph in an unrecoverable state.  After reset,
+        the next :meth:`add_odometry_factor` call will seed a fresh graph with
+        a prior on the first pose.
+
+        Reference: V6 §9 graceful-degradation / fault-tolerance.
+        """
+        isam_params = gtsam.ISAM2Params()
+        isam_params.setRelinearizeThreshold(0.001)
+        isam_params.relinearizeSkip = 3
+        self._isam = gtsam.ISAM2(isam_params)
+
+        self._last_key = {"h": None, "a": None}
+        self._last_stamp = {"h": None, "a": None}
+
+        self._new_factors = gtsam.NonlinearFactorGraph()
+        self._new_values = gtsam.Values()
+
+        self._initialized = set()
+        self._key_timestamps = {}
+        self._all_keys = set()
+
+    # ------------------------------------------------------------------
     # Update / optimise
     # ------------------------------------------------------------------
 

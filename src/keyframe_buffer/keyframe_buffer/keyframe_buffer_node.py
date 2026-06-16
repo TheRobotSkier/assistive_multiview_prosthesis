@@ -97,12 +97,12 @@ __all__ = [
 CAMERAS = ("head", "arm")
 
 DEFAULT_PARAMS = {
-    "head_image_topic": "/head/d435i_head/color/image_raw",
-    "arm_image_topic": "/arm/d435i_arm/color/image_raw",
-    "head_cloud_topic": "/head/d435i_head/depth/color/points",
-    "arm_cloud_topic": "/arm/d435i_arm/depth/color/points",
-    "head_info_topic": "/head/d435i_head/color/camera_info",
-    "arm_info_topic": "/arm/d435i_arm/color/camera_info",
+    "head_image_topic": "/jetson/head/image",
+    "arm_image_topic": "/jetson/arm/image",
+    "head_cloud_topic": "/jetson/head/points",
+    "arm_cloud_topic": "/jetson/arm/points",
+    "head_info_topic": "/jetson/head/camera_info",
+    "arm_info_topic": "/jetson/arm/camera_info",
     "head_pose_topic": "/gtsam/head_pose",
     "arm_pose_topic": "/gtsam/arm_pose",
     "max_keyframes_per_camera": 50,
@@ -556,9 +556,9 @@ def create_node():
                 pose_max_age_s=float(p("pose_max_age_s")),
             )
 
-            # ── QoS ──────────────────────────────────────────────────────
-            reliable = QoSProfile(
-                reliability=ReliabilityPolicy.RELIABLE,
+            # ── QoS (BEST_EFFORT — Jetson relay publishes with BEST_EFFORT) ──
+            best_effort = QoSProfile(
+                reliability=ReliabilityPolicy.BEST_EFFORT,
                 history=HistoryPolicy.KEEP_LAST,
                 depth=1,
             )
@@ -572,13 +572,13 @@ def create_node():
 
                 self.create_subscription(
                     PointCloud2, cloud_topic,
-                    lambda msg, c=cam: self._on_cloud(msg, c), reliable)
+                    lambda msg, c=cam: self._on_cloud(msg, c), best_effort)
                 self.create_subscription(
                     Image, image_topic,
-                    lambda msg, c=cam: self._on_image(msg, c), reliable)
+                    lambda msg, c=cam: self._on_image(msg, c), best_effort)
                 self.create_subscription(
                     CameraInfo, info_topic,
-                    lambda msg, c=cam: self._on_info(msg, c), reliable)
+                    lambda msg, c=cam: self._on_info(msg, c), best_effort)
                 self.create_subscription(
                     PoseWithCovarianceStamped, pose_topic,
                     lambda msg, c=cam: self._on_pose(msg, c), 10)

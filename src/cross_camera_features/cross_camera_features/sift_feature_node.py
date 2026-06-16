@@ -262,12 +262,12 @@ def match_and_align(
 # ---------------------------------------------------------------------------
 
 DEFAULT_PARAMS = {
-    "head_image_topic": "/head/d435i_head/color/image_raw",
-    "arm_image_topic": "/arm/d435i_arm/color/image_raw",
-    "head_cloud_topic": "/head/d435i_head/depth/color/points",
-    "arm_cloud_topic": "/arm/d435i_arm/depth/color/points",
-    "head_info_topic": "/head/d435i_head/color/camera_info",
-    "arm_info_topic": "/arm/d435i_arm/color/camera_info",
+    "head_image_topic": "/jetson/head/image",
+    "arm_image_topic": "/jetson/arm/image",
+    "head_cloud_topic": "/jetson/head/points",
+    "arm_cloud_topic": "/jetson/arm/points",
+    "head_info_topic": "/jetson/head/camera_info",
+    "arm_info_topic": "/jetson/arm/camera_info",
     "head_pose_topic": "/gtsam/head_pose",
     "arm_pose_topic": "/gtsam/arm_pose",
     "output_topic": "/vis/head_arm_pose",
@@ -286,11 +286,13 @@ def _import_ros():
     """Import ROS 2 modules lazily (host-testable core without ROS)."""
     import rclpy
     from rclpy.node import Node
+    from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
     import message_filters
     from sensor_msgs.msg import Image, PointCloud2, CameraInfo
     from geometry_msgs.msg import PoseWithCovariance, PoseWithCovarianceStamped
     from std_msgs.msg import Header
-    return (rclpy, Node, message_filters,
+    return (rclpy, Node, QoSProfile, ReliabilityPolicy, HistoryPolicy,
+            message_filters,
             Image, PointCloud2, CameraInfo,
             PoseWithCovariance, PoseWithCovarianceStamped, Header)
 
@@ -430,7 +432,8 @@ def _matrix_to_pose_with_cov(T: np.ndarray, cov: np.ndarray,
 
 def create_node():
     """Build and return the ``SiftFeatureNode`` (ROS 2 Node subclass)."""
-    (rclpy, Node, message_filters,
+    (rclpy, Node, QoSProfile, ReliabilityPolicy, HistoryPolicy,
+     message_filters,
      Image, PointCloud2, CameraInfo,
      PoseWithCovariance, PoseWithCovarianceStamped, Header) = _import_ros()
 
@@ -477,24 +480,31 @@ def create_node():
             self._arm_pose = None
 
             # Cloud / info / pose subscriptions (independent, like the
-            # keyframe buffer).
+            # keyframe buffer).  BEST_EFFORT — Jetson relay publishes BEST_EFFORT.
+            best_effort = QoSProfile(
+                reliability=ReliabilityPolicy.BEST_EFFORT,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=10,
+            )
             for cam in ("head", "arm"):
                 self.create_subscription(
                     PointCloud2, str(p(f"{cam}_cloud_topic")),
-                    lambda msg, c=cam: self._on_cloud(msg, c), 10)
+                    lambda msg, c=cam: self._on_cloud(msg, c), best_effort)
                 self.create_subscription(
                     CameraInfo, str(p(f"{cam}_info_topic")),
-                    lambda msg, c=cam: self._on_info(msg, c), 10)
+                    lambda msg, c=cam: self._on_info(msg, c), best_effort)
                 self.create_subscription(
                     PoseWithCovarianceStamped, str(p(f"{cam}_pose_topic")),
-                    lambda msg, c=cam: self._on_pose(msg, c), 10)
+                    lambda msg, c=cam: self._on_pose(msg, c), best_effort)
 
             # ── Synced image pair (ApproximateTimeSynchronizer) ─────────
             sync_slop = float(p("sync_slop_s"))
             self._head_img_sub = message_filters.Subscriber(
-                self, Image, str(p("head_image_topic")))
+                self, Image, str(p("head_image_topic")),
+                qos_profile=best_effort)
             self._arm_img_sub = message_filters.Subscriber(
-                self, Image, str(p("arm_image_topic")))
+                self, Image, str(p("arm_image_topic")),
+                qos_profile=best_effort)
             self._sync = message_filters.ApproximateTimeSynchronizer(
                 [self._head_img_sub, self._arm_img_sub],
                 queue_size=10, slop=sync_slop)

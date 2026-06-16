@@ -282,7 +282,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /ov_msckf/odomimu
+        Value: /jetson/head/odom
       Value: false
     - Angle Tolerance: 0.10000000149011612
       Class: rviz_default_plugins/Odometry
@@ -321,7 +321,7 @@ Visualization Manager:
         Filter size: 10
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /ov_msckf_arm/odomimu
+        Value: /jetson/arm/odom
       Value: false
     - Alpha: 1
       Axes Length: 0.5
@@ -375,7 +375,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /ov_msckf_arm/trackhist
+        Value: /jetson/arm/trackhist
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: true
@@ -389,7 +389,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /ov_msckf/trackhist
+        Value: /jetson/head/trackhist
       Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true

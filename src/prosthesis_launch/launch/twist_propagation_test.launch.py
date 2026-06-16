@@ -9,7 +9,7 @@ frame by the pointcloud_fusion_node, then filtered (distance, hand removal,
 voxel downsampling) before being consumed by segmentation and twist
 propagation.
 
-The arm camera's OpenVINS odometry (/ov_msckf_arm/odomimu) is relayed to
+The arm camera's OpenVINS odometry (/jetson/arm/odom) is relayed to
 /hand_pose so that moving the camera in real-time drives the twist estimation.
 
 Nodes started:
@@ -183,7 +183,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             "odom_topic",
-            default_value="/ov_msckf_arm/odomimu",
+            default_value="/jetson/arm/odom",
             description="OpenVINS odometry topic for hand pose estimation.",
         ),
         DeclareLaunchArgument(
@@ -203,12 +203,12 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "cam1_topic",
-            default_value="/head/d435i_head/depth/color/points",
+            default_value="/jetson/head/points",
             description="Camera 1 pointcloud topic.",
         ),
         DeclareLaunchArgument(
             "cam2_topic",
-            default_value="/arm/d435i_arm/depth/color/points",
+            default_value="/jetson/arm/points",
             description="Camera 2 pointcloud topic.",
         ),
         DeclareLaunchArgument(

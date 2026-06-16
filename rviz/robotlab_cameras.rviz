@@ -20,7 +20,7 @@ Visualization Manager:
         Depth: 5
         Durability Policy: Volatile
         Reliability Policy: Reliable
-        Value: /head/d435i_head/depth/color/points
+        Value: /jetson/head/points
       Size (Pixels): 3
       Use Fixed Frame: true
       Use rainbow: false
@@ -34,7 +34,7 @@ Visualization Manager:
         Depth: 5
         Durability Policy: Volatile
         Reliability Policy: Reliable
-        Value: /arm/d435i_arm/depth/color/points
+        Value: /jetson/arm/points
       Size (Pixels): 3
       Use Fixed Frame: true
       Use rainbow: false
@@ -45,7 +45,7 @@ Visualization Manager:
         Depth: 5
         Durability Policy: Volatile
         Reliability Policy: Reliable
-        Value: /head/d435i_head/color/image_raw
+        Value: /jetson/head/image
     - Class: rviz_default_plugins/Image
       Enabled: true
       Name: Arm Color
@@ -53,7 +53,7 @@ Visualization Manager:
         Depth: 5
         Durability Policy: Volatile
         Reliability Policy: Reliable
-        Value: /arm/d435i_arm/color/image_raw
+        Value: /jetson/arm/image
     - Class: rviz_default_plugins/Odometry
       Enabled: true
       Name: EKF Odometry

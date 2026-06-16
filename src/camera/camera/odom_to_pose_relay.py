@@ -10,7 +10,7 @@ The odometry twist and covariance are also forwarded to /hand_twist and
 covariance estimation (via its odom_topic parameter).
 
 Parameters:
-    odom_topic  (str)  – input Odometry topic (default: /ov_msckf_arm/odomimu)
+    odom_topic  (str)  – input Odometry topic (default: /jetson/arm/odom)
     pose_topic  (str)  – output PoseStamped topic (default: /hand_pose)
     twist_topic (str)  – output TwistStamped topic (default: /hand_twist)
     odom_out     (str)  – forwarded Odometry topic (default: /hand_odom)
@@ -33,7 +33,7 @@ class OdomToPoseRelay(Node):
     def __init__(self):
         super().__init__("odom_to_pose_relay")
 
-        self.declare_parameter("odom_topic", "/ov_msckf_arm/odomimu")
+        self.declare_parameter("odom_topic", "/jetson/arm/odom")
         self.declare_parameter("pose_topic", "/hand_pose")
         self.declare_parameter("twist_topic", "/hand_twist")
         self.declare_parameter("odom_out", "/hand_odom")

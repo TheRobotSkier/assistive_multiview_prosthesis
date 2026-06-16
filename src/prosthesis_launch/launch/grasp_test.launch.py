@@ -72,7 +72,7 @@ def _launch_setup(context, *args, **kwargs):
 
     # Choose the correct cloud topic based on camera vs mock
     if camera_enabled:
-        cloud_topic = "/head/d435i_head/depth/color/points"
+        cloud_topic = "/jetson/head/points"
     else:
         cloud_topic = "/camera/depth/color/points"
 

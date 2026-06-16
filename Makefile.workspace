@@ -3,6 +3,12 @@
 # Run `make` inside the container to see available targets.
 #
 # ROS setup is handled automatically — no need to source setup.bash manually.
+#
+# NETWORK NOTE: When monitoring topics over the Jetson Ethernet link,
+# always append --qos-reliability best_effort to ros2 topic echo/hz/bw
+# to avoid saturating the link with RELIABLE ACK/NACK traffic.
+# Pipeline nodes MUST use RELIABLE; monitoring tools should use BEST_EFFORT.
+# See: plans/2026-06-16-network-buffer-tuning-host-v2.md
 
 .DEFAULT_GOAL := help
 
@@ -27,7 +33,7 @@ TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test mock mock-v6 pipeline pipeline-v6 digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source
+.PHONY: help build build-pkg build-debug clean test mock mock-v6 pipeline pipeline-v6 start digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source run-camera-log record-v6 record-v6-mock inspect-bag
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -90,7 +96,11 @@ pipeline: ## Launch full hardware pipeline
 	ros2 launch prosthesis_launch pipeline.launch.py
 
 pipeline-v6: ## Launch V6 hardware pipeline with TSDF fusion enabled
-	@$(ROS_SETUP) && \
+	@$(ROS_SETUP) && $(ROS_WORKSPACE_SETUP) && \
+	ros2 launch prosthesis_launch pipeline.launch.py use_tsdf_fusion:=true
+
+start: ## Source + launch V6 pipeline (one command to rule them all)
+	@$(ROS_SETUP) && $(ROS_WORKSPACE_SETUP) && \
 	ros2 launch prosthesis_launch pipeline.launch.py use_tsdf_fusion:=true
 
 camera-test: ## Build + launch visual pipeline (no hardware)
@@ -109,6 +119,90 @@ run: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
 	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	$(ROS_WORKSPACE_SETUP) && \
 	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
+
+run-camera: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true
+
+run-camera-log: ## Same as run-camera but tees all output to logs/host-log-<timestamp>.txt
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
+	mkdir -p /prosthesis_ws/logs && \
+	LOG_FILE=/prosthesis_ws/logs/host-log-$$(date +%Y%m%d_%H%M%S).txt && \
+	echo "=== Logging to $$LOG_FILE ===" && \
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true 2>&1 | tee $$LOG_FILE
+
+# ── Rosbag recording (in-container) ─────────────────────────────────────────
+# These targets run entirely inside the container — no host involvement, so
+# they never recreate the container or interrupt a running pipeline.
+#
+# Bags are written to /prosthesis_ws/data/bags/v6_<timestamp>/, which is
+# bind-mounted to the host ./data/bags/ directory.
+#
+# Usage (from inside the container):
+#   make record-v6          # record all V6 perception + odometry topics
+#   make record-v6-mock     # record mock pipeline topics (lighter)
+#   make inspect-bag        # show topic list + message counts for latest bag
+#
+# Or from the host:
+#   make record-v6          # (host proxy — execs into running container)
+
+RECORD_BAG_DIR := v6_$$(date +%Y%m%d_%H%M%S)
+
+RECORD_TOPICS_V6 := \
+	/jetson/head/points \
+	/jetson/arm/points \
+	/jetson/head/image \
+	/jetson/arm/image \
+	/jetson/head/camera_info \
+	/jetson/arm/camera_info \
+	/jetson/head/odom \
+	/jetson/arm/odom \
+	/gtsam/head_pose \
+	/gtsam/arm_pose \
+	/vis/head_arm_pose \
+	/segmentation/object_cloud \
+	/keyframe_buffer/diagnostics \
+	/tf \
+	/tf_static
+
+RECORD_TOPICS_MOCK := \
+	/fused_pointcloud \
+	/segmentation/object_cloud \
+	/gtsam/head_pose \
+	/gtsam/arm_pose \
+	/vis/head_arm_pose \
+	/keyframe_buffer/diagnostics \
+	/tf \
+	/tf_static
+
+record-v6: ## Record all V6 perception + odometry topics for offline replay
+	@$(ROS_SETUP) && \
+	mkdir -p /prosthesis_ws/data/bags && \
+	echo "Recording V6 topics to /prosthesis_ws/data/bags/$(RECORD_BAG_DIR)" && \
+	echo "(host path: data/bags/$(RECORD_BAG_DIR))" && \
+	echo "Press Ctrl+C to stop." && \
+	ros2 bag record -o /prosthesis_ws/data/bags/$(RECORD_BAG_DIR) \
+		--topics $(RECORD_TOPICS_V6)
+
+record-v6-mock: ## Record mock pipeline topics (lighter set)
+	@$(ROS_SETUP) && \
+	mkdir -p /prosthesis_ws/data/bags && \
+	echo "Recording mock topics to /prosthesis_ws/data/bags/$(RECORD_BAG_DIR)" && \
+	echo "(host path: data/bags/$(RECORD_BAG_DIR))" && \
+	echo "Press Ctrl+C to stop." && \
+	ros2 bag record -o /prosthesis_ws/data/bags/$(RECORD_BAG_DIR) --topics $(RECORD_TOPICS_MOCK)
+
+inspect-bag: ## Show topic list + message counts for the most recent bag
+	@BAG=$$(ls -dt /prosthesis_ws/data/bags/v6_*/ 2>/dev/null | head -1); \
+	if [ -z "$$BAG" ]; then echo "No bags found in /prosthesis_ws/data/bags/"; exit 1; fi; \
+	echo "Latest bag: $$BAG"; \
+	$(ROS_SETUP) && ros2 bag info $$BAG | head -80
 
 run-emg-grasp: ## Build + launch EMG-triggered grasp pipeline (no perception)
 	@$(ROS_SETUP) && \
@@ -190,19 +284,19 @@ tonight-raw-check: ## Gate 0: show Jetson raw clouds, OpenVINS odom, and frames
 	set +e; \
 	echo ""; \
 	echo "Gate 0: Jetson topics visible on host"; \
-	$(TONIGHT_ROS_QUIET) ros2 topic list 2>/dev/null | sort | grep -E "d435i.*points|ov_msckf.*odomimu|/tf$$|/tf_static$$|segmentation|fused|hand_|twist" || true; \
+	$(TONIGHT_ROS_QUIET) ros2 topic list 2>/dev/null | sort | grep -E "jetson.*points|jetson.*odom|/tf$$|/tf_static$$|segmentation|fused|hand_|twist" || true; \
 	echo ""; \
 	echo "Raw cloud headers:"; \
-	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /head/d435i_head/depth/color/points --field header 2>/dev/null || echo "missing head raw cloud"; \
-	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /arm/d435i_arm/depth/color/points --field header 2>/dev/null || echo "missing arm raw cloud"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /jetson/head/points --field header 2>/dev/null || echo "missing head raw cloud"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /jetson/arm/points --field header 2>/dev/null || echo "missing arm raw cloud"; \
 	echo ""; \
 	echo "Raw cloud rates, press Ctrl-C early if enough data is shown:"; \
-	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz /head/d435i_head/depth/color/points 2>/dev/null || true; \
-	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz /arm/d435i_arm/depth/color/points 2>/dev/null || true; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz --qos-reliability best_effort /jetson/head/points 2>/dev/null || true; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz --qos-reliability best_effort /jetson/arm/points 2>/dev/null || true; \
 	echo ""; \
 	echo "OpenVINS odom headers:"; \
-	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /ov_msckf/odomimu --field header 2>/dev/null || echo "missing head OpenVINS odom"; \
-	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /ov_msckf_arm/odomimu --field header 2>/dev/null || echo "missing arm OpenVINS odom"
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /jetson/head/odom --field header 2>/dev/null || echo "missing head OpenVINS odom"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /jetson/arm/odom --field header 2>/dev/null || echo "missing arm OpenVINS odom"
 
 tonight-imu-check: ## Side diagnostic: list and sample stationary RealSense IMU topics
 	@$(ROS_SETUP) && \
@@ -218,8 +312,8 @@ tonight-imu-check: ## Side diagnostic: list and sample stationary RealSense IMU 
 	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /arm/d435i_arm/imu 2>/dev/null || echo "missing /arm/d435i_arm/imu"; \
 	echo ""; \
 	echo "Combined IMU rates:"; \
-	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz /head/d435i_head/imu 2>/dev/null || true; \
-	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz /arm/d435i_arm/imu 2>/dev/null || true
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz --qos-reliability best_effort /head/d435i_head/imu 2>/dev/null || true; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz --qos-reliability best_effort /arm/d435i_arm/imu 2>/dev/null || true
 
 tonight-tf: ## Gate 1: run only the OpenVINS->RealSense TF bridge in foreground
 	@$(ROS_SETUP) && \
@@ -257,11 +351,11 @@ tonight-fusion-check: ## Gate 2: start safe pipeline and probe fused/relayed clo
 	echo ""; \
 	echo "Gate 2: fused cloud header and rate"; \
 	timeout 8s ros2 topic echo --once /fused_pointcloud --field header 2>/dev/null || echo "missing /fused_pointcloud"; \
-	timeout $(TONIGHT_RAW_RATE_SECONDS)s ros2 topic hz /fused_pointcloud 2>/dev/null || true; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s ros2 topic hz --qos-reliability best_effort /fused_pointcloud 2>/dev/null || true; \
 	echo ""; \
 	echo "Gate 3: fused cloud relay to segmentation input"; \
 	timeout 8s ros2 topic echo --once /segmentation/input_cloud --field header 2>/dev/null || echo "missing /segmentation/input_cloud"; \
-	timeout $(TONIGHT_RAW_RATE_SECONDS)s ros2 topic hz /segmentation/input_cloud 2>/dev/null || true
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s ros2 topic hz --qos-reliability best_effort /segmentation/input_cloud 2>/dev/null || true
 
 tonight-segmentation-check: ## Gate 3/4: click a fused point and wait for segmented object cloud
 	@$(ROS_SETUP) && \
@@ -352,11 +446,13 @@ stop-twist: ## Deactivate twist propagation service
 
 openvins-check: ## Check that both OpenVINS odometry topics are publishing
 	@echo "=== Checking OpenVINS topics ==="
-	@ros2 topic list 2>/dev/null | grep -qF "/ov_msckf/odomimu" || (echo "ERROR: Head odom NOT available" && exit 1)
-	@ros2 topic list 2>/dev/null | grep -qF "/ov_msckf_arm/odomimu" || (echo "ERROR: Arm odom NOT available" && exit 1)
+	@ros2 topic list 2>/dev/null | grep -qF "/jetson/head/odom" || (echo "ERROR: Head odom NOT available" && exit 1)
+	@ros2 topic list 2>/dev/null | grep -qF "/jetson/arm/odom" || (echo "ERROR: Arm odom NOT available" && exit 1)
 	@echo "[OK] Both OpenVINS topics available"
 
 # ── Utility ──────────────────────────────────────────────────────────────────
 
-source: ## Print the source command for manual use
+source: ## Show the source command for copy-paste into your terminal
 	@echo "source /opt/ros/jazzy/setup.bash && source /prosthesis_ws/install/setup.bash"
+	@echo ""
+	@echo "Or just run:  make start"

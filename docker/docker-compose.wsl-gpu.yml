@@ -1,0 +1,25 @@
+# WSL2 GPU acceleration overlay — enables Mesa d3d12 OpenGL rendering.
+#
+# On WSL2, OpenGL is accelerated via Mesa's d3d12 Gallium driver, which talks
+# to the Windows GPU through /dev/dxg and the user-mode libraries under
+# /usr/lib/wsl (libdxcore.so + the Windows driver DLLs in /usr/lib/wsl/drivers).
+# The base prosthesis service already mounts /dev/dri and /dev/dxg via
+# `privileged: true`, but it lacks the WSL libraries and the three environment
+# variables that tell Mesa to use the d3d12 backend on the NVIDIA GPU.
+#
+# This overlay adds the volume mount and three env vars. It is auto-applied by the
+# Makefile whenever /usr/lib/wsl/lib/libdxcore.so exists on the host, so it is
+# a no-op on native Linux.
+#
+# Requirements (WSL2 only):
+#   - /dev/dri present (run `wsl --update && wsl --shutdown` from Windows if absent)
+#   - /dev/dri/* world-readable (see /etc/udev/rules.d/91-dri-render.rules)
+
+services:
+    prosthesis:
+        environment:
+            - GALLIUM_DRIVER=d3d12
+            - LD_LIBRARY_PATH=/usr/lib/wsl/lib
+            - MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA
+        volumes:
+            - /usr/lib/wsl:/usr/lib/wsl:ro

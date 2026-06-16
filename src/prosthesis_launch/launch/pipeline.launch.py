@@ -93,7 +93,7 @@ def _launch_setup(context, *args, **kwargs):
     if require_dual_openvins:
         print("[pipeline] INFO: require_dual_openvins=true — "
               "pipeline will not enable grasp execution until both "
-              "/ov_msckf/odomimu and /ov_msckf_arm/odomimu are publishing.")
+              "/jetson/head/odom and /jetson/arm/odom are publishing.")
 
     nodes = []
 
@@ -493,17 +493,17 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "odom_topic",
-                default_value="/ov_msckf_arm/odomimu",
+                default_value="/jetson/arm/odom",
                 description="OpenVINS odometry topic for hand pose estimation.",
             ),
             DeclareLaunchArgument(
                 "cam1_topic",
-                default_value="/head/d435i_head/depth/color/points",
+                default_value="/jetson/head/points",
                 description="Pointcloud topic from head RealSense D435i.",
             ),
             DeclareLaunchArgument(
                 "cam2_topic",
-                default_value="/arm/d435i_arm/depth/color/points",
+                default_value="/jetson/arm/points",
                 description="Pointcloud topic from arm RealSense D435i.",
             ),
             DeclareLaunchArgument(

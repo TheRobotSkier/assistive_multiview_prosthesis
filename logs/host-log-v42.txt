@@ -1,0 +1,353 @@
+prosthesis@KingBob:/prosthesis_ws$ make run-camera
+Starting >>> mia_hand_msgs
+Starting >>> sensor_fusion_msgs
+Starting >>> camera
+Starting >>> emg_bridge
+Starting >>> grasp_preshaping
+Starting >>> mia_hand_description
+Starting >>> pointcloud_fusion
+Starting >>> segmentation_bridge
+Starting >>> wrist_driver
+Starting >>> sensor_fusion_bringup
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+Finished <<< grasp_preshaping [2.73s]
+Finished <<< mia_hand_description [2.74s]
+Finished <<< sensor_fusion_msgs [2.81s]
+Starting >>> keyframe_buffer
+Starting >>> gtsam_tracker
+Starting >>> twist_propagation
+Finished <<< mia_hand_msgs [2.91s]
+Starting >>> mia_hand_driver
+Starting >>> command_bridge
+Starting >>> force_controller
+Finished <<< sensor_fusion_bringup [2.87s]
+Starting >>> haptic_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+Finished <<< mia_hand_driver [2.61s]
+Starting >>> pipeline_manager
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+Finished <<< segmentation_bridge [6.04s]
+--- stderr: wrist_driver
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< wrist_driver [6.03s]
+Finished <<< camera [6.11s]
+--- stderr: emg_bridge
+/usr/local/lib/python3.12/dist-packages/setuptools/_distutils/dist.py:287: UserWarning: Unknown distribution option: 'tests_require'
+  warnings.warn(msg)
+---
+Finished <<< emg_bridge [6.12s]
+Starting >>> mia_hand_ros2_control
+Finished <<< pointcloud_fusion [6.12s]
+Finished <<< mia_hand_ros2_control [0.24s]
+Finished <<< force_controller [4.29s]
+Finished <<< keyframe_buffer [4.42s]
+Starting >>> tsdf_fusion
+--- stderr: gtsam_tracker
+error removing /prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info: [Errno 13] Permission denied: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info/entry_points.txt'
+error removing /prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info: [Errno 13] Permission denied: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info/PKG-INFO'
+error removing /prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info: [Errno 13] Permission denied: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info/SOURCES.txt'
+error removing /prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info: [Errno 13] Permission denied: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info/requires.txt'
+error removing /prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info: [Errno 13] Permission denied: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info/top_level.txt'
+error removing /prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info: [Errno 13] Permission denied: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info/zip-safe'
+error removing /prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info: [Errno 13] Permission denied: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info/dependency_links.txt'
+error removing /prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info: [Errno 39] Directory not empty: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info'
+error: [Errno 13] Permission denied: '/prosthesis_ws/install/gtsam_tracker/lib/python3.12/site-packages/gtsam_tracker-0.1.0-py3.12.egg-info/entry_points.txt'
+---
+Failed   <<< gtsam_tracker [4.43s, exited with code 1]
+Aborted  <<< twist_propagation [4.42s]
+Aborted  <<< command_bridge [4.34s]
+Aborted  <<< tsdf_fusion [0.02s]
+Aborted  <<< haptic_bridge [4.31s]
+Aborted  <<< pipeline_manager [2.13s]
+
+Summary: 14 packages finished [7.88s]
+  1 package failed: gtsam_tracker
+  5 packages aborted: command_bridge haptic_bridge pipeline_manager tsdf_fusion twist_propagation
+  6 packages had stderr output: command_bridge emg_bridge gtsam_tracker haptic_bridge pipeline_manager wrist_driver
+  2 packages not processed
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-15-10-25-12-419277-KingBob-4902
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [pipeline_manager_node-1]: process started with pid [5421]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [5422]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [5423]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [5424]
+[INFO] [pointcloud_fusion_node-5]: process started with pid [5425]
+[INFO] [odom_to_pose_relay-6]: process started with pid [5426]
+[INFO] [openvins_odom_tf_relay-7]: process started with pid [5427]
+[INFO] [gtsam_tracker_node-8]: process started with pid [5428]
+[INFO] [keyframe_buffer_node-9]: process started with pid [5429]
+[INFO] [sift_feature_node-10]: process started with pid [5430]
+[INFO] [segmentation_ros2_node-11]: process started with pid [5431]
+[INFO] [twist_propagation_node-12]: process started with pid [5432]
+[INFO] [preshaping_service_bridge_node-13]: process started with pid [5433]
+[INFO] [grasp_proximity_controller_node.py-14]: process started with pid [5436]
+[INFO] [rviz2-15]: process started with pid [5437]
+[rviz2-15] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[preshaping_service_bridge_node-13] [INFO] [1781519113.091548979] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-13] [INFO] [1781519113.098693187] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-15] [INFO] [1781519113.720468471] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781519113.720811705] [rviz2]: OpenGl version: 4.5 (GLSL 4.5)
+[rviz2-15] [INFO] [1781519113.879818932] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781519114.065145567] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15]
+[rviz2-15] [INFO] [1781519114.067257637] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-15]
+[rviz2-15] [INFO] [1781519114.111261459] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15]
+[rviz2-15] [INFO] [1781519114.112796725] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-15]
+[rviz2-15] [INFO] [1781519114.450412630] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-15] [INFO] [1781519114.519605237] [rviz2]: Stereo is NOT SUPPORTED
+[pipeline_manager_node-1] [INFO] [1781519115.981993255] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781519115.983656374] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tf_pipeline_diagnostics-4] [INFO] [1781519116.141674258] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[keyframe_buffer_node-9] [INFO] [1781519116.858176067] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_in_roi
+[keyframe_buffer_node-9] [INFO] [1781519116.862455517] [keyframe_buffer]: KeyframeBufferNode ready (max_kf/cam=50, gate_t=0.1m, gate_r=15.0deg)
+[pipeline_manager_node-1] [INFO] [1781519116.985941381] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781519117.117456975] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781519117.118331139] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781519117.220783892] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781519117.230133389] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781519117.234633768] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[camera_mount_tf_publisher-3] [INFO] [1781519117.306453427] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1781519117.309701446] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[sift_feature_node-10] [INFO] [1781519117.462752654] [cross_camera_features]: SiftFeatureNode ready (backend=sift, min_matches=5, slop=0.05s)
+[pointcloud_fusion_node-5] [INFO] [1781519117.638887340] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-5] [INFO] [1781519117.643168785] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-5] [INFO] [1781519117.695154538] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-5] [WARN] [1781519117.698330759] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-5] [INFO] [1781519117.699949286] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-5] [INFO] [1781519117.701584936] [pointcloud_fusion]: Pointcloud fusion: /head/d435i_head/depth/color/points + /arm/d435i_arm/depth/color/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[gtsam_tracker_node-8] [INFO] [1781519117.787079078] [gtsam_tracker]: GtsamTrackerNode ready (rate=15.0Hz, lag=15.0s, head_source=odom)
+[segmentation_ros2_node-11] [INFO] [1781519117.916016730] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[grasp_proximity_controller_node.py-14] [INFO] [1781519117.986929903] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-14] [INFO] [1781519118.036630889] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[twist_propagation_node-12] [INFO] [1781519118.077971510] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-12] [INFO] [1781519118.152557000] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-12] [INFO] [1781519118.156321368] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[pointcloud_fusion_node-5] [WARN] [1781519119.703567256] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[pointcloud_fusion_node-5] [WARN] [1781519121.702492064] [pointcloud_fusion]: TF wait gate: not connected after 4s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[keyframe_buffer_node-9] [INFO] [1781519126.748759344] [keyframe_buffer]: arm cloud: height=1 -> UNORGANIZED
+[openvins_odom_tf_relay-7] [WARN] [1781519126.973959690] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[keyframe_buffer_node-9] [INFO] [1781519127.069964781] [keyframe_buffer]: head cloud: height=1 -> UNORGANIZED
+[sift_feature_node-10] [INFO] [1781519127.414628742] [cross_camera_features]: frames=1, published=0
+[pointcloud_fusion_node-5] [INFO] [1781519127.697039301] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-5] [WARN] [1781519127.699154822] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: stale (0.6s); cam2: stale (0.6s)
+[pointcloud_fusion_node-5] [WARN] [1781519127.709795853] [pointcloud_fusion]: TF wait gate: not connected after 10s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist.
+[tf_pipeline_diagnostics-4] [WARN] [1781519128.147528634] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1781519134.429071413] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.031, 0.043, 0.532), cov_trace=2.62e-03, pos_norm=0.534m, elapsed=17.5s, actual_imu_frame='arm_imu')
+[grasp_proximity_controller_node.py-14] [INFO] [1781519134.430491670] [proximity_controller]: Received first hand pose — control loop now active
+[gtsam_tracker_node-8] [WARN] [1781519134.477296133] [gtsam_tracker]: Rejecting odometry delta — head jump 0.000m, arm jump 0.537m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[sift_feature_node-10] [WARN] [1781519135.500012038] [cross_camera_features]: Consistently < 5 SIFT matches (0). Consider SuperPoint upgrade.
+[openvins_odom_tf_relay-7] [WARN] [1781519135.509452130] [openvins_odom_tf_relay]: arm odom pose jumped 0.791m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [WARN] [1781519135.715495245] [pointcloud_fusion]: TF tree connected via 'arm_d435i_arm_depth_optical_frame' — starting point cloud fusion (waited 18.0s since node startup)
+[openvins_odom_tf_relay-7] [WARN] [1781519136.920148766] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: OK (44 msgs)
+[tf_pipeline_diagnostics-4] [WARN] [1781519137.143153077] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1781519137.537073581] [openvins_odom_tf_relay]: arm odom pose jumped 0.552m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781519137.700178500] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-5] [WARN] [1781519137.708386082] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: stale (9.5s); cam2: stale (8.2s)
+[sift_feature_node-10] [INFO] [1781519139.090279411] [cross_camera_features]: frames=83, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519139.543923081] [openvins_odom_tf_relay]: arm odom pose jumped 0.900m (> 0.5m) — suppressing TF
+[gtsam_tracker_node-8] [WARN] [1781519140.431587838] [gtsam_tracker]: No ArUco messages received after 5s — running on odometry + visual factors only
+[openvins_odom_tf_relay-7] [WARN] [1781519141.545078846] [openvins_odom_tf_relay]: arm odom pose jumped 0.675m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519143.559290743] [openvins_odom_tf_relay]: arm odom pose jumped 0.684m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519145.561005338] [openvins_odom_tf_relay]: arm odom pose jumped 0.940m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519146.928493979] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: OK (44 msgs)
+[tf_pipeline_diagnostics-4] [WARN] [1781519147.177863196] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1781519147.567793585] [openvins_odom_tf_relay]: arm odom pose jumped 0.811m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781519147.698885380] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.0s
+[pointcloud_fusion_node-5] [WARN] [1781519147.699935145] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: stale (19.5s); cam2: stale (18.2s)
+[sift_feature_node-10] [INFO] [1781519147.711269281] [cross_camera_features]: frames=87, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519149.570695624] [openvins_odom_tf_relay]: arm odom pose jumped 0.679m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519151.587446818] [openvins_odom_tf_relay]: arm odom pose jumped 0.679m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519153.601982392] [openvins_odom_tf_relay]: arm odom pose jumped 0.637m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519155.618050783] [openvins_odom_tf_relay]: arm odom pose jumped 0.652m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519156.919042160] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: OK (44 msgs)
+[tf_pipeline_diagnostics-4] [WARN] [1781519157.138637711] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-7] [WARN] [1781519157.627202465] [openvins_odom_tf_relay]: arm odom pose jumped 0.685m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781519157.697343521] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=40.0s
+[pointcloud_fusion_node-5] [WARN] [1781519157.702037267] [pointcloud_fusion]: Stall diagnostic (no publish for 40s): cam1: stale (29.5s); cam2: stale (28.2s)
+[sift_feature_node-10] [INFO] [1781519157.958750165] [cross_camera_features]: frames=92, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519159.631880449] [openvins_odom_tf_relay]: arm odom pose jumped 0.701m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519161.676429144] [openvins_odom_tf_relay]: arm odom pose jumped 0.739m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519163.162916146] [openvins_odom_tf_relay]: head: OpenVINS initialized (covariance), publishing TF marker_map -> head_imu (p=(0.043, 0.218, 0.375), cov_trace=4.49e-02, pos_norm=0.436m, elapsed=46.2s, actual_imu_frame='head_imu')
+[openvins_odom_tf_relay-7] [WARN] [1781519163.682972686] [openvins_odom_tf_relay]: arm odom pose jumped 0.789m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519164.491667238] [openvins_odom_tf_relay]: head odom pose norm 2.03m exceeds max 2.0m — suppressing TF
+[gtsam_tracker_node-8] [WARN] [1781519164.746031047] [gtsam_tracker]: Rejecting odometry delta — head jump 0.522m, arm jump 0.012m exceed max 0.5m. Re-syncing pose baseline (diverging VIO suspected).
+[openvins_odom_tf_relay-7] [WARN] [1781519165.684085083] [openvins_odom_tf_relay]: arm odom pose jumped 0.755m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781519166.123227828] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781519167.702777407] [openvins_odom_tf_relay]: head odom pose jumped 1.563m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781519167.748780473] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=3) dist_removed=142 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=50.0s
+[pointcloud_fusion_node-5] [WARN] [1781519167.771440072] [pointcloud_fusion]: Stall diagnostic (no publish for 50s): cam1: stale (39.6s); cam2: fresh (0.43s)
+[openvins_odom_tf_relay-7] [WARN] [1781519169.706262932] [openvins_odom_tf_relay]: head odom pose jumped 1.689m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781519170.300549858] [cross_camera_features]: frames=97, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519171.707051275] [openvins_odom_tf_relay]: arm odom pose jumped 0.764m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519173.721246123] [openvins_odom_tf_relay]: head odom pose jumped 1.595m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519175.802236566] [openvins_odom_tf_relay]: head odom pose jumped 1.635m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781519176.145570525] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781519177.700626771] [pointcloud_fusion]: Stats: published=18 (dual=0, cam1_only=15) dist_removed=994 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=0.8s
+[openvins_odom_tf_relay-7] [WARN] [1781519177.798762378] [openvins_odom_tf_relay]: head odom pose jumped 1.658m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519179.802059364] [openvins_odom_tf_relay]: head odom pose jumped 1.573m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781519181.180604153] [cross_camera_features]: frames=98, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519181.813852627] [openvins_odom_tf_relay]: head odom pose jumped 1.739m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519183.814473481] [openvins_odom_tf_relay]: head odom pose jumped 1.727m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519185.828907049] [openvins_odom_tf_relay]: head odom pose jumped 1.727m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781519186.129488493] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781519187.780708563] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.9s
+[pointcloud_fusion_node-5] [WARN] [1781519187.782089638] [pointcloud_fusion]: Stall diagnostic (no publish for 11s): cam1: stale (15.6s); cam2: stale (20.5s)
+[openvins_odom_tf_relay-7] [WARN] [1781519187.839765967] [openvins_odom_tf_relay]: head odom pose jumped 1.628m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781519189.152581214] [cross_camera_features]: frames=99, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519189.886680426] [openvins_odom_tf_relay]: head odom pose jumped 1.685m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519191.888314178] [openvins_odom_tf_relay]: head odom pose jumped 1.701m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519193.888372760] [openvins_odom_tf_relay]: head odom pose jumped 1.714m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519195.889918997] [openvins_odom_tf_relay]: head odom pose jumped 1.724m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781519196.126756137] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781519197.719397136] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.8s
+[pointcloud_fusion_node-5] [WARN] [1781519197.726605704] [pointcloud_fusion]: Stall diagnostic (no publish for 21s): cam1: stale (25.5s); cam2: stale (30.4s)
+[openvins_odom_tf_relay-7] [WARN] [1781519197.894667818] [openvins_odom_tf_relay]: head odom pose jumped 1.726m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781519198.628552723] [cross_camera_features]: frames=101, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519199.909458946] [openvins_odom_tf_relay]: head odom pose jumped 1.723m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519201.912730947] [openvins_odom_tf_relay]: head odom pose jumped 1.726m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519203.931663635] [openvins_odom_tf_relay]: head odom pose jumped 1.705m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519205.941974961] [openvins_odom_tf_relay]: head odom pose jumped 1.712m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781519206.130013520] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781519207.707799628] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.8s
+[pointcloud_fusion_node-5] [WARN] [1781519207.749363459] [pointcloud_fusion]: Stall diagnostic (no publish for 31s): cam1: stale (35.5s); cam2: stale (40.4s)
+[openvins_odom_tf_relay-7] [WARN] [1781519207.942478966] [openvins_odom_tf_relay]: head odom pose jumped 1.720m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781519208.294067391] [cross_camera_features]: frames=103, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519209.959836783] [openvins_odom_tf_relay]: head odom pose jumped 1.732m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519211.965844306] [openvins_odom_tf_relay]: head odom pose jumped 1.730m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519213.973645133] [openvins_odom_tf_relay]: head odom pose jumped 1.722m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519215.979760195] [openvins_odom_tf_relay]: head odom pose jumped 1.753m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781519216.130314161] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[rviz2-15] [INFO] [1781519217.025677146] [rviz2]: Subscribing to: /arm/d435i_arm/depth/color/points
+[rviz2-15]
+[pointcloud_fusion_node-5] [INFO] [1781519217.696792152] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=40.8s
+[pointcloud_fusion_node-5] [WARN] [1781519217.705396427] [pointcloud_fusion]: Stall diagnostic (no publish for 41s): cam1: stale (45.5s); cam2: stale (50.4s)
+[openvins_odom_tf_relay-7] [WARN] [1781519217.991987476] [openvins_odom_tf_relay]: head odom pose jumped 1.731m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781519218.565082606] [cross_camera_features]: frames=105, published=0
+[openvins_odom_tf_relay-7] [WARN] [1781519219.997886756] [openvins_odom_tf_relay]: head odom pose jumped 1.715m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519222.011393026] [openvins_odom_tf_relay]: head odom pose jumped 1.728m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519224.041044228] [openvins_odom_tf_relay]: head odom pose jumped 1.729m (> 0.5m) — suppressing TF
+[rviz2-15] [INFO] [1781519225.696970836] [rviz2]: Subscribing to: /head/d435i_head/depth/color/points
+[rviz2-15]
+[openvins_odom_tf_relay-7] [WARN] [1781519226.051402890] [openvins_odom_tf_relay]: head odom pose jumped 1.735m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781519226.213999603] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[pointcloud_fusion_node-5] [INFO] [1781519227.700902355] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=50.8s
+[pointcloud_fusion_node-5] [WARN] [1781519227.704733683] [pointcloud_fusion]: Stall diagnostic (no publish for 51s): cam1: stale (55.5s); cam2: stale (60.4s)
+[openvins_odom_tf_relay-7] [WARN] [1781519228.093950440] [openvins_odom_tf_relay]: head odom pose jumped 1.778m (> 0.5m) — suppressing TF
+[sift_feature_node-10] [INFO] [1781519229.753224160] [cross_camera_features]: frames=107, published=0
+[rviz2-15] [INFO] [1781519230.092742712] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-15]
+[openvins_odom_tf_relay-7] [WARN] [1781519230.098556018] [openvins_odom_tf_relay]: head odom pose jumped 1.789m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519232.111483887] [openvins_odom_tf_relay]: head odom pose jumped 1.763m (> 0.5m) — suppressing TF
+[openvins_odom_tf_relay-7] [WARN] [1781519234.135552339] [openvins_odom_tf_relay]: head odom pose jumped 1.763m (> 0.5m) — suppressing TF
+[tf_pipeline_diagnostics-4] [INFO] [1781519236.131493085] [tf_pipeline_diagnostics]: [TF-DIAG] All chains healthy — OpenVINS(head):OK | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK
+[openvins_odom_tf_relay-7] [WARN] [1781519236.136631345] [openvins_odom_tf_relay]: head odom pose jumped 1.758m (> 0.5m) — suppressing TF
+[pointcloud_fusion_node-5] [INFO] [1781519237.701931976] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=60.8s
+[pointcloud_fusion_node-5] [WARN] [1781519237.703735262] [pointcloud_fusion]: Stall diagnostic (no publish for 61s): cam1: stale (65.5s); cam2: stale (70.4s)
+[openvins_odom_tf_relay-7] [WARN] [1781519238.140744827] [openvins_odom_tf_relay]: head odom pose jumped 1.736m (> 0.5m) — suppressing TF
+^C[WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+[preshaping_service_bridge_node-13] [INFO] [1781519238.187428509] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[rviz2-15] [INFO] [1781519238.211560785] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[segmentation_ros2_node-11] Traceback (most recent call last):
+[segmentation_ros2_node-11]   File "/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node", line 33, in <module>
+[segmentation_ros2_node-11]     sys.exit(load_entry_point('segmentation_bridge==0.1.0', 'console_scripts', 'segmentation_ros2_node')())
+[segmentation_ros2_node-11]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-11]   File "/prosthesis_ws/install/segmentation_bridge/lib/python3.12/site-packages/segmentation_bridge/segmentation_ros2_node.py", line 359, in main
+[segmentation_ros2_node-11]     rclpy.spin(node)
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[segmentation_ros2_node-11]     executor.spin_once()
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[segmentation_ros2_node-11]     self._spin_once_impl(timeout_sec)
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 916, in _spin_once_impl
+[segmentation_ros2_node-11]     handler()
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 270, in __call__
+[segmentation_ros2_node-11]     self._execute_coroutine_step(self._handler)
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[segmentation_ros2_node-11]     result = coro.send(None)
+[segmentation_ros2_node-11]              ^^^^^^^^^^^^^^^
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 584, in handler
+[segmentation_ros2_node-11]     call_coroutine = take_from_wait_list(entity)
+[segmentation_ros2_node-11]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 470, in _take_subscription
+[segmentation_ros2_node-11]     msg_info = sub.handle.take_message(sub.msg_type, sub.raw)
+[segmentation_ros2_node-11]                ^^^^^^^^^^
+[segmentation_ros2_node-11]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/subscription.py", line 88, in handle
+[segmentation_ros2_node-11]     @property
+[segmentation_ros2_node-11]
+[segmentation_ros2_node-11] KeyboardInterrupt
+[camera_mount_tf_publisher-3] Traceback (most recent call last):
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 436, in <module>
+[camera_mount_tf_publisher-3]     main()
+[camera_mount_tf_publisher-3]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py", line 432, in main
+[camera_mount_tf_publisher-3]     rclpy.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[camera_mount_tf_publisher-3]     _shutdown(context=context)
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[camera_mount_tf_publisher-3]     context.shutdown()
+[camera_mount_tf_publisher-3]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[camera_mount_tf_publisher-3]     self.__context.shutdown()
+[camera_mount_tf_publisher-3] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[tf_pipeline_diagnostics-4] Traceback (most recent call last):
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 151, in <module>
+[tf_pipeline_diagnostics-4]     main()
+[tf_pipeline_diagnostics-4]   File "/prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py", line 147, in main
+[tf_pipeline_diagnostics-4]     rclpy.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 134, in shutdown
+[tf_pipeline_diagnostics-4]     _shutdown(context=context)
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/utilities.py", line 82, in shutdown
+[tf_pipeline_diagnostics-4]     context.shutdown()
+[tf_pipeline_diagnostics-4]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/context.py", line 129, in shutdown
+[tf_pipeline_diagnostics-4]     self.__context.shutdown()
+[tf_pipeline_diagnostics-4] rclpy._rclpy_pybind11.RCLError: failed to shutdown: rcl_shutdown already called on the given context, at ./src/rcl/init.c:333
+[pointcloud_fusion_node-5] Traceback (most recent call last):
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/pointcloud_fusion/pointcloud_fusion_node", line 33, in <module>
+[pointcloud_fusion_node-5]     sys.exit(load_entry_point('pointcloud_fusion==0.1.0', 'console_scripts', 'pointcloud_fusion_node')())
+[pointcloud_fusion_node-5]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5]   File "/prosthesis_ws/install/pointcloud_fusion/lib/python3.12/site-packages/pointcloud_fusion/pointcloud_fusion_node.py", line 1004, in main
+[pointcloud_fusion_node-5]     rclpy.spin(node)
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[pointcloud_fusion_node-5]     executor.spin_once()
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[pointcloud_fusion_node-5]     self._spin_once_impl(timeout_sec)
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 918, in _spin_once_impl
+[pointcloud_fusion_node-5]     raise handler.exception()
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/task.py", line 286, in _execute_coroutine_step
+[pointcloud_fusion_node-5]     result = coro.send(None)
+[pointcloud_fusion_node-5]              ^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 584, in handler
+[pointcloud_fusion_node-5]     call_coroutine = take_from_wait_list(entity)
+[pointcloud_fusion_node-5]                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 470, in _take_subscription
+[pointcloud_fusion_node-5]     msg_info = sub.handle.take_message(sub.msg_type, sub.raw)
+[pointcloud_fusion_node-5]                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[pointcloud_fusion_node-5] RuntimeError: Unable to convert call argument '0' to Python object (#define PYBIND11_DETAILED_ERROR_MESSAGES or compile in debug mode for details)
+[ERROR] [tf_pipeline_diagnostics-4]: process has died [pid 5424, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/tf_pipeline_diagnostics.py'].
+[INFO] [keyframe_buffer_node-9]: process has finished cleanly [pid 5429]
+[ERROR] [pointcloud_fusion_node-5]: process has died [pid 5425, exit code 1, cmd '/prosthesis_ws/install/pointcloud_fusion/lib/pointcloud_fusion/pointcloud_fusion_node --ros-args -r __node:=pointcloud_fusion --params-file /tmp/launch_params_p_9ekrry'].
+[ERROR] [camera_mount_tf_publisher-3]: process has died [pid 5423, exit code 1, cmd 'python3 /prosthesis_ws/install/sensor_fusion_bringup/share/sensor_fusion_bringup/scripts/publish_camera_mounts.py --mount 8_cm_cam_mount --config /prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml --link-frame arm_d435i_arm_link'].
+[INFO] [sift_feature_node-10]: process has finished cleanly [pid 5430]
+[ERROR] [segmentation_ros2_node-11]: process has died [pid 5431, exit code -2, cmd '/prosthesis_ws/install/segmentation_bridge/lib/segmentation_bridge/segmentation_ros2_node --ros-args -r __node:=segmentation_bridge --params-file /tmp/launch_params_n85ek317 -r /segmentation/input_cloud:=/fused_pointcloud'].
+[INFO] [preshaping_service_bridge_node-13]: process has finished cleanly [pid 5433]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process has finished cleanly [pid 5422]
+[INFO] [openvins_odom_tf_relay-7]: process has finished cleanly [pid 5427]
+[INFO] [odom_to_pose_relay-6]: process has finished cleanly [pid 5426]
+[INFO] [pipeline_manager_node-1]: process has finished cleanly [pid 5421]
+[INFO] [twist_propagation_node-12]: process has finished cleanly [pid 5432]
+[INFO] [gtsam_tracker_node-8]: process has finished cleanly [pid 5428]
+[INFO] [grasp_proximity_controller_node.py-14]: process has finished cleanly [pid 5436]
+[ERROR] [rviz2-15]: process[rviz2-15] failed to terminate '5' seconds after receiving 'SIGINT', escalating to 'SIGTERM'
+[INFO] [rviz2-15]: sending signal 'SIGTERM' to process[rviz2-15]
+[ERROR] [rviz2-15]: process[rviz2-15] failed to terminate '10.0' seconds after receiving 'SIGTERM', escalating to 'SIGKILL'
+[INFO] [rviz2-15]: sending signal 'SIGKILL' to process[rviz2-15]
+[ERROR] [rviz2-15]: process has died [pid 5437, exit code -9, cmd '/opt/ros/jazzy/lib/rviz2/rviz2 -d /prosthesis_ws/rviz/prosthesis.rviz --ros-args -r __node:=rviz2'].

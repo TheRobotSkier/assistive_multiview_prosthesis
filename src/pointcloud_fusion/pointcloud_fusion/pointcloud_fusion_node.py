@@ -228,8 +228,8 @@ class PointCloudFusionNode(Node):
 
         # ── Declare parameters ────────────────────────────────────────────
         self.declare_parameter("target_frame", "marker_map")
-        self.declare_parameter("cam1_topic", "/head/d435i_head/depth/color/points")
-        self.declare_parameter("cam2_topic", "/arm/d435i_arm/depth/color/points")
+        self.declare_parameter("cam1_topic", "/jetson/head/points")
+        self.declare_parameter("cam2_topic", "/jetson/arm/points")
         self.declare_parameter("arm_frame", "arm_d435i_arm_depth_frame")
         self.declare_parameter("max_distance", 2.0)
         self.declare_parameter("voxel_size", 0.005)
@@ -249,6 +249,22 @@ class PointCloudFusionNode(Node):
         self.declare_parameter("bbox_cache_max_age_s", 2.0)
         self.declare_parameter("wait_for_tf", True)
         self.declare_parameter("tf_ready_check_interval", 2.0)
+        # Tolerance added to TF lookups when using the cloud header stamp.
+        # With chrony time sync, Jetson and host clocks are aligned, so the
+        # cloud stamp and the TF stamp are in the same time domain.  A small
+        # tolerance accommodates the case where a cloud arrives slightly
+        # before its corresponding TF has been broadcast (V6 §6.3).
+        self.declare_parameter("transform_tolerance_s", 0.1)
+        # When True, measure cloud age by the cloud's header stamp (sensor
+        # time) rather than arrival time.  Requires chrony time sync between
+        # Jetson and host so the clocks share a time domain.  This makes the
+        # age check and TF lookup temporally consistent (V6 §6.3).
+        self.declare_parameter("use_header_stamp_age", True)
+        # If the header stamp differs from the host clock by more than this
+        # threshold (seconds), chrony sync is assumed broken and the node
+        # automatically falls back to arrival-time stamping.  This prevents
+        # total cloud stall when the Jetson clock is wrong (V6 §6.3).
+        self.declare_parameter("clock_skew_fallback_s", 1.0)
 
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
@@ -273,6 +289,13 @@ class PointCloudFusionNode(Node):
         self._wait_for_tf = self.get_parameter("wait_for_tf").value
         self._tf_ready_check_interval = float(
             self.get_parameter("tf_ready_check_interval").value)
+        self._transform_tolerance = float(
+            self.get_parameter("transform_tolerance_s").value)
+        self._use_header_stamp_age = bool(
+            self.get_parameter("use_header_stamp_age").value)
+        self._clock_skew_fallback_s = float(
+            self.get_parameter("clock_skew_fallback_s").value)
+        self._clock_skew_detected = False
 
         # ── Load pruning boxes from camera_mounts.yaml or fall back to params ─
         mounts_config = self.get_parameter("mounts_config_path").value
@@ -300,9 +323,9 @@ class PointCloudFusionNode(Node):
             Marker, "/pointcloud_fusion/hand_removal_bbox", 1)
 
         # ── Subscriptions ─────────────────────────────────────────────────
-        # Use RELIABLE QoS — RealSense publishers use RELIABLE
+        # Use BEST_EFFORT QoS — Jetson relay publishes with BEST_EFFORT
         cloud_qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=1,
         )
@@ -312,6 +335,11 @@ class PointCloudFusionNode(Node):
         self._cam2_cloud = None
         self._cam1_stamp = None
         self._cam2_stamp = None
+        self._cam1_count = 0
+        self._cam2_count = 0
+        self._last_cam1_offset_s = None
+        self._last_cam2_offset_s = None
+        self._clock_skew_detected = False
         self._lock = threading.Lock()
         self.create_subscription(
             PointCloud2, cam1_topic, self._cb_cam1, cloud_qos)
@@ -406,15 +434,49 @@ class PointCloudFusionNode(Node):
 
     # ── Fallback individual callbacks ────────────────────────────────────
 
+    def _stamp_from_msg(self, msg: PointCloud2):
+        """Return the timestamp to use for age measurement.
+
+        When ``use_header_stamp_age`` is True (requires chrony time sync),
+        returns the cloud's header stamp as a ``rclpy.time.Time`` so that
+        cloud age and TF lookup are temporally consistent.  Otherwise falls
+        back to the host arrival time (legacy behaviour).
+
+        **Clock-skew auto-fallback:** if the header stamp differs from the
+        host clock by more than ``clock_skew_fallback_s`` (default 1.0s),
+        chrony sync is assumed broken and the node automatically falls back
+        to arrival-time stamping.  This prevents every cloud from being
+        rejected by the age gate when the Jetson clock is wrong.
+        """
+        arrival = self.get_clock().now()
+        if self._use_header_stamp_age and not self._clock_skew_detected:
+            header_time = rclpy.time.Time.from_msg(msg.header.stamp)
+            skew = abs((arrival - header_time).nanoseconds / 1e9)
+            if skew > self._clock_skew_fallback_s:
+                self._clock_skew_detected = True
+                self.get_logger().warn(
+                    f"Clock skew {skew:.1f}s exceeds threshold "
+                    f"{self._clock_skew_fallback_s:.1f}s — chrony sync "
+                    f"appears broken. Falling back to arrival-time "
+                    f"stamping for cloud age and TF lookups. Fix with "
+                    f"'make timesync-check' and restart.",
+                    throttle_duration_sec=60.0,
+                )
+                return arrival
+            return header_time
+        return arrival
+
     def _cb_cam1(self, msg: PointCloud2):
         with self._lock:
             self._cam1_cloud = msg
-            self._cam1_stamp = self.get_clock().now()
+            self._cam1_stamp = self._stamp_from_msg(msg)
+            self._cam1_count += 1
 
     def _cb_cam2(self, msg: PointCloud2):
         with self._lock:
             self._cam2_cloud = msg
-            self._cam2_stamp = self.get_clock().now()
+            self._cam2_stamp = self._stamp_from_msg(msg)
+            self._cam2_count += 1
 
     def _timer_merge(self):
         """Process whichever clouds are fresh enough.
@@ -454,10 +516,23 @@ class PointCloudFusionNode(Node):
                 transformed.append(cloud)
                 continue
             try:
-                t = self._tf_buffer.lookup_transform(
-                    self._target_frame, cloud.header.frame_id,
-                    rclpy.time.Time(),
-                )
+                # When use_header_stamp_age is active (chrony sync), look up
+                # TF at the cloud's actual capture time with a tolerance so
+                # we get the temporally-correct transform. Otherwise fall
+                # back to the latest available transform (legacy behaviour).
+                if self._use_header_stamp_age and not self._clock_skew_detected:
+                    stamp = rclpy.time.Time.from_msg(cloud.header.stamp)
+                    t = self._tf_buffer.lookup_transform_full(
+                        self._target_frame, stamp,
+                        cloud.header.frame_id, stamp,
+                        self._target_frame,
+                        rclpy.duration.Duration(seconds=self._transform_tolerance),
+                    )
+                else:
+                    t = self._tf_buffer.lookup_transform(
+                        self._target_frame, cloud.header.frame_id,
+                        rclpy.time.Time(),
+                    )
                 transformed.append(tf2_sensor_msgs.do_transform_cloud(cloud, t))
             except Exception as exc:
                 frame = cloud.header.frame_id
@@ -929,17 +1004,34 @@ class PointCloudFusionNode(Node):
         with self._stats_lock:
             stats_snapshot = dict(self._stats)
             stats_snapshot["tf_fail"] = dict(self._stats["tf_fail"])
+        with self._lock:
+            cam1_count = self._cam1_count
+            cam2_count = self._cam2_count
+            c1, s1 = self._cam1_cloud, self._cam1_stamp
+            c2, s2 = self._cam2_cloud, self._cam2_stamp
         since_last = (now - self._last_publish_time).nanoseconds / 1e9
         tf_fail_str = ""
         if stats_snapshot["tf_fail"]:
             tf_fail_str = " tf_fail={" + ", ".join(
                 f"{k}:{v}" for k, v in sorted(stats_snapshot["tf_fail"].items())
             ) + "}"
+        # Cloud staleness diagnostic: report how stale the last-received cloud
+        # is, and whether clock skew was detected (chrony broken).
+        skew_str = ""
+        if self._clock_skew_detected:
+            skew_str = " [CLOCK SKEW DETECTED — using arrival-time fallback]"
+        c1_age = (now - s1).nanoseconds / 1e9 if s1 else None
+        c2_age = (now - s2).nanoseconds / 1e9 if s2 else None
+        c1_str = f"{c1_age:.1f}s" if c1_age is not None else "none"
+        c2_str = f"{c2_age:.1f}s" if c2_age is not None else "none"
         self.get_logger().info(
             f"Stats: published={stats_snapshot['published']} "
             f"(dual={stats_snapshot['dual']}, cam1_only={stats_snapshot['cam1_only']}) "
-            f"dist_removed={stats_snapshot['distance_removed']} "
-            f"bbox_removed={stats_snapshot['bbox_removed']}"
+            f"received(cam1={cam1_count}, cam2={cam2_count}) "
+            f"last_cloud_age(cam1={c1_str}, cam2={c2_str})"
+            f"{skew_str}"
+            f" dist_removed={stats_snapshot['distance_removed']}"
+            f" bbox_removed={stats_snapshot['bbox_removed']}"
             f" bbox_skipped={stats_snapshot['bbox_skipped']}"
             f" bbox_cache_hits={stats_snapshot['bbox_cache_hits']}"
             f"{tf_fail_str}"
@@ -948,13 +1040,6 @@ class PointCloudFusionNode(Node):
 
         # Stall diagnostic: if nothing published this interval, explain why.
         if stats_snapshot["published"] == 0:
-            with self._lock:
-                c1, s1 = self._cam1_cloud, self._cam1_stamp
-                c2, s2 = self._cam2_cloud, self._cam2_stamp
-
-            c1_age = (now - s1).nanoseconds / 1e9 if s1 else None
-            c2_age = (now - s2).nanoseconds / 1e9 if s2 else None
-
             parts = []
             if c1 is None or c1_age is None or c1_age > self._cloud_max_age:
                 parts.append(f"cam1: no cloud"

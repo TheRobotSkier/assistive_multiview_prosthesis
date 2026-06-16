@@ -258,7 +258,7 @@ class PipelineManagerNode(Node):
             self._on_twist_hit_detected,
             QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
         self.create_subscription(
-            Float32, self.get_parameter('collision_distance_topic').value,
+            Float64, self.get_parameter('collision_distance_topic').value,
             self._on_collision_distance, 10)
         # Subscribe to wrist state to initialize target from hardware position
         self.create_subscription(
@@ -624,7 +624,7 @@ class PipelineManagerNode(Node):
             self._segmenting_start_time = self.get_clock().now()
             self._transition(State.SEGMENTING, 'Twist: collision hit detected')
 
-    def _on_collision_distance(self, msg: Float32):
+    def _on_collision_distance(self, msg: Float64):
         """Store distance to hit and deactivate twist when within stop-distance.
 
         The collision distance is published by twist_propagation as the Euclidean

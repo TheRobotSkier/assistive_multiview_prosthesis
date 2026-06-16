@@ -39,6 +39,7 @@ __pycache__/
 # Debug data
 *.ply
 *.bag
+data/bags/
 # kilo code related
 .kilo/kilo.json
 .beads

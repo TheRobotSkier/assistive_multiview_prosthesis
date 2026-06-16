@@ -43,8 +43,8 @@ __all__ = ["create_node", "main", "DEFAULT_PARAMS"]
 
 DEFAULT_PARAMS = {
     # Odometry topics
-    "head_odom_topic": "/ov_msckf/odomimu",
-    "arm_odom_topic": "/ov_msckf_arm/odomimu",
+    "head_odom_topic": "/jetson/head/odom",
+    "arm_odom_topic": "/jetson/arm/odom",
     # Head pose source: "odom" or "tf"
     "head_pose_source": "odom",
     # TF frames for the TF fallback
@@ -66,11 +66,22 @@ DEFAULT_PARAMS = {
     # Noise sigmas
     "odom_translation_sigma_m": 0.02,
     "odom_rotation_sigma_rad": 0.02,
+    # Sanity gate: reject odometry deltas larger than this (metres) to protect
+    # the factor graph from diverging VIO (V6 §9 fault tolerance).
+    "max_odom_delta_m": 0.5,
     # Output topics
     "head_pose_topic": "/gtsam/head_pose",
     "arm_pose_topic": "/gtsam/arm_pose",
     # Output frame
     "world_frame": "marker_map",
+    # TF broadcasting: when enabled, the optimised head/arm poses are
+    # broadcast as dynamic TF edges (world_frame -> head_child_frame /
+    # arm_child_frame) so downstream nodes (pointcloud_fusion, rviz) consume
+    # the smoothed trajectory instead of the raw, diverging VIO relay.
+    # See V6 §6.3 — GTSAM owns the dynamic TF tree when active.
+    "broadcast_tf": True,
+    "head_child_frame": "head_imu",
+    "arm_child_frame": "arm_imu",
 }
 
 
@@ -100,6 +111,25 @@ def _stamp_to_float(stamp) -> float:
     return float(stamp.sec) + float(stamp.nanosec) * 1e-9
 
 
+def _float_to_stamp(stamp_f: float):
+    """Convert a float timestamp (seconds) back to a ``builtin_interfaces/Time``.
+
+    Inverse of :func:`_stamp_to_float`.  Used to stamp published poses with
+    the sensor time so downstream consumers stay temporally aligned.
+    """
+    from builtin_interfaces.msg import Time
+    sec = int(stamp_f)
+    nanosec = int(round((stamp_f - sec) * 1e9))
+    # Clamp nanosec to [0, 1e9) to avoid rollover edge cases.
+    if nanosec >= 1_000_000_000:
+        sec += 1
+        nanosec -= 1_000_000_000
+    t = Time()
+    t.sec = sec
+    t.nanosec = nanosec
+    return t
+
+
 # ---------------------------------------------------------------------------
 # ROS 2 node factory
 # ---------------------------------------------------------------------------
@@ -109,23 +139,26 @@ def _import_ros():
     import rclpy
     from rclpy.node import Node
     from rclpy.time import Time
+    from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
     from nav_msgs.msg import Odometry
     from geometry_msgs.msg import PoseWithCovarianceStamped
     from std_msgs.msg import Header
-    return rclpy, Node, Time, Odometry, PoseWithCovarianceStamped, Header
+    return rclpy, Node, Time, QoSProfile, ReliabilityPolicy, HistoryPolicy, Odometry, PoseWithCovarianceStamped, Header
 
 
 def create_node():
     """Build and return the ``GtsamTrackerNode`` (ROS 2 Node subclass)."""
-    (rclpy, Node, Time, Odometry, PoseWithCovarianceStamped, Header) = _import_ros()
+    (rclpy, Node, Time, QoSProfile, ReliabilityPolicy, HistoryPolicy, Odometry, PoseWithCovarianceStamped, Header) = _import_ros()
 
-    # Optional TF2 (for head_pose_source="tf")
+    # Optional TF2 (for head_pose_source="tf" and for broadcasting the
+    # optimised poses back into the TF tree — V6 §6.3 / §6.9).
     try:
-        from tf2_ros import Buffer, TransformListener
+        from tf2_ros import Buffer, TransformListener, TransformBroadcaster
         _HAS_TF2 = True
     except ImportError:
         Buffer = None
         TransformListener = None
+        TransformBroadcaster = None
         _HAS_TF2 = False
 
     # Optional sensor_fusion_msgs (ArUco observations)
@@ -167,15 +200,24 @@ def create_node():
             self._kinematic_check_interval = int(p("kinematic_check_interval"))
             self._sigma_t = float(p("odom_translation_sigma_m"))
             self._sigma_r = float(p("odom_rotation_sigma_rad"))
+            self._max_delta = float(p("max_odom_delta_m"))
             self._head_pose_topic = str(p("head_pose_topic"))
             self._arm_pose_topic = str(p("arm_pose_topic"))
             self._world_frame = str(p("world_frame"))
+            self._broadcast_tf = bool(p("broadcast_tf"))
+            self._head_child_frame = str(p("head_child_frame"))
+            self._arm_child_frame = str(p("arm_child_frame"))
 
             # ── Factor graph ─────────────────────────────────────────────
             self._graph = TrajectoryFactorGraph(lag_s=self._lag_s)
 
             # Key counters (advance together for synchronized chains)
             self._key_idx = 0
+
+            # Recovery bookkeeping: consecutive graph-update failures trigger a
+            # full graph reset so the node self-heals after ISAM2 corruption.
+            self._consecutive_failures = 0
+            self._reset_count = 0
 
             # Latest odom caches
             self._head_pose: Optional[np.ndarray] = None
@@ -193,9 +235,11 @@ def create_node():
             self._aruco_warned = False
             self._aruco_received = False
 
-            # ── TF2 (optional, for head_pose_source="tf") ───────────────
+            # ── TF2 (optional, for head_pose_source="tf" and for broadcasting
+            #    the optimised poses back into the TF tree) ────────────────
             self._tf_buffer = None
             self._tf_listener = None
+            self._tf_broadcaster = None
             if self._head_pose_source == "tf":
                 if _HAS_TF2:
                     self._tf_buffer = Buffer()
@@ -210,16 +254,37 @@ def create_node():
                         "falling back to odom")
                     self._head_pose_source = "odom"
 
+            # TF broadcaster: publishes the smoothed head/arm poses as dynamic
+            # TF edges so downstream nodes consume the FGO trajectory rather
+            # than the raw VIO relay (V6 §6.3).
+            if self._broadcast_tf and _HAS_TF2:
+                self._tf_broadcaster = TransformBroadcaster(self)
+                self.get_logger().info(
+                    "TF broadcasting enabled "
+                    f"({self._world_frame} → {self._head_child_frame}, "
+                    f"{self._arm_child_frame})")
+            elif self._broadcast_tf and not _HAS_TF2:
+                self.get_logger().warn(
+                    "broadcast_tf=true but tf2_ros not available — "
+                    "smoothed poses will be published as topics only")
+
             # ── Subscriptions ────────────────────────────────────────────
+            # Use BEST_EFFORT QoS — Jetson relay publishes with BEST_EFFORT
+            best_effort = QoSProfile(
+                reliability=ReliabilityPolicy.BEST_EFFORT,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=10,
+            )
+
             if self._head_pose_source == "odom":
                 self.create_subscription(
                     Odometry, self._head_odom_topic,
-                    self._on_head_odom, 10)
+                    self._on_head_odom, best_effort)
 
             # Arm odom is always from the odom topic
             self.create_subscription(
                 Odometry, self._arm_odom_topic,
-                self._on_arm_odom, 10)
+                self._on_arm_odom, best_effort)
 
             # ArUco subscriptions (graceful degradation)
             if _HAS_ARUCO_MSGS:
@@ -228,13 +293,13 @@ def create_node():
                 aruco_arm_topic = str(p("aruco_arm_pose_topic"))
                 self.create_subscription(
                     MarkerPoseObservation, aruco_marker_topic,
-                    self._on_aruco_marker, 10)
+                    self._on_aruco_marker, best_effort)
                 self.create_subscription(
                     DynamicMarkerObservation, aruco_dynamic_topic,
-                    self._on_aruco_dynamic, 10)
+                    self._on_aruco_dynamic, best_effort)
                 self.create_subscription(
                     DynamicArmPoseObservation, aruco_arm_topic,
-                    self._on_aruco_arm, 10)
+                    self._on_aruco_arm, best_effort)
             else:
                 self.get_logger().warn(
                     "sensor_fusion_msgs not available — ArUco factors disabled")
@@ -242,7 +307,7 @@ def create_node():
             # Visual factor subscription (from cross_camera_features)
             self.create_subscription(
                 PoseWithCovarianceStamped, self._visual_topic,
-                self._on_visual_factor, 10)
+                self._on_visual_factor, best_effort)
 
             # ── Publishers ───────────────────────────────────────────────
             self._head_pub = self.create_publisher(
@@ -253,12 +318,24 @@ def create_node():
             # ── Graph update timer ───────────────────────────────────────
             period = 1.0 / self._graph_rate if self._graph_rate > 0 else 0.1
             self._update_count = 0
+            self._publish_count = 0
+            self._odom_head_count = 0
+            self._odom_arm_count = 0
+            self._visual_count = 0
+            self._delta_reject_count = 0
             self._timer = self.create_timer(period, self._graph_update)
+
+            # ── Periodic stats timer ─────────────────────────────────────
+            # Every 10s, log a one-line health summary so the run log
+            # surfaces divergence / clock-skew / stall issues at a glance
+            # without needing to grep through raw odom messages.
+            self.create_timer(10.0, self._log_stats)
 
             self.get_logger().info(
                 f"GtsamTrackerNode ready "
                 f"(rate={self._graph_rate}Hz, lag={self._lag_s}s, "
-                f"head_source={self._head_pose_source})")
+                f"head_source={self._head_pose_source}, "
+                f"broadcast_tf={self._broadcast_tf and _HAS_TF2})")
 
         # ------------------------------------------------------------------
         # Odometry callbacks
@@ -268,11 +345,13 @@ def create_node():
             """Cache the latest head odometry pose."""
             self._head_pose = _odom_to_matrix(msg)
             self._head_stamp = _stamp_to_float(msg.header.stamp)
+            self._odom_head_count += 1
 
         def _on_arm_odom(self, msg: Odometry):
             """Cache the latest arm odometry pose."""
             self._arm_pose = _odom_to_matrix(msg)
             self._arm_stamp = _stamp_to_float(msg.header.stamp)
+            self._odom_arm_count += 1
             # Extract covariance for arm noise
             self._arm_cov_diag = _odom_covariance_diag(
                 msg, self._sigma_t, self._sigma_r)
@@ -354,7 +433,8 @@ def create_node():
 
         def _on_visual_factor(self, msg: PoseWithCovarianceStamped):
             """Add a cross-chain visual between-factor."""
-            T_head_arm = pose_to_matrix(msg.pose)
+            self._visual_count += 1
+            T_head_arm = pose_to_matrix(msg.pose.pose)
             cov_diag = list(msg.pose.covariance)
             diag = [cov_diag[0], cov_diag[7], cov_diag[14],
                     cov_diag[21], cov_diag[28], cov_diag[35]]
@@ -406,6 +486,32 @@ def create_node():
             else:
                 delta_arm = np.eye(4)
 
+            # ── Sanity gate: reject absurd deltas from diverging VIO ─────
+            # If the translation component of either delta exceeds
+            # ``max_odom_delta_m``, the odometry source is almost certainly
+            # diverging (e.g. OpenVINS integrating garbage when static).
+            # Injecting a 900m between-factor would poison the graph, so we
+            # skip this update entirely and re-sync ``_head_prev`` /
+            # ``_arm_prev`` to the current poses so the next healthy delta is
+            # measured from here.
+            head_jump = float(np.linalg.norm(delta_head[:3, 3]))
+            arm_jump = float(np.linalg.norm(delta_arm[:3, 3]))
+            if (self._max_delta > 0.0 and
+                    (head_jump > self._max_delta or
+                     arm_jump > self._max_delta)):
+                self.get_logger().warn(
+                    f"Rejecting odometry delta — head jump {head_jump:.3f}m, "
+                    f"arm jump {arm_jump:.3f}m exceed max "
+                    f"{self._max_delta}m. Re-syncing pose baseline "
+                    f"(diverging VIO suspected).",
+                    throttle_duration_sec=2.0)
+                self._delta_reject_count += 1
+                if self._head_pose is not None:
+                    self._head_prev = self._head_pose.copy()
+                if self._arm_pose is not None:
+                    self._arm_prev = self._arm_pose.copy()
+                return
+
             # Noise models
             noise_head = self._default_noise
             noise_arm = self._default_noise
@@ -420,8 +526,16 @@ def create_node():
                     delta_head, delta_arm,
                     noise_head, noise_arm)
             except Exception as exc:
+                self._consecutive_failures += 1
                 self.get_logger().error(
-                    f"Failed to add odometry factor: {exc}", throttle_duration_sec=5.0)
+                    f"Failed to add odometry factor "
+                    f"({self._consecutive_failures}x): {exc}",
+                    throttle_duration_sec=5.0)
+                # Recovery: add_odometry_factor calls get_pose() internally,
+                # which hits the corrupted ISAM2 state.  After repeated
+                # failures, reset the graph so the node self-heals.
+                if self._consecutive_failures >= 3:
+                    self._reset_graph()
                 return
 
             # Update previous poses
@@ -433,9 +547,20 @@ def create_node():
             # Run ISAM2 update
             try:
                 self._graph.update()
+                self._consecutive_failures = 0
             except Exception as exc:
+                self._consecutive_failures += 1
                 self.get_logger().error(
-                    f"Graph update failed: {exc}", throttle_duration_sec=5.0)
+                    f"Graph update failed ({self._consecutive_failures}x): "
+                    f"{exc}", throttle_duration_sec=5.0)
+                # Recovery: after repeated failures the ISAM2 internal state
+                # is corrupt (e.g. a BetweenFactor references a variable that
+                # was never inserted).  Reset the graph and re-seed from the
+                # current poses so the node self-heals instead of looping on
+                # the same broken VectorValues forever.
+                if self._consecutive_failures >= 3:
+                    self._reset_graph()
+                    return
 
             # Marginalise old keys
             try:
@@ -451,6 +576,7 @@ def create_node():
 
             # Publish poses
             self._publish_poses()
+            self._publish_count += 1
 
             # ArUco graceful degradation warning
             if not self._aruco_received and not self._aruco_warned:
@@ -478,28 +604,136 @@ def create_node():
                 pass  # Keys may not exist yet — non-fatal
 
         # ------------------------------------------------------------------
+        # Graph recovery (self-heal after ISAM2 corruption)
+        # ------------------------------------------------------------------
+
+        def _reset_graph(self):
+            """Reinitialize the factor graph and re-seed from current poses.
+
+            Called when repeated ISAM2 updates fail (e.g.
+            ``IndeterminantLinearSystemException`` from diverging VIO).  After
+            reset, the next ``_graph_update`` cycle treats the current poses as
+            the origin of a fresh trajectory, so downstream consumers see a
+            small discontinuity rather than a permanent error loop.
+
+            Reference: V6 §9 fault tolerance / graceful degradation.
+            """
+            self._graph.reset()
+            self._key_idx = 0
+            self._head_prev = None
+            self._arm_prev = None
+            self._consecutive_failures = 0
+            self._reset_count += 1
+            self.get_logger().warn(
+                f"Factor graph reset (#{self._reset_count}). Re-seeding from "
+                f"current poses — expect a small pose discontinuity.")
+
+        # ------------------------------------------------------------------
+        # Periodic health stats
+        # ------------------------------------------------------------------
+
+        def _log_stats(self):
+            """Log a one-line health summary every 10s.
+
+            Surfaces the key signals that indicate problems at a glance:
+              - Pose norms: if these climb past a few metres, OpenVINS is
+                diverging (the delta gate catches the jumps, but the norm
+                shows the accumulated drift).
+              - Clock offset: sensor stamp vs host clock.  Under chrony
+                sync this should be < 0.1s; a large value means time sync
+                is broken and timestamp-based TF lookups will fail.
+              - Odom rates: if head or arm odom stops arriving, the graph
+                stalls.  The counts let you spot a dead publisher.
+              - Delta rejects / resets: non-zero values mean the delta
+                gate or graph recovery is actively working.
+            """
+            head_norm = (float(np.linalg.norm(self._head_pose[:3, 3]))
+                         if self._head_pose is not None else -1.0)
+            arm_norm = (float(np.linalg.norm(self._arm_pose[:3, 3]))
+                        if self._arm_pose is not None else -1.0)
+
+            # Clock offset: how far behind the host clock is the latest
+            # sensor stamp?  Positive = sensor is in the past (expected
+            # due to network transit); large positive = sync broken.
+            host_now = time.time()
+            head_offset = (host_now - self._head_stamp
+                           if self._head_stamp > 0 else -1.0)
+            arm_offset = (host_now - self._arm_stamp
+                          if self._arm_stamp > 0 else -1.0)
+
+            self.get_logger().info(
+                f"Stats: published={self._publish_count} "
+                f"odom(head={self._odom_head_count}, arm={self._odom_arm_count}) "
+                f"visual={self._visual_count} "
+                f"delta_rejects={self._delta_reject_count} "
+                f"resets={self._reset_count} "
+                f"pose_norm(head={head_norm:.3f}m, arm={arm_norm:.3f}m) "
+                f"clock_offset(head={head_offset:.3f}s, arm={arm_offset:.3f}s)"
+            )
+
+            # Reset per-interval counters (keep cumulative odom/reset counts)
+            self._publish_count = 0
+            self._visual_count = 0
+            self._delta_reject_count = 0
+
+        # ------------------------------------------------------------------
         # Pose publishing
         # ------------------------------------------------------------------
 
         def _publish_poses(self):
-            """Query the graph and publish head/arm poses."""
+            """Query the graph and publish head/arm poses.
+
+            Poses are stamped with the latest sensor time (not host publish
+            time) so downstream consumers (keyframe_buffer, pointcloud_fusion)
+            can align them with sensor data under chrony time sync.
+            """
             kh = self._graph._make_key("h", max(self._key_idx - 1, 0))
             ka = self._graph._make_key("a", max(self._key_idx - 1, 0))
 
+            # Use the most recent sensor stamp available so the published pose
+            # is temporally consistent with the sensor data that produced it.
+            sensor_stamp_f = max(self._head_stamp, self._arm_stamp)
+            if sensor_stamp_f <= 0.0:
+                sensor_stamp_f = time.time()
+
             try:
                 head_pose3 = self._graph.get_pose(kh)
-                self._publish_pose(head_pose3, self._head_pub)
+                self._publish_pose(
+                    head_pose3, self._head_pub, sensor_stamp_f,
+                    child_frame=self._head_child_frame)
             except Exception:
                 pass  # Key may not exist yet
 
             try:
                 arm_pose3 = self._graph.get_pose(ka)
-                self._publish_pose(arm_pose3, self._arm_pub)
+                self._publish_pose(
+                    arm_pose3, self._arm_pub, sensor_stamp_f,
+                    child_frame=self._arm_child_frame)
             except Exception:
                 pass
 
-        def _publish_pose(self, pose3, publisher):
-            """Convert a gtsam.Pose3 to PoseWithCovarianceStamped and publish."""
+        def _publish_pose(self, pose3, publisher, stamp_f: float,
+                          child_frame: Optional[str] = None):
+            """Convert a gtsam.Pose3 to PoseWithCovarianceStamped and publish.
+
+            Optionally also broadcast a dynamic TF edge
+            (world_frame → child_frame) when ``self._tf_broadcaster`` is set.
+
+            Parameters
+            ----------
+            pose3 : gtsam.Pose3
+                The optimised pose.
+            publisher : rclpy Publisher
+                Topic publisher for the pose.
+            stamp_f : float
+                Sensor timestamp (seconds) to stamp the message with.  Using
+                the sensor time (rather than ``get_clock().now()``) keeps the
+                pose temporally aligned with the sensor data under chrony
+                time sync.
+            child_frame : str, optional
+                If given and TF broadcasting is enabled, broadcast a dynamic
+                TF edge (world_frame → child_frame).
+            """
             from geometry_msgs.msg import PoseWithCovarianceStamped, Pose
 
             T = np.eye(4)
@@ -508,9 +742,12 @@ def create_node():
 
             t_tuple, q_tuple = matrix_to_pose(T)
 
+            # Convert the float sensor stamp back to a ROS Time message.
+            stamp_msg = _float_to_stamp(stamp_f)
+
             msg = PoseWithCovarianceStamped()
             msg.header = Header()
-            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.header.stamp = stamp_msg
             msg.header.frame_id = self._world_frame
             msg.pose.pose.position.x = t_tuple[0]
             msg.pose.pose.position.y = t_tuple[1]
@@ -523,6 +760,24 @@ def create_node():
             # would require calculateEstimateCovariance — deferred).
             msg.pose.covariance = [0.0] * 36
             publisher.publish(msg)
+
+            # Broadcast dynamic TF edge (world_frame → child_frame) so the
+            # smoothed trajectory feeds the TF tree consumed by
+            # pointcloud_fusion, rviz, etc. (V6 §6.3).
+            if child_frame is not None and self._tf_broadcaster is not None:
+                from tf2_ros import TransformStamped
+                tf_msg = TransformStamped()
+                tf_msg.header.stamp = stamp_msg
+                tf_msg.header.frame_id = self._world_frame
+                tf_msg.child_frame_id = child_frame
+                tf_msg.transform.translation.x = t_tuple[0]
+                tf_msg.transform.translation.y = t_tuple[1]
+                tf_msg.transform.translation.z = t_tuple[2]
+                tf_msg.transform.rotation.x = q_tuple[0]
+                tf_msg.transform.rotation.y = q_tuple[1]
+                tf_msg.transform.rotation.z = q_tuple[2]
+                tf_msg.transform.rotation.w = q_tuple[3]
+                self._tf_broadcaster.sendTransform(tf_msg)
 
     return GtsamTrackerNode
 

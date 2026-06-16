@@ -55,21 +55,51 @@ endif
 # 1800 = 30 minutes
 HOST_CONTAINER_LIFETIME := 1800
 
+# ── WSL2 GPU acceleration for RViz ─────────────────────────────────────────
+# On WSL2, OpenGL is accelerated via Mesa's d3d12 Gallium driver, which talks
+# to the Windows GPU through /dev/dxg and the libraries under /usr/lib/wsl.
+# These variables auto-detect that environment and expose the right flags to
+# every RViz container.  On a native Linux machine they expand to nothing, so
+# the Makefile stays portable.
+#
+# Requirements (WSL2 only):
+#   - /dev/dri present (run `wsl --update && wsl --shutdown` from Windows if absent)
+#   - /dev/dri/* world-readable (see /etc/udev/rules.d/91-dri-render.rules)
+#   - /usr/lib/wsl mounted into the container (provides libdxcore.so + driver DLLs)
+RVIZ_GPU_FLAGS :=
+RVIZ_GPU_ENV :=
+COMPOSE_WSL_GPU :=
+ifeq ($(wildcard /usr/lib/wsl/lib/libdxcore.so),)
+  # Not WSL2 — no GPU passthrough flags needed.
+else
+  RVIZ_GPU_FLAGS := --device /dev/dri --device /dev/dxg -v /usr/lib/wsl:/usr/lib/wsl:ro
+  RVIZ_GPU_ENV := -e GALLIUM_DRIVER=d3d12 -e LD_LIBRARY_PATH=/usr/lib/wsl/lib -e MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA
+  COMPOSE_WSL_GPU := -f docker-compose.wsl-gpu.yml
+endif
+
 # Compose files for segmentation variants
 COMPOSE_SEGMENTATION_CPU := -f docker-compose.yml
 COMPOSE_SEGMENTATION_CUDA := -f docker-compose.yml -f docker-compose.segmentation.cuda.yml
 COMPOSE_SEGMENTATION_CUDA_PODMAN := -f docker-compose.yml -f docker-compose.segmentation.podman-gpu.yml
+
+# Compose files for MobileSAM GPU variants (docker uses deploy.resources, podman uses devices)
+COMPOSE_MOBILE_SAM_GPU := -f docker-compose.yml
+COMPOSE_MOBILE_SAM_GPU_PODMAN := -f docker-compose.yml -f docker-compose.mobile-sam.podman-gpu.yml
 
 # Select the correct GPU runtime compose override based on the detected backend.
 # DOCKER_CMD is always set correctly (by explicit selection or auto-detect),
 # unlike CONTAINER_BACKEND which is only set when explicitly provided.
 ifeq ($(DOCKER_CMD),podman)
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA_PODMAN)
+  COMPOSE_MOBILE_SAM_RUNTIME := $(COMPOSE_MOBILE_SAM_GPU_PODMAN)
+  COMPOSE_PROFILE_FLAG :=
 else
   COMPOSE_CUDA_RUNTIME := $(COMPOSE_SEGMENTATION_CUDA)
+  COMPOSE_MOBILE_SAM_RUNTIME := $(COMPOSE_MOBILE_SAM_GPU)
+  COMPOSE_PROFILE_FLAG := --profile mobile-sam-gpu
 endif
 
-.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6
+.PHONY: help build build-prosthesis build-segmentation build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-jazzy-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-v6 record-v6-mock record-v6-pipeline inspect-bag run-camera-log
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -114,6 +144,10 @@ help:
 	@echo "    make run                    Full launch with USB detection"
 	@echo "    make mock-v6                Launch V6 mock pipeline (TSDF fusion + synthetic data)"
 	@echo "    make pipeline-v6            Launch V6 hardware pipeline (use_tsdf_fusion:=true)"
+	@echo "    make run-camera-log         Camera pipeline + auto-save log to logs/host-log-*.txt"
+	@echo "    make record-v6              Record all V6 topics to data/bags/ (needs running container)"
+	@echo "    make record-v6-mock         Record mock pipeline topics (needs running container)"
+	@echo "    make inspect-bag            Show topic list + counts for latest bag"
 	@echo "    make down                   Stop all containers"
 	@echo ""
 	@echo "  RViz:"
@@ -127,6 +161,9 @@ help:
 	@echo "    make jetson-sync            Push code to Jetson"
 	@echo "    make jetson-cameras         Sync + start cameras + RViz"
 	@echo "    make timesync               Sync clocks (host + Jetson)"
+	@echo "    make network-tune           Tune UDP buffers on host (needs sudo)"
+	@echo "    make network-tune-jetson    Tune UDP buffers on Jetson (remote)"
+	@echo "    make network-tune-all       Tune UDP buffers on both machines"
 	@echo ""
 	@echo "  Grasp Test:"
 	@echo "    make test-static-grasp      Static grasp test with MIA hand"
@@ -154,10 +191,10 @@ build-segmentation-cpu:
 
 # MobileSAM 2D segmentation server (V6 plan §6.4)
 build-mobile-sam-cpu:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu build mobile_sam_cpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) build mobile_sam_cpu
 
 build-mobile-sam-gpu:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-gpu build mobile_sam_gpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) build mobile_sam_gpu
 
 build-segmentation:
 	cd $(COMPOSE_DIR) && SEGMENTATION_CPU_ONLY=1 $(COMPOSE) build segmentation
@@ -172,7 +209,7 @@ rebuild:
 # Primary workflow: make dev → make shell → (inside container) make build
 
 dev:
-	cd $(COMPOSE_DIR) && $(COMPOSE) up -d prosthesis
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_WSL_GPU) up -d prosthesis
 
 dev-shell: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash
@@ -201,29 +238,29 @@ down-segmentation:
 
 # MobileSAM services (V6 plan §6.4)
 mobile-sam-cpu:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu up -d mobile_sam_cpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) up -d mobile_sam_cpu
 
 mobile-sam-gpu:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-gpu up -d mobile_sam_gpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_MOBILE_SAM_RUNTIME) $(COMPOSE_PROFILE_FLAG) up -d mobile_sam_gpu
 
 mobile-sam: mobile-sam-gpu
 
 down-mobile-sam:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu --profile mobile-sam-gpu down
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_MOBILE_SAM_RUNTIME) --profile mobile-sam-cpu $(COMPOSE_PROFILE_FLAG) down
 
 # ── Run ────────────────────────────────────────────────────────────────────
 # Default: prosthesis + MobileSAM GPU (V6 segmentation, <400ms latency target).
 # Use up-cpu for machines without NVIDIA runtime.
 up:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-gpu up -d prosthesis mobile_sam_gpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_WSL_GPU) $(COMPOSE_MOBILE_SAM_RUNTIME) $(COMPOSE_PROFILE_FLAG) up -d prosthesis mobile_sam_gpu
 
 up-cpu:
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mobile-sam-cpu up -d prosthesis mobile_sam_cpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_WSL_GPU) --profile mobile-sam-cpu up -d prosthesis mobile_sam_cpu
 
 up-prosthesis: dev
 
 up-hw:
-	cd $(COMPOSE_DIR) && $(COMPOSE) -f docker-compose.yml -f docker-compose.hw.yml --profile mobile-sam-gpu up -d prosthesis mobile_sam_gpu
+	cd $(COMPOSE_DIR) && $(COMPOSE) $(COMPOSE_WSL_GPU) $(COMPOSE_MOBILE_SAM_RUNTIME) -f docker-compose.hw.yml $(COMPOSE_PROFILE_FLAG) up -d prosthesis mobile_sam_gpu
 
 # ── Tonight host validation gates ────────────────────────────────────────────
 # These run the in-container Makefile targets from the host checkout. They keep
@@ -255,6 +292,51 @@ pipeline-v6: dev
 		source /prosthesis_ws/install/setup.bash 2>/dev/null || true && \
 		ros2 launch prosthesis_launch pipeline.launch.py use_tsdf_fusion:=true'
 
+# ── V6 Recording & Logging ─────────────────────────────────────────────────
+# Rosbag recording: host targets proxy to the in-container targets defined in
+# Makefile.workspace. The topic lists and bag path live there (single source
+# of truth). See the in-container targets for details.
+#
+# These targets exec into the ALREADY-RUNNING container via the in-container
+# Makefile targets (Makefile.workspace: record-v6, record-v6-mock, inspect-bag).
+#
+# They NEVER recreate the container, so they are safe to run alongside a live
+# pipeline. If the container is not running, they tell you to start it first.
+#
+# Bags land in data/bags/v6_<timestamp>/ on the host (bind-mounted).
+#
+# Usage (from host, with pipeline already running in another terminal):
+#   make record-v6          # record all V6 perception + odometry topics
+#   make record-v6-mock     # record mock pipeline topics (lighter)
+#   make inspect-bag        # show topic list + message counts for latest bag
+
+# Guard: exec into the running container only. Fails fast if it's down so we
+# never accidentally trigger a `compose up` that would recreate it.
+# Uses $(DOCKER_CMD) inspect directly (not compose ps) for a robust check
+# that works with both podman and docker regardless of compose version.
+# Usage: $(call exec-in-container,make-target)
+# Returns the exit code of the exec'd command, or 1 if the container is down.
+define exec-in-container
+@if ! $(DOCKER_CMD) inspect -f '{{.State.Running}}' prosthesis 2>/dev/null | grep -q true; then \
+  echo "ERROR: prosthesis container is not running."; \
+  echo "Start it first with 'make dev', then run your pipeline, then record."; \
+  exit 1; \
+fi
+@cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc '$(1)'
+endef
+
+record-v6: ## Record all V6 perception + odometry topics (requires running container)
+	$(call exec-in-container,make record-v6)
+
+record-v6-mock: ## Record mock pipeline topics (requires running container)
+	$(call exec-in-container,make record-v6-mock)
+
+record-v6-pipeline: record-v6  # alias for clarity in hardware runs
+
+# Inspect the most recent bag: list topics, message counts, and duration
+inspect-bag: ## Show topic list + message counts for latest bag
+	$(call exec-in-container,make inspect-bag)
+
 run: up-hw
 	make segmentation-status
 	make timesync-check
@@ -277,6 +359,11 @@ run-emg-grasp: up-hw
 
 camera-test: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make camera-test'
+
+# Run the camera-only pipeline with automatic log capture.
+# Output is teed to logs/host-log-<timestamp>.txt (mounted from host ./logs).
+run-camera-log: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-camera-log'
 
 collect-data: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make collect-data'
@@ -395,13 +482,13 @@ rviz-static:
 		--network host \
 		--ipc host \
 		--userns=keep-id \
+		$(RVIZ_GPU_FLAGS) \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
+		$(RVIZ_GPU_ENV) \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
-		-e NVIDIA_VISIBLE_DEVICES=all \
-		-e NVIDIA_DRIVER_CAPABILITIES=all \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/robotlab_cameras_static_tf.rviz:/rviz_config.rviz:ro \
@@ -522,6 +609,37 @@ timesync-check: robotlab-connect
 	@echo ""
 	@ssh $(JETSON_HOST) 'chronyc tracking 2>/dev/null | grep -E "(Reference|Stratum|Last offset|RMS offset)" || echo "  chrony tracking not available on Jetson"'
 
+# ── Network buffer tuning (UDP/IP fragment reassembly) ────────────────────
+# Prevents connection saturation when the host receives large fragmented
+# PointCloud2 streams from the Jetson over CycloneDDS UDP unicast.
+#
+# Background:
+#   Each RealSense cloud is 5-8 MB, fragmented into ~120 RTPS messages.
+#   The receiving kernel must buffer and reassemble these fragments.
+#   Default Linux settings (~208 KB rmem_max, ~4 MB ipfrag) are too small.
+#
+#   network-tune          — apply on host (requires sudo)
+#   network-tune-jetson   — push + apply on Jetson via SSH
+#   network-tune-all      — apply on both machines
+#
+# See: plans/2026-06-16-network-buffer-tuning-host-v2.md
+
+network-tune: ## Tune UDP/IP buffer settings on the host (requires sudo)
+	@test -f scripts/tune_network_host.sh || { echo "Missing scripts/tune_network_host.sh"; exit 1; }
+	@sudo bash scripts/tune_network_host.sh
+
+network-tune-jetson: robotlab-connect ## Tune UDP/IP buffer settings on the Jetson (remote, requires sudo)
+	@test -f scripts/tune_network_jetson.sh || { echo "Missing scripts/tune_network_jetson.sh"; exit 1; }
+	@echo "=== Copying tune script to Jetson ==="
+	@scp scripts/tune_network_jetson.sh $(JETSON_HOST):/tmp/tune_network_jetson.sh
+	@echo "=== Applying kernel buffer tuning on Jetson ==="
+	@ssh -T $(JETSON_HOST) "echo robotlab | sudo -S bash /tmp/tune_network_jetson.sh"
+	@ssh $(JETSON_HOST) "rm -f /tmp/tune_network_jetson.sh"
+	@echo ""
+	@echo "Jetson network buffers tuned."
+
+network-tune-all: network-tune network-tune-jetson ## Tune UDP/IP buffer settings on both host and Jetson
+
 # ── Jetson deploy (git-push based sync over Ethernet) ────────────────────
 # JETSON_HOST must be reachable via SSH (see ~/.ssh/config for 'robotlab').
 # The Jetson pulls from a bare repo here via the post-receive hook.
@@ -585,13 +703,13 @@ rviz-openvins:
 		--network host \
 		--ipc host \
 		--userns=keep-id \
+		$(RVIZ_GPU_FLAGS) \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
+		$(RVIZ_GPU_ENV) \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
-		-e NVIDIA_VISIBLE_DEVICES=all \
-		-e NVIDIA_DRIVER_CAPABILITIES=all \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/phase2_dual_openvins.rviz:/rviz_config.rviz:ro \
@@ -615,10 +733,11 @@ rviz-twist-propagation:
 	podman run --rm -d --name rviz-twist-propagation \
 		--network host \
 		--ipc host \
-		--device /dev/dri \
 		--userns=keep-id \
+		$(RVIZ_GPU_FLAGS) \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
+		$(RVIZ_GPU_ENV) \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
@@ -665,13 +784,13 @@ rviz-imu-test-single:
 		--network host \
 		--ipc host \
 		--userns=keep-id \
+		$(RVIZ_GPU_FLAGS) \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
+		$(RVIZ_GPU_ENV) \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
-		-e NVIDIA_VISIBLE_DEVICES=all \
-		-e NVIDIA_DRIVER_CAPABILITIES=all \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/imu_test_single.rviz:/rviz_config.rviz:ro \
@@ -689,13 +808,13 @@ rviz-imu-test-dual:
 		--network host \
 		--ipc host \
 		--userns=keep-id \
+		$(RVIZ_GPU_FLAGS) \
 		-e DISPLAY=$(DISPLAY) \
 		-e XAUTHORITY=/tmp/.xauth \
+		$(RVIZ_GPU_ENV) \
 		-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-e CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml \
 		-e ROS_DOMAIN_ID=0 \
-		-e NVIDIA_VISIBLE_DEVICES=all \
-		-e NVIDIA_DRIVER_CAPABILITIES=all \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v $(XAUTHORITY):/tmp/.xauth:ro \
 		-v $(CURDIR)/rviz/imu_test_dual.rviz:/rviz_config.rviz:ro \
