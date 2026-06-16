@@ -16,7 +16,7 @@ common:
   align_depth_enable: false
   pointcloud_stream_filter: 2
   pointcloud_stream_index_filter: 0
-  pointcloud_ordered_pc: false
+  pointcloud_ordered_pc: true
   pointcloud_allow_no_texture_points: false
   decimation_filter_enable: true
   decimation_filter_magnitude: 3

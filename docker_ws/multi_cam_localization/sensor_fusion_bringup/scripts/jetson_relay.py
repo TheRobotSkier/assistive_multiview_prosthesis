@@ -9,6 +9,8 @@ republishes under ``/jetson/`` at lower, laptop-friendly rates.
 Supported streams (each independently togglable via ROS2 parameters):
   - PointCloud2     — stride decimation (keep every Nth point) + throttle
   - Image (colour)  — raw passthrough + throttle (NO compression)
+  - Depth image     — raw passthrough + throttle (for SIFT depth lookup)
+  - ArUco poses     — passthrough (fixed marker observations + dynamic arm pose)
   - trackhist       — resolution downsample + throttle (visualization only)
   - CameraInfo      — throttle only
   - Odometry        — passthrough (no throttling — they are tiny)
@@ -22,7 +24,8 @@ Usage (inside the Docker container)::
     python3 jetson_relay.py
     python3 jetson_relay.py --ros-args \\
         -p pointcloud.decimation.enabled:=false \\
-        -p trackhist.hz:=3.0
+        -p depth.enabled:=true \\
+        -p aruco.enabled:=true
 """
 
 from __future__ import annotations
@@ -41,6 +44,16 @@ from rclpy.qos import (
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool
+
+try:
+    from sensor_fusion_msgs.msg import (
+        DynamicArmPoseObservation,
+        DynamicMarkerObservation,
+        MarkerPoseObservation,
+    )
+    _HAS_ARUCO_MSGS = True
+except ImportError:
+    _HAS_ARUCO_MSGS = False
 
 try:
     import cv2
@@ -92,6 +105,8 @@ _HEALTH_QOS = QoSProfile(
 _SRC = {
     "head_pc":         "/head/d435i_head/depth/color/points",
     "arm_pc":          "/arm/d435i_arm/depth/color/points",
+    "head_depth":      "/head/d435i_head/depth/image_rect_raw",
+    "arm_depth":       "/arm/d435i_arm/depth/image_rect_raw",
     "head_img":        "/head/d435i_head/color/image_raw",
     "arm_img":         "/arm/d435i_arm/color/image_raw",
     "head_trackhist":  "/ov_msckf/trackhist",
@@ -107,6 +122,8 @@ _SRC = {
 _DST = {
     "head_pc":         "/jetson/head/points",
     "arm_pc":          "/jetson/arm/points",
+    "head_depth":      "/jetson/head/depth",
+    "arm_depth":       "/jetson/arm/depth",
     "head_img":        "/jetson/head/image",
     "arm_img":         "/jetson/arm/image",
     "head_trackhist":  "/jetson/head/trackhist",
@@ -117,6 +134,9 @@ _DST = {
     "arm_odom":        "/jetson/arm/odom",
     "head_mml":        "/jetson/head/marker_map_locked",
     "arm_mml":         "/jetson/arm/marker_map_locked",
+    "head_aruco_obs":  "/jetson/head/aruco_observation",
+    "arm_aruco_obs":   "/jetson/arm/aruco_observation",
+    "arm_aruco_dyn":   "/jetson/arm/aruco_dynamic_observation",
 }
 
 CAMERAS = ("head", "arm")
@@ -254,6 +274,11 @@ class JetsonRelay(Node):
         self.declare_parameter("image.enabled", True)
         self.declare_parameter("image.hz", 5.0)
 
+        self.declare_parameter("depth.enabled", False)
+        self.declare_parameter("depth.hz", 5.0)
+
+        self.declare_parameter("aruco.enabled", False)
+
         self.declare_parameter("trackhist.enabled", True)
         self.declare_parameter("trackhist.hz", 5.0)
         self.declare_parameter("trackhist.downsample_factor", 2)
@@ -273,6 +298,11 @@ class JetsonRelay(Node):
         self._img_enabled = self.get_parameter("image.enabled").value
         self._img_hz = self.get_parameter("image.hz").value
 
+        self._depth_enabled = self.get_parameter("depth.enabled").value
+        self._depth_hz = self.get_parameter("depth.hz").value
+
+        self._aruco_enabled = self.get_parameter("aruco.enabled").value and _HAS_ARUCO_MSGS
+
         self._trackhist_enabled = self.get_parameter("trackhist.enabled").value
         self._trackhist_hz = self.get_parameter("trackhist.hz").value
         self._trackhist_ds = self.get_parameter("trackhist.downsample_factor").value
@@ -288,16 +318,27 @@ class JetsonRelay(Node):
         for cam in CAMERAS:
             self._gates[f"pc_{cam}"] = RateGate(self._pc_hz)
             self._gates[f"img_{cam}"] = RateGate(self._img_hz)
+            self._gates[f"depth_{cam}"] = RateGate(self._depth_hz)
             self._gates[f"trackhist_{cam}"] = RateGate(self._trackhist_hz)
             self._gates[f"ci_{cam}"] = RateGate(self._ci_hz)
 
         # ── setup pubs/subs ─────────────────────────────────────────────
-        self._setup_pointclouds()
-        self._setup_images()
-        self._setup_trackhist()
-        self._setup_camera_info()
-        self._setup_odometry()
-        self._setup_marker_map_locked()
+        if self._pc_enabled:
+            self._setup_pointclouds()
+        if self._img_enabled:
+            self._setup_images()
+        if self._depth_enabled:
+            self._setup_depth()
+        if self._aruco_enabled:
+            self._setup_aruco()
+        if self._trackhist_enabled:
+            self._setup_trackhist()
+        if self._ci_enabled:
+            self._setup_camera_info()
+        if self._odom_enabled:
+            self._setup_odometry()
+        if self._mml_enabled:
+            self._setup_marker_map_locked()
 
         # ── health ──────────────────────────────────────────────────────
         self._health_pub = self.create_publisher(
@@ -310,9 +351,6 @@ class JetsonRelay(Node):
     # ── setup helpers ────────────────────────────────────────────────────
 
     def _setup_pointclouds(self) -> None:
-        if not self._pc_enabled:
-            self.get_logger().info("Pointcloud relay:  DISABLED")
-            return
         for cam in CAMERAS:
             key = f"{cam}_pc"
             self.create_subscription(
@@ -325,9 +363,6 @@ class JetsonRelay(Node):
         }
 
     def _setup_images(self) -> None:
-        if not self._img_enabled:
-            self.get_logger().info("Image relay:       DISABLED")
-            return
         for cam in CAMERAS:
             key = f"{cam}_img"
             self.create_subscription(
@@ -339,10 +374,58 @@ class JetsonRelay(Node):
             for cam in CAMERAS
         }
 
+    def _setup_depth(self) -> None:
+        for cam in CAMERAS:
+            key = f"{cam}_depth"
+            self.create_subscription(
+                Image, _SRC[key],
+                lambda m, c=cam: self._on_depth(m, c), _SENSOR_QOS,
+            )
+        self._depth_pub = {
+            cam: self.create_publisher(Image, _DST[f"{cam}_depth"], _SENSOR_QOS)
+            for cam in CAMERAS
+        }
+
+    def _setup_aruco(self) -> None:
+        """Subscribe to Jetson ArUco marker observation topics.
+
+        These topic names match what the OpenVINS phase2 launch files
+        remap the marker_pose_node outputs to, NOT the raw OpenVINS
+        subscription names.
+        """
+        for cam in CAMERAS:
+            # Fixed marker observation for each camera
+            self.create_subscription(
+                MarkerPoseObservation,
+                f"/{cam}/marker_pose/observation",
+                lambda m, c=cam: self._on_aruco_obs(m, c),
+                _SENSOR_QOS,
+            )
+        # Dynamic observation: head camera sees marker ID 2 on arm
+        self.create_subscription(
+            DynamicMarkerObservation,
+            "/head/marker_pose/dynamic_observation",
+            self._on_aruco_dynamic_obs,
+            _SENSOR_QOS,
+        )
+        # Arm-side dynamic arm pose (converted by dynamic_arm_updater)
+        self.create_subscription(
+            DynamicArmPoseObservation,
+            "/arm/marker_pose/dynamic_arm_pose_observation",
+            self._on_aruco_dynamic_arm_pose,
+            _SENSOR_QOS,
+        )
+        self._aruco_obs_pub = {
+            cam: self.create_publisher(
+                MarkerPoseObservation, _DST[f"{cam}_aruco_obs"], _SENSOR_QOS
+            )
+            for cam in CAMERAS
+        }
+        self._aruco_dyn_pub = self.create_publisher(
+            DynamicMarkerObservation, _DST["arm_aruco_dyn"], _SENSOR_QOS
+        )
+
     def _setup_trackhist(self) -> None:
-        if not self._trackhist_enabled:
-            self.get_logger().info("trackhist relay:   DISABLED")
-            return
         for cam in CAMERAS:
             key = f"{cam}_trackhist"
             self.create_subscription(
@@ -355,9 +438,6 @@ class JetsonRelay(Node):
         }
 
     def _setup_camera_info(self) -> None:
-        if not self._ci_enabled:
-            self.get_logger().info("CameraInfo relay:  DISABLED")
-            return
         for cam in CAMERAS:
             key = f"{cam}_ci"
             self.create_subscription(
@@ -370,9 +450,6 @@ class JetsonRelay(Node):
         }
 
     def _setup_odometry(self) -> None:
-        if not self._odom_enabled:
-            self.get_logger().info("Odometry relay:    DISABLED")
-            return
         for cam in CAMERAS:
             key = f"{cam}_odom"
             self.create_subscription(
@@ -385,9 +462,6 @@ class JetsonRelay(Node):
         }
 
     def _setup_marker_map_locked(self) -> None:
-        if not self._mml_enabled:
-            self.get_logger().info("marker_map_locked: DISABLED")
-            return
         for cam in CAMERAS:
             key = f"{cam}_mml"
             self.create_subscription(
@@ -421,6 +495,14 @@ class JetsonRelay(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         self._img_pub[camera].publish(msg)
 
+    def _on_depth(self, msg: Image, camera: str) -> None:
+        """Throttled depth image relay — stamped with system time."""
+        if not self._gates[f"depth_{camera}"].should_publish():
+            return
+        # Override header stamp with system time.
+        msg.header.stamp = self.get_clock().now().to_msg()
+        self._depth_pub[camera].publish(msg)
+
     def _on_trackhist(self, msg: Image, camera: str) -> None:
         if not self._gates[f"trackhist_{camera}"].should_publish():
             return
@@ -439,6 +521,18 @@ class JetsonRelay(Node):
     def _on_mml(self, msg: Bool, camera: str) -> None:
         self._mml_pub[camera].publish(msg)
 
+    def _on_aruco_obs(self, msg, camera: str) -> None:
+        """Fixed marker observation — passthrough relay."""
+        self._aruco_obs_pub[camera].publish(msg)
+
+    def _on_aruco_dynamic_obs(self, msg) -> None:
+        """Dynamic marker observation (head sees marker ID 2 on arm)."""
+        self._aruco_dyn_pub.publish(msg)
+
+    def _on_aruco_dynamic_arm_pose(self, msg) -> None:
+        """Converted dynamic arm pose (arm-side)."""
+        self._aruco_dyn_pub.publish(msg)
+
     # ── health ───────────────────────────────────────────────────────────
 
     def _publish_health(self) -> None:
@@ -453,6 +547,10 @@ class JetsonRelay(Node):
              f"dec={self._pc_dec_enabled} (step={self._pc_dec_step})")
         info(f"  image:       enabled={self._img_enabled}  hz={self._img_hz:.1f}  "
              f"(raw passthrough)")
+        info(f"  depth:       enabled={self._depth_enabled}  hz={self._depth_hz:.1f}  "
+             f"(raw passthrough)")
+        info(f"  aruco:       enabled={self._aruco_enabled}  "
+             f"(msgs_available={_HAS_ARUCO_MSGS})")
         info(f"  trackhist:   enabled={self._trackhist_enabled}  hz={self._trackhist_hz:.1f}  "
              f"ds={self._trackhist_ds}x")
         info(f"  camera_info: enabled={self._ci_enabled}  hz={self._ci_hz:.1f}")
