@@ -49,6 +49,7 @@ install(
     scripts/calibrate_arm_marker_extrinsic.py
     scripts/dynamic_arm_pose_measurement_node.py
     scripts/head_derived_arm_pose_preview_node.py
+    scripts/jetson_relay.py
     scripts/marker_quality_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )

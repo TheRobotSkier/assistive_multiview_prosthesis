@@ -312,6 +312,26 @@ def _setup(context, *args, **kwargs):
             )
         )
 
+    # ── Jetson → Laptop relay ─────────────────────────────────────────
+    jetson_relay_enabled = _as_bool(
+        _arg_or_config(context, "jetson_relay_enabled", True)
+    )
+    if jetson_relay_enabled:
+        relay_script = str(package_dir / "scripts" / "jetson_relay.py")
+        actions.append(
+            ExecuteProcess(
+                cmd=[
+                    "python3", relay_script,
+                    "--ros-args",
+                    "-p", f"pointcloud.hz:={pointcloud_max_rate_hz}",
+                    "-p", "pointcloud.decimation.enabled:=true",
+                    "-p", "image.compression.enabled:=true",
+                ],
+                name="jetson_relay",
+                output="screen",
+            )
+        )
+
     return actions
 
 
@@ -342,6 +362,11 @@ def generate_launch_description():
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("verbosity", default_value=""),
             DeclareLaunchArgument("hold_back_imu_for_frames", default_value=""),
+            DeclareLaunchArgument(
+                "jetson_relay_enabled",
+                default_value="true",
+                description="Run the jetson_relay node to throttle/compress sensor data for the laptop.",
+            ),
             OpaqueFunction(function=_setup),
         ]
     )

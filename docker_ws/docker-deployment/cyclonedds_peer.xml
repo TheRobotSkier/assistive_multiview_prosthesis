@@ -10,6 +10,12 @@
                 <Peer address="10.42.0.1"/>
                 <Peer address="10.42.0.2"/>
             </Peers>
-        </Discovery>
+    	</Discovery>
+	<Internal>
+  		<SocketReceiveBufferSize>8388608</SocketReceiveBufferSize>
+  		<SocketSendBufferSize>8388608</SocketSendBufferSize>
+  		<MaximumMessageSize>65536</MaximumMessageSize>
+  		<FragmentSize>16384</FragmentSize>
+	</Internal>
     </Domain>
 </CycloneDDS>
