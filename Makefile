@@ -18,7 +18,8 @@ run-log-debug:
 	SYSMON_PID=$$! && \
 	cd docker_ws/docker-deployment && docker compose run --rm --name openvins_pc \
 		-e RCUTILS_CONSOLE_OUTPUT_FORMAT='[{severity}][{time}][{name}]: {message}' \
-		realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=false pointcloud_decimation_enable:=false pointcloud_max_range_m:=0.0 start_preview:=false start_rviz:=false enable_pointcloud_neon_fix:=true relay_pc_decimate:=true relay_hz:=10.0 image.downsample_factor:=2 --log-level debug' 2>&1 | tee $$LOGFILE; \
+		-e RCL_LOG_LEVEL=debug \
+		realsense_camera 'source /opt/ros/jazzy/setup.bash && cd /miahand_ws/src && source install_overlay/setup.bash && ros2 launch sensor_fusion_bringup dynamic_id2_arm_update_live.launch.py enable_pointclouds:=true enable_marker_map_pointclouds:=false pointcloud_decimation_enable:=false pointcloud_max_range_m:=0.0 start_preview:=false start_rviz:=false enable_pointcloud_neon_fix:=true relay_pc_decimate:=true relay_hz:=10.0 image.downsample_factor:=2' 2>&1 | tee $$LOGFILE; \
 	EXIT_CODE=$$?; \
 	kill $$SYSMON_PID 2>/dev/null; wait $$SYSMON_PID 2>/dev/null; \
 	exit $$EXIT_CODE
