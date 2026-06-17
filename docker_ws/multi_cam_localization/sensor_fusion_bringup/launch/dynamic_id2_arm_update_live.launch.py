@@ -85,7 +85,7 @@ def _setup(context, *args, **kwargs):
     hold_back_imu_for_frames = _as_bool(
         _arg_or_config(context, "hold_back_imu_for_frames", launch_cfg.get("hold_back_imu_for_frames", True))
     )
-    marker_detection_rate_hz = str(launch_cfg.get("marker_detection_rate_hz", 15.0))
+    marker_detection_rate_hz = str(_arg_or_config(context, "marker_detection_rate_hz", launch_cfg.get("marker_detection_rate_hz", 15.0)))
     pointcloud_max_rate_hz = str(_arg_or_config(context, "pointcloud_max_rate_hz", pointcloud_cfg.get("max_rate_hz", 15.0)))
     relay_pc_hz = str(_arg_or_config(context, "relay_pc_hz", launch_cfg.get("relay_pc_hz", pointcloud_max_rate_hz)))
     relay_pc_hz = launch_cfg.get("relay_pc_hz") or pointcloud_max_rate_hz
@@ -383,6 +383,11 @@ def generate_launch_description():
             DeclareLaunchArgument("pointcloud_max_range_m", default_value=""),
             DeclareLaunchArgument("pointcloud_decimation_magnitude", default_value=""),
             DeclareLaunchArgument("pointcloud_require_marker_map_locked", default_value=""),
+            DeclareLaunchArgument(
+                "marker_detection_rate_hz",
+                default_value="",
+                description="ArUco marker detection throttle Hz (empty = use launch.marker_detection_rate_hz from dynamic_config).",
+            ),
             DeclareLaunchArgument("enable_pointcloud_neon_fix", default_value=""),
             DeclareLaunchArgument("record_pointclouds", default_value=""),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
