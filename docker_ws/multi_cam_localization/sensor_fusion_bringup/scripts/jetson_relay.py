@@ -273,6 +273,7 @@ class JetsonRelay(Node):
 
         self.declare_parameter("image.enabled", True)
         self.declare_parameter("image.hz", 5.0)
+        self.declare_parameter("image.downsample_factor", 1)
 
         self.declare_parameter("depth.enabled", False)
         self.declare_parameter("depth.hz", 5.0)
@@ -297,6 +298,7 @@ class JetsonRelay(Node):
 
         self._img_enabled = self.get_parameter("image.enabled").value
         self._img_hz = self.get_parameter("image.hz").value
+        self._img_ds = self.get_parameter("image.downsample_factor").value
 
         self._depth_enabled = self.get_parameter("depth.enabled").value
         self._depth_hz = self.get_parameter("depth.hz").value
@@ -490,6 +492,8 @@ class JetsonRelay(Node):
     def _on_img(self, msg: Image, camera: str) -> None:
         if not self._gates[f"img_{camera}"].should_publish():
             return
+        if self._img_ds > 1:
+            msg = downsample_image(msg, self._img_ds)
         # Override header stamp with system time — same rationale as
         # pointclouds (RealSense ASIC clock != system clock).
         msg.header.stamp = self.get_clock().now().to_msg()
@@ -546,7 +550,7 @@ class JetsonRelay(Node):
         info(f"  pointcloud:  enabled={self._pc_enabled}  hz={self._pc_hz:.1f}  "
              f"dec={self._pc_dec_enabled} (step={self._pc_dec_step})")
         info(f"  image:       enabled={self._img_enabled}  hz={self._img_hz:.1f}  "
-             f"(raw passthrough)")
+             f"ds={self._img_ds}x")
         info(f"  depth:       enabled={self._depth_enabled}  hz={self._depth_hz:.1f}  "
              f"(raw passthrough)")
         info(f"  aruco:       enabled={self._aruco_enabled}  "
