@@ -12,7 +12,7 @@ cameras:
 
 common:
   pointcloud_enable: false
-  enable_depth: true
+  enable_depth: false
   align_depth_enable: false
   pointcloud_stream_filter: 2
   pointcloud_stream_index_filter: 0
