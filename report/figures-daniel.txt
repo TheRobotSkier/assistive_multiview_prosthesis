@@ -1,0 +1,52 @@
+# Need generation
+9 The table showing how offsets and forward velocity from the hit point influence performance (exits)
+12 The table showing how morton codes work (exits)
+13 A new figure/or some code showing how we do sorting of the morton ids
+14 a list of benefits with tsdf for the grasping use case (can just be text and not an image)
+19 A figure showing the Supenquadrics we use and thir perameters
+20 The superquadric equation (eq exist in latex)
+21 A figure showing how a point cloud becomes an oriented bounding box with pca
+28 A table showing what we do when camera and backside estimation agree on the sign of the tsdf
+32 The python code for loading the urdf with pinochio and maybe an example of getting a transform from it
+35 A figure showing the normal and the force vectors we store in the lut for the finger tip contacts (in 3d)
+36 a rust snippet on how we load the lut npz file and use it
+39 A figure showing a 1M samples drawn randomly from a gaussian distibution (2d)
+40 A figure showing 3 iterations of convergence from random gaussian with 20k samples to clustering around some random point with randdom weights
+43 A code snippet showing how we calculate the alignment and the wrench proxy
+44 the contact tiers table (exist in latex but might need to be verified against the real code)
+45 the combined score equation from latex
+47 The timing table from grasp evaluation in latex
+53 The commands we use to run the code (make run on jetson same on host but we also do make up and make shell before) include comments on what they do
+55 The commands we run to debug currently (jetson: make run-log-debug, host: make run-camera-log-debug and make record-debug, analysis: make analyze-bag and analyze-log) include comments against
+57 The udp fix we run with make network-tune-all expalined through code and comments
+
+15 An image showing a grid with randomly colored cell around each colored cell the cells around them are colored in a different colored (like BFS)
+33 An image showing finger tips sweeping across the lut in 3d
+
+# AI
+4 A image showing how the grasp prediction is challenging due to high dimensionality
+7 An image showing how the pose seach space being large makes it difficult to find the right position and how if you have an area to look inside makes it easier
+8 same as 7 so no need to also make a description for this
+10 An image showing that if we know a point to look around it makes the box from image 7 kinda redundant
+16 An image showing how we calculate the initial sign based only on cameras in the tsdf
+22 An image explaing how gauss newton optimization works and why a little dampening is nice
+23 A image showing how the implicit proximity to the Superquadric works as an fittin optimization cost
+24 An image expaining how we do not accept superquadric fittings if thir residual is below some threshold
+25 An image showing how the taubin distance works in relation to this
+26 An image showing how Newton rapson can improve the taubin score
+27 An image showing how we use domains of authority to calculate the distance in the tsdf
+34 An image showing how dual quaterions work
+38 An image comparing SMC vs ES in a simple visual way
+41 an image showing our main ESO flow with something like Score -> Select -> Resample -> Decay (but actually a bit more grounded in the code)
+42 An image showing what our ESO can do vs what we ended up using it for wich was only wrist rotation
+56 An image showing what the timesync make command does in a visual way
+61 An image showing the new tsdf and mobile sam fusion approch in a visual way
+62 An image showing how our fgo (gtsam) differs in its approch to a common kalman filter
+
+# Existion Figs
+5 Achitecture
+32 Lut contacts
+48 Variability
+50 test 1
+51 test 3
+59 debug plot

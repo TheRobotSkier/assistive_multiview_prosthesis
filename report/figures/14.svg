@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="491.720625pt" height="297.261813pt" viewBox="0 0 491.720625 297.261813" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-06-17T20:56:53.222024</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.3, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 297.261813 
+L 491.720625 297.261813 
+L 491.720625 0 
+L 0 0 
+L 0 297.261813 
+z
+" style="fill: none"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 19.17 70.966532 
+L 31.725 70.966532 
+L 31.725 58.215332 
+L 19.17 58.215332 
+z
+" clip-path="url(#p1474a0ca6f)" style="fill: #2563eb"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 19.17 115.595732 
+L 31.725 115.595732 
+L 31.725 102.844532 
+L 19.17 102.844532 
+z
+" clip-path="url(#p1474a0ca6f)" style="fill: #dc2626"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 19.17 160.224933 
+L 31.725 160.224933 
+L 31.725 147.473733 
+L 19.17 147.473733 
+z
+" clip-path="url(#p1474a0ca6f)" style="fill: #0284c7"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 19.17 204.854132 
+L 31.725 204.854132 
+L 31.725 192.102933 
+L 19.17 192.102933 
+z
+" clip-path="url(#p1474a0ca6f)" style="fill: #6b7280"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 19.17 249.483333 
+L 31.725 249.483333 
+L 31.725 236.732133 
+L 19.17 236.732133 
+z
+" clip-path="url(#p1474a0ca6f)" style="fill: #2563eb"/>
+   </g>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 11.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #2563eb" x="44.28" y="62.040693" transform="rotate(-0 44.28 62.040693)">O(1) proximity lookup</text>
+   </g>
+   <g id="text_2">
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 83.057575)">Distance to the surface is a direct voxel query, turning expensive collision checks into array</text>
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 93.359563)">reads along the finger-closure path.</text>
+   </g>
+   <g id="text_3">
+    <text style="font-weight: 700; font-size: 11.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #dc2626" x="44.28" y="106.669893" transform="rotate(-0 44.28 106.669893)">Narrow-band truncation</text>
+   </g>
+   <g id="text_4">
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 127.686775)">Only voxels within a few cells of the surface are stored, bounding memory and compute to</text>
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 137.988763)">exactly the band fingers interact with.</text>
+   </g>
+   <g id="text_5">
+    <text style="font-weight: 700; font-size: 11.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #0284c7" x="44.28" y="151.299093" transform="rotate(-0 44.28 151.299093)">Free signed inside/outside</text>
+   </g>
+   <g id="text_6">
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 172.315975)">The sign separates object interior from free space, so the optimiser knows whether a contact</text>
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 182.617963)">penetrated the surface.</text>
+   </g>
+   <g id="text_7">
+    <text style="font-weight: 700; font-size: 11.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #6b7280" x="44.28" y="195.928292" transform="rotate(-0 44.28 195.928292)">Analytic surface normals</text>
+   </g>
+   <g id="text_8">
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 216.945175)">The field gradient yields per-voxel normals used directly for the alignment and wrench-proxy</text>
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 227.247163)">grasp scores.</text>
+   </g>
+   <g id="text_9">
+    <text style="font-weight: 700; font-size: 11.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #2563eb" x="44.28" y="240.557492" transform="rotate(-0 44.28 240.557492)">Backside completion</text>
+   </g>
+   <g id="text_10">
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 261.574375)">Superquadric geometry fills the unobserved backside, giving a stable closure target even from a</text>
+    <text style="font-size: 9.2px; font-family: 'DejaVu Sans'; fill: #333333" transform="translate(44.28 271.876363)">single viewpoint.</text>
+   </g>
+   <g id="text_11">
+    <text style="font-weight: 700; font-size: 14px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="220.05" y="21.437813" transform="rotate(-0 220.05 21.437813)">Why a TSDF for grasp preshaping?</text>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p1474a0ca6f">
+   <rect x="10.8" y="31.437813" width="418.5" height="255.024"/>
+  </clipPath>
+ </defs>
+</svg>

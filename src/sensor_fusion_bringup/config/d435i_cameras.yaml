@@ -11,15 +11,22 @@ cameras:
     mount_location: prosthetic_arm
 
 common:
-  pointcloud_enable: true
-  align_depth_enable: true
+  pointcloud_enable: false
+  enable_depth: false
+  align_depth_enable: false
+  pointcloud_stream_filter: 2
+  pointcloud_stream_index_filter: 0
+  pointcloud_ordered_pc: false
+  pointcloud_allow_no_texture_points: false
+  decimation_filter_enable: true
+  decimation_filter_magnitude: 3
+  pointcloud_max_range_m: 2.0
   enable_gyro: true
   enable_accel: true
-  unite_imu_method: 2
-  depth_profile: "640x480x30"
+  unite_imu_method: 1
+  hold_back_imu_for_frames: true
+  depth_profile: "640x480x15"
   color_profile: "640x480x30"
   pointcloud_neon_param: "pointcloud__neon_.enable"
   pointcloud_neon_value: true
   pointcloud_neon_delay_sec: 6.0
-  pointcloud_neon_stream_filter_param: "pointcloud__neon_.stream_filter"
-  pointcloud_neon_stream_filter_value: 2

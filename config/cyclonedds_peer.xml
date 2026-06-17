@@ -1,9 +1,12 @@
 <CycloneDDS>
   <Domain Id="0">
     <General>
-      <Interfaces>
-        <NetworkInterface address="10.42.0.1" />
-      </Interfaces>
+      <!--
+        Single-machine mode: no explicit interface binding or peer list.
+        CycloneDDS auto-detects the loopback/interface for local discovery.
+        The Jetson peer entries (10.42.0.1/0.2) were removed when the
+        localization pipeline was merged onto this host.
+      -->
       <AllowMulticast>true</AllowMulticast>
       <MulticastRecvNetworkInterfaceAddresses>all</MulticastRecvNetworkInterfaceAddresses>
       <!--
@@ -13,24 +16,16 @@
       <FragmentSize>16384B</FragmentSize>
       <Transport>UDP</Transport>
     </General>
-    <Discovery>
-      <Peers>
-        <Peer address="10.42.0.1"/>
-        <Peer address="10.42.0.2"/>
-      </Peers>
-    </Discovery>
-    <!-- ── Internal / socket buffer tuning ────────────────────────────────
+    <!-- ── Internal / socket buffer tuning ────────────────────────
          Uses the "min" attribute … the kernel may grant a larger buffer.
          Kernel grant = 2× min (double-buffering).
 
          SocketReceiveBufferSize: 8 MB holds one full PointCloud2 plus
          overhead from multiple subscribers (keyframe_buffer, fusion,
-         record).  Jetson publishes ~15 Hz × 2 cameras ~ 30 clouds/s.
+         record).  Two cameras publish ~30 clouds/s.
 
-         SocketSendBufferSize: 8 MB for /fused_pointcloud from host.
-
-         See: plans/2026-06-16-network-buffer-tuning-host-v2.md
-    ─────────────────────────────────────────────────────────────────────── -->
+         SocketSendBufferSize: 8 MB for /fused_pointcloud.
+    ──────────────────────────────────────────────────────────────── -->
     <Internal>
       <SocketReceiveBufferSize min="8MB"/>
       <SocketSendBufferSize min="8MB"/>

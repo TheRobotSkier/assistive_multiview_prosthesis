@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="538.229033pt" height="422.0595pt" viewBox="0 0 538.229033 422.0595" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:date>2026-06-17T20:56:53.387294</dc:date>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.10.3, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 422.0595 
+L 538.229033 422.0595 
+L 538.229033 0 
+L 0 0 
+L 0 422.0595 
+z
+" style="fill: none"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 10.8 411.2595 
+L 376.704 411.2595 
+L 376.704 45.3555 
+L 10.8 45.3555 
+L 10.8 411.2595 
+z
+" style="fill: none"/>
+   </g>
+   <g clip-path="url(#p25e347d8e0)">
+    <image xlink:href="data:image/png;base64,
+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" id="image0aa6ddc715" transform="scale(1 -1) translate(0 -366.48)" x="10.8" y="-44.7795" width="366.48" height="366.48"/>
+   </g>
+   <g id="patch_3">
+    <path d="M 36.936 385.1235 
+L 63.072 385.1235 
+L 63.072 358.9875 
+L 36.936 358.9875 
+L 36.936 385.1235 
+z
+" clip-path="url(#p25e347d8e0)" style="fill: none; stroke: #111827; stroke-width: 2.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 167.616 123.7635 
+L 193.752 123.7635 
+L 193.752 97.6275 
+L 167.616 97.6275 
+L 167.616 123.7635 
+z
+" clip-path="url(#p25e347d8e0)" style="fill: none; stroke: #111827; stroke-width: 2.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 219.888 202.1715 
+L 246.024 202.1715 
+L 246.024 176.0355 
+L 219.888 176.0355 
+L 219.888 202.1715 
+z
+" clip-path="url(#p25e347d8e0)" style="fill: none; stroke: #111827; stroke-width: 2.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 10.8 176.0355 
+L 36.936 176.0355 
+L 36.936 149.8995 
+L 10.8 149.8995 
+L 10.8 176.0355 
+z
+" clip-path="url(#p25e347d8e0)" style="fill: none; stroke: #111827; stroke-width: 2.5; stroke-linejoin: miter"/>
+   </g>
+   <g id="matplotlib.axis_1"/>
+   <g id="matplotlib.axis_2"/>
+   <g id="patch_7">
+    <path d="M 10.8 411.2595 
+L 10.8 45.3555 
+" style="fill: none; stroke: #111827; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_8">
+    <path d="M 376.704 411.2595 
+L 376.704 45.3555 
+" style="fill: none; stroke: #111827; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_9">
+    <path d="M 10.8 411.2595 
+L 376.704 411.2595 
+" style="fill: none; stroke: #111827; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="patch_10">
+    <path d="M 10.8 45.3555 
+L 376.704 45.3555 
+" style="fill: none; stroke: #111827; stroke-width: 0.8; stroke-linejoin: miter; stroke-linecap: square"/>
+   </g>
+   <g id="text_1">
+    <text style="font-weight: 700; font-size: 12px; font-family: 'DejaVu Sans'; fill: #111827" transform="translate(26.039812 19.918125)">BFS wavefront expansion from random seed cells</text>
+    <text style="font-weight: 700; font-size: 12px; font-family: 'DejaVu Sans'; fill: #111827" transform="translate(27.955125 33.3555)">each ring is a different shade of its seed's colour</text>
+   </g>
+   <g id="legend_1">
+    <g id="patch_11">
+     <path d="M 389.97208 128.465656 
+L 525.729033 128.465656 
+Q 527.429033 128.465656 527.429033 126.765656 
+L 527.429033 51.3055 
+Q 527.429033 49.6055 525.729033 49.6055 
+L 389.97208 49.6055 
+Q 388.27208 49.6055 388.27208 51.3055 
+L 388.27208 126.765656 
+Q 388.27208 128.465656 389.97208 128.465656 
+z
+" style="fill: #ffffff; opacity: 0.9; stroke: #cccccc; stroke-linejoin: miter"/>
+    </g>
+    <g id="text_2">
+     <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="416.945088" y="60.603937" transform="rotate(-0 416.945088 60.603937)">wavefront origin</text>
+    </g>
+    <g id="patch_12">
+     <path d="M 391.67208 73.392297 
+L 408.67208 73.392297 
+L 408.67208 67.442297 
+L 391.67208 67.442297 
+z
+" style="fill: #6ac4eb; stroke: #111827; stroke-linejoin: miter"/>
+    </g>
+    <g id="text_3">
+     <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="415.47208" y="73.392297" transform="rotate(-0 415.47208 73.392297)">seed 1 (ring 0)</text>
+    </g>
+    <g id="patch_13">
+     <path d="M 391.67208 85.868703 
+L 408.67208 85.868703 
+L 408.67208 79.918703 
+L 391.67208 79.918703 
+z
+" style="fill: #eb796a; stroke: #111827; stroke-linejoin: miter"/>
+    </g>
+    <g id="text_4">
+     <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="415.47208" y="85.868703" transform="rotate(-0 415.47208 85.868703)">seed 2 (ring 0)</text>
+    </g>
+    <g id="patch_14">
+     <path d="M 391.67208 98.345109 
+L 408.67208 98.345109 
+L 408.67208 92.395109 
+L 391.67208 92.395109 
+z
+" style="fill: #ebce6a; stroke: #111827; stroke-linejoin: miter"/>
+    </g>
+    <g id="text_5">
+     <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="415.47208" y="98.345109" transform="rotate(-0 415.47208 98.345109)">seed 3 (ring 0)</text>
+    </g>
+    <g id="patch_15">
+     <path d="M 391.67208 110.821516 
+L 408.67208 110.821516 
+L 408.67208 104.871516 
+L 391.67208 104.871516 
+z
+" style="fill: #6ceb6a; stroke: #111827; stroke-linejoin: miter"/>
+    </g>
+    <g id="text_6">
+     <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="415.47208" y="110.821516" transform="rotate(-0 415.47208 110.821516)">seed 4 (ring 0)</text>
+    </g>
+    <g id="patch_16">
+     <path d="M 391.67208 123.297922 
+L 408.67208 123.297922 
+L 408.67208 117.347922 
+L 391.67208 117.347922 
+z
+" style="fill: #dddddd; stroke: #999999; stroke-linejoin: miter"/>
+    </g>
+    <g id="text_7">
+     <text style="font-size: 8.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="415.47208" y="123.297922" transform="rotate(-0 415.47208 123.297922)">outer ring (max distance)</text>
+    </g>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="p25e347d8e0">
+   <rect x="10.8" y="45.3555" width="365.904" height="365.904"/>
+  </clipPath>
+ </defs>
+</svg>

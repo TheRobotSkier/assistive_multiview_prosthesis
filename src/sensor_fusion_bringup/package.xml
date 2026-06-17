@@ -2,17 +2,34 @@
 <package format="3">
   <name>sensor_fusion_bringup</name>
   <version>0.1.0</version>
-  <description>Bringup package for dual D435/D435i cameras with IMU + OpenVINS on Jetson Orin Nano.</description>
+  <description>Bringup package for dual D435i cameras with OpenVINS localization and ArUco marker fusion (x86 single-machine).</description>
   <maintainer email="dev@multiview-prosthesis.org">multiview_prosthesis</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <!-- C++ build deps for pointcloud_to_frame_node -->
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>tf2</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>tf2_sensor_msgs</build_depend>
+
+  <build_export_depend>geometry_msgs</build_export_depend>
+  <build_export_depend>rclcpp</build_export_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>tf2</build_export_depend>
+  <build_export_depend>tf2_ros</build_export_depend>
+  <build_export_depend>tf2_sensor_msgs</build_export_depend>
+
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>realsense2_camera</exec_depend>
   <exec_depend>realsense2_description</exec_depend>
-  <exec_depend>imu_driver</exec_depend>
+  <exec_depend>rclcpp</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
@@ -21,7 +38,10 @@
   <exec_depend>std_srvs</exec_depend>
   <exec_depend>rosbag2_py</exec_depend>
   <exec_depend>rosidl_runtime_py</exec_depend>
+  <exec_depend>sensor_fusion_msgs</exec_depend>
+  <exec_depend>tf2</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_sensor_msgs</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
 
   <test_depend>ament_cmake_pytest</test_depend>

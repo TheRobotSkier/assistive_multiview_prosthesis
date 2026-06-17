@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" width="589" height="398" viewBox="0 0 589 398">
+<text x="12" y="18" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#111827">UDP buffer fix  (make network-tune-all)</text>
+<g font-family="monospace" font-size="14px">
+<text x="0" y="14" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic">#&#160;make&#160;network-tune-all&#160;&#160;-&gt;&#160;&#160;tunes&#160;BOTH&#160;host&#160;and&#160;Jetson.</tspan></text>
+<text x="0" y="33" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Fixes&#160;CycloneDDS&#160;UDP&#160;fragment&#160;drops&#160;from&#160;two&#160;RealSense&#160;PointCloud2&#160;streams</tspan></text>
+<text x="0" y="52" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;(each&#160;5-8&#160;MB,&#160;fragmented&#160;into&#160;~120&#160;RTPS&#160;messages&#160;of&#160;64&#160;KB).</tspan></text>
+<text x="0" y="71" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#</tspan></text>
+<text x="0" y="90" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;scripts/tune_network_host.sh&#160;writes&#160;a&#160;persistent&#160;/etc/sysctl.d/&#160;config:</tspan></text>
+<text x="0" y="109" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="128" xml:space="preserve"><tspan fill="#bbbbbb"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Max&#160;socket&#160;receive&#160;buffer:&#160;2&#160;GB&#160;ceiling&#160;for&#160;setsockopt(SO_RCVBUF).</tspan></text>
+<text x="0" y="147" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Default&#160;~208&#160;KB&#160;drops&#160;a&#160;single&#160;8&#160;MB&#160;cloud.</tspan></text>
+<text x="0" y="166" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan>net.core.rmem_max<tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#666666">=</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#666666">2147483647</tspan><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="185" xml:space="preserve"><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="204" xml:space="preserve"><tspan fill="#bbbbbb"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Max&#160;socket&#160;send&#160;buffer&#160;(symmetrical&#160;ceiling&#160;for&#160;published&#160;fused&#160;clouds).</tspan></text>
+<text x="0" y="223" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan>net.core.wmem_max<tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#666666">=</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#666666">2147483647</tspan><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="242" xml:space="preserve"><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="261" xml:space="preserve"><tspan fill="#bbbbbb"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Kernel&#160;IP-fragment&#160;reassembly&#160;memory:&#160;128&#160;MB.</tspan></text>
+<text x="0" y="280" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Default&#160;~4&#160;MB&#160;cannot&#160;hold&#160;150+&#160;fragments&#160;from&#160;two&#160;concurrent&#160;clouds.</tspan></text>
+<text x="0" y="299" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan>net.ipv4.ipfrag_high_thresh<tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#666666">=</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#666666">134217728</tspan><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="318" xml:space="preserve"><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="337" xml:space="preserve"><tspan fill="#bbbbbb"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Seconds&#160;to&#160;hold&#160;an&#160;incomplete&#160;fragment&#160;queue:&#160;3&#160;s.</tspan></text>
+<text x="0" y="356" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Default&#160;30&#160;s&#160;wastes&#160;memory&#160;on&#160;stale&#160;fragments;&#160;3&#160;s&#160;&gt;&gt;&#160;pointcloud&#160;cadence.</tspan></text>
+<text x="0" y="375" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan>net.ipv4.ipfrag_time<tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#666666">=</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#666666">3</tspan><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="394" xml:space="preserve"><tspan fill="#bbbbbb"></tspan></text>
+<text x="0" y="413" xml:space="preserve"><tspan fill="#bbbbbb"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Applied&#160;immediately&#160;via&#160;`sysctl&#160;-w`&#160;and&#160;persisted&#160;across&#160;reboots.</tspan></text>
+<text x="0" y="432" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan></text></g></svg>

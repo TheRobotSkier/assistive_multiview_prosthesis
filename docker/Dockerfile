@@ -14,7 +14,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # ── System dependencies ──────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        chrony \
         gosu \
         libserial-dev \
         python3-pip \
@@ -27,6 +26,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-jazzy-librealsense2 \
         ros-jazzy-realsense2-camera \
         ros-jazzy-realsense2-description \
+        # OpenVINS build dependencies (merged from Jetson branch)
+        libceres-dev \
+        libboost-all-dev \
+        libeigen3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Python dependencies ──────────────────────────────────────────────────────

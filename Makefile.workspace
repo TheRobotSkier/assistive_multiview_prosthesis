@@ -4,11 +4,14 @@
 #
 # ROS setup is handled automatically — no need to source setup.bash manually.
 #
-# NETWORK NOTE: When monitoring topics over the Jetson Ethernet link,
-# always append --qos-reliability best_effort to ros2 topic echo/hz/bw
-# to avoid saturating the link with RELIABLE ACK/NACK traffic.
-# Pipeline nodes MUST use RELIABLE; monitoring tools should use BEST_EFFORT.
-# See: plans/2026-06-16-network-buffer-tuning-host-v2.md
+# Single-machine architecture: localization (cameras + OpenVINS + ArUco) and
+# the consumer pipeline (fusion, segmentation, twist) both run in this
+# container.  Use `make localization` + `make run-camera` (two terminals),
+# or `make run-local` (one terminal).
+#
+# QoS NOTE: when monitoring topics with ros2 topic echo/hz/bw, append
+# --qos-reliability best_effort for sensor topics that use BEST_EFFORT QoS
+# (pointclouds, images) to avoid RELIABLE ACK/NACK overhead.
 
 .DEFAULT_GOAL := help
 
@@ -33,7 +36,7 @@ TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test test-unit test-baseline mock mock-v6 pipeline pipeline-v6 start digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source run-camera-log run-camera-log-debug-new run-log-debug run-tui record-bag record-bag-mock inspect-bag
+.PHONY: help build build-pkg build-debug clean test test-unit test-baseline mock mock-v6 pipeline pipeline-v6 start digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source localization localization-head run-local run-camera-log run-camera-log-debug-new run-log-debug run-tui record-bag record-bag-mock inspect-bag
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -203,12 +206,12 @@ run-tui: ## Open the pipeline-config TUI (toggles + tuning knobs), then launch
 RECORD_BAG_DIR := v6_$$(date +%Y%m%d_%H%M%S)
 
 RECORD_TOPICS_V6 := \
-	/jetson/head/points \
-	/jetson/arm/points \
-	/jetson/head/image \
-	/jetson/arm/image \
-	/jetson/head/camera_info \
-	/jetson/arm/camera_info \
+	/head/d435i_head/depth/color/points \
+	/arm/d435i_arm/depth/color/points \
+	/head/d435i_head/color/image_raw \
+	/arm/d435i_arm/color/image_raw \
+	/head/d435i_head/color/camera_info \
+	/arm/d435i_arm/color/camera_info \
 	/jetson/head/odom \
 	/jetson/arm/odom \
 	/gtsam/head_pose \
@@ -273,6 +276,41 @@ inspect-bag: ## Show topic list + message counts for the most recent bag
 	if [ -z "$$BAG" ]; then echo "No bags found in /prosthesis_ws/data/bags/"; exit 1; fi; \
 	echo "Latest bag: $$BAG"; \
 	$(ROS_SETUP) && ros2 bag info $$BAG | head -80
+
+# ── Single-machine localization (producer side) ─────────────────────────────
+# These targets run the dual-D435i + OpenVINS + ArUco localization pipeline
+# on this machine.  The consumer pipeline (pointcloud_fusion, twist, etc.)
+# is launched separately via pipeline/run/run-camera.
+#
+# Typical workflow (two terminals inside the container):
+#   Terminal 1:  make localization        # cameras + OpenVINS + ArUco
+#   Terminal 2:  make run-camera          # fusion + segmentation + twist
+#
+# Or a single terminal with run-local (builds, starts localization in
+# background, then runs the consumer pipeline in foreground):
+#   make run-local
+
+localization: ## Launch single-machine localization (cameras + OpenVINS + ArUco)
+	@$(ROS_SETUP) && $(ROS_WORKSPACE_SETUP) && \
+	ros2 launch prosthesis_launch localization.launch.py
+
+localization-head: ## Launch head-only localization (single camera, for debugging)
+	@$(ROS_SETUP) && $(ROS_WORKSPACE_SETUP) && \
+	ros2 launch prosthesis_launch localization.launch.py head_only:=true
+
+run-local: ## Build + launch localization (bg) + consumer pipeline (fg)
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
+	echo "=== Starting localization (background) ===" && \
+	ros2 launch prosthesis_launch localization.launch.py > /prosthesis_ws/logs/localization-$$(date +%Y%m%d_%H%M%S).log 2>&1 & \
+	LOC_PID=$$!; \
+	sleep 8; \
+	echo "=== Localization started (PID $$LOC_PID). Launching consumer pipeline. ===" && \
+	trap 'kill -INT $$LOC_PID 2>/dev/null; sleep 1; kill -TERM $$LOC_PID 2>/dev/null; pkill -TERM -f "run_subscribe_msckf_marker" 2>/dev/null; pkill -TERM -f "aruco_marker_pose_node" 2>/dev/null; true' INT TERM HUP; \
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy; \
+	kill -INT $$LOC_PID 2>/dev/null || true
 
 run-emg-grasp: ## Build + launch EMG-triggered grasp pipeline (no perception)
 	@$(ROS_SETUP) && \
@@ -349,20 +387,20 @@ tonight-clean: ## Kill host-side tonight pipeline nodes left from an interrupted
 	@echo "Remaining ROS nodes:"
 	@$(ROS_SETUP) && $(TONIGHT_ROS_QUIET) ros2 node list 2>/dev/null | sort || true
 
-tonight-raw-check: ## Gate 0: show Jetson raw clouds, OpenVINS odom, and frames
+tonight-raw-check: ## Gate 0: show raw clouds, OpenVINS odom, and frames
 	@$(ROS_SETUP) && \
 	set +e; \
 	echo ""; \
-	echo "Gate 0: Jetson topics visible on host"; \
-	$(TONIGHT_ROS_QUIET) ros2 topic list 2>/dev/null | sort | grep -E "jetson.*points|jetson.*odom|/tf$$|/tf_static$$|segmentation|fused|hand_|twist" || true; \
+	echo "Gate 0: camera + localization topics visible"; \
+	$(TONIGHT_ROS_QUIET) ros2 topic list 2>/dev/null | sort | grep -E "d435i.*points|jetson.*odom|/tf$$|/tf_static$$|segmentation|fused|hand_|twist" || true; \
 	echo ""; \
 	echo "Raw cloud headers:"; \
-	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /jetson/head/points --field header 2>/dev/null || echo "missing head raw cloud"; \
-	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /jetson/arm/points --field header 2>/dev/null || echo "missing arm raw cloud"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /head/d435i_head/depth/color/points --field header 2>/dev/null || echo "missing head raw cloud"; \
+	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /arm/d435i_arm/depth/color/points --field header 2>/dev/null || echo "missing arm raw cloud"; \
 	echo ""; \
 	echo "Raw cloud rates, press Ctrl-C early if enough data is shown:"; \
-	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz --qos-reliability best_effort /jetson/head/points 2>/dev/null || true; \
-	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz --qos-reliability best_effort /jetson/arm/points 2>/dev/null || true; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz --qos-reliability best_effort /head/d435i_head/depth/color/points 2>/dev/null || true; \
+	timeout $(TONIGHT_RAW_RATE_SECONDS)s env $(TONIGHT_ROS_QUIET) ros2 topic hz --qos-reliability best_effort /arm/d435i_arm/depth/color/points 2>/dev/null || true; \
 	echo ""; \
 	echo "OpenVINS odom headers:"; \
 	timeout 8s env $(TONIGHT_ROS_QUIET) ros2 topic echo --once /jetson/head/odom --field header 2>/dev/null || echo "missing head OpenVINS odom"; \

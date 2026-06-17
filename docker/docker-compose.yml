@@ -48,10 +48,8 @@ services:
         volumes:
             # X11 forwarding (works on Linux and WSL2 with WSLg)
             - /tmp/.X11-unix:/tmp/.X11-unix:rw
-            # CycloneDDS peer config for Jetson discovery
+            # CycloneDDS config (socket buffer tuning; single-machine, no peers)
             - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
-            # Chrony config for clock sync with Jetson
-            - ../config/chrony-host.conf:/tmp/chrony-host.conf:ro
             # Source directories — bind-mounted for instant edit→build cycles
             - ../src:/prosthesis_ws/src:rw
             - ../config:/prosthesis_ws/config:rw

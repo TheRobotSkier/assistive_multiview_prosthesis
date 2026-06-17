@@ -244,8 +244,8 @@ preshaping_service:
 pointcloud_fusion:
     ros__parameters:
         target_frame: "marker_map"
-        cam1_topic: "/jetson/head/points"
-        cam2_topic: "/jetson/arm/points"
+        cam1_topic: "/head/d435i_head/depth/color/points"
+        cam2_topic: "/arm/d435i_arm/depth/color/points"
         arm_frame: "arm_d435i_arm_depth_frame"
         max_distance: 2.0
         voxel_size: 0.005
@@ -264,7 +264,7 @@ pointcloud_fusion:
         tf_ready_check_interval: 2.0
         # V6 §6.3 — when true, cloud age and TF lookup use the cloud's
         # header stamp (sensor time) instead of host arrival time.
-        # Requires chrony time sync between Jetson and host.
+        # Single-machine: no clock skew, so this is always safe.
         use_header_stamp_age: true
         transform_tolerance_s: 0.15
 
@@ -454,13 +454,13 @@ pipeline_diagnostics:
         cloud_plateau_window_s: 4.0
         head_odom_topic: "/jetson/head/odom"
         arm_odom_topic: "/jetson/arm/odom"
-        head_cloud_topic: "/jetson/head/points"
-        arm_cloud_topic: "/jetson/arm/points"
+        head_cloud_topic: "/head/d435i_head/depth/color/points"
+        arm_cloud_topic: "/arm/d435i_arm/depth/color/points"
         head_pose_topic: "/gtsam/head_pose"
         arm_pose_topic: "/gtsam/arm_pose"
         visual_factor_topic: "/vis/head_arm_pose"
-        head_image_topic: "/jetson/head/image"
-        arm_image_topic: "/jetson/arm/image"
+        head_image_topic: "/head/d435i_head/color/image_raw"
+        arm_image_topic: "/arm/d435i_arm/color/image_raw"
 
 gtsam_tracker:
     ros__parameters:
@@ -511,12 +511,12 @@ gtsam_tracker:
 keyframe_buffer:
     ros__parameters:
         # Per-camera topic names
-        head_image_topic: "/jetson/head/image"
-        arm_image_topic: "/jetson/arm/image"
-        head_cloud_topic: "/jetson/head/points"
-        arm_cloud_topic: "/jetson/arm/points"
-        head_info_topic: "/jetson/head/camera_info"
-        arm_info_topic: "/jetson/arm/camera_info"
+        head_image_topic: "/head/d435i_head/color/image_raw"
+        arm_image_topic: "/arm/d435i_arm/color/image_raw"
+        head_cloud_topic: "/head/d435i_head/depth/color/points"
+        arm_cloud_topic: "/arm/d435i_arm/depth/color/points"
+        head_info_topic: "/head/d435i_head/color/camera_info"
+        arm_info_topic: "/arm/d435i_arm/color/camera_info"
         # Pose topics (from gtsam_tracker)
         head_pose_topic: "/gtsam/head_pose"
         arm_pose_topic: "/gtsam/arm_pose"
@@ -539,14 +539,14 @@ keyframe_buffer:
 cross_camera_features:
     ros__parameters:
         # Per-camera topic names
-        head_image_topic: "/jetson/head/image"
-        arm_image_topic: "/jetson/arm/image"
-        head_cloud_topic: "/jetson/head/points"
-        arm_cloud_topic: "/jetson/arm/points"
-        head_depth_image_topic: "/jetson/head/depth"
-        arm_depth_image_topic: "/jetson/arm/depth"
-        head_info_topic: "/jetson/head/camera_info"
-        arm_info_topic: "/jetson/arm/camera_info"
+        head_image_topic: "/head/d435i_head/color/image_raw"
+        arm_image_topic: "/arm/d435i_arm/color/image_raw"
+        head_cloud_topic: "/head/d435i_head/depth/color/points"
+        arm_cloud_topic: "/arm/d435i_arm/depth/color/points"
+        head_depth_image_topic: "/head/d435i_head/depth/image_rect_raw"
+        arm_depth_image_topic: "/arm/d435i_arm/depth/image_rect_raw"
+        head_info_topic: "/head/d435i_head/color/camera_info"
+        arm_info_topic: "/arm/d435i_arm/color/camera_info"
         # Pose topics (from gtsam_tracker)
         head_pose_topic: "/gtsam/head_pose"
         arm_pose_topic: "/gtsam/arm_pose"
