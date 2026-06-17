@@ -352,6 +352,7 @@ def _setup(context, *args, **kwargs):
                     "-p", f"pointcloud.hz:={relay_pc_hz}",
                     "-p", f"pointcloud.decimation.enabled:={relay_pc_decimate}",
                     "-p", f"image.hz:={relay_img_hz}",
+                    "-p", f"image.downsample_factor:={str(_arg_or_config(context, 'image.downsample_factor', 1))}",
                     "-p", f"trackhist.hz:={relay_trackhist_hz}",
                 ],
                 name="jetson_relay",
@@ -383,6 +384,11 @@ def generate_launch_description():
             DeclareLaunchArgument("pointcloud_max_range_m", default_value=""),
             DeclareLaunchArgument("pointcloud_decimation_magnitude", default_value=""),
             DeclareLaunchArgument("pointcloud_require_marker_map_locked", default_value=""),
+            DeclareLaunchArgument(
+                "image.downsample_factor",
+                default_value="",
+                description="Color image downsample factor passed to the relay (empty = relay code default of 1).",
+            ),
             DeclareLaunchArgument(
                 "marker_detection_rate_hz",
                 default_value="",
