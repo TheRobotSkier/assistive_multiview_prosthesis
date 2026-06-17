@@ -254,7 +254,13 @@ class KeyframeBufferCore:
 
         Returns the created ``Keyframe`` if accepted, or ``None`` if rejected
         by the spatial gate or if no fresh pose/image is available.
+
+        The heavy cloud coordinate transform (camera→world) is done OUTSIDE
+        the core lock so that concurrent callbacks (pose updates, image
+        updates, the other camera's cloud) are not blocked during the
+        ~2-5 ms matrix multiplication on a 640×480 cloud.
         """
+        # ── Phase 1: fast checks under lock ───────────────────────────
         with self._lock:
             st = self._state[camera_id]
 
@@ -283,10 +289,27 @@ class KeyframeBufferCore:
             img = image if image is not None else st.image
             intrinsics = K if K is not None else st.info
 
+        # ── Phase 2: transform cloud camera→world OUTSIDE lock ────────
+        # The sensor message provides points in the camera optical frame, but
+        # downstream consumers (TSDF fusion, cloud_utils, cross-camera features)
+        # require world-frame coordinates (matching the Keyframe convention).
+        xyz_in = np.asarray(cloud_xyz)
+        orig_shape = xyz_in.shape
+        flat = xyz_in.reshape(-1, 3)
+        N = flat.shape[0]
+        homog = np.empty((N, 4), dtype=np.float64)
+        homog[:, :3] = flat
+        homog[:, 3] = 1.0
+        cloud_xyz_world = (pose @ homog.T).T[:, :3]
+        cloud_xyz_world = cloud_xyz_world.reshape(orig_shape).astype(xyz_in.dtype)
+
+        # ── Phase 3: store keyframe under lock ────────────────────────
+        with self._lock:
+            st = self._state[camera_id]
             kf = Keyframe(
                 timestamp=float(ts) if ts is not None else 0.0,
                 camera_id=camera_id,
-                cloud_xyz=np.asarray(cloud_xyz),
+                cloud_xyz=cloud_xyz_world,
                 cloud_rgb=np.asarray(cloud_rgb),
                 image=np.asarray(img) if img is not None
                 else np.zeros((1, 1, 3), dtype=np.uint8),
@@ -619,7 +642,7 @@ def create_node():
             # ── Diagnostics publisher ────────────────────────────────────
             self._diag_pub = self.create_publisher(
                 DiagnosticArray, "~/diagnostics", 10)
-            self.create_timer(5.0, self._publish_diagnostics)
+            self.create_timer(1.0, self._publish_diagnostics)
 
             self._use_receive_time = (
                 str(p("cloud_timestamp_source")).strip().lower() == "receive_time"
@@ -794,13 +817,23 @@ def create_node():
 
 
 def main(args=None):
-    """Entry point for the ``keyframe_buffer_node`` console script."""
+    """Entry point for the ``keyframe_buffer_node`` console script.
+
+    Uses a MultiThreadedExecutor so that heavy service-response
+    serialisation (e.g.  GetAllKeyframes returning 100 keyframes with
+    multi-MB images) does not starve cloud/image/pose subscription
+    callbacks.  The core is already thread-safe (``threading.Lock``).
+    """
     (rclpy, *_rest) = _import_ros()
     rclpy.init(args=args)
     NodeClass = create_node()
     node = NodeClass()
     try:
-        rclpy.spin(node)
+        from rclpy.executors import MultiThreadedExecutor
+
+        executor = MultiThreadedExecutor(num_threads=2)
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:

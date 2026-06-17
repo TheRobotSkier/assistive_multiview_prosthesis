@@ -20,6 +20,8 @@ from typing import Optional
 
 import numpy as np
 
+import gtsam
+
 # Pure-logic helpers (ROS-free, done in Phase 1).
 from gtsam_tracker.factor_graph import (
     TrajectoryFactorGraph,
@@ -29,6 +31,7 @@ from gtsam_tracker.factor_graph import (
 from gtsam_tracker.se3_helpers import (
     pose_to_matrix,
     matrix_to_pose,
+    pose3_to_matrix,
     inverse_se3,
     relative_transform,
 )
@@ -58,8 +61,19 @@ DEFAULT_PARAMS = {
     "visual_factor_topic": "/vis/head_arm_pose",
     # Graph parameters
     "graph_rate_hz": 15.0,
-    "smoother_lag_s": 15.0,
-    # Kinematic range factor
+    "smoother_lag_s": 7.0,
+    # Periodic ISAM2 full reset: number of key increments between resets.
+    # Increased from 720 to 4320 (~288 s at 15 Hz) in iteration 30 because
+    # the original rate decline (15→8.7 Hz over a 170 s run) that the reset
+    # was designed to fix no longer occurs — the chain-structured Bayes tree
+    # with no marginalization (iter18) keeps each ISAM2 update O(1).
+    # Scheduled resets cause ~7 s gaps where gtsam_corr=0 (smoother refill)
+    # and degraded localization precision (∼8% of run).  The new interval
+    # is longer than a typical capture session so scheduled resets
+    # essentially never fire.  Set to 0 to disable entirely.  The fault-
+    # tolerance path (consecutive_failures ≥ 3) still triggers a reset if
+    # ISAM2 state becomes corrupt, so safety is preserved.
+    "graph_reset_interval": 4320,
     "kinematic_range_m": 1.0,
     "kinematic_range_sigma_m": 0.05,
     "kinematic_check_interval": 10,
@@ -219,6 +233,11 @@ def create_node():
             self._consecutive_failures = 0
             self._reset_count = 0
 
+            # Periodic reset: when True the next cycle's delta gate is bypassed
+            # so the first post-reset cycle (which creates a prior from the
+            # absolute VIO pose) is not mistaken for an absurd odometry jump.
+            self._skip_delta_check = False
+
             # Latest odom caches
             self._head_pose: Optional[np.ndarray] = None
             self._arm_pose: Optional[np.ndarray] = None
@@ -230,6 +249,11 @@ def create_node():
             # Default odom noise (when covariance is unavailable)
             self._default_noise = default_odom_noise(
                 self._sigma_t, self._sigma_r)
+
+            # Periodic graph reset interval (key increments between resets).
+            # 4320 ≈ 288 s at 15 Hz — well beyond a typical capture so resets
+            # almost never fire during a run (safety net for ISAM2 corruption).
+            self._graph_reset_interval = int(p("graph_reset_interval"))
 
             # ArUco graceful-degradation tracking
             self._aruco_warned = False
@@ -451,6 +475,25 @@ def create_node():
 
         def _graph_update(self):
             """Run one graph update cycle at graph_rate_hz."""
+            self._update_count += 1
+
+            # ── Periodic ISAM2 full reset (rare) ───────────────────────
+            # ISAM2's internal factor_graph_ and VariableIndex grow with every
+            # update cycle, adding ~0.3 ms of overhead per second of runtime.
+            # A full reset clears this accumulation, restoring per-update cost
+            # to baseline.  With graph_reset_interval=4320, scheduled resets
+            # only fire on runs longer than ~288 s.  Shorter runs (typical
+            # capture) see no scheduled resets, so GTSAM provides continuous
+            # smoothed output throughout — advancing Goal 1 (localization
+            # precision).  If ISAM2 does become corrupt, the fault-tolerance
+            # path (3 consecutive failures) still triggers an emergency reset.
+            # Reference: iteration-19 analysis (iteration-logs/).
+            if (self._graph_reset_interval > 0 and
+                    self._key_idx >= self._graph_reset_interval):
+                self._reset_graph()
+                # Continue processing — this cycle adds a prior from the
+                # current VIO pose so the published estimate is correct.
+
             # If head source is TF, look up the latest transform
             if self._head_pose_source == "tf":
                 self._lookup_head_tf()
@@ -468,6 +511,17 @@ def create_node():
             if not head_new and not arm_new:
                 # No new data — skip this update
                 return
+
+            # ── Add kinematic range factor every 5th update ────────────
+            # This is the ONLY cross-chain coupling when visual factors
+            # are unavailable (e.g. sparse images in the replay bag).
+            # Adding it every cycle would force ISAM2 to create
+            # cross-chain cliques in the Bayes tree on EVERY update,
+            # slowing the solve.  Every 5th cycle keeps the chains coupled
+            # while allowing ISAM2 to maintain a more efficient tree
+            # structure on 4 out of 5 updates (was every 3rd in iter 7).
+            if self._key_idx % 5 == 0:
+                self._add_kinematic_range_factor()
 
             # Compute deltas
             if self._head_prev is not None and self._head_pose is not None:
@@ -496,7 +550,8 @@ def create_node():
             # measured from here.
             head_jump = float(np.linalg.norm(delta_head[:3, 3]))
             arm_jump = float(np.linalg.norm(delta_arm[:3, 3]))
-            if (self._max_delta > 0.0 and
+            if (not self._skip_delta_check and
+                    self._max_delta > 0.0 and
                     (head_jump > self._max_delta or
                      arm_jump > self._max_delta)):
                 self.get_logger().warn(
@@ -510,6 +565,7 @@ def create_node():
                     self._head_prev = self._head_pose.copy()
                 if self._arm_pose is not None:
                     self._arm_prev = self._arm_pose.copy()
+                self._skip_delta_check = False
                 return
 
             # Noise models
@@ -520,11 +576,24 @@ def create_node():
 
             # Add odometry factors (both chains advance together)
             stamp = max(self._head_stamp, self._arm_stamp, time.time())
+
+            # Compute initial estimates from the latest raw odometry poses so
+            # ``add_odometry_factor`` can skip redundant ISAM2 back-substitution
+            # (``get_pose(prev_key)``) and use the VIO estimate directly.
+            # This eliminates 2 of the 4 ``get_pose()`` calls per cycle.
+            init_head = (
+                gtsam.Pose3(np.asarray(self._head_pose, dtype=np.float64))
+                if self._head_pose is not None else None)
+            init_arm = (
+                gtsam.Pose3(np.asarray(self._arm_pose, dtype=np.float64))
+                if self._arm_pose is not None else None)
+
             try:
                 self._graph.add_odometry_factor(
                     self._key_idx, self._key_idx, stamp,
                     delta_head, delta_arm,
-                    noise_head, noise_arm)
+                    noise_head, noise_arm,
+                    init_head=init_head, init_arm=init_arm)
             except Exception as exc:
                 self._consecutive_failures += 1
                 self.get_logger().error(
@@ -544,9 +613,29 @@ def create_node():
             if self._arm_pose is not None:
                 self._arm_prev = self._arm_pose.copy()
 
-            # Run ISAM2 update
+            # ── ISAM2 update (no marginalization) ───────────────────────────
+            #
+            # Marginalization is deliberately DISABLED because it creates
+            # linear approximation factors (Schur-complement fill-in) that
+            # accumulate in the Bayes tree over long replay runs, making
+            # each ISAM2 update progressively slower.  This was the root
+            # cause of the GTSAM rate decline (15.1 → 8.6 Hz mid→last)
+            # seen in iterations 16‑17; reducing smoother_lag_s (iter 17)
+            # bounded variable count but did NOT bound fill-in.
+            #
+            # Without marginalization:
+            #   • The Bayes tree stays nearly chain-structured — cross-chain
+            #     cliques exist only at range-factor timestamps (every 5th
+            #     update) and do NOT accumulate.
+            #   • ISAM2 incremental updates are O(1) per new chain variable.
+            #   • The graph grows to ~4160 variables for a 170 s run
+            #     (≈1.2 MB in GTSAM's internal tree) — trivially small.
+            #   • The unit test (test_factor_graph.py:86) already uses
+            #     lag_s=100.0 to avoid marginalization, confirming validity.
+            #
+            # Reference: iteration 18 analysis in iteration-logs/.
             try:
-                self._graph.update()
+                self._graph.update(marginalize_keys=[])
                 self._consecutive_failures = 0
             except Exception as exc:
                 self._consecutive_failures += 1
@@ -562,21 +651,13 @@ def create_node():
                     self._reset_graph()
                     return
 
-            # Marginalise old keys
-            try:
-                self._graph.marginalize_old_keys(stamp)
-            except Exception:
-                pass
-
-            # Kinematic range factor (every N updates)
-            self._update_count += 1
-            if (self._kinematic_check_interval > 0 and
-                    self._update_count % self._kinematic_check_interval == 0):
-                self._add_kinematic_range_factor()
-
             # Publish poses
             self._publish_poses()
             self._publish_count += 1
+
+            # Reset the delta-gate bypass flag so subsequent cycles are
+            # protected by the normal jump detection.
+            self._skip_delta_check = False
 
             # ArUco graceful degradation warning
             if not self._aruco_received and not self._aruco_warned:
@@ -593,13 +674,39 @@ def create_node():
         # ------------------------------------------------------------------
 
         def _add_kinematic_range_factor(self):
-            """Add a soft range constraint between head and arm."""
-            kh = self._graph._make_key("h", max(self._key_idx - 1, 0))
-            ka = self._graph._make_key("a", max(self._key_idx - 1, 0))
+            """Add a soft range constraint between head and arm at the current key index.
+
+            Uses ``self._key_idx`` (the *current* key index being added in this
+            update cycle) instead of ``key_idx - 1`` so that:
+
+            1. Every new key pair gets a range factor in the *same* update where it
+               is created (no one-cycle delay before cross-chain coupling activates).
+            2. No duplicate range factors accumulate on the same key pair (which
+               happened previously because the next cycle would add another range
+               factor on the same keys).
+
+            Computes the current head→arm relative transform from the latest
+            odometry poses and passes it to the factor graph so the between-factor
+            uses the measured configuration rather than an incorrect identity.
+            """
+            kh = self._graph._make_key("h", self._key_idx)
+            ka = self._graph._make_key("a", self._key_idx)
+
+            # Compute the current odometry-based head→arm relative pose.
+            # T_head_arm = inv(T_world_head) * T_world_arm
+            T_head_arm = None
+            if self._head_pose is not None and self._arm_pose is not None:
+                try:
+                    inv_head = inverse_se3(self._head_pose)
+                    T_head_arm = inv_head @ self._arm_pose
+                except np.linalg.LinAlgError:
+                    pass
+
             try:
                 self._graph.add_range_factor(
                     kh, ka, self._kinematic_range,
-                    self._kinematic_sigma)
+                    self._kinematic_sigma,
+                    T_head_arm=T_head_arm)
             except Exception:
                 pass  # Keys may not exist yet — non-fatal
 
@@ -624,6 +731,7 @@ def create_node():
             self._arm_prev = None
             self._consecutive_failures = 0
             self._reset_count += 1
+            self._skip_delta_check = True
             self.get_logger().warn(
                 f"Factor graph reset (#{self._reset_count}). Re-seeding from "
                 f"current poses — expect a small pose discontinuity.")
@@ -661,6 +769,27 @@ def create_node():
             arm_offset = (host_now - self._arm_stamp
                           if self._arm_stamp > 0 else -1.0)
 
+            # Odom → GTSAM correction magnitude: how much GTSAM is
+            # adjusting the raw VIO estimate.  This directly measures
+            # whether the factor-graph optimisation is actively correcting
+            # VIO drift (Goal 1).  Large correction = VIO drifting and
+            # GTSAM pulling it back; small correction = VIO already
+            # accurate or graph too weak to correct.
+            head_corr = arm_corr = -1.0
+            try:
+                kh_diag = self._graph._make_key("h", max(self._key_idx - 1, 0))
+                ka_diag = self._graph._make_key("a", max(self._key_idx - 1, 0))
+                if self._head_pose is not None and kh_diag in self._graph._all_keys:
+                    gtsam_h = pose3_to_matrix(self._graph.get_pose(kh_diag))
+                    corr_h = relative_transform(self._head_pose, gtsam_h)
+                    head_corr = float(np.linalg.norm(corr_h[:3, 3]))
+                if self._arm_pose is not None and ka_diag in self._graph._all_keys:
+                    gtsam_a = pose3_to_matrix(self._graph.get_pose(ka_diag))
+                    corr_a = relative_transform(self._arm_pose, gtsam_a)
+                    arm_corr = float(np.linalg.norm(corr_a[:3, 3]))
+            except Exception:
+                pass  # Non-fatal — first cycle or stale key
+
             self.get_logger().info(
                 f"Stats: published={self._publish_count} "
                 f"odom(head={self._odom_head_count}, arm={self._odom_arm_count}) "
@@ -668,6 +797,7 @@ def create_node():
                 f"delta_rejects={self._delta_reject_count} "
                 f"resets={self._reset_count} "
                 f"pose_norm(head={head_norm:.3f}m, arm={arm_norm:.3f}m) "
+                f"gtsam_corr(head={head_corr:.4f}m, arm={arm_corr:.4f}m) "
                 f"clock_offset(head={head_offset:.3f}s, arm={arm_offset:.3f}s)"
             )
 
@@ -690,8 +820,14 @@ def create_node():
             prevents TF extrapolation errors when one camera's odom stamp is
             ahead of the other's cloud stamp.
             """
-            kh = self._graph._make_key("h", max(self._key_idx - 1, 0))
-            ka = self._graph._make_key("a", max(self._key_idx - 1, 0))
+            # Publish the CURRENT key (the one just added this cycle) so each key
+            # is published exactly ONCE after its first optimization.  Publishing
+            # key_idx-1 (the previous cycle's key) was the root cause of 3000+ TF
+            # jumps: every ISAM2 re-optimization changed the already-published key,
+            # causing 0.4-0.7 m discontinuities in the TF tree.
+            # See iteration-25 analysis in iteration-logs/.
+            kh = self._graph._make_key("h", self._key_idx)
+            ka = self._graph._make_key("a", self._key_idx)
 
             # Use each camera's own latest sensor stamp so the published pose
             # is temporally consistent with that camera's sensor data.
@@ -768,10 +904,19 @@ def create_node():
             # Broadcast dynamic TF edge (world_frame → child_frame) so the
             # smoothed trajectory feeds the TF tree consumed by
             # pointcloud_fusion, rviz, etc. (V6 §6.3).
+            #
+            # IMPORTANT: Use the HOST clock timestamp (not the sensor stamp)
+            # so the TF2 buffer can compose this chain with other TF edges
+            # that also use host timestamps (bridge, relay, camera mounts).
+            # Publishing with a sensor timestamp that is ~56000s behind
+            # the host clock (due to chrony offset) makes TF2's can_transform
+            # fail: the GTSAM edge at timestamp T_sensor appears expired
+            # when queried alongside bridge edges at T_host, breaking the
+            # multi-edge chain composition.
             if child_frame is not None and self._tf_broadcaster is not None:
                 from tf2_ros import TransformStamped
                 tf_msg = TransformStamped()
-                tf_msg.header.stamp = stamp_msg
+                tf_msg.header.stamp = self.get_clock().now().to_msg()
                 tf_msg.header.frame_id = self._world_frame
                 tf_msg.child_frame_id = child_frame
                 tf_msg.transform.translation.x = t_tuple[0]

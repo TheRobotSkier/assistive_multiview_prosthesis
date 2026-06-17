@@ -1,11 +1,130 @@
+\documentclass[master.tex]{subfiles}
+
+\begin{document}
+\section{Grasp Prediction}\label{ch:Grasp}
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\textwidth]{0.2_Pictures/Implementation/General_setup/Main_sections_flowchart_4.png}
+    \caption{The Grasp Prediction in the general setup pipeline.}
+    \label{fig:Grasp Prediction in general_setup_pipeline}
+\end{figure}
+
+To enable autonomous grasping, reliable grasp prediction must be established on the Mia hand (see \autoref{fig:Grasp Prediction in general_setup_pipeline}). The core challenges this part of the system must overcome include:
+\begin{itemize}
+    \item Only partial point cloud observations are available, even with multi-view cameras.
+    \item Determining the optimal wrist rotation and categorical grasp type without a predefined end position creates a high-dimensional search problem.
+    \item Real-time control loops demand low-latency computations within this complex search space.
+    \item Reliable grasps across diverse object geometries must be ensured while managing coupled finger mechanics of the Mia hand as described in \autoref{ssc:DelimitaionMiaHand}.
+\end{itemize}
+
+\subsection{Related Work}
+Evaluating the proposed framework against representative data-driven and geometric grasp planning methods contextualises the underlying design decisions.
+
+\subsubsection{Dex-Net}
+The Dexterity Network (Dex-Net) framework uses a data-driven grasp planning network made by training a Grasp Quality Convolutional Neural Network (GQ-CNN) on massive synthetic datasets to predict grasp success from depth images \cite{dexnet2, dexnet3}. Two critical constraints prevent the direct transfer of this framework to the project.
+\begin{itemize}
+    \item Firstly, in the authors' experiments, they got to 0.7\,s inference on a GTX 980 \cite{dexnet2}, which is slower than our required latency of 400\,ms in \autoref{sc:Requirements}.
+    \item Secondly, the underlying datasets optimise strictly for single-point suction contacts or simplified, independent rigid parallel jaws. Consequently, they fail to model the complex, underactuated, and coupled finger mechanics inherent to the Mia hand prosthesis.
+\end{itemize}
+
+\subsubsection{Dexterous Grasping under Shape Uncertainty}
+More applicable work by Li et al.~\cite{li2016dex} addresses dexterous grasping under explicit object shape uncertainty, using more dexterous hands with multiple fingers. To deal with single-view occlusions, their framework mathematically estimates the missing geometry and confidence scores for every point on the predicted surface using a probabilistic model that calculates relative distances and surface directions. The target contact points are determined by formulating grasp planning as an optimisation problem solved via an interior point method, ensuring the final grasp positions are physically stable and avoid highly uncertain regions of the object. Once these contact points are established, they utilise a Gaussian Mixture Model to calculate the required finger joint angles by mapping the contact locations to hand shapes that remain valid regardless of the object's orientation. While this approach works well against sensor occlusion, it also creates a severe computational bottleneck. They report planning latencies between 8.46 and 26.52 seconds per object configuration, well beyond the requirements for this project~\cite{li2016dex}.
+
+\subsubsection{Synthesis}
+The proposed approach deliberately avoids large deep-learning models and large-scale optimisation problems due to computational constraints. Since existing grasp datasets assume independent finger control (e.g., parallel-jaw grippers or fully anthropomorphic hands with uncoupled joints), they fail to model coupled finger mechanics like the Mia hand. While a pure geometric baseline using Principal Component Analysis and primitive shape fitting could handle primitive objects, they would fail to resolve asymmetric or complex topologies. Borrowing ideas from Li et al.~\cite{li2016dex}, the evolutionary optimisation framework developed in this work addresses these limitations by maintaining multi-modal grasping hypotheses without requiring a complete object mesh.
+
+\subsection{Architecture}
+The grasp prediction library is implemented in Rust, leveraging the data-parallelism library \texttt{rayon} to maximise hardware utilisation. Parallel execution is explicitly utilised across point cloud pruning, Morton sorting, sign determination, superquadric template matching, and population scoring. This parallelised design maintains high CPU utilisation, maximising the performance throughput of modern multi-core processors. The overall architecture of the grasp prediction pipeline is illustrated in \autoref{fig:grasp-pipeline}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\linewidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/grasp-pipeline.pdf}
+    \caption{The grasp prediction pipeline. Starting with region of interest filtering (\textit{ROI}) and Morton code storing, then doing backside estimation and truncated signed distance field (\textit{TSDF}) construction. This representation is used along with a precomputed lookup table (\textit{LUT}) in an evolution strategy to find the target grasp.}
+    \label{fig:grasp-pipeline}
+\end{figure}
+
+The primary design objective is to minimise latency through efficient, intermediary representations. By replacing the computationally intensive probabilistic surface model of Li et al.~\cite{li2016dex} with parametric superquadric fitting and a truncated signed distance field (\textit{TSDF}) representation, the pipeline shifts from dense point-wise calculations to highly efficient distance field queries. Furthermore, substituting the interior point optimisation method with a highly parallelisable Evolutionary Strategy (\textit{ES}) shifts absolute mathematical convergence guarantees for multi-modal global exploration within a predictable time budget.
+
+\subsection{Region of Interest \& TSDF Construction}\label{ssec:roi_and_tsdf}
+To enable quick distance queries for collision detection and surface normals, this pipeline makes use of an intermediary representation called a Truncated Signed Distance Field. It is a voxel-based representation encoding the following information as single scalars per voxel:
+\begin{itemize}
+    \item Distance Field: The distance to the nearest surface/point.
+    \item Signed: A positive distance for outside voxels and a negative sign for voxels inside the object.
+    \item Truncated: To enable faster construction, distances are truncated if they fall beyond a truncation distance.
+\end{itemize}
+To do the initial TSDF construction based on the point cloud input, the point cloud is first pruned to a region of interest (\textit{ROI}), then constructed using breadth-first search (\textit{BFS})
+
+\subsubsection{Region of Interest Pruning}
+To find the relevant bounding box for the TSDF, an ROI is constructed by propagating the current hand pose, twist, and covariance over a 5\,s prediction horizon using a screw motion model. The pipeline uses sample-based propagation. Per sample, a new twist is randomly resampled using the covariance. The new twists are then propagated across randomly sampled time horizons up to the maximum horizon. Inflating the resulting sample positions by the maximum hand radius forms an axis-aligned bounding box (\textit{AABB}) that defines the active ROI.
+
+Pruning the raw point cloud to this bounding box isolates the target object. This acts as a safety net against imperfect upstream camera segmentation and reduces the overall point density, directly accelerating both the next phases of construction.
+
+Initial testing showed that a larger ROI required a larger sample density, which meant higher latency. It was chosen that the initial hand position would be determined by the earlier trajectory prediction, and a static offset and one-dimensional twist in the hand frame were used for this pipeline. After doing a grid search on some optimisation parameters, an offset of -0.25 m and a forward velocity of 0.05 m/s was chosen. The results can be seen in \autoref{tab:gracp_parameter_sweep}
+
+\begin{table}[h]
+\centering
+\small
+\caption{Grasp Prediction Performance across Distance and Twist Parameters for initial hand state.}
+\label{tab:gracp_parameter_sweep}
+\begin{tabular}{ccccc}
+\toprule
+\textbf{Offset (m)} & \textbf{Twist $l_x$ (m/s)} & \textbf{Success Rate} & \textbf{Avg. Score} \\
+\midrule
+-0.15 & 0.00 & 222 / 240 & 0.272 \\
+-0.20 & 0.00 & 218 / 240 & 0.175 \\
+-0.25 & 0.00 & 219 / 240 & 0.180 \\
+\midrule
+-0.25 & 0.05 & 240 / 240 & 0.413 \\
+-0.25 & 0.10 & 240 / 240 & 0.313 \\
+-0.30 & 0.10 & 240 / 240 & 0.377 \\
+-0.35 & 0.10 & 240 / 240 & 0.409 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Morton Ordering}
+Following the initial spatial pruning, the pipeline computes a tight bounding volume from the remaining points. Then the points are sorted into voxels using Morton codes. This is done by first casting the coordinates of each point to integers representing the voxels, then the Morton IDs are constructed by combining the integers as seen in \autoref{fig:morton_interleaving}. After that, all the IDs are sorted while maintaining a correlation to their original coordinate. Then, a lookup index is constructed to find the points that are present in a certain voxel. This enables the system to look up any points that are inside any given voxel and find their exact coordinates. This explicit spatial mapping eliminates the need for expensive structural queries like $k\text{-d}$ trees.
+
+\begin{figure}[h]
+\centering
+\small
+\renewcommand{\arraystretch}{1.3}
+\setlength{\tabcolsep}{8pt}
+
+% Define colours cleanly inside the figure using explicit HTML hex definitions
+\definecolor{zcolor}{HTML}{E3F2FD}
+\definecolor{ycolor}{HTML}{E8F5E9}
+\definecolor{xcolor}{HTML}{FFF3E0}
+\definecolor{mcolor}{HTML}{F3E5F5}
+
+\begin{tabular}{r|ccccccccc|l}
+    \hline
+    \multicolumn{11}{l}{\textbf{Input Coordinates (Decimal $\rightarrow$ 3-bit Binary)}} \\
+    \hline
+    \textbf{Z Input} & \multicolumn{10}{l}{$4_{10} = \mathbf{100}_2$} \\
+    \textbf{Y Input} & \multicolumn{10}{l}{$2_{10} = \mathbf{010}_2$} \\
+    \textbf{X Input} & \multicolumn{10}{l}{$1_{10} = \mathbf{001}_2$} \\
+    \hline
+    \multicolumn{11}{l}{\textbf{Bit Interleaving Process}} \\
+    \hline
+    \textbf{Z Bits} & \cellcolor{zcolor}1 & $\cdot$ & $\cdot$ & \cellcolor{zcolor}0 & $\cdot$ & $\cdot$ & \cellcolor{zcolor}0 & $\cdot$ & $\cdot$ & \\
+    \textbf{Y Bits} & $\cdot$ & \cellcolor{ycolor}0 & $\cdot$ & $\cdot$ & \cellcolor{ycolor}1 & $\cdot$ & $\cdot$ & \cellcolor{ycolor}0 & $\cdot$ & \\
+    \textbf{X Bits} & $\cdot$ & $\cdot$ & \cellcolor{xcolor}0 & $\cdot$ & $\cdot$ & \cellcolor{xcolor}0 & $\cdot$ & $\cdot$ & \cellcolor{xcolor}1 & \\
+    \hline
+    \textbf{Morton} & \cellcolor{mcolor}1 & \cellcolor{mcolor}0 & \cellcolor{mcolor}0 & \cellcolor{mcolor}0 & \cellcolor{mcolor}1 & \cellcolor{mcolor}0 & \cellcolor{mcolor}0 & \cellcolor{mcolor}0 & \cellcolor{mcolor}1 & $= 100010001_2 = 273_{10}$ \\
+    \hline
+\end{tabular}
+
+\caption{3D Morton Code Bit Interleaving. The 3-bit input coordinates $(X=1, Y=2, Z=4)$ are converted to binary, and their bits are systematically interleaved into a single 1D scalar key ($273$) to preserve spatial locality. This can be done with any number of input representation bits.}
+\label{fig:morton_interleaving}
+\end{figure}
+
 \subsubsection{Initial TSDF Construction via BFS}
-The algorithm constructs an unsigned truncated distance field by running a breadth-first search outward from the occupied surface voxels, which are identified via the sorted Morton array by finding the unique IDs of the array. Setting the maximum BFS depth to match the truncation distance naturally confines all volumetric computations and memory allocations to a narrow band surrounding the object boundary.
+The algorithm constructs an unsigned truncated distance field by running a breadth-first search outward from the occupied surface voxels, which are identified via the sorted Morton array by finding the unique IDs of the array. Setting the maximum BFS depth to match the truncation distance naturally confines all volumetric computations to a narrow band surrounding the object boundary.
 
 A per-camera ray-voting scheme determines the signs of individual voxels. The system remembers the nearest surface point from the previous BFS step, then projects both the target voxel and that point onto the ray originating from each camera centre. If the voxel lies farther along the camera ray than the surface point, and the surface-to-voxel vector aligns with the camera ray direction (maintaining a dot product greater than 0.9), that camera casts an internal vote. The system assigns a negative sign if at least one camera confirms the voxel is occluded behind the surface and no other sensor views it as unoccluded. While thin geometric surfaces can introduce voting ambiguity within narrow truncation bands, this edge-case mismatch does not compromise stability, as the underlying superquadric approximation resolves outstanding tie-breakers.
 
-It is worth noting that the sign assignment of the initial TSDF is inherently an approximation of the real TSDF. The architecture was designed to accept a fused, segmented point cloud as the interface between perception and planning, meaning the grasp planner operates on a camera-agnostic representation without requiring knowledge of intrinsics, extrinsics, or depth map formats. Computing distances directly on this fused point cloud via a BFS provides analytically exact nearest-surface Euclidean distances at the voxel centres, avoiding the `staircase' artefacts that projective TSDF can introduce at oblique surfaces. While projective TSDF could alternatively be applied to individual depth maps and fused in a separate volume, this would reintroduce camera-specific dependencies that the current architecture intentionally avoids.
-
-[We should have an image that shows the tsdf at this stage]
+It is worth noting that the sign assignment of the initial TSDF is inherently an approximation of the real TSDF. The architecture was designed to accept a fused, segmented point cloud as the interface between perception and planning, meaning the grasp planner operates on a camera-agnostic representation without requiring knowledge of intrinsics, extrinsics, or depth map formats. While projective TSDF could alternatively be applied to individual depth maps and fused in a separate volume, this would reintroduce camera-specific dependencies that the current architecture avoids.
 
 A TSDF offers three distinct advantages over raw point representations:
 \begin{enumerate}
@@ -16,9 +135,9 @@ A TSDF offers three distinct advantages over raw point representations:
 
 \subsection{Superquadric Backside Estimation}
 
-Without backside estimation, the TSDF only contains information from the visible surface. This makes the optimiser fail to determine how far to close the grasp and makes grasp scoring unreliable. This could result in the wrong grasp type purely based on the thin shell of observed voxels. Therefore, a backside estimation is implemented.
+Without backside estimation, the TSDF only contains information from the visible surface. This causes the optimiser to fail to determine how far to close the grasp, making grasp scoring unreliable. This could result in the wrong grasp type purely based on the thin shell of observed voxels. Therefore, a backside estimation is implemented.
 
-While fitting standard shapes like cubes, cylinders, or spheres independently could close the mesh, each primitive demands distinct algebraic formulations, specialised optimisation procedures, and dedicated boundary checks. To prevent this complexity, this framework uses superquadric representations of these primitives to provide a single inside-outside function that unifies all shapes:
+While fitting standard shapes such as cubes, cylinders, or spheres independently could work, each primitive requires distinct algebraic formulations, specialised optimisation procedures, and dedicated boundary checks. To prevent this complexity, this framework uses superquadric representations of these primitives to provide a single inside-outside function that unifies all shapes:
 \begin{equation}
 F(x,y,z) = \left(\left(\left|\frac{x}{a}\right|^{\frac{2}{\epsilon_1}} + \left|\frac{y}{b}\right|^{\frac{2}{\epsilon_1}}\right)^{\frac{\epsilon_1}{\epsilon_2}} + \left|\frac{z}{c}\right|^{\frac{2}{\epsilon_2}}\right)^{\epsilon_2} - 1
 \end{equation}
@@ -26,10 +145,10 @@ where $a,b,c$ are the half-extents along each axis and $(\epsilon_1, \epsilon_2)
 
 \subsubsection{Pipeline}
 \begin{enumerate}
-    \item \textbf{Principal Component Analysis:} Using PCA, the orientation of the point cloud can be established, limiting the optimisation variables. One thing to note is that PCA locks the rotation for all template fits; for the cylinder template the Z PCA axis is implicitly treated as the symmetry axis. This is acceptable in practice because the hand approach direction from the motion model constrains the feasible cylinder orientations, and the parallel template matching selects the best-fitting shape class overall.
+    \item \textbf{Principal Component Analysis:} Using PCA, the orientation of the point cloud can be established, limiting the optimisation variables. One thing to note is that PCA locks the rotation for all template fits.
     \item \textbf{Oriented Bounding Boxes:} Evaluates the bounding extents along the computed PCA axes to establish the initial scale and translation parameters for the optimiser.
-    \item \textbf{Parallel Template Matching:} Fits three distinct shape configurations (sphere: $\epsilon_1=1, \epsilon_2=1$; box: $\epsilon_1=0.1, \epsilon_2=0.1$; cylinder: $\epsilon_1=0.1, \epsilon_2=1.0$) concurrently using the \texttt{rayon} parallel framework. The primitives use $\epsilon_1, \epsilon_2 = 0.1$ (rather than true zero) for the box and cylinder templates to maintain numerical stability in the Taubin distance approximation (\S\ref{sec:taubin}), which divides by the gradient norm — near-singular gradients that arise from extremely sharp corners would degrade this computation.
-    \item \textbf{Optimiser:} Each primitive template is refined using a Gauss-Newton optimiser. The optimisation searches for the optimal location and scale for each axis that minimises distance to the template.
+    \item \textbf{Parallel Template Matching:} Fits three distinct shape configurations (sphere: $\epsilon_1=1, \epsilon_2=1$; box: $\epsilon_1=0.1, \epsilon_2=0.1$; cylinder: $\epsilon_1=0.1, \epsilon_2=1.0$) concurrently using the \texttt{rayon} parallel framework. The primitives use $\epsilon_1, \epsilon_2 = 0.1$ (rather than true zero) for the box and cylinder templates to maintain numerical stability in distance approximation, which divides by the gradient norm — near-singular gradients that arise from extremely sharp corners would degrade this computation.
+    \item \textbf{Optimiser:} Each primitive template is refined using a Gauss-Newton optimiser. The optimisation searches for the optimal location and scale for each axis that minimises the point could distances to the template ($F(x,y,z)=0$).
     \item \textbf{Template Selection:} The pipeline selects the shape template with the lowest mean squared fitting residual — the average of $F(\mathbf{p})^2$ over all observed points $\mathbf{p}$ in the point cloud, which measures how closely each point conforms to the superquadric surface — provided the error falls below a predefined threshold ($0.15$ in the default configuration, chosen as a sensible empirical value); otherwise, the backside estimation is skipped entirely and the pipeline proceeds with camera-only TSDF data.
 \end{enumerate}
 
@@ -38,7 +157,7 @@ Evaluating geometric distances from the fitted superquadric uses the Taubin appr
 \begin{equation}
 D = \frac{\sqfunc}{\|\nabla \sqfunc\|},
 \end{equation}
-which normalises the inside-outside function by its analytical spatial gradient. One Newton-Raphson refinement step along the estimated surface normal reduces the distance error from approximately 15\% to 5\% within the truncation band, satisfying the precision constraints of the collision scoring system.
+which normalises the inside-outside function by its analytical spatial gradient. One Newton-Raphson refinement step along the estimated surface normal reduces the distance error from approximately 15\% to 5\% within the truncation band.
 
 \subsubsection{Backside Integration in TSDF}
 Integrating the superquadric geometry into the existing TSDF uses a blending scheme defined by:
@@ -46,16 +165,41 @@ Integrating the superquadric geometry into the existing TSDF uses a blending sch
     \item \textbf{Congruent Signs:} If both the camera and superquadric model agree on the sign, the pipeline preserves the camera-derived distances near the visible shell. The framework will interpolate into the superquadric distance values near the existing outer truncation boundary. Beyond the initial truncation band, the superquadric model defines the distance exclusively.
     \item \textbf{Incongruent Signs:} If they disagree, the pipeline trusts the superquadric sign for the inside/outside decision in all cases. Near the visible boundary, the camera distance magnitude is preserved while the sign is flipped to match the superquadric. Farther from the observed shell, the system switches to the superquadric distance entirely, with smoothstep interpolation in the transition zone to ensure a continuous gradient.
 \end{itemize}
-This dual-domain approach ensures that camera data governs the visible regions, while the regularised superquadric geometry builds the unobserved backside.
+This dual-domain approach ensures that camera data governs the visible regions, while the regularised superquadric geometry builds the unobserved backside. \autoref{fig:tsdf_combined} shows an example of the final integration into the TSDF.
 
-[We should have a nice figure to show the finished TSDF]
+\begin{figure}[h]
+    \centering
+    % Subfigure 1: 3D TSDF Voxel/Point View
+    \begin{subfigure}[b]{0.4\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/tsdfUI.png}
+        \caption{3D TSDF spatial distribution}
+        \label{fig:tsdf_3d}
+    \end{subfigure}
+    \hfill
+    % Subfigure 2: 2D Cross Section Heat Map
+    \begin{subfigure}[b]{0.55\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/tsdf_slice.png}
+        \caption{2D cross-section with SQ overlay}
+        \label{fig:tsdf_2d_cross_section}
+    \end{subfigure}
+
+    \caption{The final TSDF constructed from the point cloud and the fitted superquadric. (a) 3D point distribution colour-coded by signed cell distance to the surface boundary. (b) Corresponding 2D cross-sectional heat map showcasing raw point cloud data overlaid with a fitted superquadric sphere primitive ($\epsilon_1 = 1.0, \epsilon_2 = 1.0$) yielding a localized fitting error of 0.00174.}
+    \label{fig:tsdf_combined}
+\end{figure}
 
 \subsection{Finger Contact Lookup Table}
 To avoid running inverse kinematics at runtime, the full finger closure trajectories are pre-computed offline. This allows the execution loop to step along a pre-calculated path and evaluate coordinate positions directly against the TSDF volume, reducing collision detection to a series of array lookups and distance queries.
 
 Generating this LUT utilises the Pinocchio rigid-body dynamics library operating on the official prosthesis URDF. The kinematic description is simplified to match the single-degree-of-freedom actuation constraints of the prosthesis, enabling direct integration with Pinocchio. The system stores the spatial transforms of individual points along the finger segments at every step along the closure path as dual quaternions. Dual quaternions represent rigid body transforms compactly using eight real coefficients, avoiding gimbal lock and allowing computationally efficient linear interpolation directly in the rigid body transform manifold. The resulting \texttt{.npz} file is saved and otherwise loaded into memory during application startup.
 
-[Figure showing the contact points. There is a Python file that can already visualise this]
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/lut.png}
+    \caption{3D visualisation of the contact points saved in the LUT. It holds the spatial lookup data for tracking contacts across the palm structure and finger segments (\textit{Tip}, \textit{Dip}, \textit{Pip}, and \textit{Mcp})}
+    \label{fig:hand_kinematics_lut}
+\end{figure}
 
 \subsection{Grasp Scoring}
 The scoring framework evaluates grasp quality by combining multiple complementary metrics. Each metric targets a specific failure mode, constructing a dense optimisation landscape that guides the evolutionary search toward stable grasps.
@@ -122,7 +266,7 @@ The underlying search space comprises eight dimensions: a 6-DOF propagation pose
 By replacing random sampling with an iterative, population-based Evolution Strategy with elitist preservation and decaying mutation variance, the pipeline achieves equivalent stability in grasp selection using only $20{,}000$ particles evaluated over 5 iterations. The predictive motion model provides a strong spatial prior that clusters the initial population around likely future trajectories, while the tiered scoring function ensures a smooth optimisation gradient across sparse regions.
 
 \subsubsection{The Optimization Algorithm}
-The optimization initializes by drawing a broad population from the motion model prior (Iteration 0). The framework then iteratively refines this population through truncation selection, elite preservation, and focused resampling guided by a decaying proposal variance. In each subsequent iteration, a hard threshold isolates the top-performing 5\% of the population to act as parents. The algorithm then regenerates the population around these parents by applying localised Gaussian perturbations with a standard deviation that decays geometrically as $\sigma = \sigma_0 \cdot 0.7^{\text{iteration}}$.
+The optimization initializes by drawing a broad population from the motion model prior (Iteration 0). The framework then iteratively refines this population through truncation selection, elite preservation, and focused resampling guided by a decaying proposal variance. In each subsequent iteration, a hard threshold isolates the top-performing 5\% of the population to act as parents. The algorithm then regenerates the population around these parents by applying localised Gaussian perturbations with a standard deviation that decays geometrically as $\sigma = \sigma_0 \cdot 0.7^{\text{iteration}}$. \autoref{fig:grasp_optimization_flow} shows this visually in a sample run.
 
 \subsubsection{Algorithmic Enhancements}
 Five tailored architectural enhancements were made to stabilise the evolution loop and prevent localised convergence:
@@ -133,8 +277,43 @@ Five tailored architectural enhancements were made to stabilise the evolution lo
     \item \textbf{Decaying Proposal Variance:} The mutation standard deviation decays geometrically according to $\sigma = \sigma_0 \cdot 0.7^{\text{iteration}}$. This decay ensures broad exploration during initial iterations and fine-grained refinement in later generations.
 \end{itemize}
 
+
+\begin{figure}[h]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/iter1.png}
+        \caption{Iteration 1}
+        \label{fig:iter1}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/iter3.png}
+        \caption{Iteration 3}
+        \label{fig:iter3}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/iter5.png}
+        \caption{Iteration 5}
+        \label{fig:iter5}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/grasps.png}
+        \caption{Top grasps}
+        \label{fig:top_grasps}
+    \end{subfigure}
+
+    \caption{Select iterations from the optimisation algorithm showing 3D and grasp type convergence on a sample run based on simulation data. The combined grasp score moves from an initial baseline of 0.3419 to a peak converged score of 0.9013. The screenshots are taken from a debug viewer developed to investigate the results of the grasping algorithm.}
+    \label{fig:grasp_optimization_flow}
+\end{figure}
+
 \subsubsection{Computational Considerations}
-The primary configuration manages an active population of $20{,}000$ particles across a maximum of 5 generations. Because the pipeline constructs the TSDF volume once per sensor frame, parallel particle scoring across concurrent threads dominates the per-generation computational cost. Total execution timing for the entire pipeline ranges around $\sim$100 ms on an Intel i7-12700 (20 000 particles $\times$ 5 iterations), fitting comfortably within the target operating window.
+The primary configuration manages an active population of $20{,}000$ particles across a of 5 iterations. Because the pipeline constructs the TSDF volume once per sensor frame, parallel particle scoring across concurrent threads dominates the per-generation computational cost. Total execution timing for the entire pipeline ranges around $\sim$70 ms on an Intel i5-13600k, fitting comfortably within the target marginal operating window. A full breakdown can be seen in \autoref{tab:timing_breakdown}.
 
 \subsection{Challenges}
 Several engineering challenges encountered during development yielded insights applicable beyond this specific system:
@@ -144,3 +323,44 @@ Several engineering challenges encountered during development yielded insights a
     \item \textbf{Best-grasp tracking across iterations:} Initially, the output was selected from the final iteration only. In debugs, this produced inconsistent results with higher scores being seen than where selected. The resolution was to use elite injection to prevent loss of high-quality solutions.
     \item \textbf{SQ boundary artefacts :} Slight misalignment between the superquadric surface and the camera-derived surface caused sign flips near the boundary. Writing better thought-out sign flipping logic, combined with a minimum distance threshold (2 voxels from the surface), helps preserve camera authority near the observed surface.
 \end{enumerate}
+
+
+\subsection{Evaluation}
+To briefly evaluate the performance of this pipeline, a synthetic setup was constructed. Mainly two things were examined: the latency and variability of the system. The synthetic setup was also used in \autoref{sec:test1}, and is described further in this section. There might be some variability, since these numbers were found by purely running the Rust code with no ROS integration.
+
+\subsubsection{Timing Benchmarks}
+This performance verification logs latency by using the integrated benchmarking tools in Rust. Table~\ref{tab:timing_breakdown} breaks down the mean latency metrics collected across test runs.
+
+\begin{table}[h]
+\centering
+\caption{Computational Latency Breakdown by Pipeline Stage for $20{,}000$ particles across of 5 iterations with $10{,}000$ points in the input point cloud run on an Intel i5-13600k. The chosen stages do not include the handling of data between stages in their computation, so the total latency is not a reflection of summing the stages, but of a separate measurement.}
+
+\label{tab:timing_breakdown}
+\begin{tabular}{lr}
+\hline
+\textbf{Pipeline Phase} & \textbf{Mean Execution Time (ms)} \\ \hline
+ROI Filtering \& Morton Sort & 8.02 \\
+Superquadric Backside Estimation & 4.37 \\
+TSDF Volumetric Construction & 2.99 \\
+Single Iteration Scoring & 5.82 \\
+Evolutionary Optimization Loop & 53.34 \\ \hline
+\textbf{Total Pipeline Latency} & \textbf{70.62} \\ \hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Grasp Variability}
+Evaluating the consistency of the optimisation framework involves running the pipeline 100 times and logging both scores and latency. The results in \autoref{fig:latency_score_variability} show stable latency across runs, but scores that fluctuate widely across runs. The main reason for high variable scores is the stochastic nature of our evolution strategy. This suggests that to fully uncover the search space, much higher sample counts are likely necessary.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=\textwidth]{0.2_Pictures/Implementation/4_Grasp_Prediction/latency_score_variability.png}
+    \caption{Pipeline latency (left) and combined score variability (right) evaluated across a logarithmic scale of prediction sample counts. A configuration of $20{,}000$ samples is chosen as the operational baseline; this choice optimises the grasp score potential while ensuring execution speeds for the grasp prediction remain below the 100 ms IDE threshold for the whole pipeline.}
+    \label{fig:latency_score_variability}
+\end{figure}
+
+\subsection{Integration} \label{ssec:grasp_node_integration}
+The core optimisation routine compiles into a native shared library (\texttt{.so}) and integrates with a C++ ROS2 bridge node. The Foreign Function Interface (FFI) boundary passes flat, C-compatible structures representing the request parameters (hand pose, twist, point cloud array, and camera positions) and response configurations (grasp type, joint closure amounts, performance scores, and target wrist orientation).
+
+The ROS2 bridge node subscribes to the active topics \path{/hand_pose}, \path{/hand_twist}, and \path{/segmentation/object_cloud}, while exposing a dedicated service named \path{/grasp_preshaping/compute_grasp}. Upon receiving a service request, the node queries the transform tree (\path{tf2}) to resolve exact camera origins, assembles the packed FFI request structure, and invokes the compiled Rust execution loop. After execution, the node unpacks the response data and publishes finger motor commands, wrist rotation values, and estimated grasp target to the pipeline.
+
+\end{document}

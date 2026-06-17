@@ -1,0 +1,30 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-17-07-23-59-348665-KingBob-701
+[INFO] [launch]: Default logging verbosity is set to INFO
+[pipeline] fusion_mode='tsdf_preview'
+[pipeline] fusion_mode='tsdf_preview' — launching tsdf_fusion (preview_mode=True)
+[INFO] [pipeline_manager_node-1]: process started with pid [707]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [708]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [709]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [710]
+[INFO] [odom_to_pose_relay-5]: process started with pid [711]
+[INFO] [openvins_odom_tf_relay-6]: process started with pid [712]
+[INFO] [pipeline_diagnostics_node-7]: process started with pid [713]
+[INFO] [gtsam_tracker_node-8]: process started with pid [714]
+[INFO] [keyframe_buffer_node-9]: process started with pid [715]
+[INFO] [sift_feature_node-10]: process started with pid [716]
+[INFO] [tsdf_fusion_node-11]: process started with pid [717]
+[INFO] [twist_propagation_node-12]: process started with pid [718]
+[INFO] [preshaping_service_bridge_node-13]: process started with pid [719]
+[INFO] [grasp_proximity_controller_node.py-14]: process started with pid [720]
+[INFO] [rviz2-15]: process started with pid [721]
+[preshaping_service_bridge_node-13] [INFO] [1781681040.272271210] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-13] [INFO] [1781681040.275870841] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[sift_feature_node-10] /prosthesis_ws/install/cross_camera_features/lib/cross_camera_features/sift_feature_node:4: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+[sift_feature_node-10]   __import__('pkg_resources').require('cross-camera-features==0.1.0')
+[rviz2-15] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[pipeline_manager_node-1] [INFO] [1781681041.572872818] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781681041.574844173] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tsdf_fusion_node-11] [INFO] [1781681041.650948204] [tsdf_fusion]: TsdfFusionNode ready (PREVIEW mode) (rate=1.0 Hz, output=/fused_pointcloud, bbox_crop=True, dbscan=True)
+[keyframe_buffer_node-9] [INFO] [1781681042.129928409] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_in_roi
+[keyframe_buffer_node-9] [INFO] [1781681042.132267955] [keyframe_buffer]: Service advertised: /keyframe_buffer/get_all
+[keyframe_buffer_node-9] [INFO] [1781681042.149818015] [keyframe_buffer]: KeyframeBufferNode ready (max_kf/cam=50, gate_t=0.1m, gate_r=15.0deg, cloud_ts=header)

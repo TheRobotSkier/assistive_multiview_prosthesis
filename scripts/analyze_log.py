@@ -650,8 +650,14 @@ def to_metrics(rep: LogReport) -> dict:
 # ---------------------------------------------------------------------------
 
 def _latest_log():
-    """Return the most-recently-modified host-log, or None."""
-    logs = glob.glob(os.path.join(LOGS_DIR, "host-log-*.txt"))
+    """Return the most-recently-modified raw host-log, or None.
+
+    Excludes ``*_analysis.txt`` so that standalone ``analyze_log.py``
+    (without an explicit path) does not re-parse a previous analysis report
+    as if it were a raw log.
+    """
+    logs = [f for f in glob.glob(os.path.join(LOGS_DIR, "host-log-*.txt"))
+            if not f.endswith("_analysis.txt")]
     if not logs:
         return None
     return max(logs, key=os.path.getmtime)
@@ -668,7 +674,10 @@ def main():
     args = ap.parse_args()
 
     if args.all:
-        logs = sorted(glob.glob(os.path.join(LOGS_DIR, "host-log-*.txt")))
+        logs = sorted(
+            f for f in glob.glob(os.path.join(LOGS_DIR, "host-log-*.txt"))
+            if not f.endswith("_analysis.txt")
+        )
     else:
         log = args.log or _latest_log()
         if not log:

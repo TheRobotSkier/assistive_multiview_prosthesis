@@ -1,0 +1,119 @@
+[sudo] password for robotlab: [INFO] [launch]: All log files can be found below /root/.ros/log/2026-05-13-11-28-41-600643-ubuntu-1
+[INFO] [launch]: Default logging verbosity is set to INFO
+[33mWarning: Parameter 'enable_pointcloud_neon_fix' is not supported. Supported parameters are:
+['accel_fps', 'accelerate_gpu_with_glsl', 'align_depth.enable', 'angular_velocity_cov', 'base_frame_id', 'camera_name', 'camera_namespace', 'clip_distance', 'colorizer.enable', 'config_file', 'decimation_filter.enable', 'decimation_filter.filter_magnitude', 'depth_mapping_camera.labeled_point_cloud_profile', 'depth_mapping_camera.occupancy_profile', 'depth_module.color_format', 'depth_module.color_profile', 'depth_module.depth_format', 'depth_module.depth_profile', 'depth_module.enable_auto_exposure', 'depth_module.exposure', 'depth_module.exposure.1', 'depth_module.exposure.2', 'depth_module.gain', 'depth_module.gain.1', 'depth_module.gain.2', 'depth_module.hdr_enabled', 'depth_module.infra1_format', 'depth_module.infra2_format', 'depth_module.infra_format', 'depth_module.infra_profile', 'depth_module.inter_cam_sync_mode', 'device_type', 'diagnostics_period', 'disparity_filter.enable', 'enable_accel', 'enable_color', 'enable_depth', 'enable_gyro', 'enable_infra', 'enable_infra1', 'enable_infra2', 'enable_labeled_point_cloud', 'enable_motion', 'enable_occupancy', 'enable_rgbd', 'enable_safety', 'enable_sync', 'gyro_fps', 'hdr_merge.enable', 'hole_filling_filter.enable', 'initial_reset', 'json_file_path', 'linear_accel_cov', 'log_level', 'motion_fps', 'output', 'pointcloud.allow_no_texture_points', 'pointcloud.enable', 'pointcloud.ordered_pc', 'pointcloud.stream_filter', 'pointcloud.stream_index_filter', 'publish_tf', 'reconnect_timeout', 'rgb_camera.color_format', 'rgb_camera.color_profile', 'rgb_camera.enable_auto_exposure', 'rosbag_filename', 'rosbag_loop', 'rotation_filter.enable', 'rotation_filter.rotation', 'safety_camera.safety_mode', 'serial_no', 'spatial_filter.enable', 'temporal_filter.enable', 'tf_prefix', 'tf_publish_rate', 'unite_imu_method', 'usb_port_id', 'wait_for_device_timeout'][0m
+[INFO] [launch.user]: 🚀 Launching as Normal ROS Node
+[33mWarning: Parameter 'enable_pointcloud_neon_fix' is not supported. Supported parameters are:
+['accel_fps', 'accelerate_gpu_with_glsl', 'align_depth.enable', 'angular_velocity_cov', 'base_frame_id', 'camera_name', 'camera_namespace', 'clip_distance', 'colorizer.enable', 'config_file', 'decimation_filter.enable', 'decimation_filter.filter_magnitude', 'depth_mapping_camera.labeled_point_cloud_profile', 'depth_mapping_camera.occupancy_profile', 'depth_module.color_format', 'depth_module.color_profile', 'depth_module.depth_format', 'depth_module.depth_profile', 'depth_module.enable_auto_exposure', 'depth_module.exposure', 'depth_module.exposure.1', 'depth_module.exposure.2', 'depth_module.gain', 'depth_module.gain.1', 'depth_module.gain.2', 'depth_module.hdr_enabled', 'depth_module.infra1_format', 'depth_module.infra2_format', 'depth_module.infra_format', 'depth_module.infra_profile', 'depth_module.inter_cam_sync_mode', 'device_type', 'diagnostics_period', 'disparity_filter.enable', 'enable_accel', 'enable_color', 'enable_depth', 'enable_gyro', 'enable_infra', 'enable_infra1', 'enable_infra2', 'enable_labeled_point_cloud', 'enable_motion', 'enable_occupancy', 'enable_rgbd', 'enable_safety', 'enable_sync', 'gyro_fps', 'hdr_merge.enable', 'hole_filling_filter.enable', 'initial_reset', 'json_file_path', 'linear_accel_cov', 'log_level', 'motion_fps', 'output', 'pointcloud.allow_no_texture_points', 'pointcloud.enable', 'pointcloud.ordered_pc', 'pointcloud.stream_filter', 'pointcloud.stream_index_filter', 'publish_tf', 'reconnect_timeout', 'rgb_camera.color_format', 'rgb_camera.color_profile', 'rgb_camera.enable_auto_exposure', 'rosbag_filename', 'rosbag_loop', 'rotation_filter.enable', 'rotation_filter.rotation', 'safety_camera.safety_mode', 'serial_no', 'spatial_filter.enable', 'temporal_filter.enable', 'tf_prefix', 'tf_publish_rate', 'unite_imu_method', 'usb_port_id', 'wait_for_device_timeout'][0m
+[INFO] [launch.user]: 🚀 Launching as Normal ROS Node
+[INFO] [realsense2_camera_node-1]: process started with pid [39]
+[INFO] [realsense2_camera_node-2]: process started with pid [40]
+[realsense2_camera_node-2] 1778671721.980926 [0] realsense2: config: //CycloneDDS/Domain/General: 'NetworkInterfaceAddress': deprecated element (file:///tmp/cyclonedds_peer.xml line 4)
+[realsense2_camera_node-1] 1778671721.980926 [0] realsense2: config: //CycloneDDS/Domain/General: 'NetworkInterfaceAddress': deprecated element (file:///tmp/cyclonedds_peer.xml line 4)
+[realsense2_camera_node-1] [33m[WARN] [1778671721.997766103] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.[0m
+[realsense2_camera_node-1] [33m[WARN] [1778671722.000560209] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.[0m
+[realsense2_camera_node-1] [33m[WARN] [1778671722.000604147] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.[0m
+[realsense2_camera_node-1] [33m[WARN] [1778671722.000632051] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.008562452] [arm.d435i_arm]: RealSense ROS v4.57.7[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.008702073] [arm.d435i_arm]: Built with LibRealSense v2.57.7[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.008730714] [arm.d435i_arm]: Running with LibRealSense v2.57.7[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.008677144] [head.d435i_head]: RealSense ROS v4.57.7[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.008759547] [head.d435i_head]: Built with LibRealSense v2.57.7[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.008783900] [head.d435i_head]: Running with LibRealSense v2.57.7[0m
+[realsense2_camera_node-1]  13/05 11:28:42,010 ERROR [281473130946624] (context.cpp:41) No valid configuration file found at : /root/.realsense-config.json loading defaults
+[realsense2_camera_node-2]  13/05 11:28:42,010 ERROR [281472574087232] (context.cpp:41) No valid configuration file found at : /root/.realsense-config.json loading defaults
+[realsense2_camera_node-1] [0m[INFO] [1778671722.358454875] [head.d435i_head]: Device with serial number 336222071386 was found.
+[realsense2_camera_node-1] [0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.358611040] [head.d435i_head]: Device with physical ID /sys/devices/platform/bus@0/3610000.usb/usb2/2-1/2-1.2/2-1.2:1.0/video4linux/video6 was found.[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.358643649] [head.d435i_head]: Device with name Intel RealSense D435I was found.[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.358938123] [head.d435i_head]: Device with port number 2-1.2 was found.[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.358972460] [head.d435i_head]: Device USB type: 3.2[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.359169074] [head.d435i_head]: getParameters...[0m
+[realsense2_camera_node-1] [33m[WARN] [1778671722.360812231] [head.d435i_head]: For the 'unite_imu_method' param update to take effect, re-enable either gyro or accel stream.[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.360916523] [head.d435i_head]: JSON file is not provided[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.360948716] [head.d435i_head]: Device Name: Intel RealSense D435I[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.360971820] [head.d435i_head]: Device Serial No: 336222071386[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.360988397] [head.d435i_head]: Device physical port: /sys/devices/platform/bus@0/3610000.usb/usb2/2-1/2-1.2/2-1.2:1.0/video4linux/video6[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.361018798] [head.d435i_head]: Device FW version: 5.17.0.10[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.361044367] [head.d435i_head]: Device Product ID: 0x0B3A[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.361064399] [head.d435i_head]: Sync Mode: Off[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.371963921] [arm.d435i_arm]: Device with serial number 336222071386 was found.
+[realsense2_camera_node-2] [0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.372095701] [arm.d435i_arm]: Device with physical ID /sys/devices/platform/bus@0/3610000.usb/usb2/2-1/2-1.2/2-1.2:1.0/video4linux/video6 was found.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.372122934] [arm.d435i_arm]: Device with name Intel RealSense D435I was found.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.372415551] [arm.d435i_arm]: Device with port number 2-1.2 was found.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.388773809] [arm.d435i_arm]: Device with serial number 310622071850 was found.
+[realsense2_camera_node-2] [0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.388854996] [arm.d435i_arm]: Device with physical ID /sys/devices/platform/bus@0/3610000.usb/usb2/2-1/2-1.4/2-1.4:1.0/video4linux/video0 was found.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.388896565] [arm.d435i_arm]: Device with name Intel RealSense D435I was found.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.389302978] [arm.d435i_arm]: Device with port number 2-1.4 was found.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.389368292] [arm.d435i_arm]: Device USB type: 3.2[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.389552522] [arm.d435i_arm]: getParameters...[0m
+[realsense2_camera_node-2] [33m[WARN] [1778671722.390813139] [arm.d435i_arm]: For the 'unite_imu_method' param update to take effect, re-enable either gyro or accel stream.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.390894710] [arm.d435i_arm]: JSON file is not provided[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.390934167] [arm.d435i_arm]: Device Name: Intel RealSense D435I[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.390975160] [arm.d435i_arm]: Device Serial No: 310622071850[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.391048987] [arm.d435i_arm]: Device physical port: /sys/devices/platform/bus@0/3610000.usb/usb2/2-1/2-1.4/2-1.4:1.0/video4linux/video0[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.391110557] [arm.d435i_arm]: Device FW version: 5.17.0.10[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.391152990] [arm.d435i_arm]: Device Product ID: 0x0B3A[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.391193183] [arm.d435i_arm]: Sync Mode: Off[0m
+[realsense2_camera_node-1] [33m[WARN] [1778671722.532956272] [head.d435i_head]: re-enable the stream for the change to take effect.[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.534420831] [head.d435i_head]: Set ROS param depth_module.infra_profile to default: 848x480x30[0m
+[realsense2_camera_node-1] [33m[WARN] [1778671722.555614670] [head.d435i_head]: re-enable the stream for the change to take effect.[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.558271460] [head.d435i_head]: Set ROS param gyro_fps to default: 200[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.558541581] [head.d435i_head]: Set ROS param accel_fps to default: 100[0m
+[realsense2_camera_node-2] [33m[WARN] [1778671722.562221476] [arm.d435i_arm]: re-enable the stream for the change to take effect.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.563739381] [arm.d435i_arm]: Set ROS param depth_module.infra_profile to default: 848x480x30[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.575747546] [head.d435i_head]: Stopping Sensor: Depth Module[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.576297932] [head.d435i_head]: Stopping Sensor: RGB Camera[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.576399215] [head.d435i_head]: Stopping Sensor: Motion Module[0m
+[realsense2_camera_node-2] [33m[WARN] [1778671722.583528790] [arm.d435i_arm]: re-enable the stream for the change to take effect.[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.585476021] [arm.d435i_arm]: Set ROS param gyro_fps to default: 200[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.585636122] [arm.d435i_arm]: Set ROS param accel_fps to default: 100[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.593414102] [head.d435i_head]: Starting Sensor: Depth Module[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.598997387] [arm.d435i_arm]: Stopping Sensor: Depth Module[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.599615967] [arm.d435i_arm]: Stopping Sensor: RGB Camera[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.599718403] [arm.d435i_arm]: Stopping Sensor: Motion Module[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.605562688] [head.d435i_head]: Open profile: stream_type: Depth(0), Format: Z16, Width: 640, Height: 480, FPS: 15[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.611333243] [arm.d435i_arm]: Starting Sensor: Depth Module[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.623861169] [arm.d435i_arm]: Open profile: stream_type: Depth(0), Format: Z16, Width: 640, Height: 480, FPS: 15[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.631751600] [head.d435i_head]: Starting Sensor: RGB Camera[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.642432586] [head.d435i_head]: Open profile: stream_type: Color(0), Format: RGB8, Width: 640, Height: 480, FPS: 15[0m
+[realsense2_camera_node-1]  13/05 11:28:42,648 WARNING [281473130946624] (ds-calib-parsers.cpp:36) IMU Calibration is not available, default intrinsic and extrinsic will be used.
+[realsense2_camera_node-2] [0m[INFO] [1778671722.650194566] [arm.d435i_arm]: Starting Sensor: RGB Camera[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.651917277] [head.d435i_head]: Starting Sensor: Motion Module[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.659950338] [head.d435i_head]: Open profile: stream_type: Accel(0)Format: MOTION_XYZ32F, FPS: 100[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.660028196] [head.d435i_head]: Open profile: stream_type: Gyro(0)Format: MOTION_XYZ32F, FPS: 200[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.660315214] [arm.d435i_arm]: Open profile: stream_type: Color(0), Format: RGB8, Width: 640, Height: 480, FPS: 15[0m
+[realsense2_camera_node-2]  13/05 11:28:42,666 WARNING [281472574087232] (ds-calib-parsers.cpp:36) IMU Calibration is not available, default intrinsic and extrinsic will be used.
+[realsense2_camera_node-2] [0m[INFO] [1778671722.668880995] [arm.d435i_arm]: Starting Sensor: Motion Module[0m
+[realsense2_camera_node-1] [0m[INFO] [1778671722.672659933] [head.d435i_head]: RealSense Node Is Up![0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.676797603] [arm.d435i_arm]: Open profile: stream_type: Accel(0)Format: MOTION_XYZ32F, FPS: 100[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.676866214] [arm.d435i_arm]: Open profile: stream_type: Gyro(0)Format: MOTION_XYZ32F, FPS: 200[0m
+[realsense2_camera_node-2] [0m[INFO] [1778671722.684751333] [arm.d435i_arm]: RealSense Node Is Up![0m
+[realsense2_camera_node-2] [33m[WARN] [1778671722.997821379] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.[0m
+[realsense2_camera_node-2] [33m[WARN] [1778671722.997979976] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.[0m
+[realsense2_camera_node-2] [33m[WARN] [1778671722.998032554] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.[0m
+[realsense2_camera_node-2] [33m[WARN] [1778671722.998065739] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.[0m
+[realsense2_camera_node-1] [33m[WARN] [1778671723.597491913] [head.d435i_head]: XXX Hardware Notification:Motion Module failure,1.77867e+12,Error,Hardware Error[0m
+[realsense2_camera_node-1] [33m[WARN] [1778671723.597822995] [head.d435i_head]: Hardware Notification:Motion Module failure,1.77867e+12,Error,Hardware Error[0m
+[INFO] [ros2-3]: process started with pid [117]
+[INFO] [ros2-4]: process started with pid [118]
+[ros2-3] 1778671728.657157 [0]       ros2: config: //CycloneDDS/Domain/General: 'NetworkInterfaceAddress': deprecated element (file:///tmp/cyclonedds_peer.xml line 4)
+[ros2-4] 1778671728.657844 [0]       ros2: config: //CycloneDDS/Domain/General: 'NetworkInterfaceAddress': deprecated element (file:///tmp/cyclonedds_peer.xml line 4)
+[ros2-3] 1778671729.503437 [0]       ros2: config: //CycloneDDS/Domain/General: 'NetworkInterfaceAddress': deprecated element (file:///tmp/cyclonedds_peer.xml line 4)
+[ros2-4] 1778671729.503674 [0]       ros2: config: //CycloneDDS/Domain/General: 'NetworkInterfaceAddress': deprecated element (file:///tmp/cyclonedds_peer.xml line 4)
+[ros2-3] [WARN] [1778671729.671158201] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[ros2-3] [WARN] [1778671729.671472995] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[ros2-3] [WARN] [1778671729.671615432] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[ros2-4] [WARN] [1778671729.671500772] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[ros2-4] [WARN] [1778671729.671590151] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/rosout' with type 'rcl_interfaces::msg::dds_::Log_' from USER_DATA '(null)'.
+[ros2-4] [WARN] [1778671729.671612231] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'rt/parameter_events' with type 'rcl_interfaces::msg::dds_::ParameterEvent_' from USER_DATA '(null)'.
+[ros2-4] [WARN] [1778671729.671633000] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[ros2-3] [WARN] [1778671729.671752332] [rmw_cyclonedds_cpp]: Failed to parse type hash for topic 'ros_discovery_info' with type 'rmw_dds_common::msg::dds_::ParticipantEntitiesInfo_' from USER_DATA '(null)'.
+[ros2-4] Set parameter successful
+[ros2-3] Set parameter successful
+[INFO] [ros2-4]: process has finished cleanly [pid 118]
+[INFO] [ros2-3]: process has finished cleanly [pid 117]
+[realsense2_camera_node-1] [33m[WARN] [1778671923.759811562] [head.d435i_head]: No matching stream for texture 'Process - Any'. Set 'pointcloud.stream_profile' to 'depth(1)', 'color(2)', or 'infrared(3)' to enable textured pointclouds.[0m
+[realsense2_camera_node-2] [33m[WARN] [1778671923.843153486] [arm.d435i_arm]: No matching stream for texture 'Process - Any'. Set 'pointcloud.stream_profile' to 'depth(1)', 'color(2)', or 'infrared(3)' to enable textured pointclouds.[0m

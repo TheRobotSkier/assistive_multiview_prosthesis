@@ -99,7 +99,7 @@ else
   COMPOSE_PROFILE_FLAG := --profile mobile-sam-gpu
 endif
 
-.PHONY: help build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test test-unit test-baseline test-fresh test-replay test-replay-baseline shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill mounts-viz mounts-viz-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-bag record-bag-mock record-debug analyze-log analyze-bag analyze-bag-meta inspect-bag run-camera-log run-camera-log-debug run-tui
+.PHONY: help build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test test-unit test-baseline test-fresh test-replay test-replay-baseline shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill mounts-viz mounts-viz-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-bag record-bag-mock record-debug analyze-log analyze-bag analyze-bag-meta inspect-bag run-camera-log run-camera-log-debug run-tui jetson-fetch-log jetson-analyze-log
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -173,6 +173,8 @@ help:
 	@echo "    make robotlab-connect       Connect to Jetson via Ethernet"
 	@echo "    make jetson-sync            Push code to Jetson"
 	@echo "    make jetson-cameras         Sync + start cameras + RViz"
+	@echo "    make jetson-fetch-log       Copy latest Jetson log + sysmon to logs/"
+	@echo "    make jetson-analyze-log     Fetch + analyze latest Jetson log (runs analyze_log.py --plot)"
 	@echo "    make timesync               Sync clocks (host + Jetson)"
 	@echo "    make network-tune           Tune UDP buffers on host (needs sudo)"
 	@echo "    make network-tune-jetson    Tune UDP buffers on Jetson (remote)"
@@ -362,18 +364,32 @@ record-debug: ## Record bag + system telemetry (host CPU/GPU/RAM/drift/NIC + Jet
 	BEFORE=$$(ls -d data/bags/v6_*/ 2>/dev/null | tr '\n' ' '); \
 	$(MAKE) record-bag & \
 	RECORD_PID=$$!; \
-	sleep 3; \
-	AFTER=$$(ls -d data/bags/v6_*/ 2>/dev/null | tr '\n' ' '); \
-	BAG_DIR=$$(for d in $$AFTER; do case "$$BEFORE" in *"$$d"*) ;; *) echo "$$d"; break;; esac; done); \
+	BAG_DIR=""; \
+	for i in $$(seq 1 10); do \
+		sleep 3; \
+		AFTER=$$(ls -d data/bags/v6_*/ 2>/dev/null | tr '\n' ' '); \
+		BAG_DIR=$$(for d in $$AFTER; do case "$$BEFORE" in *"$$d"*) ;; *) echo "$$d"; break;; esac; done); \
+		if [ -n "$$BAG_DIR" ]; then break; fi; \
+		echo "  ($$i/10) waiting for bag dir..."; \
+	done; \
 	if [ -z "$$BAG_DIR" ]; then \
-		echo "ERROR: no new bag dir detected after 3s (recording may have failed)."; \
+		echo "ERROR: no new bag dir detected after 30s (recording may have failed)."; \
 		kill $$RECORD_PID 2>/dev/null; wait $$RECORD_PID 2>/dev/null; true; exit 1; \
 	fi; \
 	echo "Bag dir:    $$BAG_DIR"; \
 	echo "Sysmon out: $$BAG_DIR/sysmon.jsonl"; \
-	trap 'kill $$RECORD_PID 2>/dev/null; wait $$RECORD_PID 2>/dev/null; true' INT TERM; \
+	trap '_stop_bag() { \
+		echo; \
+		echo "Stopping recording..."; \
+		$(DOCKER_CMD) exec prosthesis bash -c "kill -INT \$$(pgrep -f \"ros2 bag record\" 2>/dev/null || echo 0)" 2>/dev/null || true; \
+		sleep 3; \
+		kill -INT $$RECORD_PID 2>/dev/null; \
+		wait $$RECORD_PID 2>/dev/null; \
+		echo "Bag finalized."; \
+		true; \
+	}; _stop_bag' INT TERM; \
 	python3 scripts/sysmon.py --output "$$BAG_DIR/sysmon.jsonl"; \
-	kill $$RECORD_PID 2>/dev/null; wait $$RECORD_PID 2>/dev/null; true
+	_stop_bag
 
 # Analyze a host-log for fast debugging. Defaults to the latest log.
 # Usage: make analyze-log  /  make analyze-log LOG=logs/host-log-<ts>.txt
@@ -441,11 +457,29 @@ run-camera-log: dev
 run-camera-log-debug: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-camera-log-debug'
 
+# Same as run-camera-log-debug but uses the V6 TSDF/GTSAM fusion pipeline
+# (tsdf_fusion, gtsam_tracker, keyframe_buffer, SIFT features).
+run-camera-log-debug-new: dev
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-camera-log-debug-new'
+
 # Launch the pipeline-config TUI inside the container. Presents toggles and
 # tuning knobs for the pipeline.launch.py launch arguments, then launches
 # the pipeline with your chosen settings. Uses curses (no X11 needed).
 run-tui: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-tui'
+
+# Full pipeline (EMG + wrist + hand) with legacy fusion + log capture + debug
+# diagnostics (same as run-camera-log-debug but includes hardware).
+run-log-debug: up-hw
+	make segmentation-status
+	make timesync-check
+	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
+	echo "[host] Detected: MIA=$$DETECTED_MIA_PORT  WRIST=$$DETECTED_WRIST_PORT" && \
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec \
+		-e MIA_SERIAL_PORT="$$DETECTED_MIA_PORT" \
+		-e WRIST_SERIAL_PORT="$$DETECTED_WRIST_PORT" \
+		prosthesis /bin/bash -lc 'make setup-usb' && \
+	$(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-log-debug'
 
 collect-data: dev
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make collect-data'
@@ -833,6 +867,7 @@ JETSON_HOST       := robotlab
 JETSON_DEPLOY_DIR := /home/robotlab/multiview_prosthesis
 JETSON_BARE_REPO  := /home/robotlab/multiview_prosthesis.git
 JETSON_BRANCH     := full_test_implementation
+JETSON_LOG_DIR    := ~/Documents/assistive_multiview_prosthesis/logs
 
 # One-time setup: creates bare repo + checkout hook on Jetson, adds git remote.
 jetson-setup: robotlab-connect
@@ -862,6 +897,71 @@ jetson-cameras-logs: robotlab-connect
 
 jetson-list-cameras: robotlab-connect
 	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make list-cameras"
+
+# ── Jetson log fetch + analysis ────────────────────────────────────────────
+# Fetches Docker container logs + sysmon JSONL from the Jetson.
+# Tries multiple container names to handle both old (miahand_*) and
+# new (cameras_test / openvins) naming schemes.
+#
+#   make jetson-fetch-log          # fetch Docker logs + sysmon from Jetson
+#   make jetson-fetch-log JETSON_LOG=run-jetson-debug-20260617_120000.txt  # specific
+#
+#   make jetson-analyze-log        # analyze the latest LOCAL jetson log
+JETSON_LOG ?=
+
+jetson-fetch-log: robotlab-connect
+	@mkdir -p $(CURDIR)/logs && \
+	if [ -n "$(JETSON_LOG)" ]; then \
+		REMOTE_PATH="$(JETSON_LOG_DIR)/$(JETSON_LOG)"; \
+		echo "Fetching specified: $$REMOTE_PATH"; \
+		BASENAME=$$(basename "$$REMOTE_PATH") && \
+		LOCAL_PATH="$(CURDIR)/logs/jetson-$$BASENAME" && \
+		scp $(JETSON_HOST):"$$REMOTE_PATH" "$$LOCAL_PATH" && \
+		echo " + log: jetson-$$BASENAME"; \
+		SYSMON=$$(echo "$$REMOTE_PATH" | sed 's/\.txt$$/\.jsonl/') && \
+		if ssh $(JETSON_HOST) "test -f $$SYSMON"; then \
+			SYSMON_BASE=$$(basename "$$SYSMON") && \
+			scp $(JETSON_HOST):"$$SYSMON" "$(CURDIR)/logs/jetson-$$SYSMON_BASE" && \
+			echo " + sysmon: jetson-$$SYSMON_BASE"; \
+		else \
+			echo " (no sysmon jsonl found)"; \
+		fi; \
+	else \
+		TS=$$(date +%Y%m%d_%H%M%S); \
+		echo "=== Fetching Jetson logs ($$TS) ==="; \
+		echo "--- Docker container logs ---"; \
+		for CONTAINER in cameras_test openvins miahand_realsense_camera miahand_ros2; do \
+			echo "  $$CONTAINER ..."; \
+			ssh $(JETSON_HOST) "echo robotlab | sudo -S docker logs --tail 5000 $$CONTAINER 2>&1" > "$(CURDIR)/logs/jetson-$$CONTAINER-$$TS.txt" 2>&1 || true; \
+			if [ -s "$(CURDIR)/logs/jetson-$$CONTAINER-$$TS.txt" ]; then \
+				echo "    saved: logs/jetson-$$CONTAINER-$$TS.txt"; \
+			else \
+				rm -f "$(CURDIR)/logs/jetson-$$CONTAINER-$$TS.txt"; \
+				echo "    (no logs / container not found)"; \
+			fi; \
+		done; \
+		echo ""; \
+		echo "--- Sysmon (JSONL) ---"; \
+		SYSMON_REMOTE=$$(ssh $(JETSON_HOST) 'ls -t $(JETSON_LOG_DIR)/run-jetson-debug-*.jsonl 2>/dev/null | head -1'); \
+		if [ -n "$$SYSMON_REMOTE" ]; then \
+			SYSMON_BASE=$$(basename "$$SYSMON_REMOTE"); \
+			scp $(JETSON_HOST):"$$SYSMON_REMOTE" "$(CURDIR)/logs/jetson-$$SYSMON_BASE" && \
+			echo "  saved: logs/jetson-$$SYSMON_BASE"; \
+		else \
+			echo "  (no sysmon jsonl found on Jetson)"; \
+		fi; \
+		echo "Done."; \
+	fi
+
+jetson-analyze-log: ## Analyze the latest locally-fetched Jetson log
+	@LOCAL_PATH=$$(ls -t $(CURDIR)/logs/jetson-cameras_test-*.txt $(CURDIR)/logs/jetson-miahand_realsense_camera-*.txt 2>/dev/null | head -1); \
+	if [ -z "$$LOCAL_PATH" ]; then \
+		echo "ERROR: no local jetson logs found. Run 'make jetson-fetch-log' first."; \
+		exit 1; \
+	fi; \
+	echo "Analyzing: $$LOCAL_PATH"; \
+	echo ""; \
+	python3 $(CURDIR)/scripts/analyze_log.py --plot "$$LOCAL_PATH"
 
 # ── Jetson OpenVINS (cameras + VIO containers + host RViz) ───────────────────
 # Syncs the repo, starts both Jetson containers, and opens the Phase 2 RViz.

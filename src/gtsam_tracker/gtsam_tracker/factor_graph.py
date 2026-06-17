@@ -22,7 +22,7 @@ Reference: V6 plan §5.3, §5.4.
 
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -81,13 +81,21 @@ class TrajectoryFactorGraph:
         Smoother lag in seconds.  Keys older than this are marginalised.
     """
 
-    def __init__(self, lag_s: float = 15.0):
+    def __init__(self, lag_s: float = 7.0):
         self._lag_s = lag_s
 
         # ISAM2 parameters
         isam_params = gtsam.ISAM2Params()
-        isam_params.setRelinearizeThreshold(0.001)
-        isam_params.relinearizeSkip = 3
+        # relinearizeThreshold = 0.01 — at 12 Hz with <1 cm/step VIO deltas,
+        # variables accumulate ~5 cm of linearization error between checks
+        # (every 5 updates = ~415 ms) and are relinearized promptly.
+        # This keeps the linearized-system approximation accurate enough
+        # that Gauss-Newton converges in few iterations.
+        # Setting this too loose (e.g. GTSAM default 0.1) makes the
+        # linearized system stale → more solver iterations → LOWER output
+        # rate, as confirmed by the iteration-13 regression.
+        isam_params.setRelinearizeThreshold(0.01)
+        isam_params.relinearizeSkip = 5
         self._isam = gtsam.ISAM2(isam_params)
 
         # Track the last key index and timestamp for each chain.
@@ -132,6 +140,8 @@ class TrajectoryFactorGraph:
         delta_arm: np.ndarray,
         noise_head: gtsam.noiseModel,
         noise_arm: gtsam.noiseModel,
+        init_head: Optional[gtsam.Pose3] = None,
+        init_arm: Optional[gtsam.Pose3] = None,
     ) -> None:
         """Add odometry between-factors for both chains.
 
@@ -145,6 +155,13 @@ class TrajectoryFactorGraph:
             The relative pose delta ``T_prev_curr`` for each chain.
         noise_head, noise_arm : gtsam.noiseModel
             Noise models for the head and arm between-factors.
+        init_head, init_arm : gtsam.Pose3, optional
+            Pre-computed initial estimates for the new keys.  When provided,
+            these are used directly instead of computing ``get_pose(prev_key)
+            * delta``, which avoids a redundant ISAM2 back-substitution.
+            Typically set to the raw odometry pose for the current step.
+            Falls back to the existing get_pose-based initialisation when
+            ``None`` (backward compatible).
         """
         for chain, key_new, delta, noise in [
             ("h", key_head, delta_head, noise_head),
@@ -170,7 +187,14 @@ class TrajectoryFactorGraph:
 
             # Provide initial estimate if not yet in the graph.
             if k_new not in self._initialized:
-                if key_last is not None and self._make_key(chain, key_last) in self._initialized:
+                # When a pre-computed initial estimate is provided (e.g. the
+                # raw odometry pose from the caller), use it directly to avoid
+                # a redundant get_pose() / calculateEstimatePose3() call.
+                if (chain == "h" and init_head is not None):
+                    init_pose = init_head
+                elif (chain == "a" and init_arm is not None):
+                    init_pose = init_arm
+                elif key_last is not None and self._make_key(chain, key_last) in self._initialized:
                     prev_pose = self.get_pose(self._make_key(chain, key_last))
                     init_pose = prev_pose.compose(delta_pose)
                 else:
@@ -250,32 +274,53 @@ class TrajectoryFactorGraph:
         key_arm: int,
         max_distance: float,
         sigma: float,
+        T_head_arm: Optional[np.ndarray] = None,
     ) -> None:
         """Add a soft range constraint between head and arm.
 
-        If the head-arm distance exceeds ``max_distance``, a penalty pulls
-        them back.  Implemented as a loose between-factor that acts as a soft
-        spring pulling the two poses together.
+        Adds a weak between-factor that constrains the head-arm relative
+        pose to stay near the currently-observed configuration, preventing
+        the two chains from drifting apart while respecting that the cameras
+        move relative to each other (the arm is not rigidly attached to the
+        head).
 
         Parameters
         ----------
         key_head, key_arm : int
             Head and arm keys.
         max_distance : float
-            The target / maximum distance in metres.
+            Approximate maximum head-arm separation in metres.  Used as
+            the translation noise sigma so the constraint only activates
+            when the chains diverge beyond this distance.
         sigma : float
-            Range measurement sigma in metres.
+            Rotation noise sigma in radians.
+        T_head_arm : ndarray (4, 4) or None
+            Current odometry-based relative transform T_head_arm.
+            If None, falls back to a weak identity prior.
         """
-        # Loose rotation noise, tight translation noise.
-        # The zero-translation between-factor pulls head and arm together,
-        # counteracted by odometry.  This acts as a soft spring.
-        loose_noise = gtsam.noiseModel.Diagonal.Sigmas(
-            np.array([10.0, 10.0, 10.0, sigma, sigma, sigma])
+        # Translation noise = max_distance (loose — only activates when
+        # chains diverge by more than ~max_distance).  Rotation noise = sigma
+        # (default 0.05 rad) so the factor provides a moderate relative
+        # orientation constraint between the two kinematic chains.
+        #
+        # GTSAM BetweenFactorPose3 error ordering: [tx, ty, tz, rx, ry, rz].
+        # First three = translation (sigma = max_distance), last three =
+        # rotation (sigma = sigma parameter).
+        noise = gtsam.noiseModel.Diagonal.Sigmas(
+            np.array([float(max_distance), float(max_distance), float(max_distance),
+                      float(sigma), float(sigma), float(sigma)])
         )
 
-        measured = gtsam.Pose3()  # identity
+        if T_head_arm is not None:
+            measured = gtsam.Pose3(np.asarray(T_head_arm, dtype=np.float64))
+        else:
+            # No odometry reference — fall back to a very loose identity
+            # prior.  The large sigmas make this a rubber-band that only
+            # activates at multi-metre divergence.
+            measured = gtsam.Pose3()
+
         self._new_factors.add(
-            gtsam.BetweenFactorPose3(key_head, key_arm, measured, loose_noise)
+            gtsam.BetweenFactorPose3(key_head, key_arm, measured, noise)
         )
 
     # ------------------------------------------------------------------
@@ -293,8 +338,9 @@ class TrajectoryFactorGraph:
         Reference: V6 §9 graceful-degradation / fault-tolerance.
         """
         isam_params = gtsam.ISAM2Params()
-        isam_params.setRelinearizeThreshold(0.001)
-        isam_params.relinearizeSkip = 3
+        # relinearizeThreshold = 0.01 — matches __init__.  Skip 5.
+        isam_params.setRelinearizeThreshold(0.01)
+        isam_params.relinearizeSkip = 5
         self._isam = gtsam.ISAM2(isam_params)
 
         self._last_key = {"h": None, "a": None}
@@ -311,12 +357,28 @@ class TrajectoryFactorGraph:
     # Update / optimise
     # ------------------------------------------------------------------
 
-    def update(self) -> None:
-        """Run an ISAM2 update with all accumulated new factors."""
-        if self._new_factors.size() == 0:
+    def update(self, marginalize_keys: Optional[List[int]] = None) -> None:
+        """Run an ISAM2 update with all accumulated new factors.
+
+        Parameters
+        ----------
+        marginalize_keys : list of int, optional
+            Keys to marginalize during this update (fixed-lag smoother).
+            Passed as ``marginalizeTheta`` to ISAM2 so old variables are
+            removed and replaced by linear approximation factors.
+        """
+        if self._new_factors.size() == 0 and not marginalize_keys:
             return
 
-        self._isam.update(self._new_factors, self._new_values)
+        # Build marginalization KeyVector if keys were provided.
+        if marginalize_keys:
+            theta = gtsam.KeyVector()
+            for k in marginalize_keys:
+                theta.push_back(k)
+        else:
+            theta = gtsam.KeyVector()
+
+        self._isam.update(self._new_factors, self._new_values, theta)
 
         # Reset accumulators.
         self._new_factors = gtsam.NonlinearFactorGraph()
@@ -326,14 +388,24 @@ class TrajectoryFactorGraph:
     # Marginalisation (fixed-lag)
     # ------------------------------------------------------------------
 
-    def marginalize_old_keys(self, current_stamp: float) -> int:
+    def marginalize_old_keys(self, current_stamp: float) -> List[int]:
         """Identify keys older than ``current_stamp - lag_s`` for marginalisation.
 
-        In this ISAM2-based implementation, old keys are tracked and can be
-        removed in a future rebuild step.  The timestamp bookkeeping is
-        maintained here so that the graph size stays bounded.
+        Returns the list of integer keys eligible for marginalisation.  The
+        caller should pass these keys to :meth:`update` so ISAM2 removes
+        them from the Bayes tree and replaces them with linear approximation
+        factors (fixed-lag smoother behaviour).
 
-        Returns the number of keys eligible for marginalisation.
+        Parameters
+        ----------
+        current_stamp : float
+            Current timestamp in seconds.  Keys with timestamps older than
+            ``current_stamp - lag_s`` are returned.
+
+        Returns
+        -------
+        list of int
+            Keys that should be marginalised on the next update.
         """
         threshold = current_stamp - self._lag_s
         to_remove = [
@@ -341,12 +413,17 @@ class TrajectoryFactorGraph:
             if t < threshold
         ]
         if not to_remove:
-            return 0
+            return []
 
-        # Mark old keys as marginalised (remove from timestamp tracking).
+        # Remove from timestamp tracking (keys are gone from the smoother
+        # once ISAM2 marginalises them during update()).
         for k in to_remove:
             self._key_timestamps.pop(k, None)
-        return len(to_remove)
+            self._all_keys.discard(k)
+            # Also forget initialisation status so re-adding a key with
+            # the same index after a reset works cleanly.
+            self._initialized.discard(k)
+        return to_remove
 
     # ------------------------------------------------------------------
     # Query

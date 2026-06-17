@@ -1,0 +1,108 @@
+==============================================================================
+LOG ANALYSIS — host-log-20260617_135843.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/host-log-20260617_135843.txt
+Lines:      8784
+Time span:  15:58:45 – 16:01:04 (138.8s)
+Launch args: fusion_mode='tsdf_preview', fusion_mode='tsdf_preview' — launching tsdf_fusion (preview_mode=True)
+
+Nodes started (15):
+  camera_mount_tf_publisher                  pid=715
+  grasp_proximity_controller_node.py         pid=726
+  gtsam_tracker_node                         pid=720
+  keyframe_buffer_node                       pid=721
+  odom_to_pose_relay                         pid=717
+  openvins_odom_tf_relay                     pid=718
+  openvins_realsense_tf_bridge_node          pid=714
+  pipeline_diagnostics_node                  pid=719
+  pipeline_manager_node                      pid=713
+  preshaping_service_bridge_node             pid=725
+  rviz2                                      pid=727
+  sift_feature_node                          pid=722
+  tf_pipeline_diagnostics                    pid=716
+  tsdf_fusion_node                           pid=723
+  twist_propagation_node                     pid=724
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  tsdf_fusion_node                               1      0      24  <-- noisy
+  pipeline_diagnostics_node                      0   6349      29  <-- noisy
+  openvins_odom_tf_relay                         0     50       1
+  tf_pipeline_diagnostics                        0      4      11
+  gtsam_tracker_node                             0      2      16
+  camera_mount_tf_publisher                      0      0       3
+  grasp_proximity_controller_node.py             0      0       4
+  keyframe_buffer_node                           0      0      78
+  odom_to_pose_relay                             0      0       1
+  openvins_realsense_tf_bridge_node              0      0       6
+  pipeline_manager_node                          0      0       4
+  preshaping_service_bridge_node                 0      0       3
+  rviz2                                          0      0      10
+  sift_feature_node                              0      0      15
+  twist_propagation_node                         0      0       4
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  [ 6335x] TF jump (pipeline_diagnostics)  [15:59:36 .. 16:01:04]
+          hint: VIO/odometry discontinuity — check OpenVINS stability & clock drift
+          sample: {'edge': 'marker_map -> head_imu', 'jump_m': 0.397, 'stamp': 1781704776.944}
+          sample: {'edge': 'marker_map -> head_imu_openvins_corrected', 'jump_m': 0.408, 'stamp': 1781704776.945}
+  [   43x] odom pose jumped — TF suppressed  [15:59:38 .. 16:01:03]
+          hint: openvins_odom_tf_relay rejecting a large VIO jump
+          sample: {'side': 'arm', 'jump_m': 1.985, 'threshold': 0.5}
+          sample: {'side': 'arm', 'jump_m': 1.915, 'threshold': 0.5}
+  [    1x] gtsam odometry rejected  [15:59:38 .. 15:59:38]
+          hint: gtsam_tracker detected diverging VIO — re-syncing baseline
+          sample: {'head_m': 0.008, 'arm_m': 1.985, 'max_m': 0.5}
+  [    1x] tsdf GetAllKeyframes timeout  [15:59:46 .. 15:59:46]
+          hint: keyframe_buffer service hung — check buffer load / deadlocks
+          sample: {}
+  [   13x] TF chain disconnected  [15:58:59 .. 16:00:57]
+          hint: OpenVINS→RealSense TF bridge incomplete — Jetson link down?
+          sample: {'head': 'MISSING', 'arm': 'MISSING'}
+          sample: {'head': 'MISSING', 'arm': 'MISSING'}
+  [    4x] relay status change  [15:58:57 .. 15:59:27]
+          hint: openvins_odom_tf_relay head/arm message-flow state
+          sample: {'head': 'WAITING', 'arm': 'WAITING'}
+          sample: {'head': 'WAITING', 'arm': 'WAITING'}
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  Topic rates (Hz) — first / mid / last / min / max:
+    /gtsam/arm_pose                      0.0 /  15.0 /  10.7   (min 0.0, max 15.5)
+    /gtsam/head_pose                     0.0 /  15.0 /  10.7   (min 0.0, max 15.0)
+    /jetson/arm/image                    0.0 /   0.0 /   0.0   (min 0.0, max 2.3)
+    /jetson/arm/odom                     0.0 / 158.8 / 142.3   (min 0.0, max 184.5)  <-- FLOODED (nominal 30.0 Hz)
+    /jetson/arm/points                   0.0 /   6.3 /   5.7   (min 0.0, max 7.5)
+    /jetson/head/image                   0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+    /jetson/head/odom                    0.0 / 153.9 / 137.4   (min 0.0, max 169.0)  <-- FLOODED (nominal 30.0 Hz)
+    /jetson/head/points                  0.0 /   6.2 /   6.7   (min 0.0, max 7.8)
+    /vis/head_arm_pose                   0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+
+  Clock offset (max |clock_off| across topics per block):
+    peak |offset| = 109.716s at 16:01:03
+    24/24 blocks exceeded 50ms offset (clock skew)
+
+  TF chain connectivity (marker_map -> depth_optical_frame):
+    > arm_d435i_arm_depth_optical_frame: DISCONNECTED entire run (9 blocks)
+    > arm_imu: DISCONNECTED entire run (9 blocks)
+    > head_d435i_head_depth_optical_frame: DISCONNECTED entire run (9 blocks)
+    > head_imu: DISCONNECTED entire run (9 blocks)
+
+  TF jump events: 6335 total
+    peak burst: 429 jumps in 5s window at 15:59:40
+     1744x  marker_map -> arm_imu
+     1644x  marker_map -> head_imu
+     1482x  marker_map -> head_imu_openvins_corrected
+     1457x  marker_map -> arm_imu_openvins_corrected
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  [1x] GetAllKeyframes call timed out.
+        first: 15:59:46 (tsdf_fusion_node)  last: 15:59:46
+

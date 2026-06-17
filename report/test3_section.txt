@@ -1,0 +1,168 @@
+\documentclass[master.tex]{subfiles}
+
+\begin{document}
+% ==========================================
+% Test 3: FUNCTIONAL USER TRIAL
+% ==========================================
+\section{Test 3: Functional User Trial}
+
+This test introduces a functional rubric to evaluate baseline usability and intent prediction accuracy in a real-world, cluttered environment. By enforcing a specific task sequence, an objective ground truth is established for intent validation.
+
+\subsection{Relevant Requirements}
+\begin{table}[H]
+\centering
+\small
+\begin{tabularx}{\linewidth}{ c l X c c c }
+\toprule
+\textbf{ID} & \textbf{Category} & \textbf{Requirement / Metric} & \textbf{Units} & \textbf{MAR} & \textbf{IDE} \\
+\midrule
+\multicolumn{6}{c}{\textbf{Functional Requirements}} \\
+\midrule
+1.5 & Autonomy & \multicolumn{4}{l}{The prosthesis shall autonomously predict the intended target object} \\
+    &          & \multicolumn{4}{l}{from environmental context and arm pose.} \\
+\midrule
+\multicolumn{6}{c}{\textbf{Technical Requirements}} \\
+\midrule
+2.1 & Func. Perf. & Normalised task completion time relative to the biological limb. & \% & $\le 155$ & $\le 100$ \\
+\midrule
+2.3 & Cognitive Ld. & The NASA-TLX score reported by participants. & score & $\le 65$ & $\le 54$ \\
+\midrule
+2.5 & Intent Predict. & Accuracy of object selection in multi-object scenes. & \% & $\ge 95$ & $\ge 100$ \\
+\bottomrule
+\end{tabularx}
+\caption{Requirements evaluated during Phase 3: Functional User Trial.}
+\label{tab:req_phase3}
+\end{table}
+
+\subsection{Setup}
+A participant wears the prosthesis system. A variety of SHAP-inspired objects are placed in a cluttered layout on a table, intentionally positioned to create partial visual occlusions.
+\begin{enumerate}
+    \item \textbf{Task Execution:} The participant is instructed to reach, grasp, and move the objects in a specific, pre-defined sequence using the EMG trigger.
+    \item \textbf{Functional Performance (2.1):} The time taken to complete moving a single object is recorded. This is then compared against the time it takes the user to complete the identical sequence with their biological hand to calculate the normalised completion percentage.
+    \item \textbf{Intent Prediction Accuracy (2.5, 1.5):} After the trial concludes, the internal system logs are parsed. The software's recorded object selections are cross-referenced sequentially against the known requested order. The percentage of correctly predicted targets validates the system's accuracy and autonomy. The failure type is recorded for reference.
+    \item \textbf{Cognitive Load (2.3):} Immediately following the task, the participant fills out a NASA Task Load Index (NASA-TLX) questionnaire to establish the baseline cognitive demand of operating the multi-view semi-autonomous system.
+\end{enumerate}
+
+
+\subsection{Results}
+The functional user trials were executed utilising a physical hardware-in-the-loop tracking framework operating at a fixed frame rate of 30\,FPS. Data logging isolated the performance profiles of two participants (Participant 1 and Participant 2) across single-view and dual-view camera architectures, with the dual-view configuration evaluated exclusively by Participant 1. \autoref{fig:trial_workspace_mapping} shows the trial setup from both the physical side and system side.
+
+\begin{figure}[htbp]
+    \centering
+    \begin{subfigure}[b]{0.55\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{0.2_Pictures/tests/test3/experiment.png}
+        \caption{Physical experimental workspace.}
+        \label{fig:experiment_setup_real}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.42\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{0.2_Pictures/tests/test3/scene_reconstruction.png}
+        \caption{3D point cloud reconstruction.}
+        \label{fig:scene_reconstruction_cloud}
+    \end{subfigure}
+    \caption{Functional user trial environment mapping. The physical camera, arm pose, and object layout configuration during testing (a) map directly to the real-time frame coordinate systems and TF trees managed by the runtime reconstruction pipeline (b).}
+    \label{fig:trial_workspace_mapping}
+\end{figure}
+
+\subsubsection{Temporal Performance and Task Abandonment (Req. 2.1)}
+Completion time was tracked across five sequential interaction attempts per experimental block. To establish the baseline control group, biological completion times were aggregated, yielding a highly optimised mean duration of 1.55\,s (46.5 frames) for Participant 1 and 1.41\,s (42.2 frames) for Participant 2.
+
+As illustrated in \autoref{fig:functional_efficiency}, execution through the vision-guided prosthetic pipeline introduced massive temporal inflation. Successful executions ranged from a minimum duration of 15.93\,s (\textit{Participant 2 Single View 1}, Attempt 2) to a maximum of 59.70\,s (\textit{Participant 2 Single View 1}, Attempt 1). When normalised against the biological control mean, these intervals represent an inflation band spanning from \textbf{1132.2\% to 4243.1\%}, significantly exceeding the maximum allowable requirement thresholds.
+
+Furthermore, system volatility introduced severe task failure rates, which were recorded whenever a single object manipulation sequence exceeded a strict 1-minute timeout ceiling. Complete operational collapse was observed during the \textit{Participant 1 Dual View 2} testing series, which experienced a 100\% task failure rate across all five baseline attempts.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=\textwidth]{0.2_Pictures/tests/test3/temporal_performance.png}
+    \caption{Temporal distribution profiles for the test. Left: Boxplot tracking valid normalised completion times alongside localised trial scatter points against the 100\% biological baseline. Right: Stacked bar chart mapping the absolute ratio of successful attempts against timeouts.}
+    \label{fig:functional_efficiency}
+\end{figure}
+
+\subsubsection{Fault Topology and Cascading Sub-system Breakdowns (Req. 1.5 \& 2.5)}
+Diagnostic annotation from the internal runtime framework reveals that failure rarely occurred as isolated system events; instead, they manifested as compounding, sequential fault cascades within the state machine. The underlying failure modes are categorised as follows:
+\begin{itemize}
+    \item \textbf{\texttt{t} (Trigger Error):} The EMG trigger failed to register within the control loop.
+    \item \textbf{\texttt{l} (Localisation Error):} The spatial coordinates failed to reach the precision required for subsequent pipeline components to operate.
+    \item \textbf{\texttt{v} (Vision / Scene Reconstruction Error):} Sensors were unable to adequately reconstruct the area of interest.
+    \item \texttt{i} \textbf{(Intent Prediction Error):} Tracking and pose registration anomalies induced downstream failures in target object selection.
+    \item \textbf{\texttt{s} (Segmentation Error):} The object segmentation pipeline failed to isolate and deliver a usable target point cloud.
+    \item \textbf{\texttt{d} (Incorrect Deactivation Error):} An EMG misclassification prematurely triggered system deactivation during reach.
+    \item \textbf{\texttt{p} (Proximity Detection Error):} The proximity subsystem lost spatial tracking of the arm and failed to trigger hand closure.
+\end{itemize}
+
+The tracking logs visualised in \autoref{fig:failure_state_space} reveal distinct behavioural trends across the evaluated architectures:
+\begin{itemize}
+    \item \textbf{Single-View Occlusions:} Standalone sensor configurations proved highly susceptible to Vision (\texttt{v}) due to limited field of view. This vulnerability is highlighted by fault sequences such as \texttt{dvd} and \texttt{illd}, where visibility dropouts directly induce intent alignment faults (\texttt{i}) and localisation state errors (\texttt{l}).
+    \item \textbf{Dual-View Sensor Fusion Stalls:} While the multi-view system successfully mitigated single-perspective visual dropouts, it introduced severe cross-view fusion errors and lag. This noise triggered state-machine gridlocks, characterised by compounding error strings such as \texttt{lllpp} (repeated localisation losses and proximity tracking errors) and \texttt{lvip} (simultaneous localisation, vision, intent, and proximity collapses).
+    \item \textbf{EMG Classification Error:} Participant 1 had a high rate of errors related to EMG classification (\texttt{t} and \texttt{d}), despite a high average f1 score of 0.97 on validation data. This suggests either user error or a shifted EMG armband.
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{0.2_Pictures/tests/test3/failure_mode_state_space.png}
+    \caption{Categorical state-space scatterplot tracking explicit sub-system failure mode occurrences across individual experimental configuration trial runs.}
+    \label{fig:failure_state_space}
+\end{figure}
+
+\subsubsection{Methodological Omission Analysis of Subjective Cognitive Load (Req. 2.3)}
+While the experimental protocol originally mandated the immediate collection of NASA Task Load Index (NASA-TLX) questionnaires following task completion, tracking was intentionally suspended during this testing phase.
+
+Methodologically, subjective workload assessment scales assume a stable baseline architecture where the designated task sequence can be consistently executed to completion. In this study, the software pipeline encountered a global failure rate of 53.33\% (16 out of 30 total trial cycles resulting in timeout) as can be seen in \autoref{fig:reliability_profile}. Combined with a highly constrained sample size ($N=2$), administering a psychometric evaluation under these conditions would be hard to interpret. The resulting scores would exclusively reflect participant frustration with systemic hardware dropouts rather than isolating the actual cognitive workload induced by the semi-autonomous control strategy itself. Consequently, reporting subjective metrics was deemed statistically uninformative, and formal cognitive load evaluation must be deferred until core loop reliability is established.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{0.2_Pictures/tests/test3/reliability_profile.png}
+    \caption{Bar chart showing the distribution of successful outcomes, error-recovered loops, and unrecoverable timeouts.}
+    \label{fig:reliability_profile}
+\end{figure}
+
+\subsection{Evaluation}
+The functional user trial phase clearly isolates the operational boundaries of the prosthesis. The system fails to clear the technical compliance thresholds established in the requirements document, indicating that real-world environmental clutter and human-in-the-loop interaction introduce massive integration penalties. The verification summary is compiled in \autoref{tab:test3_evaluation}.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Requirements verification and functional evaluation summary.}
+\label{tab:test3_evaluation}
+\begin{tabular}{ccccc}
+\toprule
+\textbf{ID} & \textbf{Requirement} & \textbf{Target} & \textbf{Observed Metric} & \textbf{Evaluation Status} \\
+\midrule
+1.5 & Autonomy & Contextual Selection & Verified in isolated frames & \textbf{Passed (Conditional)} \\
+\addlinespace
+2.1 & Func. Performance & $\le 155\%$ Bio Time & $> 1000\%$ Temporal Inflation & \textbf{Failed} \\
+\addlinespace
+2.3 & Cognitive Load & NASA-TLX $\le 65$ & Omitted due to high timeouts & \textbf{Suspended} \\
+\addlinespace
+2.5 & Intent Precision & $\ge 95\%$ Accuracy & $53.33\%$ Timeouts & \textbf{Failed} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Requirement 1.5: Autonomy}
+\begin{quote}
+    \textit{The prosthesis shall autonomously predict the intended target object from the environmental context and arm pose.}
+\end{quote}
+This requirement is cleared under a highly restrictive conditional pass. The core prediction architecture successfully executes target tracking and object classification within isolated, error-free execution windows. However, this autonomy cannot be sustained reliably when subjected to full system cascaded errors.
+
+\subsubsection{Requirement 2.1: Functional Performance}
+\begin{quote}
+    \textit{Normalised task completion time relative to the biological limb should marginally be $\le 155\%$.}
+\end{quote}
+The system completely fails to satisfy the functional performance requirement. Even within the most efficient prosthetic execution sequence observed in the logs (15.93\,s), the processing overhead and error-recovery cycles yield an aggregate 1132.2\% temporal inflation compared to the biological control reference. This massive divergence from the 155\% MAR threshold indicates that the current system is unviable for daily use.
+
+\subsubsection{Requirement 2.3: Cognitive Load Assessment}
+\begin{quote}
+    \textit{The NASA-TLX score reported by participants should marginally be $\le 65$ and ideally be $\le 54$.}
+\end{quote}
+Compliance verification for this metric has been formally suspended. Due to a small sample size ($N=2$) and a catastrophic 53.33\% task abandonment rate driven by unrecoverable software stalls, any recorded psychometric data would be mathematically corrupted by confounding systemic variables.
+
+\subsubsection{Requirement 2.5: Intent Prediction Accuracy}
+\begin{quote}
+    \textit{Accuracy of object selection in multi-object scenes should marginally be $\ge 95\%$.}
+\end{quote}
+The pipeline fails to satisfy the intent precision criteria. While classification accuracy remains moderately viable during steady-state tracking, the continuous reliability mandate required by the MAR threshold ($\ge 95\%$) is entirely invalidated by the severe 53.33\% frequency of cascading state-machine stalls and unrecoverable timeouts.
+
+\end{document}

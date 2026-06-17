@@ -85,12 +85,10 @@ def project_points_to_pixels(
         raise ValueError(f"cloud_xyz must be (N, 3), got {pts.shape}")
 
     N = pts.shape[0]
-    homogeneous = np.empty((N, 4), dtype=np.float64)
-    homogeneous[:, :3] = pts
-    homogeneous[:, 3] = 1.0
 
-    pose_inv = np.linalg.inv(pose)
-    p_cam = (pose_inv @ homogeneous.T).T[:, :3]
+    # SE(3)-efficient world→camera: p_cam = R^T @ (p_world - t)
+    centered = pts - pose[:3, 3]  # (N, 3)
+    p_cam = (pose[:3, :3].T @ centered.T).T  # (N, 3)
 
     in_front = p_cam[:, 2] > 0
 
@@ -353,10 +351,9 @@ def project_3d_to_2d(
         camera.
     """
     p = np.asarray(point_3d, dtype=np.float64).reshape(3)
-    homogeneous = np.append(p, 1.0)
 
-    pose_inv = np.linalg.inv(pose)
-    p_cam = (pose_inv @ homogeneous)[:3]
+    # SE(3)-efficient world→camera: p_cam = R^T @ (p_world - t)
+    p_cam = pose[:3, :3].T @ (p - pose[:3, 3])
 
     if p_cam[2] <= 0:
         return (-1, -1)

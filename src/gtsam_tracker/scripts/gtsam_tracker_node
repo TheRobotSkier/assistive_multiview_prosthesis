@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""Launcher for gtsam_tracker_node.
+
+Bypasses the setuptools console_scripts entry-point wrapper (which uses
+importlib.metadata.distribution() to find package metadata) and directly
+imports the module.  This avoids PackageNotFoundError when colcon install
+does not place dist-info in a location importlib.metadata can discover.
+
+Usage
+-----
+    gtsam_tracker_node --ros-args ...
+"""
+
+import sys
+
+from gtsam_tracker.gtsam_tracker_node import main
+
+if __name__ == "__main__":
+    sys.exit(main())

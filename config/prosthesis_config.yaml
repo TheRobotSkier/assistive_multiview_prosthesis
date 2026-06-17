@@ -320,7 +320,7 @@ openvins_odom_tf_relay:
         # marker_map -> *_imu TF edges.  Instead, the GTSAM tracker owns
         # those edges (broadcast_tf=true) so downstream nodes consume the
         # smoothed FGO trajectory rather than raw, diverging VIO.
-        publish_dynamic_tf: true
+        publish_dynamic_tf: false
         use_corrected_tf: true
 
 openvins_realsense_tf_bridge:
@@ -442,7 +442,7 @@ emg_grasp_controller:
 pipeline_diagnostics:
     ros__parameters:
         summary_interval_s: 5.0
-        tf_jump_threshold_m: 0.05
+        tf_jump_threshold_m: 0.20
         pose_norm_warn_m: 1.0
         pose_norm_critical_m: 2.0
         clock_offset_warn_s: 0.15
@@ -481,14 +481,19 @@ gtsam_tracker:
         visual_factor_topic: "/vis/head_arm_pose"
         # Graph parameters
         graph_rate_hz: 15.0
-        smoother_lag_s: 15.0
+        smoother_lag_s: 7.0
         # Kinematic range factor (soft constraint between head and arm)
         kinematic_range_m: 1.0
         kinematic_range_sigma_m: 0.05
-        kinematic_check_interval: 10
-        # Noise sigmas (used when odom covariance is zero/invalid)
-        odom_translation_sigma_m: 0.02
-        odom_rotation_sigma_rad: 0.02
+        kinematic_check_interval: 5
+        # Noise sigmas (used when odom covariance is zero/invalid).
+        # Increased from 0.02 to 0.10 (5x) so GTSAM trusts VIO less
+        # aggressively and produces a smoother trajectory, filtering
+        # VIO discontinuities (iteration-24: 2990 TF jumps from tight
+        # tracking of noisy VIO).  The 7-second smoother lag maintains
+        # adequate tracking accuracy while suppressing VIO noise.
+        odom_translation_sigma_m: 0.10
+        odom_rotation_sigma_rad: 0.10
         # Output topics
         head_pose_topic: "/gtsam/head_pose"
         arm_pose_topic: "/gtsam/arm_pose"
@@ -499,7 +504,7 @@ gtsam_tracker:
         # rviz, and other consumers use the FGO trajectory instead of the
         # raw VIO relay.  The relay's publish_dynamic_tf must be set to
         # false to avoid two publishers fighting over the same edges.
-        broadcast_tf: false
+        broadcast_tf: true
         head_child_frame: "head_imu"
         arm_child_frame: "arm_imu"
 
@@ -549,7 +554,7 @@ cross_camera_features:
         output_topic: "/vis/head_arm_pose"
         # Processing
         process_rate_hz: 5.0
-        sync_slop_s: 0.05
+        sync_slop_s: 0.2
         min_matches: 5
         top_k_matches: 100
         ratio_threshold: 0.8

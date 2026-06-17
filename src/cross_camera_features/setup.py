@@ -9,11 +9,7 @@ setup(
     version="0.1.0",
     packages=[package_name],
     py_modules=[],
-    entry_points={
-        "console_scripts": [
-            "sift_feature_node = cross_camera_features.sift_feature_node:main",
-        ],
-    },
+    scripts=["scripts/sift_feature_node"],
     data_files=[
         ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
         ("share/" + package_name, ["package.xml"]),

@@ -22,8 +22,6 @@ import numpy as np
 
 # Pure-logic helpers (Phase 1 Task B + C).
 from keyframe_buffer.cloud_utils import lookup_depth_3d, lookup_depth_from_image
-from gtsam_tracker.umeyama import umeyama
-
 
 __all__ = [
     "match_and_align",
@@ -264,8 +262,9 @@ def match_and_align(
     dst = np.array(p_head_list)  # head points (destination)
 
     try:
+        from gtsam_tracker.umeyama import umeyama  # lazy import — node can start even if gtsam_tracker is temporarily unavailable
         T, cov = umeyama(src, dst)
-    except ValueError as exc:
+    except (ValueError, ImportError, np.linalg.LinAlgError) as exc:
         return AlignResult(
             None, None, num_valid, len(correspondences),
             f"umeyama failed: {exc}")
@@ -291,7 +290,7 @@ DEFAULT_PARAMS = {
     "arm_pose_topic": "/gtsam/arm_pose",
     "output_topic": "/vis/head_arm_pose",
     "process_rate_hz": 5.0,
-    "sync_slop_s": 0.05,
+    "sync_slop_s": 0.2,
     "min_matches": 5,
     "top_k_matches": 100,
     "ratio_threshold": 0.8,
@@ -595,9 +594,23 @@ def create_node():
             self._frame_count += 1
 
             # Need cloud + K + pose for both cameras before we can align.
-            if (self._head_cloud is None or self._arm_cloud is None
-                    or self._head_K is None or self._arm_K is None
-                    or self._head_pose is None or self._arm_pose is None):
+            missing = []
+            if self._head_cloud is None:
+                missing.append("head_cloud")
+            if self._arm_cloud is None:
+                missing.append("arm_cloud")
+            if self._head_K is None:
+                missing.append("head_K")
+            if self._arm_K is None:
+                missing.append("arm_K")
+            if self._head_pose is None:
+                missing.append("head_pose")
+            if self._arm_pose is None:
+                missing.append("arm_pose")
+            if missing:
+                self.get_logger().debug(
+                    f"Synced images arrived but missing: {', '.join(missing)}",
+                    throttle_duration_sec=5.0)
                 return
 
             try:
@@ -634,6 +647,11 @@ def create_node():
                 self.get_logger().debug(
                     f"Published head_arm_pose ({result.num_matches} matches)")
             else:
+                # Log every alignment result at debug level for diagnostics.
+                self.get_logger().debug(
+                    f"Alignment skipped: {result.message} "
+                    f"(matches={result.num_matches}, raw={result.num_raw_matches})",
+                    throttle_duration_sec=2.0)
                 # Diagnostics: warn if consistently low.
                 if (result.num_matches < self._min_matches
                         and not self._low_match_warned

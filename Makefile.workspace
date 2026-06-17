@@ -33,7 +33,7 @@ TONIGHT_ROS_QUIET := RCUTILS_LOGGING_SEVERITY_THRESHOLD=ERROR
 
 # ── Targets ──────────────────────────────────────────────────────────────────
 
-.PHONY: help build build-pkg build-debug clean test test-unit test-baseline mock mock-v6 pipeline pipeline-v6 start digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source run-camera-log run-tui record-bag record-bag-mock inspect-bag
+.PHONY: help build build-pkg build-debug clean test test-unit test-baseline mock mock-v6 pipeline pipeline-v6 start digital-twin digital-twin-mock grasp-test twist-test twist-launch start-twist stop-twist collect-data train run-classifier setup-usb tonight tonight-build tonight-clean tonight-raw-check tonight-imu-check tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates openvins-check source run-camera-log run-camera-log-debug-new run-log-debug run-tui record-bag record-bag-mock inspect-bag
 
 tonight twist-test twist-launch tonight-tf tonight-tf-check tonight-fusion tonight-fusion-check tonight-segmentation-check tonight-twist-check tonight-grasp-check tonight-gates: tonight-build
 
@@ -53,10 +53,10 @@ help: ## Show this help message
 	@printf "  %-22s %s\n" "PKG=<name>" "Package name for build-pkg target"
 	@echo ""
 
-build: ## Build all ROS packages (Release mode)
+build: ## Build all ROS packages (Release mode, symlink-install for Python)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
-	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+	colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 build-pkg: ## Build a single package (use: make build-pkg PKG=pipeline_manager)
 	@if [ -z "$(PKG)" ]; then \
@@ -65,12 +65,12 @@ build-pkg: ## Build a single package (use: make build-pkg PKG=pipeline_manager)
 	fi
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
-	colcon build --packages-select $(PKG) --cmake-args -DCMAKE_BUILD_TYPE=Release
+	colcon build --packages-select $(PKG) --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 
 build-debug: ## Build all packages with debug symbols
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
-	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Debug
+	colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Debug
 
 clean: ## Remove all build artifacts (build/, install/, log/)
 	rm -rf /prosthesis_ws/build/* /prosthesis_ws/install/* /prosthesis_ws/log/*
@@ -132,14 +132,14 @@ run: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
 	cd /prosthesis_ws && \
 	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	$(ROS_WORKSPACE_SETUP) && \
-	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview
+	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy
 
-run-camera: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
+run-camera: ## Build + launch camera-only pipeline (no hardware)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
 	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	$(ROS_WORKSPACE_SETUP) && \
-	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy
 
 run-camera-log: ## Same as run-camera but tees all output to logs/host-log-<timestamp>.txt
 	@$(ROS_SETUP) && \
@@ -149,7 +149,7 @@ run-camera-log: ## Same as run-camera but tees all output to logs/host-log-<time
 	mkdir -p /prosthesis_ws/logs && \
 	LOG_FILE=/prosthesis_ws/logs/host-log-$$(date +%Y%m%d_%H%M%S).txt && \
 	echo "=== Logging to $$LOG_FILE ===" && \
-	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview 2>&1 | tee $$LOG_FILE
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy 2>&1 | tee $$LOG_FILE
 
 run-camera-log-debug: ## Same as run-camera-log but launches the pipeline_diagnostics node (TF jump / rate / divergence monitor)
 	@$(ROS_SETUP) && \
@@ -159,7 +159,27 @@ run-camera-log-debug: ## Same as run-camera-log but launches the pipeline_diagno
 	mkdir -p /prosthesis_ws/logs && \
 	LOG_FILE=/prosthesis_ws/logs/host-log-$$(date +%Y%m%d_%H%M%S).txt && \
 	echo "=== Logging to $$LOG_FILE (with pipeline_diagnostics) ===" && \
+	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy debug_monitor:=true 2>&1 | tee $$LOG_FILE
+
+run-camera-log-debug-new: ## Like run-camera-log-debug but with TSDF/GTSAM fusion pipeline (V6 new)
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
+	mkdir -p /prosthesis_ws/logs && \
+	LOG_FILE=/prosthesis_ws/logs/host-log-$$(date +%Y%m%d_%H%M%S).txt && \
+	echo "=== Logging to $$LOG_FILE (TSDF fusion + pipeline_diagnostics) ===" && \
 	ros2 launch prosthesis_launch pipeline.launch.py mia_hand:=false wrist:=false emg:=false haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=tsdf_preview debug_monitor:=true 2>&1 | tee $$LOG_FILE
+
+run-log-debug: ## Build + launch full pipeline with legacy fusion + log + pipeline diagnostics
+	@$(ROS_SETUP) && \
+	cd /prosthesis_ws && \
+	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	$(ROS_WORKSPACE_SETUP) && \
+	mkdir -p /prosthesis_ws/logs && \
+	LOG_FILE=/prosthesis_ws/logs/host-log-$$(date +%Y%m%d_%H%M%S).txt && \
+	echo "=== Logging to $$LOG_FILE (full pipeline + pipeline_diagnostics) ===" && \
+	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy debug_monitor:=true 2>&1 | tee $$LOG_FILE
 
 run-tui: ## Open the pipeline-config TUI (toggles + tuning knobs), then launch
 	@$(ROS_SETUP) && \
@@ -216,7 +236,18 @@ record-bag: ## Record all V6 perception + odometry topics for offline replay
 	echo "(host path: data/bags/$(RECORD_BAG_DIR))" && \
 	echo "Press Ctrl+C to stop." && \
 	ros2 bag record -o /prosthesis_ws/data/bags/$(RECORD_BAG_DIR) \
-		--topics $(RECORD_TOPICS_V6)
+		--topics $(RECORD_TOPICS_V6) & \
+	REC_PID=$$!; \
+	_stop_rec() { \
+		echo; \
+		echo "Stopping recording (flushing to disk)..."; \
+		kill -INT $$REC_PID 2>/dev/null; \
+		wait $$REC_PID 2>/dev/null; \
+		echo "Recording saved to /prosthesis_ws/data/bags/$(RECORD_BAG_DIR)"; \
+		exit 0; \
+	}; \
+	trap _stop_rec INT TERM HUP; \
+	wait $$REC_PID
 
 record-bag-mock: ## Record mock pipeline topics (lighter set)
 	@$(ROS_SETUP) && \
@@ -224,7 +255,18 @@ record-bag-mock: ## Record mock pipeline topics (lighter set)
 	echo "Recording mock topics to /prosthesis_ws/data/bags/$(RECORD_BAG_DIR)" && \
 	echo "(host path: data/bags/$(RECORD_BAG_DIR))" && \
 	echo "Press Ctrl+C to stop." && \
-	ros2 bag record -o /prosthesis_ws/data/bags/$(RECORD_BAG_DIR) --topics $(RECORD_TOPICS_MOCK)
+	ros2 bag record -o /prosthesis_ws/data/bags/$(RECORD_BAG_DIR) --topics $(RECORD_TOPICS_MOCK) & \
+	REC_PID=$$!; \
+	_stop_rec() { \
+		echo; \
+		echo "Stopping recording (flushing to disk)..."; \
+		kill -INT $$REC_PID 2>/dev/null; \
+		wait $$REC_PID 2>/dev/null; \
+		echo "Recording saved to /prosthesis_ws/data/bags/$(RECORD_BAG_DIR)"; \
+		exit 0; \
+	}; \
+	trap _stop_rec INT TERM HUP; \
+	wait $$REC_PID
 
 inspect-bag: ## Show topic list + message counts for the most recent bag
 	@BAG=$$(ls -dt /prosthesis_ws/data/bags/v6_*/ 2>/dev/null | head -1); \

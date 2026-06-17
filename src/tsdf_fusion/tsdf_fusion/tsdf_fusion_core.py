@@ -299,7 +299,12 @@ def fuse_object_cloud(
             float(K[0, 2]), float(K[1, 2]),
         )
         # Open3D expects the *extrinsic* as T_camera_world = inv(T_world_camera).
-        extrinsic = np.linalg.inv(pose)
+        # Use SE(3)-efficient closed-form inverse: inv([R t; 0 1]) = [R^T -R^T t; 0 1]
+        R = pose[:3, :3]
+        t = pose[:3, 3]
+        extrinsic = np.eye(4)
+        extrinsic[:3, :3] = R.T
+        extrinsic[:3, 3] = -R.T @ t
         volume.integrate(rgbd, intrinsic, extrinsic)
         integrated_count += 1
 
@@ -532,7 +537,12 @@ def fuse_scene_preview(
             float(K[0, 0]), float(K[1, 1]),
             float(K[0, 2]), float(K[1, 2]),
         )
-        extrinsic = np.linalg.inv(pose)
+        # Use SE(3)-efficient closed-form inverse: inv([R t; 0 1]) = [R^T -R^T t; 0 1]
+        R = pose[:3, :3]
+        t = pose[:3, 3]
+        extrinsic = np.eye(4)
+        extrinsic[:3, :3] = R.T
+        extrinsic[:3, 3] = -R.T @ t
         volume.integrate(rgbd, intrinsic, extrinsic)
         integrated_count += 1
 

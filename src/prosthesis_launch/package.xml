@@ -19,6 +19,14 @@
   <depend>twist_propagation</depend>
   <depend>force_controller</depend>
   <depend>rviz2</depend>
+
+  <!-- V6 TSDF fusion pipeline (launched by pipeline.launch.py / mock.launch.py) -->
+  <exec_depend>tsdf_fusion</exec_depend>
+  <exec_depend>gtsam_tracker</exec_depend>
+  <exec_depend>cross_camera_features</exec_depend>
+  <exec_depend>keyframe_buffer</exec_depend>
+  <exec_depend>sensor_fusion_bringup</exec_depend>
+  <exec_depend>sensor_fusion_msgs</exec_depend>
   <export>
     <build_type>ament_python</build_type>
   </export>

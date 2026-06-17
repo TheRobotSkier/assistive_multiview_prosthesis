@@ -36,6 +36,7 @@ import json
 import math
 import os
 import re
+import struct
 import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -233,14 +234,26 @@ class BagReport:
 # ---------------------------------------------------------------------------
 
 def _parse_metadata(bag_dir: str) -> BagReport:
-    """Parse metadata.yaml — no MCAP read needed."""
+    """Parse bag metadata — tries metadata.yaml first, then MCAP file."""
     import yaml
     meta_path = os.path.join(bag_dir, "metadata.yaml")
+    rep = BagReport(bag_dir=os.path.normpath(bag_dir))
+
+    if os.path.isfile(meta_path):
+        return _parse_metadata_yaml(meta_path, rep)
+    else:
+        print("[analyze_bag] metadata.yaml missing — falling back to MCAP file",
+              file=sys.stderr)
+        return _parse_metadata_mcap(bag_dir, rep)
+
+
+def _parse_metadata_yaml(meta_path: str, rep: BagReport) -> BagReport:
+    """Parse a rosbag2 metadata.yaml file."""
+    import yaml
     with open(meta_path) as f:
         d = yaml.safe_load(f)
     info = d["rosbag2_bagfile_information"]
 
-    rep = BagReport(bag_dir=os.path.normpath(bag_dir))
     rep.duration_s = info["duration"]["nanoseconds"] / 1e9
     rep.total_msgs = info["message_count"]
     rep.start_ns = info["starting_time"]["nanoseconds_since_epoch"]
@@ -255,18 +268,109 @@ def _parse_metadata(bag_dir: str) -> BagReport:
             count=t["message_count"],
             expected_hz=EXPECTED_HZ.get(name),
         )
-        if ti.count > 0 and rep.duration_s > 0:
-            ti.effective_hz = ti.count / rep.duration_s
-        # Health assessment
-        if ti.count == 0:
-            ti.health = "ABSENT"
-        elif ti.expected_hz and ti.effective_hz:
-            if ti.effective_hz < ti.expected_hz * RATE_STARVED_FRAC:
-                ti.health = "STARVED"
-            elif ti.effective_hz > ti.expected_hz * RATE_FLOODED_FRAC:
-                ti.health = "FLOODED"
+        _compute_topic_health(ti, rep.duration_s)
         rep.topics[name] = ti
     return rep
+
+
+def _parse_metadata_mcap(bag_dir: str, rep: BagReport) -> BagReport:
+    """Extract bag metadata from the MCAP file(s) when metadata.yaml is absent.
+
+    Uses the low-level StreamReader (not make_reader) so we can gracefully
+    handle truncated/corrupt MCAP files from interrupted recordings.
+    """
+    mcap_files = sorted(glob.glob(os.path.join(bag_dir, "*.mcap")))
+    if not mcap_files:
+        print(f"[analyze_bag] no .mcap file in {bag_dir} — report will be empty",
+              file=sys.stderr)
+        rep.start_iso = "unknown"
+        return rep
+
+    try:
+        from mcap.stream_reader import StreamReader
+        from mcap.records import Channel, Message, Schema
+    except ImportError:
+        print("[analyze_bag] mcap not installed — cannot read MCAP metadata",
+              file=sys.stderr)
+        rep.start_iso = "unknown (install mcap)"
+        return rep
+
+    # Collect topic message counts and find earliest/latest timestamps.
+    # StreamReader reads raw records sequentially without needing a valid
+    # summary, so it works with truncated files (we catch errors at EOF).
+    topic_counts: dict = defaultdict(int)
+    topic_types: dict = {}
+    channels: dict = {}   # channel_id -> Channel
+    schemas: dict = {}     # schema_id -> Schema
+    earliest_ns: int = None
+    latest_ns: int = None
+    total_msgs = 0
+
+    for mcap_path in mcap_files:
+        with open(mcap_path, "rb") as f:
+            reader = StreamReader(f)
+            try:
+                for rec in reader.records:
+                    if isinstance(rec, Schema):
+                        schemas[rec.id] = rec
+                    elif isinstance(rec, Channel):
+                        channels[rec.id] = rec
+                    elif isinstance(rec, Message):
+                        ch = channels.get(rec.channel_id)
+                        if ch is not None:
+                            topic = ch.topic
+                            topic_counts[topic] = topic_counts.get(topic, 0) + 1
+                            if topic not in topic_types:
+                                s = schemas.get(ch.schema_id)
+                                topic_types[topic] = s.name if s else "unknown"
+                        stamp_ns = rec.publish_time
+                        if earliest_ns is None or stamp_ns < earliest_ns:
+                            earliest_ns = stamp_ns
+                        if latest_ns is None or stamp_ns > latest_ns:
+                            latest_ns = stamp_ns
+                        total_msgs += 1
+            except (struct.error, Exception) as e:
+                # Truncated MCAP — the file was killed mid-write.
+                print(f"[analyze_bag] MCAP read stopped early "
+                      f"(corrupt/truncated file): {e}",
+                      file=sys.stderr)
+
+    rep.total_msgs = total_msgs
+    if earliest_ns and latest_ns:
+        rep.start_ns = earliest_ns
+        rep.duration_s = (latest_ns - earliest_ns) / 1e9
+        rep.start_iso = datetime.datetime.fromtimestamp(
+            earliest_ns / 1e9).strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        rep.start_iso = "unknown (no messages)"
+        rep.duration_s = 0.0
+
+    for name, count in topic_counts.items():
+        ti = TopicInfo(
+            name=name,
+            msg_type=topic_types.get(name, "unknown"),
+            count=count,
+            expected_hz=EXPECTED_HZ.get(name),
+        )
+        _compute_topic_health(ti, rep.duration_s)
+        rep.topics[name] = ti
+
+    print(f"[analyze_bag] MCAP fallback: {total_msgs} msgs across "
+          f"{len(topic_counts)} topics", file=sys.stderr)
+    return rep
+
+
+def _compute_topic_health(ti: TopicInfo, duration_s: float):
+    """Compute health flags for a topic (shared by yaml and mcap paths)."""
+    if ti.count > 0 and duration_s > 0:
+        ti.effective_hz = ti.count / duration_s
+    if ti.count == 0:
+        ti.health = "ABSENT"
+    elif ti.expected_hz and ti.effective_hz:
+        if ti.effective_hz < ti.expected_hz * RATE_STARVED_FRAC:
+            ti.health = "STARVED"
+        elif ti.effective_hz > ti.expected_hz * RATE_FLOODED_FRAC:
+            ti.health = "FLOODED"
 
 
 # ---------------------------------------------------------------------------
@@ -562,7 +666,12 @@ def _compute_all_agreements(pose_samples: dict) -> list:
 # ---------------------------------------------------------------------------
 
 def _deep_replay(rep: BagReport, max_msgs_per_topic: int = 5000):
-    """Read the MCAP file to extract per-message sizes, timestamps, and pose data."""
+    """Read the MCAP file to extract per-message sizes, timestamps, and pose data.
+
+    Falls back to raw StreamReader if the MCAP summary/index is corrupt
+    (e.g. from an interrupted recording), which skips pose/TF decoding but
+    still collects per-message timestamps and sizes for Tier B stats.
+    """
     try:
         from mcap.reader import make_reader
         from mcap_ros2.decoder import DecoderFactory
@@ -577,6 +686,22 @@ def _deep_replay(rep: BagReport, max_msgs_per_topic: int = 5000):
         print(f"[analyze_bag] no .mcap file in {rep.bag_dir} — skipping Tier B",
               file=sys.stderr)
         return False
+
+    # Try full decoded replay first (pose/TF extraction needs valid summary).
+    # If the MCAP summary is corrupt, fall back to raw StreamReader.
+    try:
+        return _deep_replay_decoded(rep, mcap_files, max_msgs_per_topic)
+    except Exception as e:
+        print(f"[analyze_bag] MCAP summary corrupt, falling back to raw replay: {e}",
+              file=sys.stderr)
+        return _deep_replay_raw(rep, mcap_files, max_msgs_per_topic)
+
+
+def _deep_replay_decoded(rep: BagReport, mcap_files: list,
+                         max_msgs_per_topic: int) -> bool:
+    """Full decoded replay — requires a valid MCAP summary/index."""
+    from mcap.reader import make_reader
+    from mcap_ros2.decoder import DecoderFactory
 
     pose_norms = defaultdict(list)  # topic -> [(stamp_s, norm)]
     pose_samples = defaultdict(list)  # topic -> [PoseSample]
@@ -670,6 +795,70 @@ def _deep_replay(rep: BagReport, max_msgs_per_topic: int = 5000):
     rep.pose_stats = {t: _compute_pose_stats(t, samples)
                       for t, samples in pose_samples.items()}
     print(f"[analyze_bag] Tier B: read {total} messages from {len(mcap_files)} file(s)",
+          file=sys.stderr)
+    return True
+
+
+def _deep_replay_raw(rep: BagReport, mcap_files: list,
+                     max_msgs_per_topic: int) -> bool:
+    """Raw StreamReader fallback for corrupted MCAP files (no summary/index).
+
+    Collects per-message sizes, publish times, and log times for Tier B stats
+    (jitter, bandwidth).  Pose/TF decoding is skipped because ROS
+    deserialization requires schemas from the summary.
+    """
+    try:
+        from mcap.stream_reader import StreamReader
+        from mcap.records import Channel, Message
+    except ImportError:
+        print("[analyze_bag] mcap StreamReader not available — no Tier B data",
+              file=sys.stderr)
+        return False
+
+    total = 0
+    channels: dict = {}   # channel_id -> Channel
+    for mcap_path in mcap_files:
+        with open(mcap_path, "rb") as f:
+            reader = StreamReader(f)
+            try:
+                for rec in reader.records:
+                    if isinstance(rec, Channel):
+                        channels[rec.id] = rec
+                    elif isinstance(rec, Message):
+                        ch = channels.get(rec.channel_id)
+                        if ch is None:
+                            continue
+                        topic = ch.topic
+                        ti = rep.topics.get(topic)
+                        size = len(rec.data)
+                        if ti is not None:
+                            if len(ti.sizes) < max_msgs_per_topic:
+                                ti.sizes.append(size)
+                                ti.stamps.append(rec.publish_time)
+                                ti.recv_times.append(rec.log_time)
+                        total += 1
+            except (struct.error, Exception) as e:
+                print(f"[analyze_bag] MCAP read stopped early: {e}",
+                      file=sys.stderr)
+
+    # Compute Tier B stats per topic (same as decoded path)
+    for ti in rep.topics.values():
+        if len(ti.sizes) < 2:
+            continue
+        dts = [(ti.stamps[i] - ti.stamps[i - 1]) / 1e6
+               for i in range(1, len(ti.stamps))]
+        dts_ms = sorted(dts)
+        ti.median_dt_ms = dts_ms[len(dts_ms) // 2] if dts_ms else None
+        med = ti.median_dt_ms or 1.0
+        ti.max_gap_ms = max(dts) if dts else None
+        ti.n_gaps = sum(1 for d in dts if d > med * GAP_WARN_FRAC)
+        ti.avg_size_kb = sum(ti.sizes) / len(ti.sizes) / 1024.0
+        if ti.effective_hz:
+            ti.bandwidth_mbs = ti.avg_size_kb * ti.effective_hz / 1024.0
+
+    print(f"[analyze_bag] Tier B (raw): read {total} messages from "
+          f"{len(mcap_files)} file(s) (pose/TF decoding skipped — "
+          f"corrupt summary)",
           file=sys.stderr)
     return True
 

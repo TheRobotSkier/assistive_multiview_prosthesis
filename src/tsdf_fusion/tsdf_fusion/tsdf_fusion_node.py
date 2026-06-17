@@ -457,6 +457,11 @@ def create_node():
                 period, self._preview_tick,
                 callback_group=self._reentrant_group)
 
+            # ── In-flight guard — prevents concurrent GetAllKeyframes calls
+            #     piling up when the service response serialisation is slow
+            #     (100 keyframes × multi-MB images can take several seconds).
+            self._preview_fetch_in_flight = False
+
             self.get_logger().info(
                 f"TsdfFusionNode ready (PREVIEW mode) "
                 f"(rate={self._preview_rate_hz} Hz, "
@@ -650,9 +655,21 @@ def create_node():
 
         def _preview_tick(self):
             """One cycle of scene-preview fusion (timer-driven)."""
+            # ── In-flight guard: if a previous GetAllKeyframes call is still
+            #     waiting for the slow service response serialisation, skip
+            #     this tick to avoid piling up concurrent calls.
+            if self._preview_fetch_in_flight:
+                self.get_logger().debug(
+                    "Preview: skipping tick — previous GetAllKeyframes still in flight")
+                return
+
             t0 = time.monotonic()
 
-            keyframes = self._fetch_all_keyframes()
+            self._preview_fetch_in_flight = True
+            try:
+                keyframes = self._fetch_all_keyframes()
+            finally:
+                self._preview_fetch_in_flight = False
             if keyframes is None:
                 # Service error already logged (throttled).
                 return

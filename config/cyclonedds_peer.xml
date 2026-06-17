@@ -4,8 +4,8 @@
       <Interfaces>
         <NetworkInterface address="10.42.0.1" />
       </Interfaces>
-      <AllowMulticast>false</AllowMulticast>
-      <MulticastRecvNetworkInterfaceAddresses>none</MulticastRecvNetworkInterfaceAddresses>
+      <AllowMulticast>true</AllowMulticast>
+      <MulticastRecvNetworkInterfaceAddresses>all</MulticastRecvNetworkInterfaceAddresses>
       <!--
         Prevent IP-level fragmentation.  16 KB keeps each UDP datagram
         well under the Ethernet MTU (~1500 bytes after headers).

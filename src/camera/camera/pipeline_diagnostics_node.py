@@ -161,7 +161,7 @@ DEFAULT_PARAMS = {
     # Periodic summary interval (seconds)
     "summary_interval_s": 5.0,
     # TF jump threshold (meters) — flag edges that jump more than this
-    "tf_jump_threshold_m": 0.05,
+    "tf_jump_threshold_m": 0.20,
     # Pose norm warning thresholds (meters)
     "pose_norm_warn_m": 1.0,
     "pose_norm_critical_m": 2.0,

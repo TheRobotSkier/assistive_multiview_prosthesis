@@ -231,11 +231,25 @@ def step_preflight():
 
 
 def step_run_pipeline() -> subprocess.Popen | None:
-    """Start the pipeline in the background inside the container."""
+    """Start the pipeline in the background inside the container.
+
+    Captures pipeline output to a timestamped host-log file so that
+    step_analyze() and analyze_log.py can extract diagnostics (gtsam_corr,
+    TF jumps, errors, rate timeline) instead of finding only stale analysis
+    files from earlier runs.
+    """
     log("[1/6] Starting pipeline (tsdf_preview, debug_monitor)...", BOLD)
+    # Redirect all pipeline output to a timestamped log inside the container.
+    # The file lands at logs/host-log-<datetime>.txt and is later picked up
+    # by step_analyze() via the ls -t /prosthesis_ws/logs/host-log-*.txt glob.
     launch_cmd = (
-        "cd /prosthesis_ws && "
-        "ros2 launch prosthesis_launch pipeline.launch.py " + " ".join(LAUNCH_ARGS)
+        "cd /prosthesis_ws "
+        "&& mkdir -p /prosthesis_ws/logs "
+        "&& LOG_FILE=/prosthesis_ws/logs/host-log-$(date +%Y%m%d_%H%M%S).txt "
+        "&& echo '=== Logging pipeline output to $LOG_FILE ===' "
+        "&& ros2 launch prosthesis_launch pipeline.launch.py "
+        + " ".join(LAUNCH_ARGS)
+        + " > $LOG_FILE 2>&1"
     )
     proc = container_exec_bg(launch_cmd)
     log(f"  Pipeline PID (host-side): {proc.pid}", DIM)
@@ -464,9 +478,11 @@ def step_analyze(run_dir: Path, bag_dir: Path) -> tuple[Path | None, Path | None
             log(f"  {r.stderr[:300]}", DIM)
         bag_metrics = None
 
-    # analyze_log — find the latest host-log
+    # analyze_log — find the latest raw host-log (exclude stale _analysis.txt)
     r = container_exec(
-        "ls -t /prosthesis_ws/logs/host-log-*.txt 2>/dev/null | head -1",
+        "ls -t /prosthesis_ws/logs/host-log-*.txt 2>/dev/null "
+        "| grep -v '_analysis' "
+        "| head -1",
         capture_output=True, text=True, timeout=10)
     log_path = (r.stdout or "").strip()
     if log_path:
