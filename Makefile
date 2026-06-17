@@ -18,7 +18,7 @@ run-log-debug:
 	SYSMONFILE=$(CURDIR)/logs/run-jetson-debug-$$TS.jsonl && \
 	echo "=== Logging to $$LOGFILE (debug) ===" && \
 	echo "=== Sysmon to $$SYSMONFILE ===" && \
-	python3 $(CURDIR)/scripts/sysmon-jetson.py --output $$SYSMONFILE & \
+	{ python3 $(CURDIR)/scripts/sysmon-jetson.py --output $$SYSMONFILE & } && \
 	SYSMON_PID=$$! && \
 	docker compose --project-directory $(CURDIR)/docker_ws/docker-deployment run --rm --name openvins_pc \
 		-e RCUTILS_CONSOLE_OUTPUT_FORMAT='[{severity}][{time}][{name}]: {message}' \
