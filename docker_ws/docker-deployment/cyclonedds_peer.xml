@@ -4,8 +4,8 @@
             <Interfaces>
                 <NetworkInterface address="10.42.0.2"/>
             </Interfaces>
-            <AllowMulticast>false</AllowMulticast>
-            <MulticastRecvNetworkInterfaceAddresses>none</MulticastRecvNetworkInterfaceAddresses>
+            <AllowMulticast>true</AllowMulticast>
+            <MulticastRecvNetworkInterfaceAddresses>all</MulticastRecvNetworkInterfaceAddresses>
             <FragmentSize>16384B</FragmentSize>
         </General>
         <Discovery>
