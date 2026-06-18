@@ -3,7 +3,12 @@
 
 Lightweight status printer at ~2 Hz that matches the legacy monolithic
 script's terminal output layout.  Subscribes to the full topic contract
-and renders ANSI-coloured status to stdout.
+and renders ANSI-coloured status to the controlling terminal.
+
+The UI writes directly to ``/dev/tty`` so it owns a clean screen region
+even while ``ros2 launch`` multiplexes every other node's stdout into
+the same terminal.  When ``/dev/tty`` is unavailable (e.g. CI) it falls
+back to stdout.
 """
 
 from __future__ import annotations
@@ -44,8 +49,11 @@ from scripts.mia_haptic_force_test.common.constants import (
     TOPIC_WRIST_STATE,
 )
 from scripts.mia_haptic_force_test.common.conversions import circ_delta_deg, hold_velocity
-
-# ── ANSI helpers ──────────────────────────────────────────────────────────────
+from scripts.mia_haptic_force_test.common.ui_render import (
+    ANSI_CLEAR,
+    UiSnapshot,
+    render_terminal_frame,
+)
 
 _BOLD = "\033[1m"
 _DIM = "\033[2m"
@@ -53,8 +61,9 @@ _GREEN = "\033[92m"
 _YELLOW = "\033[93m"
 _RED = "\033[91m"
 _RESET = "\033[0m"
-_CLEAR = "\033[2J\033[H"
-
+_HIDE_CURSOR = "\033[?25l"
+_SHOW_CURSOR = "\033[?25h"
+_TTY_DEVICE = "/dev/tty"
 # ── Config defaults ───────────────────────────────────────────────────────────
 
 _DEFAULT_CONFIDENCE_THRESHOLD = 0.55
@@ -120,6 +129,8 @@ class TerminalUINode(Node):
         )
         self._force_min: float = float(haptics.get("force_min_grasp_force", 50.0))
         self._force_max: float = float(haptics.get("force_max_grasp_force", 500.0))
+        self._run_id: str = os.environ.get("MIA_HAPTIC_FORCE_TEST_RUN_ID", "")
+        self._gesture_label: int = 0
 
         # ── Shared state (all guarded by _lock) ──────────────────────────
         self._lock = threading.Lock()
@@ -143,6 +154,27 @@ class TerminalUINode(Node):
         self._joint_positions: list[float] = [0.0] * len(FINGER_LABELS)
         self._contact_reason: str = ""
         self._fault_reason: str = ""
+        # ── Terminal handle (private TTY channel) ─────────────────────────
+        # ROS 2's launch multiplexes every node's stdout into one prefixed
+        # stream, which makes a redrawing TUI unreadable: each frame's
+        # clear-screen ANSI collides with other nodes' log lines.  We open
+        # the controlling terminal directly so the UI owns a clean channel
+        # and other nodes' logs scroll past it normally.  Falls back to
+        # stdout when /dev/tty is unavailable (e.g. CI without a TTY).
+        self._tty_fd: Optional[int] = None
+        self._tty_owned: bool = False
+        try:
+            fd = os.open(_TTY_DEVICE, os.O_WRONLY | os.O_NOCTTY)
+            self._tty_fd = fd
+            self._tty_owned = True
+        except OSError:
+            self._tty_fd = None
+            self._tty_owned = False
+        if self._tty_fd is not None:
+            try:
+                os.write(self._tty_fd, _HIDE_CURSOR.encode("utf-8"))
+            except OSError:
+                pass
 
         # ── Subscriptions ────────────────────────────────────────────────
         self.create_subscription(String, TOPIC_TEST_STAGE, self._on_stage, 10)
@@ -251,151 +283,92 @@ class TerminalUINode(Node):
             remaining = self._dt - (time.monotonic() - t0)
             if remaining > 0.0:
                 time.sleep(remaining)
+    def _build_snapshot(self) -> UiSnapshot:
+        """Build a ``UiSnapshot`` from the guarded node state.
 
-    # ── UI rendering ─────────────────────────────────────────────────────
+        Holds ``self._lock`` just long enough to copy the fields the
+        renderer needs, so the DDS callbacks are never blocked.
+        """
+        with self._lock:
+            forces = tuple(self._forces[: len(FINGER_LABELS)])
+            targets = tuple(self._target_force[: len(FINGER_LABELS)])
+            errors = tuple(self._force_error[: len(FINGER_LABELS)])
+            haptics = tuple(self._haptics[:MOTOR_COUNT])
+            joints = tuple(self._joint_positions[: len(FINGER_LABELS)])
+            emg_age = (
+                time.monotonic() - self._last_emg_time
+                if self._last_emg_time > 0.0
+                else -1.0
+            )
+            snapshot = UiSnapshot(
+                config_name=self._config_name,
+                run_id=self._run_id,
+                stage=self._stage,
+                stage_elapsed_s=time.monotonic() - self._stage_changed_at,
+                stage_countdown_s=self._countdown_s(
+                    self._stage, time.monotonic() - self._stage_changed_at
+                ),
+                mode=self._mode,
+                hold_mode=self._hold_mode,
+                enable=self._enable,
+                control_hint=self._control_hint(self._stage, self._mode, self._hold_mode),
+                gesture=self._gesture,
+                gesture_label=self._gesture_label,
+                confidence=self._confidence,
+                proportional=self._proportional,
+                emg_age_s=emg_age,
+                confidence_threshold=self._confidence_threshold,
+                forces=forces,
+                target_forces=targets,
+                force_errors=errors,
+                force_min=self._force_min,
+                force_max=self._force_max,
+                joint_positions=joints,
+                wrist_position_deg=self._wrist_position,
+                wrist_velocity_deg_s=self._wrist_velocity,
+                wrist_target_deg=self._target_wrist,
+                haptics=haptics,
+                haptic_phase=self._derive_haptic_phase(
+                    self._stage, list(haptics), 0.0
+                ),
+                contact_reason=self._contact_reason,
+                fault_reason=self._fault_reason,
+            )
+        return snapshot
+
+    def _write(self, payload: str, *, sink=None) -> None:
+        """Write a UI frame to the controlling TTY (or stdout fallback).
+
+        Targets the dedicated ``/dev/tty`` handle when available so the
+        UI is not interleaved with other nodes' stdout, and ends every
+        frame with a newline so the next ``2J`` clears cleanly.
+
+        ``sink`` is an optional writable object (e.g. ``BytesIO``) used
+        by the offline test suite to capture frames without a TTY.
+        """
+        if sink is not None:
+            try:
+                sink.write(payload.encode("utf-8", errors="replace"))
+                return
+            except Exception:
+                pass
+        if self._tty_fd is not None:
+            try:
+                os.write(self._tty_fd, payload.encode("utf-8", errors="replace"))
+                return
+            except OSError:
+                self._tty_fd = None
+        try:
+            sys.stdout.write(payload)
+            sys.stdout.flush()
+        except Exception:
+            pass
 
     def _render(self) -> None:
-        """Clear and repaint the terminal, matching legacy layout."""
-        sys.stdout.write(_CLEAR)
-
-        with self._lock:
-            stage = self._stage
-            mode = self._mode
-            hold = self._hold_mode
-            gesture = self._gesture
-            conf = self._confidence
-            prop = self._proportional
-            emg_age = (
-                time.monotonic() - self._last_emg_time if self._last_emg_time > 0.0 else 999.0
-            )
-            forces = list(self._forces)
-            targets = list(self._target_force)
-            wrist_pos = self._wrist_position
-            wrist_target = self._target_wrist
-            haptics = list(self._haptics)
-            contact = self._contact_reason
-            fault = self._fault_reason
-
-        now = time.monotonic()
-        elapsed = now - self._start_time
-        stage_elapsed = now - self._stage_changed_at
-        fc = len(FINGER_LABELS)
-
-        lines: list[str] = []
-
-        # ── Header ───────────────────────────────────────────────────────
-        lines.append("Mia Hand EMG Haptic Force Test")
-        lines.append(f"Config: {self._config_name}")
-
-        # ── Control hint ─────────────────────────────────────────────────
-        hint = self._control_hint(stage, mode, hold)
-        if hint:
-            lines.append(f"Controls: {hint}")
-
-        lines.append("------")
-
-        # ── Dynamic info ─────────────────────────────────────────────────
-        lines.append(f"  Elapsed      {elapsed:.1f}s")
-
-        # Countdown for timed stages
-        countdown = self._countdown_s(stage, stage_elapsed)
-        if countdown is not None:
-            lines.append(f"  Countdown    {countdown:.1f}s")
-
-        # State + mode
-        stage_display = stage.replace("_", " ")
-        lines.append(f"  State        {_BOLD}{stage_display}{_RESET}  ·  {mode}")
-
-        # EMG — green when above confidence threshold, dim otherwise
-        if conf >= self._confidence_threshold:
-            lines.append(
-                f"  EMG          {_GREEN}{gesture}{_RESET}"
-                f"  conf={conf:.2f}  prop={prop:.2f}  age={emg_age:.3f}s"
-            )
-        else:
-            lines.append(
-                f"  EMG          {_DIM}{gesture}{_RESET}"
-                f"  conf={conf:.2f}  prop={prop:.2f}  age={emg_age:.3f}s"
-            )
-
-        # Force: avg, max, target, haptic%
-        avg_f = sum(forces) / fc if fc else 0.0
-        max_f = max(forces) if forces else 0.0
-        target_avg = sum(targets) / fc if fc else 0.0
-        fpct = self._force_percent(avg_f)
-        vel_str = ""
-        if stage == "force_hold" and forces:
-            vels = [
-                hold_velocity(
-                    forces[i],
-                    targets[i],
-                    self._hold_deadzone,
-                    self._hold_max_vel,
-                    self._hold_min_os,
-                    self._hold_max_os,
-                )
-                for i in range(fc)
-            ]
-            if any(abs(v) > 0.001 for v in vels):
-                vel_str = (
-                    f"  {_YELLOW}vel=[{vels[0]:+.3f}"
-                    f" {vels[1]:+.3f}"
-                    f" {vels[2]:+.3f}]{_RESET}"
-                )
-        lines.append(
-            f"  Force        avg={avg_f:.1f}  max={max_f:.1f}"
-            f"  target={target_avg:.1f}  haptic={fpct:.0f}%{vel_str}"
-        )
-
-        # Wrist: actual → target (error)
-        w_err = circ_delta_deg(wrist_target, wrist_pos)
-        lines.append(
-            f"  Wrist        {wrist_pos:.1f}\u00b0 \u2192 {wrist_target:.1f}\u00b0"
-            f"  (err={w_err:+.1f}\u00b0)"
-        )
-
-        # Adjustment status (FORCE_HOLD only)
-        if stage == "force_hold":
-            if conf >= self._confidence_threshold and gesture in ("FLEXION", "EXTENSION"):
-                if hold == "force":
-                    if gesture == "FLEXION":
-                        arrow = "\u25b2"
-                        delta = prop * self._force_adjustment_rate_up
-                    else:
-                        arrow = "\u25bc"
-                        delta = -prop * self._force_adjustment_rate_down
-                    lines.append(
-                        f"  Adjust       {_YELLOW}{arrow} adjusting force{_RESET}"
-                        f"  \u0394={delta:+.1f}/s"
-                    )
-                else:
-                    vel = self._wrist_velocity_deg_s * max(prop, 0.15)
-                    lines.append(
-                        f"  Adjust       {_YELLOW}\u25c0\u25b6 adjusting wrist{_RESET}"
-                        f"  vel={vel:.1f}\u00b0/s"
-                    )
-            else:
-                lines.append(
-                    f"  Adjust       idle"
-                    f"  (need conf \u2265 {self._confidence_threshold:.2f}, got {conf:.2f})"
-                )
-
-        # Haptics
-        haptic_phase = self._derive_haptic_phase(stage, haptics, fpct)
-        haptic_str = " ".join(f"{v:.0f}" for v in haptics)
-        lines.append(f"  Haptics      {haptic_phase:20s} [{haptic_str}]")
-
-        # ── Footer ───────────────────────────────────────────────────────
-        lines.append("------")
-        lines.append(
-            f"  Gesture      {gesture}  conf={conf:.2f}  prop={prop:.2f}"
-        )
-        if contact:
-            lines.append(f"  Contact      {contact}")
-        if fault:
-            lines.append(f"  {_RED}Fault        {fault}{_RESET}")
-
-        print("\n".join(lines), flush=True)
+        """Clear and repaint the terminal using the pure renderer."""
+        snapshot = self._build_snapshot()
+        frame = ANSI_CLEAR + render_terminal_frame(snapshot, color=True)
+        self._write(frame)
 
     # ── UI helpers ───────────────────────────────────────────────────────
 
@@ -476,6 +449,18 @@ class TerminalUINode(Node):
 
     def destroy_node(self) -> None:
         self.stop()
+        if self._tty_fd is not None:
+            try:
+                os.write(self._tty_fd, (_SHOW_CURSOR + _RESET).encode("utf-8"))
+            except OSError:
+                pass
+            if self._tty_owned:
+                try:
+                    os.close(self._tty_fd)
+                except OSError:
+                    pass
+            self._tty_fd = None
+            self._tty_owned = False
         super().destroy_node()
 
 

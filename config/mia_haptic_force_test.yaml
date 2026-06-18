@@ -9,6 +9,7 @@ runtime:
   auto_kill_s: 0.0
   mock_hardware: auto
   use_multi_node: true
+  keyboard_emg: true
 topics:
   joint_states: /joint_states
   force_data: data_streams/fingers/forces/data
@@ -151,3 +152,4 @@ logging:
   events_csv: events.csv
   config_snapshot_yaml: config_snapshot.yaml
   flush_every_rows: 1
+  keep_last_runs: 7

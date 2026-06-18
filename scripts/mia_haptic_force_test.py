@@ -40,6 +40,10 @@ from std_srvs.srv import Trigger
 from force_controller.controller_manager_client import ControllerManagerClient
 from mia_hand_msgs.msg import ForceData, JointData, MotorData
 
+_REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from scripts.mia_haptic_force_test.common.log_retention import prune_run_dirs
 
 FINGER_JOINTS = ["j_thumb_fle", "j_index_fle", "j_mrl_fle"]
 FINGER_LABELS = ["thumb", "index", "mrl"]
@@ -454,6 +458,18 @@ class CsvLogger:
         self.run_dir = Path(str(cfg.logging["output_dir"])) / self.run_id
         self.run_dir.mkdir(parents=True, exist_ok=True)
 
+        # ── Retention: keep only the newest keep_last_runs directories ────
+        try:
+            prune_run_dirs(
+                Path(str(cfg.logging["output_dir"])),
+                str(cfg.logging["run_name_prefix"]),
+                keep_last=int(cfg.logging.get("keep_last_runs", 7)),
+                preserve=self.run_dir,
+            )
+        except Exception as exc:
+            print(f"[csv_logger] log retention failed: {exc}", file=sys.stderr)
+
+
         snapshot = self.run_dir / str(cfg.logging["config_snapshot_yaml"])
         with snapshot.open("w", encoding="utf-8") as f:
             yaml.safe_dump(cfg.raw, f, sort_keys=False)
@@ -857,6 +873,11 @@ class MiaHapticForceTest(Node):
             if play_cli.wait_for_service(timeout_sec=2.0):
                 play_cli.call_async(Trigger.Request())
                 self.get_logger().info("Called play service to clear emergency-stop flag.")
+            elif os.environ.get("MOCK_HARDWARE", "false").lower() == "true":
+                self.get_logger().info(
+                    "Play service unavailable in mock-hardware mode; "
+                    "skipping emergency-stop clear."
+                )
             else:
                 self.get_logger().warn(
                     "Play service (/mia_hand_system_interface_diagnostics/play) "

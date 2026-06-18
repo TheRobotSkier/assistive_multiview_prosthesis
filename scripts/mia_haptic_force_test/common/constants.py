@@ -100,6 +100,26 @@ GESTURES: Final[dict[str, int]] = {
 
 REST_GESTURE_LABEL: Final[int] = EMG_REST_LABEL
 
+# Keyboard EMG emulation: key sequence → gesture name.
+# Used by keyboard_emg_node to map terminal keys onto the gesture contract
+# above.  An empty/no-key state maps to REST via the node loop.
+# Both arrow keys and WASD are accepted; capital and lowercase work.
+KEYBOARD_GESTURE_MAP: Final[dict[str, str]] = {
+    "\x1b[D": "OPEN",        # left
+    "a":      "OPEN",        # A / a
+    "A":      "OPEN",
+    "\x1b[C": "POWER",       # right
+    "d":      "POWER",       # D / d
+    "D":      "POWER",
+    "\x1b[B": "FLEXION",     # down
+    "s":      "FLEXION",     # S / s
+    "S":      "FLEXION",
+    "\x1b[A": "EXTENSION",   # up
+    "w":      "EXTENSION",   # W / w
+    "W":      "EXTENSION",
+}
+"""Terminal key sequences (arrow keys and WASD) mapped to emulated EMG gestures."""
+
 
 # ── Default topic names ─────────────────────────────────────────────────────
 # Multi-node topic contract.  These are the canonical inter-node topics;
@@ -115,6 +135,8 @@ TOPIC_EMG_GESTURE: Final[str] = "/emg/gesture_name"
 TOPIC_EMG_GESTURE_LABEL: Final[str] = "/emg/gesture_label"
 TOPIC_EMG_CONFIDENCE: Final[str] = "/emg/confidence"
 TOPIC_EMG_PROPORTIONAL: Final[str] = "/emg/proportional"
+TOPIC_EMG_SOURCE: Final[str] = "/emg/source"
+TOPIC_EMG_AGE: Final[str] = "/emg/age"
 
 # Control
 TOPIC_CONTROL_TARGET_FORCE: Final[str] = "/control/target_force"
@@ -184,6 +206,8 @@ MSG_JOINT_DATA: Final[str] = "mia_hand_msgs/JointData"
 #   TOPIC_EMG_GESTURE_LABEL  → MSG_INT32           (std_msgs/Int32)
 #   TOPIC_EMG_CONFIDENCE     → MSG_FLOAT32         (std_msgs/Float32)
 #   TOPIC_EMG_PROPORTIONAL   → MSG_FLOAT32         (std_msgs/Float32)
+#   TOPIC_EMG_SOURCE         → MSG_STRING          (std_msgs/String)
+#   TOPIC_EMG_AGE            → MSG_FLOAT32         (std_msgs/Float32)
 #
 # Control topics
 #   TOPIC_CONTROL_TARGET_FORCE → MSG_FLOAT64_MULTI (std_msgs/Float64MultiArray)

@@ -74,12 +74,13 @@ from scripts.mia_haptic_force_test.common.constants import (
     TOPIC_WRIST_STATE,
 )
 
+from scripts.mia_haptic_force_test.common.log_retention import prune_run_dirs
+
 
 class LoggerNode(Node):
     """CSV logger for the multi-node haptic force test.
 
     Subscribes to both inter-node ``/hand/*`` topics and raw hardware data
-    streams, logging them in the legacy CsvLogger format.
     """
 
     def __init__(self, config_path: Optional[str] = None) -> None:
@@ -101,12 +102,24 @@ class LoggerNode(Node):
         events_csv_name = log_cfg.get("events_csv", "events.csv")
         config_snapshot_name = log_cfg.get("config_snapshot_yaml", "config_snapshot.yaml")
         self._flush_every = max(1, int(log_cfg.get("flush_every_rows", 10)))
+        keep_last_runs = int(log_cfg.get("keep_last_runs", 7))
 
         # ── Create run directory ─────────────────────────────────────────
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.run_id = f"{run_prefix}_{stamp}"
         self._run_dir = Path(output_base) / self.run_id
         self._run_dir.mkdir(parents=True, exist_ok=True)
+
+        # ── Retention: keep only the newest keep_last_runs directories ────
+        try:
+            prune_run_dirs(
+                Path(output_base),
+                str(run_prefix),
+                keep_last=keep_last_runs,
+                preserve=self._run_dir,
+            )
+        except Exception as exc:
+            self.get_logger().warn(f"log retention failed: {exc}")
 
         # ── Config snapshot ──────────────────────────────────────────────
         snapshot_path = self._run_dir / config_snapshot_name
