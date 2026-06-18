@@ -40,6 +40,7 @@ def generate_launch_description():
         output="screen",
         emulate_tty=True,
         condition=IfCondition(LaunchConfiguration("start_camera")),
+        additional_env={"ROS_AUTOMATIC_DISCOVERY_RANGE": "LOCALHOST"},
         parameters=[{
             "camera_name": "d435i_arm",
             "serial_no": "_310622071850",
