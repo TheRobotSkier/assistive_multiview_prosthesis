@@ -18,6 +18,9 @@ TESTS_LABEL=(
 )
 TESTS_TARGET=(
     "test-grasp"
+    "test-grasp-topics"
+    "test-grasp-tui"
+    "test-grasp-offline"
     "emg-force-grasp"
     "emg-collect-train"
     "test-emg-latency"
@@ -26,6 +29,9 @@ TESTS_TARGET=(
 )
 TESTS_PARAMS=(
     "yes"
+    "no"
+    "no"
+    "no"
     "yes"
     "no"
     "yes"

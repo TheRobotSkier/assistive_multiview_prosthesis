@@ -17,11 +17,13 @@ Common commands:
 - `make test`: open the interactive test selector
 - `make test-help`: show test commands and config YAML locations
 - `make test-grasp`: run the isolated Mia/EMG/wrist/haptic force test container
+- `make test-grasp-topics`: fast topic-contract + helper tests (no Docker rebuild)
+- `make test-grasp-tui`: TUI smoke test for the new dashboard and 8-motor haptic ring
+- `make test-grasp-offline`: full PTY-driven offline end-to-end suite (additive; keep test-grasp interactive)
 - `make test-emg-latency`: run EMG collection, training, and interactive latency benchmarking
 - `make test-emg-latency-notrain`: skip collection/training, reuse existing model
 - `make test-emg-sim`: offline prediction simulator - replay raw data with tunable parameters
 - `make test-smoke`: run the existing containerized smoke test suite
-
 ### In-container
 
 File: `Makefile.workspace`
@@ -65,7 +67,27 @@ It runs these tests:
 - `src/emg_bridge/test/test_latency_analysis.py`
 - `src/emg_bridge/test/test_latency_benchmark_cli.py`
 
-## EMG Workflow
+## Offline Test Tiers (Mia Haptic Force Test)
+
+The split-node `mia_haptic_force_test` stack has three additive offline
+test tiers, all of which run **without real hardware** by using the
+`hand_simulator_node` and a temporary config overlay.
+
+| Tier | Target | What it covers |
+|---|---|---|
+| Fast | `make test-grasp-topics` | Pure helper tests (hand sim, UI render, log retention), keyboard idle helper, supervisor stage transitions, controller switching, haptic mapping, logger field contract. Runs in <1s locally. |
+| TUI smoke | `make test-grasp-tui` | Renders the new dashboard and 8-motor haptic ring, verifies ring cells change with synthetic haptic inputs, asserts clean shutdown. |
+| Full e2e | `make test-grasp-offline` | PTY-driven offline suite: spawns the launch under a pseudo-terminal, writes raw WASD bytes, verifies the full happy-path scenario (`waiting_for_activation → rotating_to_vertical → vertical_delay → force_closing → force_hold → d flips hold_mode force→wrist → w/s adjust → d flips back → a held → opening_hand → return_delay → return_wrist → complete`) and a separate fault-path scenario. |
+
+Key implementation files:
+
+- `scripts/mia_haptic_force_test/hand_simulator_node.py` — publishes the raw Mia hardware streams (`data_streams/fingers/forces/data`, `data_streams/motors/{positions,speeds,currents}/data`, `data_streams/joints/{positions,speeds,efforts}/data`) plus `/hand_sim/joint_states`, `/hand_sim/forces`, and `/wrist/state` (Float64MultiArray `[deg, vel]`).
+- `scripts/mia_haptic_force_test/launch/mia_haptic_force_test.launch.py` — adds `mock_hardware`, `wrist_enable`, `terminal_ui`, `logger` `DeclareLaunchArgument`s. In mock mode, `force_input_node` is pointed at `/hand_sim/joint_states` and `/hand_sim/forces`.
+- `tests/mia_haptic_force_test/` — pytest modules for the fast and TUI tiers; `tests/mia_haptic_force_test/offline_suite.py` for the full e2e tier.
+- `scripts/test_mia_haptic_force_offline.sh` — thin shell wrapper for the full e2e tier.
+
+Log retention: `logging.keep_last_runs: 7` in `config/mia_haptic_force_test.yaml` keeps only the newest 7 run directories under `logging.output_dir`. Both the split-node `logger_node.py` and the monolithic `scripts/mia_haptic_force_test.py` call `prune_run_dirs()` after creating the run dir.
+
 
 Primary host entrypoint:
 

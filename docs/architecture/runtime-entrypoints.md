@@ -66,9 +66,37 @@ Starts:
 
 Use this when changing EMG-triggered closing behavior without needing cameras, segmentation, or grasp planning.
 
-### `mia_haptic_force_test.launch.py`
+### `mia_haptic_force_test.launch.py` (split-node, multi-process)
 
-Bench-test pipeline for the Mia Hand, wrist, EMG classifier, and Vibro8 haptics with no perception stack.
+Multi-process pipeline for the Mia Hand, wrist, EMG classifier, and
+Vibro8 haptics with no perception stack.  Each node is a standalone
+Python script under `scripts/mia_haptic_force_test/` and communicates
+via the canonical topic contract in
+`scripts/mia_haptic_force_test/common/README.md`.
+
+Starts:
+
+- `emg_input_node` (or `keyboard_emg_node` in `USE_MULTI_NODE=true` mode)
+- `force_input_node`
+- `supervisor_node`
+- `hand_controller_node`
+- optional `haptic_node`
+- optional `terminal_ui_node`
+- optional `logger_node`
+- optional `hand_simulator_node` (when `mock_hardware:=true`)
+
+Launch arguments:
+
+- `mock_hardware` (default `false`): launch `hand_simulator_node` instead of expecting real hardware.  The simulator publishes the raw Mia hardware streams (`data_streams/fingers/forces/data`, `data_streams/motors/{positions,speeds,currents}/data`, `data_streams/joints/{positions,speeds,efforts}/data`) plus `/hand_sim/joint_states`, `/hand_sim/forces`, and `/wrist/state` (Float64MultiArray `[deg, vel]`).  When true, `force_input_node` is pointed at `/hand_sim/joint_states` and `/hand_sim/forces` via `--ros-args -p ...`.
+- `wrist_enable` (default `true`): enable the real wrist driver.  Set to `false` in `mock_hardware:=true` mode so the real `/dev/ttyDynamixel` is not opened.
+- `terminal_ui` (default `true`): launch `terminal_ui_node`.  Set to `false` for headless CI runs.
+- `logger` (default `true`): launch `logger_node`.  Set to `false` for headless CI runs.
+
+Use this when testing wrist rotation, force closure, force-hold target adjustment, POWER toggling between force and wrist control, OPEN-stop behavior, haptic mappings, and CSV capture without cameras or the production pipeline manager.
+
+### `mia_haptic_force_test.launch.py` (monolith, legacy)
+
+Bench-test pipeline (single Python process) for the Mia Hand, wrist, EMG classifier, and Vibro8 haptics with no perception stack.
 
 Starts:
 
@@ -78,8 +106,7 @@ Starts:
 - optional `haptic_bridge_node`
 - `scripts/mia_haptic_force_test.py`
 
-Use this when testing wrist rotation, force closure, force-hold target adjustment, POWER toggling between force and wrist control, OPEN-stop behavior, haptic mappings, and CSV capture without cameras or the production pipeline manager.
-
+Use this as a reference for the split-node behaviour or when running on real hardware with a single process.
 ### Other Launch Files
 
 - `mock.launch.py`: mock pipeline for non-hardware use

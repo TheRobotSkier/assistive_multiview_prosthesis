@@ -864,6 +864,24 @@ test-grasp-down: ## Stop and remove the isolated haptic force-test container
 test-grasp-logs: ## Follow logs for the isolated haptic force-test container
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test logs -f mia-haptic-force-test
 
+test-grasp-topics: test-grasp-up ## Fast topic-contract + helper tests (no Docker rebuild)
+	@$(DOCKER_CMD) exec -T --user prosthesis \
+		-e PYTHONPATH=/miahand_ws \
+		mia-haptic-force-test \
+		bash -lc 'cd /miahand_ws && python3 -m pytest tests/mia_haptic_force_test/test_topic_contracts.py tests/mia_haptic_force_test/test_hand_simulation.py tests/mia_haptic_force_test/test_rendering.py tests/mia_haptic_force_test/test_log_retention.py tests/mia_haptic_force_test/test_simulator_health.py -q'
+
+test-grasp-tui: test-grasp-up ## TUI smoke test (no Docker rebuild)
+	@$(DOCKER_CMD) exec -T --user prosthesis \
+		-e PYTHONPATH=/miahand_ws \
+		mia-haptic-force-test \
+		bash -lc 'cd /miahand_ws && python3 -m pytest tests/mia_haptic_force_test/test_tui_smoke.py -q'
+
+test-grasp-offline: test-grasp-up ## Full PTY-driven offline end-to-end suite (additive; keep test-grasp interactive)
+	@$(DOCKER_CMD) exec -T --user prosthesis \
+		-e PYTHONPATH=/miahand_ws \
+		mia-haptic-force-test \
+		bash -lc 'cd /miahand_ws && TIMEOUT=180 bash scripts/test_mia_haptic_force_offline.sh'
+
 emg-grasp-test: ## EMG-driven grasp test: collect → train → launch (set MOCK_HARDWARE=true for CI)
 	@echo "=== EMG-Driven Grasp Test ==="
 	@echo ""

@@ -85,19 +85,26 @@ These are written by the controller to drive the physical hand.
 
 ## 9. Hardware Input Streams (raw Mia Hand topics)
 
-Consumed by input-processing nodes, **not** directly by the controller.
-These topics originate from the Mia Hand driver's data stream publishers.
+Published by either the real Mia Hand driver (production) or
+`hand_simulator_node` (mock mode, when `mock_hardware:=true`).  Consumed
+by `force_input_node` and `logger_node`.  In mock mode the simulator
+publishes on a **distinct** joint-state topic `/hand_sim/joint_states`
+(not `/joint_states`, which `joint_state_broadcaster` already
+publishes in mock mode) and on `/hand_sim/forces` for direct testing.
 
-| Topic | Type | Subscriber (consumer) | Semantics |
-|---|---|---|---|
-| `data_streams/fingers/forces/data` | `mia_hand_msgs/ForceData` | `force_input_node` | Raw finger normal and tangential forces. |
-| `data_streams/motors/positions/data` | `mia_hand_msgs/MotorData` | `force_input_node` | Raw motor position data. |
-| `data_streams/motors/speeds/data` | `mia_hand_msgs/MotorData` | `force_input_node` | Raw motor speed data. |
-| `data_streams/motors/currents/data` | `mia_hand_msgs/MotorData` | `force_input_node` | Raw motor current draw. |
-| `data_streams/joints/positions/data` | `mia_hand_msgs/JointData` | `hand_state_node` | Raw joint angle data from the hand. |
-| `data_streams/joints/speeds/data` | `mia_hand_msgs/JointData` | `hand_state_node` | Raw joint speed data from the hand. |
-| `/joint_states` | `sensor_msgs/JointState` | `hand_state_node` | Full joint state from `robot_state_publisher` or the hardware driver. |
-
+| Topic | Type | Publisher | Subscriber (consumer) | Semantics |
+|---|---|---|---|---|
+| `data_streams/fingers/forces/data` | `mia_hand_msgs/ForceData` | `mia_hand_driver` or `hand_simulator_node` | `force_input_node`, `logger_node` | Raw finger normal and tangential forces. |
+| `data_streams/motors/positions/data` | `mia_hand_msgs/MotorData` | `mia_hand_driver` or `hand_simulator_node` | `logger_node` | Raw motor position data (encoder ticks). |
+| `data_streams/motors/speeds/data` | `mia_hand_msgs/MotorData` | `mia_hand_driver` or `hand_simulator_node` | `logger_node` | Raw motor speed data (encoder ticks/s). |
+| `data_streams/motors/currents/data` | `mia_hand_msgs/MotorData` | `mia_hand_driver` or `hand_simulator_node` | `logger_node` | Raw motor current draw (mA). |
+| `data_streams/joints/positions/data` | `mia_hand_msgs/JointData` | `mia_hand_driver` or `hand_simulator_node` | `logger_node` | Raw joint angle data from the hand (rad). |
+| `data_streams/joints/speeds/data` | `mia_hand_msgs/JointData` | `mia_hand_driver` or `hand_simulator_node` | `logger_node` | Raw joint speed data from the hand (rad/s). |
+| `data_streams/joints/efforts/data` | `mia_hand_msgs/JointData` | `hand_simulator_node` (mock) | `logger_node` | Synthetic normal force in N·m so the effort fallback has real data. |
+| `/hand_sim/joint_states` | `sensor_msgs/JointState` | `hand_simulator_node` (mock) | `force_input_node` | Simulator-owned joint state; `force_input_node.joint_states_topic` is pointed here when `mock_hardware:=true`. |
+| `/hand_sim/forces` | `std_msgs/Float32MultiArray` | `hand_simulator_node` (mock) | `force_input_node` (via `force_data_topic`) | Convenience passthrough of synthetic normal force. |
+| `/wrist/state` | `std_msgs/Float64MultiArray` | `wrist_driver_node` or `hand_simulator_node` | `supervisor_node`, `logger_node` | Wrist actual position (deg) and velocity (deg/s).  Published by the simulator so `_wrist_target_complete()` does not fall back to `assume_target_on_timeout` after 10s. |
+| `/joint_states` | `sensor_msgs/JointState` | `joint_state_broadcaster` (ros2_control) or `hand_simulator_node` | `force_input_node` (production) | Full joint state from `robot_state_publisher` or the hardware driver.  In mock mode the simulator uses a distinct topic (`/hand_sim/joint_states`) to avoid colliding with `joint_state_broadcaster`. |
 ---
 
 ## Topic Name Migration from Legacy
