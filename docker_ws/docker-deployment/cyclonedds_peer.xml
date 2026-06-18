@@ -7,6 +7,7 @@
             <AllowMulticast>true</AllowMulticast>
             <MulticastRecvNetworkInterfaceAddresses>all</MulticastRecvNetworkInterfaceAddresses>
             <FragmentSize>16384B</FragmentSize>
+            <Transport>UDP</Transport>
         </General>
         <Discovery>
             <Peers>
@@ -14,9 +15,31 @@
                 <Peer address="10.42.0.2"/>
             </Peers>
         </Discovery>
+        <!-- ── Internal / socket buffer tuning ────────────────────────────
+             SocketSendBufferSize: 50 MB — the Jetson publishes two 0.5 MB
+             PointCloud2 streams at ~15 Hz (or ~5 Hz with relay decimation).
+             Each message fragments into ~120 RTPS sub-messages.  A 50 MB
+             send buffer ensures that kernel socket memory can hold several
+             seconds of backlog during CPU spikes without forcing CycloneDDS
+             to discard fragments mid-transmission.
+
+             SocketReceiveBufferSize: 50 MB — mirrors the host setting.
+
+             MaxQueuedRexmitBytes: 5 MB — hard ceiling on the
+             retransmission backlog.  Without this cap, the Jetson writer
+             would attempt to replay megabytes of history per heartbeat
+             under CPU pressure, driving the effective wire rate to
+             440+ Mbps of pure protocol overhead.
+
+             RetransmitMerging / RetransmitMergingPeriod: 5 ms — bundles
+             retransmission responses to reduce per-reader unicast overhead.
+        ─────────────────────────────────────────────────────────────────── -->
         <Internal>
-            <SocketReceiveBufferSize min="8MB"/>
-            <SocketSendBufferSize min="8MB"/>
+            <SocketReceiveBufferSize min="50MB"/>
+            <SocketSendBufferSize min="50MB"/>
+            <MaxQueuedRexmitBytes>5MB</MaxQueuedRexmitBytes>
+            <RetransmitMerging>true</RetransmitMerging>
+            <RetransmitMergingPeriod>5ms</RetransmitMergingPeriod>
         </Internal>
     </Domain>
 </CycloneDDS>

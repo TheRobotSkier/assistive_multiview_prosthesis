@@ -51,6 +51,7 @@ install(
     scripts/head_derived_arm_pose_preview_node.py
     scripts/jetson_relay.py
     scripts/marker_quality_monitor.py
+    scripts/tf_throttle_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

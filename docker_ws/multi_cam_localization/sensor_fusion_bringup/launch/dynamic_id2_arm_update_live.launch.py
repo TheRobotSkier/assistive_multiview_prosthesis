@@ -362,6 +362,40 @@ def _setup(context, *args, **kwargs):
                 output="screen",
             )
         )
+
+    # ── TF throttle ────────────────────────────────────────────────────
+    # Caps /tf broadcast per child frame to prevent DDS retransmission
+    # storms.  The two aruco nodes publish corrected odom TFs at ~200 Hz
+    # each; without throttling the combined /tf rate approaches 1.5 kHz
+    # which starves PointCloud2 streams of network bandwidth.
+    tf_throttle_enabled = _as_bool(
+        _arg_or_config(context, "tf_throttle_enabled", True)
+    )
+    if tf_throttle_enabled:
+        tf_throttle_hz = str(
+            _arg_or_config(context, "tf_throttle_hz", "50.0")
+        )
+        tf_throttle_frames = str(
+            _arg_or_config(
+                context, "tf_throttle_frames",
+                '["head_imu_openvins_corrected","arm_imu_openvins_corrected","head_imu","arm_imu"]'
+            )
+        )
+        throttle_script = ("/miahand_ws/src/multi_cam_localization/"
+                           "sensor_fusion_bringup/scripts/tf_throttle_node.py")
+        actions.append(
+            ExecuteProcess(
+                cmd=[
+                    "python3", throttle_script,
+                    "--ros-args",
+                    "-p", f"max_hz:={tf_throttle_hz}",
+                    "-p", f"subscribe_topic:=/tf_raw",
+                    "-p", f"child_frames:={tf_throttle_frames}",
+                ],
+                name="tf_throttle",
+                output="screen",
+            )
+        )
     return actions
 
 
@@ -432,6 +466,22 @@ def generate_launch_description():
                 "relay_trackhist_hz",
                 default_value="",
                 description="Trackhist relay throttle Hz (empty = use relay_img_hz).",
+            ),
+            DeclareLaunchArgument(
+                "tf_throttle_enabled",
+                default_value="true",
+                description="Enable /tf throttle to cap broadcast rate per child frame "
+                            "and prevent DDS retransmission storms.",
+            ),
+            DeclareLaunchArgument(
+                "tf_throttle_hz",
+                default_value="50.0",
+                description="Maximum TF broadcast rate per child frame (Hz).",
+            ),
+            DeclareLaunchArgument(
+                "tf_throttle_frames",
+                default_value='["head_imu_openvins_corrected","arm_imu_openvins_corrected","head_imu","arm_imu"]',
+                description="JSON list of child frame IDs to throttle on /tf.",
             ),
             OpaqueFunction(function=_setup),
         ]

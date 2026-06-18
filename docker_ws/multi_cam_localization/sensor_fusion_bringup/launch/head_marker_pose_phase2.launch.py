@@ -39,6 +39,9 @@ def generate_launch_description():
             executable="aruco_marker_pose_node.py",
             name="aruco_marker_pose_node_phase2",
             output="screen",
+            remappings=[
+                ("/tf", "/tf_raw"),
+            ],
             parameters=[
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
                 {"config_file": LaunchConfiguration("config_file")},

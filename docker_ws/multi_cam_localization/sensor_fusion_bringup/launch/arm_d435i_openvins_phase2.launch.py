@@ -141,6 +141,9 @@ def generate_launch_description():
         namespace="ov_msckf_arm",
         name="run_subscribe_msckf_marker",
         output="screen",
+        remappings=[
+            ("/tf", "/tf_raw"),
+        ],
         parameters=[
             {"use_sim_time": LaunchConfiguration("use_sim_time")},
             {"verbosity": LaunchConfiguration("verbosity")},
@@ -150,8 +153,8 @@ def generate_launch_description():
             {"global_frame_id": "marker_map"},
             {"imu_frame_id": "arm_imu"},
             {"camera_frame_prefix": "arm_cam"},
-            {"publish_global_to_imu_tf": True},
-            {"publish_calibration_tf": True},
+            {"publish_global_to_imu_tf": False},
+            {"publish_calibration_tf": False},
             {"use_marker_pose_updates": True},
             {"marker_pose_topic": "/arm/marker_pose/observation"},
             {"marker_global_frame_id": "marker_map"},
