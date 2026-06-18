@@ -32,6 +32,7 @@ FORCE_RETRAIN="${FORCE_RETRAIN:-false}"
 MOCK_HARDWARE="${MOCK_HARDWARE:-false}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 AUTO_KILL_S="${AUTO_KILL_S:-0}"
+USE_MULTI_NODE="${USE_MULTI_NODE:-true}"
 
 set +u
 source /opt/ros/jazzy/setup.bash
@@ -52,6 +53,7 @@ echo "  CONFIG_PATH    = $CONFIG_PATH"
 echo "  FORCE_RETRAIN  = $FORCE_RETRAIN"
 echo "  MOCK_HARDWARE  = $MOCK_HARDWARE"
 echo "  LOG_LEVEL      = $LOG_LEVEL"
+echo "  USE_MULTI_NODE = $USE_MULTI_NODE"
 echo ""
 
 if [ ! -f "$CONFIG_PATH" ]; then
@@ -134,6 +136,7 @@ LAUNCH_CMD=(
     emg_enable:="$EMG_ENABLE"
     mock_hardware:="$MOCK_HARDWARE"
     log_level:="$LOG_LEVEL"
+    use_multi_node:="$USE_MULTI_NODE"
 )
 
 if [ "$AUTO_KILL_S" = "0" ]; then

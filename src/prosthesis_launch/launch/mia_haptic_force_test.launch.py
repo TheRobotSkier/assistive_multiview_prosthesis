@@ -99,7 +99,7 @@ def _launch_setup(context, *args, **kwargs):
                     output="screen" if name in ("emg_input_node", "supervisor_node", "hand_controller_node", "terminal_ui_node") else "log",
                     sigkill_timeout="5",
                     sigterm_timeout="3",
-                    env={"PYTHONPATH": script_dir},
+                    env={"PYTHONPATH": "/prosthesis_ws/scripts"},
                 )
             )
         return nodes

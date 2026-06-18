@@ -86,6 +86,7 @@ _load_yaml_defaults() {
 
     EMG_BOARD_IP="${EMG_BOARD_IP:-10.27.30.3}"
     WRIST_BOARD_IP="${WRIST_BOARD_IP:-}"
+    USE_MULTI_NODE="${USE_MULTI_NODE:-true}"
 
 }
 # ── Write env file ───────────────────────────────────────────────────
@@ -96,6 +97,7 @@ write_env_file() {
         for v in MIA_PORT WRIST_PORT MOCK_HARDWARE WRIST_ENABLE HAPTIC_ENABLE \
                  FORCE_RETRAIN AUTO_KILL_S CONFIG_PATH CONTROL_RATE_HZ CSV_RATE_HZ \
                  HAPTICS_RATE_HZ TERMINAL_RATE_HZ STARTUP_TIMEOUT_S EMG_BOARD_IP \
+                 USE_MULTI_NODE \
                  OPEN_THUMB OPEN_INDEX OPEN_MRL MAXCLOSE_THUMB MAXCLOSE_INDEX MAXCLOSE_MRL \
                  OPEN_TOLERANCE OPEN_MIN_S OPEN_TIMEOUT_S CLOSE_VEL_START CLOSE_VEL_END \
                  CLOSE_DECAY CLOSE_INTERVAL HOLD_DEADZONE HOLD_MIN_OVER HOLD_MAX_OVER \
@@ -189,6 +191,7 @@ param_editor_grasp() {
         "Startup timeout (s)"        STARTUP_TIMEOUT_S
         "Auto-kill (s)"              AUTO_KILL_S
         "Mock hardware"              MOCK_HARDWARE
+        "Use multi-node stack"       USE_MULTI_NODE
         "── Hand: Open ──"           ""
         "Open thumb (rad)"           OPEN_THUMB
         "Open index (rad)"           OPEN_INDEX

@@ -18,6 +18,7 @@ _DEFAULT_CONFIG = os.environ.get(
     "/prosthesis_ws/config/mia_haptic_force_test.yaml",
 )
 _SCRIPT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_LAUNCH_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def _as_bool(context, name: str) -> bool:
@@ -26,14 +27,13 @@ def _as_bool(context, name: str) -> bool:
 
 
 def _node_process(name: str, output: str = "log") -> ExecuteProcess:
-    script = os.path.join(_SCRIPT_DIR, f"{name}.py")
     return ExecuteProcess(
         cmd=["python3", "-m", f"scripts.mia_haptic_force_test.{name}"],
         name=name,
         output=output,
         sigkill_timeout="5",
         sigterm_timeout="3",
-        env={"PYTHONPATH": _SCRIPT_DIR},
+        env={"PYTHONPATH": os.path.dirname(_SCRIPT_DIR)},
     )
 
 

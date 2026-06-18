@@ -815,7 +815,7 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test (launched from T
 	test -f config/mia_haptic_force_test.yaml || { echo "Missing config/mia_haptic_force_test.yaml"; exit 1; }; \
 	mkdir -p data models; \
 	echo ""; \
-	echo "[make] Launching with: MIA=$${MIA_PORT:-auto} WRIST=$${WRIST_PORT:-auto} MOCK=$${MOCK_HARDWARE:-auto} KILL=$${AUTO_KILL_S:-0}s"; \
+	echo "[make] Launching with: MIA=$${MIA_PORT:-auto} WRIST=$${WRIST_PORT:-auto} MOCK=$${MOCK_HARDWARE:-auto} MULTI=$${USE_MULTI_NODE:-true} KILL=$${AUTO_KILL_S:-0}s"; \
 	echo ""; \
 	DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED"; \
 	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}"; \
@@ -839,6 +839,7 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test (launched from T
 		-e HAPTIC_ENABLE="$$HAPTIC_MODE" \
 		-e FORCE_RETRAIN="$${FORCE_RETRAIN:-false}" \
 		-e MOCK_HARDWARE="$$MOCK_MODE" \
+		-e USE_MULTI_NODE="$${USE_MULTI_NODE:-true}" \
 		-e AUTO_KILL_S="$${AUTO_KILL_S:-0}" \
 		-e HAPTIC_BT_ADDR1="$${HAPTIC_BT_ADDR1:-842E1409E14E}" \
 		-e EMG_BOARD_IP="$${EMG_BOARD_IP:-10.27.30.3}" \
