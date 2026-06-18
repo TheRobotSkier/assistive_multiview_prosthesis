@@ -1,0 +1,19 @@
+config/mia_haptic_force_test.yaml
+  s_1af9946e906ce9::t_78025b03e05aac 2-3,9-11,41,44,47,60-61,67,77,79-82,92-93,95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "a7a4efc203cc94d48a9abc2f91b597eee2890260",
+  "prompts": {},
+  "sessions": {
+    "s_1af9946e906ce9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edb8d-4f00-7601-a1bc-7f3f88f261b9",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
