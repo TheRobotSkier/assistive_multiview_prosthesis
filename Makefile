@@ -786,13 +786,15 @@ emg-force-grasp: ## EMG force grasp + wrist: collect (if needed) → train → l
 test-grasp-up: ## Start isolated container for Mia haptic force testing
 	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
 	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}" && \
-	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-/dev/ttyUSB1}}" && \
-	echo "[host] Mia haptic force test devices: MIA=$$MIA_PORT WRIST=$$WRIST_PORT" && \
+	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-}}" && \
+	WRIST_SERIAL_ENV="$${WRIST_PORT:-/dev/nonexistent-wrist}" && \
+	echo "[host] Mia haptic force test devices: MIA=$$MIA_PORT WRIST=$${WRIST_PORT:-<not detected>}" && \
 	if [ ! -e "$$MIA_PORT" ]; then echo "[host] MIA device missing; container will still start and run target will default to MOCK_HARDWARE=true."; fi && \
-	if [ ! -e "$$WRIST_PORT" ]; then echo "[host] Wrist device missing; run target will default to WRIST_ENABLE=false."; fi && \
+	if [ -z "$$WRIST_PORT" ]; then echo "[host] Wrist device not detected; run target will default to WRIST_ENABLE=false."; \
+	elif [ ! -e "$$WRIST_PORT" ]; then echo "[host] Wrist device missing at $$WRIST_PORT; run target will default to WRIST_ENABLE=false."; fi && \
 	$(DOCKER_CMD) rm -f mia-haptic-force-test >/dev/null 2>&1 || true && \
 	cd $(COMPOSE_DIR) && \
-	MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="$$WRIST_PORT" \
+	MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="$$WRIST_SERIAL_ENV" \
 	$(COMPOSE) --profile mia-haptic-force-test up -d --build mia-haptic-force-test
 
 test-grasp: test-grasp-up ## Run isolated EMG/haptic force test and CSV logger
@@ -816,14 +818,15 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test and CSV logger
 	@mkdir -p data models
 	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
 	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}" && \
-	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-/dev/ttyUSB1}}" && \
+	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-}}" && \
+	WRIST_SERIAL_ENV="$${WRIST_PORT:-/dev/nonexistent-wrist}" && \
 	MOCK_MODE="$${MOCK_HARDWARE:-auto}" && \
 	if [ "$$MOCK_MODE" = "auto" ]; then \
 		if [ -e "$$MIA_PORT" ]; then MOCK_MODE=false; else MOCK_MODE=true; fi; \
 	fi && \
 	WRIST_MODE="$${WRIST_ENABLE:-auto}" && \
 	if [ "$$WRIST_MODE" = "auto" ]; then \
-		if [ -e "$$WRIST_PORT" ]; then WRIST_MODE=true; else WRIST_MODE=false; fi; \
+		if [ -n "$$WRIST_PORT" ] && [ -e "$$WRIST_PORT" ]; then WRIST_MODE=true; else WRIST_MODE=false; fi; \
 	fi && \
 	HAPTIC_MODE="$${HAPTIC_ENABLE:-true}" && \
 	if [ "$$MOCK_MODE" = "true" ] && [ -z "$${HAPTIC_ENABLE+x}" ]; then HAPTIC_MODE=false; fi && \
@@ -832,8 +835,10 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test and CSV logger
 	$(COMPOSE) --profile mia-haptic-force-test exec -T --user prosthesis \
 		-e EMG_DATA_DIR="$${EMG_DATA_DIR:-/app/data}" \
 		-e EMG_MODEL_DIR="$${EMG_MODEL_DIR:-/app/models}" \
+		-e MIA_SERIAL_PORT="$$MIA_PORT" \
+		-e WRIST_SERIAL_PORT="$$WRIST_SERIAL_ENV" \
 		-e MIA_PORT="$$MIA_PORT" \
-		-e WRIST_PORT="$$WRIST_PORT" \
+		-e WRIST_PORT="$$WRIST_SERIAL_ENV" \
 		-e CONFIG_PATH="$${CONFIG_PATH:-/prosthesis_ws/config/mia_haptic_force_test.yaml}" \
 		-e WRIST_ENABLE="$$WRIST_MODE" \
 		-e HAPTIC_ENABLE="$$HAPTIC_MODE" \

@@ -28,17 +28,23 @@ echo "[setup-usb]   WRIST_SERIAL_PORT = $WRIST_PORT"
 
 # ── Create symlinks ───────────────────────────────────────────────────────
 if [ -e "$MIA_PORT" ]; then
-    ln -sf "$MIA_PORT" "$MIA_HAND_LINK"
-    ln -sf "$MIA_PORT" "/dev/mia_hand"
-    echo "[setup-usb] Linked $MIA_PORT → $MIA_HAND_LINK, /dev/mia_hand"
+    if ln -sf "$MIA_PORT" "$MIA_HAND_LINK" \
+        && ln -sf "$MIA_PORT" "/dev/mia_hand"; then
+        echo "[setup-usb] Linked $MIA_PORT → $MIA_HAND_LINK, /dev/mia_hand"
+    else
+        echo "[setup-usb] WARNING: could not create MIA device symlinks"
+    fi
 else
     echo "[setup-usb] WARNING: $MIA_PORT does not exist — MIA Hand not available"
 fi
 
 if [ -e "$WRIST_PORT" ]; then
-    ln -sf "$WRIST_PORT" "$WRIST_LINK"
-    ln -sf "$WRIST_PORT" "/dev/wrist_motor"
-    echo "[setup-usb] Linked $WRIST_PORT → $WRIST_LINK, /dev/wrist_motor"
+    if ln -sf "$WRIST_PORT" "$WRIST_LINK" \
+        && ln -sf "$WRIST_PORT" "/dev/wrist_motor"; then
+        echo "[setup-usb] Linked $WRIST_PORT → $WRIST_LINK, /dev/wrist_motor"
+    else
+        echo "[setup-usb] WARNING: could not create wrist device symlinks"
+    fi
 else
     echo "[setup-usb] WARNING: $WRIST_PORT does not exist — Wrist Dynamixel not available"
 fi

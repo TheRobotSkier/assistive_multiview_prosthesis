@@ -118,15 +118,13 @@ services:
         environment:
             - DISPLAY=${DISPLAY:-:0}
             - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-            - CYCLONEDDS_URI=/tmp/cyclonedds_peer.xml
             - ROS_DOMAIN_ID=0
             - MIA_SERIAL_PORT=${MIA_SERIAL_PORT:-/dev/ttyUSB0}
-            - WRIST_SERIAL_PORT=${WRIST_SERIAL_PORT:-/dev/ttyUSB1}
+            - WRIST_SERIAL_PORT=${WRIST_SERIAL_PORT:-/dev/nonexistent-wrist}
         network_mode: host
         userns_mode: "keep-id"
         volumes:
             - /tmp/.X11-unix:/tmp/.X11-unix:rw
-            - ../config/cyclonedds_peer.xml:/tmp/cyclonedds_peer.xml:ro
             - ../src:/prosthesis_ws/src:rw
             - ../config:/prosthesis_ws/config:rw
             - ../scripts:/prosthesis_ws/scripts:rw
