@@ -8,9 +8,10 @@ republishes under ``/jetson/`` at lower, laptop-friendly rates.
 
 Supported streams (each independently togglable via ROS2 parameters):
   - PointCloud2     — stride decimation (keep every Nth point) + throttle
-  - Image (colour)  — raw passthrough + throttle (NO compression)
-  - Depth image     — NEAREST spatial downscale (2×) + throttle (for host-side
-                        depth-to-cloud backprojection via depth_image_proc)
+  - Image (colour)  — spatial downscale + JPEG compression (default Q=75) + throttle
+  - Depth image     — NEAREST spatial downscale (2×) + PNG compression (lossless)
+                        + throttle (for host-side depth-to-cloud backprojection
+                        via depth_image_proc)
   - ArUco poses     — passthrough (fixed marker observations + dynamic arm pose)
   - trackhist       — resolution downsample + throttle (visualization only)
   - CameraInfo      — throttle + K/P intrinsic scaling (to match 2× downsample)
@@ -42,7 +43,7 @@ from rclpy.qos import (
     QoSProfile,
     ReliabilityPolicy,
 )
-from sensor_msgs.msg import CameraInfo, Image, PointCloud2
+from sensor_msgs.msg import CameraInfo, CompressedImage, Image, PointCloud2
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool
 
@@ -123,10 +124,10 @@ _SRC = {
 _DST = {
     "head_pc":         "/jetson/head/points",
     "arm_pc":          "/jetson/arm/points",
-    "head_depth":      "/jetson/head/depth",
-    "arm_depth":       "/jetson/arm/depth",
-    "head_img":        "/jetson/head/image",
-    "arm_img":         "/jetson/arm/image",
+    "head_depth":      "/jetson/head/depth/compressed",
+    "arm_depth":       "/jetson/arm/depth/compressed",
+    "head_img":        "/jetson/head/image/compressed",
+    "arm_img":         "/jetson/arm/image/compressed",
     "head_trackhist":  "/jetson/head/trackhist",
     "arm_trackhist":   "/jetson/arm/trackhist",
     "head_ci":         "/jetson/head/camera_info",
@@ -340,6 +341,64 @@ def scale_camera_info(msg: CameraInfo, factor: int) -> CameraInfo:
     return out
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Compression helpers — cv2 imencode (zero extra dependencies)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def compress_depth_png(msg: Image) -> CompressedImage:
+    """Compress a Z16 depth image to lossless PNG.
+
+    PNG compression level 1 (fastest).  Returns a CompressedImage ready
+    for publishing on a /compressed transport topic.
+    """
+    if not _HAS_CV2:
+        return msg  # type: ignore[return-value]
+    raw = np.frombuffer(bytes(msg.data), dtype=np.uint16)
+    try:
+        arr = raw.reshape(msg.height, msg.width)
+    except ValueError:
+        return msg  # type: ignore[return-value]
+    _, buf = cv2.imencode('.png', arr, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+    out = CompressedImage()
+    out.header = msg.header
+    out.format = "png"
+    out.data = buf.tobytes()
+    return out
+
+
+def compress_image_jpeg(msg: Image, quality: int = 75) -> CompressedImage:
+    """Compress an RGB8/BGR8 image to lossy JPEG.
+
+    JPEG quality 75 is a good balance between visual fidelity (~40 KB
+    for 320×240) and wire size.
+    """
+    if not _HAS_CV2:
+        return msg  # type: ignore[return-value]
+    # Determine channel count from encoding
+    enc = msg.encoding
+    if enc in ("rgb8", "bgr8", "8UC3"):
+        channels = 3
+    elif enc in ("mono8", "8UC1"):
+        channels = 1
+    else:
+        return msg  # type: ignore[return-value]
+    raw = np.frombuffer(bytes(msg.data), dtype=np.uint8)
+    try:
+        arr = raw.reshape(msg.height, msg.width, channels)
+    except ValueError:
+        return msg  # type: ignore[return-value]
+    # JPEG expects BGR
+    if enc == "rgb8":
+        arr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+    _, buf = cv2.imencode('.jpg', arr, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
+    out = CompressedImage()
+    out.header = msg.header
+    out.format = "jpeg"
+    out.data = buf.tobytes()
+    return out
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # JetsonRelay node
 # ═══════════════════════════════════════════════════════════════════════════
@@ -363,6 +422,11 @@ class JetsonRelay(Node):
         self.declare_parameter("depth.enabled", False)
         self.declare_parameter("depth.hz", 5.0)
         self.declare_parameter("depth.downsample_factor", 2)
+        self.declare_parameter("depth.compress", True)
+        self.declare_parameter("depth.compress_format", "png")
+
+        self.declare_parameter("image.compress", True)
+        self.declare_parameter("image.compress_quality", 75)
 
         self.declare_parameter("aruco.enabled", False)
 
@@ -390,6 +454,11 @@ class JetsonRelay(Node):
         self._depth_enabled = self.get_parameter("depth.enabled").value
         self._depth_hz = self.get_parameter("depth.hz").value
         self._depth_ds = self.get_parameter("depth.downsample_factor").value
+        self._depth_compress = self.get_parameter("depth.compress").value
+        self._depth_compress_fmt = self.get_parameter("depth.compress_format").value
+
+        self._img_compress = self.get_parameter("image.compress").value
+        self._img_compress_qty = self.get_parameter("image.compress_quality").value
 
         self._aruco_enabled = self.get_parameter("aruco.enabled").value and _HAS_ARUCO_MSGS
 
@@ -462,7 +531,11 @@ class JetsonRelay(Node):
                 lambda m, c=cam: self._on_img(m, c), _SENSOR_QOS,
             )
         self._img_pub = {
-            cam: self.create_publisher(Image, _DST[f"{cam}_img"], _SENSOR_QOS)
+            cam: self.create_publisher(
+                CompressedImage if self._img_compress else Image,
+                _DST[f"{cam}_img"],
+                _SENSOR_QOS,
+            )
             for cam in CAMERAS
         }
 
@@ -474,7 +547,11 @@ class JetsonRelay(Node):
                 lambda m, c=cam: self._on_depth(m, c), _SENSOR_QOS,
             )
         self._depth_pub = {
-            cam: self.create_publisher(Image, _DST[f"{cam}_depth"], _SENSOR_QOS)
+            cam: self.create_publisher(
+                CompressedImage if self._depth_compress else Image,
+                _DST[f"{cam}_depth"],
+                _SENSOR_QOS,
+            )
             for cam in CAMERAS
         }
 
@@ -593,10 +670,12 @@ class JetsonRelay(Node):
         # Override header stamp with system time — same rationale as
         # pointclouds (RealSense ASIC clock != system clock).
         msg.header.stamp = self.get_clock().now().to_msg()
+        if self._img_compress:
+            msg = compress_image_jpeg(msg, self._img_compress_qty)
         self._img_pub[camera].publish(msg)
 
     def _on_depth(self, msg: Image, camera: str) -> None:
-        """Throttled + downsampled depth relay (NEAREST, no interpolation)."""
+        """Throttled + downsampled depth relay (NEAREST), then compressed."""
         if not self._gates[f"depth_{camera}"].should_publish():
             return
         if self._depth_ds > 1:
@@ -604,6 +683,8 @@ class JetsonRelay(Node):
         # Override header stamp with system time — same rationale as
         # pointclouds (RealSense ASIC clock != system clock).
         msg.header.stamp = self.get_clock().now().to_msg()
+        if self._depth_compress:
+            msg = compress_depth_png(msg)
         self._depth_pub[camera].publish(msg)
 
     def _on_trackhist(self, msg: Image, camera: str) -> None:
