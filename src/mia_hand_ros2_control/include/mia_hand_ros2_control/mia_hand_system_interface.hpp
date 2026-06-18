@@ -9,7 +9,10 @@
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
+#include "mia_hand_msgs/msg/force_data.hpp"
+#include "rclcpp/node.hpp"
 #include "rclcpp/logger.hpp"
+#include "rclcpp/publisher.hpp"
 #include "rclcpp_lifecycle/state.hpp"
 
 #include "mia_hand_driver/cpp_driver.hpp"
@@ -148,6 +151,7 @@ private:
     std::string name;
     double pos;
     double vel;
+    double eff;
   };
 
   /**
@@ -165,9 +169,12 @@ private:
 
   bool b_jnt_pos_cmd_defined_[3];    //!< Joint position commands defined or not.
   bool b_jnt_pos_state_defined_[3];  //!< Joint position states defined or not.
+  bool b_jnt_eff_state_defined_[3];  //!< Joint effort states defined or not.
 
   double jnt_pos_cmd_[3];    //!< Joint position commands.
   double jnt_pos_state_[3];  //!< Joint position states.
+  double jnt_eff_state_[3];  //!< Joint effort states; normal fingertip force.
+  int32_t jnt_tangential_force_[3];  //!< Latest tangential fingertip force.
 
   bool b_jnt_vel_cmd_defined_[3];    //!< Joint velocity commands defined or not.
   bool b_jnt_vel_state_defined_[3];  //!< Joint velocity states defined or not.
@@ -178,11 +185,12 @@ private:
   std::array<CommandMode, 3> jnt_cmd_modes_;  //!< Current joint command modes.
 
   std::array<Rviz2JointInfo, 3> rviz2_joints_;  //!< Rviz2 joints info.
+
+  rclcpp::Node::SharedPtr diagnostics_node_;  //!< Publishes raw force diagnostics.
+  rclcpp::Publisher<mia_hand_msgs::msg::ForceData>::SharedPtr force_pub_;
 };
 }  // namespace
 
 #endif  // MIA_HAND_ROS2_CONTROL_MIA_HAND_SYSTEM_INTERFACE_HPP
-
-
 
 

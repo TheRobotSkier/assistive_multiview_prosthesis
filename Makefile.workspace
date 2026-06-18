@@ -127,12 +127,12 @@ camera-test: ## Build + launch visual pipeline (no hardware)
 setup-usb: ## Detect USB devices by VID:PID and create stable symlinks
 	@bash /prosthesis_ws/scripts/setup_usb_devices.sh
 
-run: ## Build + launch full pipeline (EMG + wrist + hand, no haptic)
+run: ## Build + launch full pipeline (EMG + wrist + hand + haptic)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
 	colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
 	$(ROS_WORKSPACE_SETUP) && \
-	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy
+	ros2 launch prosthesis_launch pipeline.launch.py mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy
 
 run-camera: ## Build + launch camera-only pipeline (no hardware)
 	@$(ROS_SETUP) && \
@@ -179,7 +179,7 @@ run-log-debug: ## Build + launch full pipeline with legacy fusion + log + pipeli
 	mkdir -p /prosthesis_ws/logs && \
 	LOG_FILE=/prosthesis_ws/logs/host-log-$$(date +%Y%m%d_%H%M%S).txt && \
 	echo "=== Logging to $$LOG_FILE (full pipeline + pipeline_diagnostics) ===" && \
-	ros2 launch prosthesis_launch pipeline.launch.py haptic:=false mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy debug_monitor:=true 2>&1 | tee $$LOG_FILE
+	ros2 launch prosthesis_launch pipeline.launch.py mounts_config:=/prosthesis_ws/src/sensor_fusion_bringup/config/camera_mounts.yaml tf_diagnostics:=true fusion_mode:=legacy debug_monitor:=true 2>&1 | tee $$LOG_FILE
 
 run-tui: ## Open the pipeline-config TUI (toggles + tuning knobs), then launch
 	@$(ROS_SETUP) && \
