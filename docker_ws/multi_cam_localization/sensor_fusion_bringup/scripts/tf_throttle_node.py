@@ -16,19 +16,28 @@ topic and the global /tf topic that crosses the physical link:
   OpenVINS     --200 Hz--> /tf_raw  (suppressed by publish_*_tf:=False)
                               |
                      tf_throttle_node
-                     (subscribe_topic=/tf_raw, BestEffort)
+                (subscribe=/tf_raw, BestEffort)
                               |
                          rate-limit to 50 Hz per child frame
                               |
-                   publish to /tf (global, BestEffort, crosses the cable)
+         publish to /tf (global, TRANSFORM BROADCASTER,
+                         crosses the cable)
 
 This way CycloneDDS only broadcasts the 50 Hz /tf stream over the Cat5e
 link.  The 200 Hz /tf_raw traffic stays entirely within the Jetson's local
 shared-memory transport (/dev/shm).
 
-The output /tf publisher uses BestEffort QoS by default.  Dynamic TF frames
-are ephemeral — a dropped frame is replaced by the next update ~20 ms later.
-This eliminates the last remaining NACK source for TF traffic on the wire.
+Output QoS: TransformBroadcaster (Reliable) by default.
+  The original NACK storm was caused by ~1,489 Hz of Reliable /tf traffic.
+  After throttling to ~50 Hz per frame (max ~200 Hz across4 frames),
+  Reliable QoS on the wire is safe and NECESSARY: tf2_ros::TransformListener
+  (used by RViz2, pointcloud_fusion_node, and state estimators) is
+  hardcoded to request Reliable QoS.  A BestEffort publisher on /tf will
+  be rejected by the host infrastructure, blinding the entire coordinate
+  tree and triggering lookupTransform exception loops.
+
+  For experimental A/B testing, set publish_qos:="best_effort" to use
+  a raw BestEffort publisher instead.
 
 USAGE
 -----
@@ -54,8 +63,9 @@ subscribe_qos : str
     retransmission pressure.
 publish_qos : str
     Reliability for the output /tf publisher ("best_effort" or "reliable").
-    Default "best_effort" — dynamic TF frames are replaceable and a
-    dropped frame is harmless.
+    Default "reliable" — matches tf2_ros::TransformListener expectations
+    on the host side.  At throttled rates (50 Hz), Reliable does not
+    trigger NACK storms.
 """
 
 from __future__ import annotations
@@ -67,7 +77,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from tf2_msgs.msg import TFMessage
-from tf2_ros import StaticTransformBroadcaster
+from tf2_ros import StaticTransformBroadcaster, TransformBroadcaster
 
 
 class TFThrottleNode(Node):
@@ -81,7 +91,7 @@ class TFThrottleNode(Node):
         self.declare_parameter("subscribe_topic", "/tf_raw")
         self.declare_parameter("child_frames", [""])
         self.declare_parameter("subscribe_qos", "best_effort")
-        self.declare_parameter("publish_qos", "best_effort")
+        self.declare_parameter("publish_qos", "reliable")
 
         self._max_hz = float(self.get_parameter("max_hz").value)
         self._interval_ns = int(1e9 / max(self._max_hz, 0.1))
@@ -113,23 +123,22 @@ class TFThrottleNode(Node):
             )
 
         # -- Publishers / Subscribers ------------------------------------
-        # Output: global /tf via raw publisher (crosses the wire).
-        # Dynamic TF frames are ephemeral — a dropped frame is replaced by
-        # the next one ~20 ms later.  BestEffort eliminates the last NACK
-        # source for TF traffic on the 1 Gbps link.
-        if self._publish_qos == "best_effort":
+        # Output: global /tf via TransformBroadcaster (Reliable).
+        # tf2_ros::TransformListener on the host is hardcoded to request
+        # Reliable QoS — a BestEffort publisher will be rejected.  At the
+        # throttled rate (~50 Hz per frame), Reliable is safe and does not
+        # cause NACK storms (the original storm was at ~1,489 Hz).
+        self._use_broadcaster = (self._publish_qos != "best_effort")
+        if self._use_broadcaster:
+            self._tf_broadcaster = TransformBroadcaster(self)
+        else:
             pub_qos = QoSProfile(
                 reliability=ReliabilityPolicy.BEST_EFFORT,
                 history=HistoryPolicy.KEEP_LAST,
                 depth=10,
             )
-        else:
-            pub_qos = QoSProfile(
-                reliability=ReliabilityPolicy.RELIABLE,
-                history=HistoryPolicy.KEEP_LAST,
-                depth=10,
-            )
-        self._tf_pub = self.create_publisher(TFMessage, "/tf", pub_qos)
+            self._tf_pub = self.create_publisher(
+                TFMessage, "/tf", pub_qos)
         # Static transforms: keep Reliable on /tf_static — they are
         # low-frequency calibration frames that must not be dropped.
         self._tf_static_broadcaster = StaticTransformBroadcaster(self)
@@ -193,9 +202,14 @@ class TFThrottleNode(Node):
                 self._skipped_count += 1
                 continue
 
-            # Republish as BestEffort TFMessage on global /tf.
+            # Republish on global /tf.
+            # Reliable path: TransformBroadcaster (matches host infra)
+            # BestEffort path: raw publisher (experimental)
             transform.header.stamp = self.get_clock().now().to_msg()
-            self._tf_pub.publish(TFMessage(transforms=[transform]))
+            if self._use_broadcaster:
+                self._tf_broadcaster.sendTransform(transform)
+            else:
+                self._tf_pub.publish(TFMessage(transforms=[transform]))
             self._last_publish_ns[child] = now_ns
             self._sent_hashes[dedup_key] = (child, now_ns)
             self._tx_count += 1
