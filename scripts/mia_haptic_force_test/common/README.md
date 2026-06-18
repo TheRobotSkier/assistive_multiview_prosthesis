@@ -22,44 +22,44 @@ subscribes to an inter-node topic **must** use the name listed here
 
 | Topic | Type | Publisher | Subscriber(s) | Semantics |
 |---|---|---|---|---|
-| `/hand/joint_states` | `sensor_msgs/JointState` | `hand_state_node` | `force_controller_node` | Filtered/selected finger joint positions, velocities, and efforts for the three flexion joints (`j_thumb_fle`, `j_index_fle`, `j_mrl_fle`). Other joints may be present but are ignored. |
-| `/hand/forces` | `std_msgs/Float32MultiArray` | `force_input_node` | `force_controller_node`, `haptic_node`, CSV logger | Normal contact forces `[thumb, index, mrl]` in hardware-specific units. |
-| `/hand/force_source` | `std_msgs/String` | `force_input_node` | `force_controller_node` | Identifies the active force data source: `"force_data"`, `"joint_state_effort"`, or `"none"`. |
+| `/hand/joint_states` | `sensor_msgs/JointState` | `hand_state_node` | `hand_controller_node`, logger | Filtered/selected finger joint positions, velocities, and efforts for the three flexion joints (`j_thumb_fle`, `j_index_fle`, `j_mrl_fle`). Other joints may be present but are ignored. |
+| `/hand/forces` | `std_msgs/Float32MultiArray` | `force_input_node` | `hand_controller_node`, `haptic_node`, logger | Normal contact forces `[thumb, index, mrl]` in hardware-specific units. |
+| `/hand/force_source` | `std_msgs/String` | `force_input_node` | `hand_controller_node`, logger | Identifies the active force data source: `"force_data"`, `"joint_state_effort"`, or `"none"`. |
 
 ## 2. EMG Input
 
 | Topic | Type | Publisher | Subscriber(s) | Semantics |
 |---|---|---|---|---|
-| `/emg/gesture` | `std_msgs/String` | `emg_node` | `force_controller_node`, `haptic_node` | Gesture name string, e.g. `"REST"`, `"POWER"`, `"OPEN"`. |
-| `/emg/gesture_label` | `std_msgs/Int32` | `emg_node` | `force_controller_node` | Numeric gesture label (0-4+). See `EMG_*_LABEL` constants in `constants.py`. |
-| `/emg/confidence` | `std_msgs/Float32` | `emg_node` | `force_controller_node` | Classifier confidence `[0.0, 1.0]`. |
-| `/emg/proportional` | `std_msgs/Float32` | `emg_node` | `force_controller_node` | Proportional EMG signal `[0.0, 1.0]` for continuous control. |
+| `/emg/gesture` | `std_msgs/String` | `emg_input_node` | `hand_controller_node`, `haptic_node` | Gesture name string, e.g. `"REST"`, `"POWER"`, `"OPEN"`. |
+| `/emg/gesture_label` | `std_msgs/Int32` | `emg_input_node` | `hand_controller_node` | Numeric gesture label (0-4+). See `EMG_*_LABEL` constants in `constants.py`. |
+| `/emg/confidence` | `std_msgs/Float32` | `emg_input_node` | `hand_controller_node` | Classifier confidence `[0.0, 1.0]`. |
+| `/emg/proportional` | `std_msgs/Float32` | `emg_input_node` | `hand_controller_node` | Proportional EMG signal `[0.0, 1.0]` for continuous control. |
 
 ## 3. Control Setpoints
 
 | Topic | Type | Publisher | Subscriber(s) | Semantics |
 |---|---|---|---|---|
-| `/control/target_force` | `std_msgs/Float64MultiArray` | `force_controller_node` | `haptic_node` | Per-finger force targets `[thumb, index, mrl]` in hardware units. |
-| `/control/target_wrist` | `std_msgs/Float64` | `force_controller_node` | `wrist_node` | Wrist target angle in degrees. |
-| `/control/mode` | `std_msgs/String` | `force_controller_node` | `wrist_node`, `haptic_node`, diagnostic nodes | Controller mode: `"position"`, `"velocity"`, or `"emergency_backoff"`. |
-| `/control/enable` | `std_msgs/Bool` | Supervisor / `force_controller_node` | `force_controller_node`, `wrist_node` | When `False`, all controller outputs are suppressed (motors stop, hand holds). |
-| `/control/hold_mode` | `std_msgs/String` | `force_controller_node` | `haptic_node` | Hold phase the haptics should render: `"force"` or `"wrist"`. |
+| `/control/target_force` | `std_msgs/Float64MultiArray` | `supervisor_node` | `hand_controller_node`, `haptic_node`, logger | Per-finger force targets `[thumb, index, mrl]` in hardware units. |
+| `/control/target_wrist` | `std_msgs/Float64` | `supervisor_node` | `hand_controller_node`, wrist node | Wrist target angle in degrees. |
+| `/control/mode` | `std_msgs/String` | `supervisor_node` | `hand_controller_node`, wrist node, `haptic_node`, logger | Controller mode: `"position"`, `"velocity"`, or `"emergency_backoff"`. |
+| `/control/enable` | `std_msgs/Bool` | `supervisor_node` | `hand_controller_node`, wrist node | When `False`, all controller outputs are suppressed (motors stop, hand holds). |
+| `/control/hold_mode` | `std_msgs/String` | `supervisor_node` | `hand_controller_node`, `haptic_node`, logger | Hold phase the haptics should render: `"force"` or `"wrist"`. |
 
 ## 4. Test Orchestration
 
 | Topic | Type | Publisher | Subscriber(s) | Semantics |
 |---|---|---|---|---|
-| `/test/stage` | `std_msgs/String` | `force_controller_node` | `test_ui_node`, CSV logger | Current test stage name (values from `Stage` enum in `constants.py`). |
-| `/test/event` | `std_msgs/String` | `force_controller_node` | `test_ui_node`, CSV logger | JSON-encoded event payload describing noteworthy transitions. |
-| `/test/status` | `std_msgs/String` | `force_controller_node` | `test_ui_node`, CSV logger | JSON-encoded periodic status snapshot with current measurements. |
+| `/test/stage` | `std_msgs/String` | `supervisor_node` | `terminal_ui_node`, logger | Current test stage name (values from `Stage` enum in `constants.py`). |
+| `/test/event` | `std_msgs/String` | `supervisor_node` | `terminal_ui_node`, logger | JSON-encoded event payload describing noteworthy transitions. |
+| `/test/status` | `std_msgs/String` | `supervisor_node` | `terminal_ui_node`, logger | JSON-encoded periodic status snapshot with current measurements. |
 
 ## 5. Controller Feedback
 
 | Topic | Type | Publisher | Subscriber(s) | Semantics |
 |---|---|---|---|---|
-| `/controller/force_error` | `std_msgs/Float64MultiArray` | `force_controller_node` | diagnostic / logging | Per-finger force error `[error_thumb, error_index, error_mrl]`. |
-| `/controller/active` | `std_msgs/Bool` | `force_controller_node` | Supervisor, `test_ui_node` | ``True`` while the force controller is actively modulating output. |
-| `/controller/loop_timing` | `std_msgs/String` | `force_controller_node` | diagnostic / logging | JSON payload with performance metrics: `hz`, `jitter_ms`, etc. |
+| `/controller/force_error` | `std_msgs/Float64MultiArray` | `hand_controller_node` | diagnostic / logger | Per-finger force error `[error_thumb, error_index, error_mrl]`. |
+| `/controller/active` | `std_msgs/Bool` | `hand_controller_node` | `supervisor_node`, `terminal_ui_node` | ``True`` while the force controller is actively modulating output. |
+| `/controller/loop_timing` | `std_msgs/String` | `hand_controller_node` | diagnostic / logger | JSON payload with performance metrics: `hz`, `jitter_ms`, etc. |
 
 ## 6. Haptic Band Output
 
@@ -73,8 +73,8 @@ These are written by the controller to drive the physical hand.
 
 | Topic | Type | Publisher | Subscriber(s) | Semantics |
 |---|---|---|---|---|
-| `/group_vel_ff_controller/commands` | `std_msgs/Float64MultiArray` | `force_controller_node` | `group_vel_ff_controller` | Velocity commands forwarded to the hand's velocity FF controller. |
-| `/group_pos_ff_controller/commands` | `std_msgs/Float64MultiArray` | `force_controller_node` | `group_pos_ff_controller` | Position commands forwarded to the hand's position FF controller. |
+| `/group_vel_ff_controller/commands` | `std_msgs/Float64MultiArray` | `hand_controller_node` | `group_vel_ff_controller` | Velocity commands forwarded to the hand's velocity FF controller. |
+| `/group_pos_ff_controller/commands` | `std_msgs/Float64MultiArray` | `hand_controller_node` | `group_pos_ff_controller` | Position commands forwarded to the hand's position FF controller. |
 
 ## 8. Wrist Topics
 
