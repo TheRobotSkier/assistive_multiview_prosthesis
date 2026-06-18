@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg xmlns="http://www.w3.org/2000/svg" width="634" height="289" viewBox="0 0 634 289">
-<text x="12" y="18" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#111827">Debugging commands</text>
-<g font-family="monospace" font-size="14px">
+<svg xmlns="http://www.w3.org/2000/svg" width="739" height="352" viewBox="0 0 739 352">
+<text x="14" y="20" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#111827">Debugging commands</text>
+<g font-family="monospace" font-size="14px" transform="translate(0 38)">
 <text x="0" y="14" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic">#&#160;──&#160;Jetson:&#160;full&#160;pipeline&#160;with&#160;hardware&#160;+&#160;rich&#160;diagnostics&#160;───────────</tspan></text>
 <text x="0" y="33" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan>make<tspan fill="#bbbbbb">&#160;</tspan>run-log-debug<tspan fill="#bbbbbb">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;</tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;run&#160;with&#160;pipeline_diagnostics&#160;node&#160;on&#160;(TF&#160;jumps,</tspan></text>
 <text x="0" y="52" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#bbbbbb">&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;</tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;topic&#160;rates,&#160;pose&#160;divergence,&#160;clock&#160;offset),&#160;logs&#160;teed</tspan></text>

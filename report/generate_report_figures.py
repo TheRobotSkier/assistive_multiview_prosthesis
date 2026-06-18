@@ -15,6 +15,7 @@ against the real implementation under src/grasp_preshaping/.
 
 import argparse
 import os
+import re
 import sys
 
 import matplotlib
@@ -24,7 +25,10 @@ import numpy as np
 from matplotlib.patches import FancyArrowPatch, Rectangle
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  (registers 3d projection)
 
-import cairosvg
+try:
+    import cairosvg
+except ImportError:  # optional: only needed for PNG rasterisation
+    cairosvg = None
 from pygments import highlight
 from pygments.formatters import SvgFormatter
 from pygments.lexers import BashLexer, PythonLexer, RustLexer
@@ -79,7 +83,12 @@ def save_fig(fig, number, hint=""):
 
 
 def save_code(code, language, number, hint="", font_size=13, title=None):
-    """Render a code string to SVG via Pygments (transparent), compare to PNG."""
+    """Render a code string to SVG via Pygments (transparent), compare to PNG.
+
+    Note: Pygments' SvgFormatter ignores the requested font_size and always
+    renders at 14px with a 19px line step. We therefore parse the *actual*
+    metrics out of the rendered SVG so the dimensions match reality.
+    """
     os.makedirs(FIG_DIR, exist_ok=True)
     lexer = {"bash": BashLexer, "python": PythonLexer, "rust": RustLexer}[language]()
     formatter = SvgFormatter(
@@ -91,30 +100,49 @@ def save_code(code, language, number, hint="", font_size=13, title=None):
     )
     body = highlight(code, lexer, formatter)
 
-    # Pygments emits a dimensionless <svg>; give it an explicit viewBox so the
-    # PNG rasterisation (for the size check) actually works.
-    lines = code.count("\n") + 1
-    char_w = font_size * 0.62            # approx monospace char width in px
-    max_chars = max(len(ln) for ln in code.split("\n"))
-    title_h = (font_size + 16) if title else 0
-    line_h = font_size * 1.3
-    width = max(320, int(max_chars * char_w) + 24)
-    height = int(title_h + lines * line_h + 12)
+    # Parse the ACTUAL rendering metrics from Pygments' output (it ignores
+    # font_size and always uses 14px / 19px line step).
+    fs_match = re.search(r'<g[^>]*font-size="(\d+)px"', body)
+    real_fs = int(fs_match.group(1)) if fs_match else 14
+    ys = [int(m) for m in re.findall(r'<text[^>]*\sy="(\d+)"', body)]
+    if len(ys) >= 2:
+        line_step = ys[1] - ys[0]
+        first_baseline = ys[0]
+    else:
+        line_step = int(round(real_fs * 1.4))
+        first_baseline = real_fs
+    # Monospace char width ~0.6em; measure the longest line for true width.
+    lines = code.split("\n")
+    # Account for tab expansion (Pygments renders tabs as ~8 spaces).
+    expanded = [ln.expandtabs(4) for ln in lines]
+    max_chars = max((len(ln) for ln in expanded), default=1)
+    char_w = real_fs * 0.62
+
+    title_h = (real_fs + 16) if title else 0
+    top_pad = 8
+    bottom_pad = 10
+    width = max(320, int(max_chars * char_w) + 28)
+    height = int(title_h + top_pad + len(lines) * line_step + bottom_pad)
     body = _add_svg_dimensions(body, width, height)
 
     if title:
         title_svg = (
-            f'<text x="12" y="{font_size + 6}" '
-            f'font-family="DejaVu Sans" font-size="{font_size + 3}" '
+            f'<text x="14" y="{real_fs + 6}" '
+            f'font-family="DejaVu Sans" font-size="{real_fs + 3}" '
             f'font-weight="bold" fill="#111827">{title}</text>'
         )
-        body = _inject_svg_title(body, title_svg, font_size)
+        body = _inject_svg_title(body, title_svg, title_h + top_pad)
 
     svg_path = os.path.join(FIG_DIR, f"{number}.svg")
     with open(svg_path, "w", encoding="utf-8") as fh:
         fh.write(body)
 
     png_path = os.path.join(FIG_DIR, f"{number}.png")
+    if cairosvg is None:
+        if os.path.exists(png_path):
+            os.remove(png_path)
+        print(f"  [{number}] {hint}: {number}.svg (cairosvg not installed)")
+        return f"{number}.svg"
     try:
         cairosvg.svg2png(bytestring=body.encode("utf-8"), write_to=png_path,
                          background_color=None, scale=2.0)
@@ -149,13 +177,28 @@ def _keep_smaller(number, svg_path, png_path, hint):
     return chosen
 
 
-def _inject_svg_title(svg, title_svg, font_size):
-    """Shift the Pygments content down and insert a title line."""
-    # Pygments wraps content in <g>. Translate it down to make room for title.
-    svg = svg.replace("<g>", f'<g transform="translate(0,{font_size + 16})">', 1)
-    # Insert title just before the first <g>.
-    idx = svg.find("<g")
-    return svg[:idx] + title_svg + "\n" + svg[idx:]
+def _inject_svg_title(svg, title_svg, shift_y):
+    """Shift the Pygments content down by shift_y and insert a title line.
+
+    Pygments wraps its content in a <g> tag that carries font attributes, e.g.
+    '<g font-family="monospace" font-size="14px">'. We must translate THAT
+    group (not a plain '<g>'), so we match the first <g...> opening tag.
+    """
+    m = re.search(r'<g(?=[\s>])[^>]*>', svg)
+    if not m:
+        return svg  # unexpected structure; leave unchanged rather than corrupt
+    open_tag = m.group(0)
+    # Insert a translate transform, preserving any existing attributes.
+    if "transform=" in open_tag:
+        new_tag = open_tag.replace(
+            "transform=", f'transform="translate(0 {shift_y})" ', 1)
+        # Handle the case where transform had no quotes already is rare; the
+        # Pygments tag has no transform, so this branch is just defensive.
+    else:
+        new_tag = open_tag[:-1] + f' transform="translate(0 {shift_y})">'
+    svg = svg[:m.start()] + new_tag + svg[m.end():]
+    # Insert the title text just before the (now translated) <g>.
+    return svg[:m.start()] + title_svg + "\n" + svg[m.start():]
 
 
 def draw_table(ax, headers, rows, cell_colors=None, header_color=None,
@@ -713,64 +756,135 @@ def _dq_to_se3(dq):
     return M
 
 
+def _set_equal_aspect_3d(ax, points):
+    """Force an equal aspect ratio on a 3D axes around the given points.
+
+    matplotlib's 3D axes don't honour ``set_aspect('equal')``; this computes a
+    cubic bounding box from the points and sets matching per-axis limits so the
+    hand geometry isn't stretched along any axis.
+    """
+    pts = np.asarray(points)
+    lo = pts.min(axis=0)
+    hi = pts.max(axis=0)
+    center = (lo + hi) / 2
+    span = (hi - lo).max() / 2 + 1e-6
+    ax.set_xlim(center[0] - span, center[0] + span)
+    ax.set_ylim(center[1] - span, center[1] + span)
+    ax.set_zlim(center[2] - span, center[2] + span)
+
+
 def fig_33():
     lut_path = os.path.join(ROOT, "..", "src", "grasp_preshaping", "data",
                             "finger_contact_lut.npz")
     data = np.load(lut_path)
-
-    # Contacts to plot: (table_key, contact_index, name, color).
-    # IndexTip = idx 6 in index_table; ThumbAbdTip = idx 2 in thumb_opp_mode1.
-    contacts = [
-        ("index_table", 6, "Index tip", PAL["primary"]),
-        ("thumb_opp_mode1_table", 2, "Thumb tip (abducted)", PAL["accent"]),
-        ("index_table", 4, "Index pip", PAL["blue"]),
-    ]
-    # Also draw the full index finger chain at a few closure steps.
     n_steps = data["index_table"].shape[0]
 
-    fig = plt.figure(figsize=(8.2, 6.6))
+    # Joint chains (indices into each table): base -> ... -> tip.
+    index_chain = [0, 4, 2, 6]              # IndexMcp -> Pip -> Dip -> Tip
+    thumb_chain = [0, 1, 2]                 # ThumbAbd(Mcp) -> Pip -> Tip
+    mrl_chains = [                          # Middle/Ring/Little: Mcp -> Pip -> Dip -> Tip
+        [0, 2, 1, 3],                       # Middle
+        [6, 5, 4],                          # Ring (no Mcp stored)
+        [8, 7, 6],                          # Little (no Mcp stored)
+    ]
+
+    def chain_at(table_key, chain, step):
+        table = data[table_key]
+        return np.array([_dq_to_se3(table[step, ci, :])[:3, 3] for ci in chain])
+
+    def sweep_at(table_key, cidx):
+        table = data[table_key]
+        return np.array([_dq_to_se3(table[s, cidx, :])[:3, 3]
+                         for s in range(n_steps)])
+
+    fig = plt.figure(figsize=(8.6, 7.0))
     ax = fig.add_subplot(111, projection="3d")
 
-    for key, cidx, name, color in contacts:
-        table = data[key]                      # (n_steps, n_contacts, 8)
-        traj = np.array([_dq_to_se3(table[s, cidx, :])[:3, 3]
-                         for s in range(n_steps)])
-        # Sweep path.
-        ax.plot(traj[:, 0], traj[:, 1], traj[:, 2], color=color, lw=2.2,
-                alpha=0.85, label=name)
-        # Closure-step markers, coloured from light->dark along the sweep.
-        for s in range(n_steps):
-            frac = s / (n_steps - 1)
-            ax.scatter(*traj[s], s=42, color=color, alpha=0.4 + 0.6 * frac,
-                       edgecolors="white", linewidths=0.5, zorder=4)
-        # Arrow from open (step 0) to closed (last step).
-        ax.quiver(*traj[0], *(traj[-1] - traj[0]), color=color, lw=1.6,
-                  arrow_length_ratio=0.12, alpha=0.6)
+    # --- Palm base (faint) at the open step, to ground the hand. -----------
+    palm = data["palm_table"]               # (4, 8): ProxUlna, ProxRadi, DistUlna, DistRadi
+    palm_pts = np.array([_dq_to_se3(palm[i, :])[:3, 3] for i in range(4)])
+    # Order into a sensible quad: prox-ulna, dist-ulna, dist-radi, prox-radi.
+    quad = palm_pts[[0, 2, 3, 1]]
+    from matplotlib.patches import Polygon
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    poly = Poly3DCollection([quad], alpha=0.10, facecolor=PAL["amber"],
+                            edgecolor=PAL["amber"], linewidth=0.8)
+    ax.add_collection3d(poly)
 
-    # Draw the index finger chain (Mcp->Pip->Dip->Tip) at 3 closure steps to
-    # show the finger curling.
-    chain_idx = [0, 4, 2, 6]  # IndexMcp, IndexPip, IndexDip, IndexTip
-    idx_table = data["index_table"]
+    # --- Other fingers (middle/ring/little), faint, for full-hand context.-
+    for ci in mrl_chains:
+        for s, alpha in zip([0, n_steps - 1], [0.18, 0.30]):
+            chain = chain_at("mrl_table", ci, s)
+            ax.plot(chain[:, 0], chain[:, 1], chain[:, 2], color=PAL["amber"],
+                    lw=2.0, alpha=alpha)
+
+    # --- Index finger: skeleton chain at 3 closure steps ------------------
     for s, alpha in zip([0, n_steps // 2, n_steps - 1], [0.35, 0.6, 0.95]):
-        chain = np.array([_dq_to_se3(idx_table[s, ci, :])[:3, 3]
-                          for ci in chain_idx])
-        ax.plot(chain[:, 0], chain[:, 1], chain[:, 2], color=PAL["amber"],
-                lw=3.0, alpha=alpha)
-        ax.scatter(chain[:, 0], chain[:, 1], chain[:, 2], color=PAL["amber"],
-                   s=30, alpha=alpha, edgecolors=PAL["dark"], linewidths=0.5)
+        chain = chain_at("index_table", index_chain, s)
+        ax.plot(chain[:, 0], chain[:, 1], chain[:, 2], color=PAL["primary"],
+                lw=3.2, alpha=alpha)
+        ax.scatter(chain[:, 0], chain[:, 1], chain[:, 2], color=PAL["primary"],
+                   s=34, alpha=alpha, edgecolors="white", linewidths=0.5,
+                   zorder=5)
+    # Index tip sweep path (faded) + direction arrow.
+    idx_sweep = sweep_at("index_table", 6)
+    ax.plot(idx_sweep[:, 0], idx_sweep[:, 1], idx_sweep[:, 2],
+            color=PAL["primary"], lw=1.4, alpha=0.35, linestyle="--")
+    ax.quiver(*idx_sweep[0], *(idx_sweep[-1] - idx_sweep[0]),
+              color=PAL["primary"], lw=1.6, arrow_length_ratio=0.14, alpha=0.7)
+
+    # --- Thumb: skeleton chain at 3 closure steps -------------------------
+    for s, alpha in zip([0, n_steps // 2, n_steps - 1], [0.35, 0.6, 0.95]):
+        chain = chain_at("thumb_opp_mode1_table", thumb_chain, s)
+        ax.plot(chain[:, 0], chain[:, 1], chain[:, 2], color=PAL["accent"],
+                lw=3.2, alpha=alpha)
+        ax.scatter(chain[:, 0], chain[:, 1], chain[:, 2], color=PAL["accent"],
+                   s=34, alpha=alpha, edgecolors="white", linewidths=0.5,
+                   zorder=5)
+    # Thumb tip sweep path (faded) + direction arrow.
+    th_sweep = sweep_at("thumb_opp_mode1_table", 2)
+    ax.plot(th_sweep[:, 0], th_sweep[:, 1], th_sweep[:, 2],
+            color=PAL["accent"], lw=1.4, alpha=0.35, linestyle="--")
+    ax.quiver(*th_sweep[0], *(th_sweep[-1] - th_sweep[0]),
+              color=PAL["accent"], lw=1.6, arrow_length_ratio=0.14, alpha=0.7)
+
+    # --- Viewing angle chosen to separate thumb (opposition) from index ---
+    # The thumb moves mostly in the x-z plane (opposition sweep), while the
+    # index curls in y-z. An elevation of ~22° with azimuth ~-65° opens up
+    # the angle between the two fingers so both chains read clearly.
+    ax.view_init(elev=22, azim=-65)
 
     ax.set_title("Fingertip sweep across the precomputed LUT\n"
-                 "(11 closure steps, real dual-quaternion trajectory data)",
+                 "(index & thumb joint chains over 11 closure steps)",
                  fontsize=12, fontweight="bold", color=PAL["dark"], pad=10)
     ax.set_xlabel("x (m)"); ax.set_ylabel("y (m)"); ax.set_zlabel("z (m)")
     ax.set_xticks([]); ax.set_yticks([]); ax.set_zticks([])
     ax.xaxis.pane.fill = ax.yaxis.pane.fill = ax.zaxis.pane.fill = False
     for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
         axis.pane.set_edgecolor((0, 0, 0, 0.08))
-    ax.legend(loc="upper left", fontsize=8.5, framealpha=0.9)
+
+    # Equal aspect so the hand isn't stretched.
+    all_pts = np.vstack([
+        sweep_at("index_table", 6), sweep_at("thumb_opp_mode1_table", 2),
+        chain_at("index_table", index_chain, 0), palm_pts,
+    ])
+    _set_equal_aspect_3d(ax, all_pts)
+
+    # Custom legend (proxy artists).
+    from matplotlib.lines import Line2D
+    legend_handles = [
+        Line2D([0], [0], color=PAL["primary"], lw=3, label="Index chain"),
+        Line2D([0], [0], color=PAL["accent"], lw=3, label="Thumb chain"),
+        Line2D([0], [0], color=PAL["primary"], lw=1.4, ls="--",
+               alpha=0.6, label="Tip sweep path"),
+        Line2D([0], [0], color=PAL["amber"], lw=2, alpha=0.4,
+               label="Other fingers / palm"),
+    ]
+    ax.legend(handles=legend_handles, loc="upper left", fontsize=8.5,
+              framealpha=0.9)
     fig.text(0.5, 0.01,
-             "Amber links = index finger chain (Mcp→Pip→Dip→Tip) at open / mid / closed. "
-             "Markers fade from open→closed.",
+             "Solid links = joint chains at open / mid / closed.  "
+             "Dashed = tip sweep path.  Arrows = open→closed direction.",
              ha="center", fontsize=8.5, color="#555", style="italic")
     return save_fig(fig, 33, "fingertip LUT sweep 3D")
 
@@ -840,27 +954,35 @@ def fig_35():
 def fig_36():
     code = '''use grasp_preshaping::lut_helper::{Contact, FingerLUT};
 
-fn main() {
-    // Load the precomputed finger-closure LUT (.npz of dual quaternions).
-    // Each contact stores an SE(3) transform per closure step, so runtime
-    // collision detection is just array lookups against the TSDF.
-    let lut = FingerLUT::load("data/finger_contact_lut.npz");
+// Load the precomputed finger-closure LUT (.npz of dual quaternions).
+// Each contact stores an SE(3) transform per closure step, so runtime
+// collision detection is just array lookups against the TSDF.
+let lut = FingerLUT::load("data/finger_contact_lut.npz");
 
-    // Control value in [0, 1] along the closure path (0 = open, 1 = closed).
-    let control = 0.6;
+// --- How the grasp type is chosen -------------------------------------
+// Every search particle carries a grasp_type in {0,1,2}:
+//   0 = Cylindrical, 1 = Pinch, 2 = Lateral.
+// Iteration 0 assigns it uniformly at random; later iterations either
+// inherit the parent elite's type (90% of the time) or mutate (10%)
+// to a score-weighted distribution. After the last iteration the single
+// highest-scoring particle wins, and its grasp_type is the chosen grasp.
+//
+// The chosen type selects a different contact set, thumb mode, and a
+// per-type maximum closure (the LUT stores the self-collision limit):
+let max_closure = lut.get_max_closure(chosen_grasp_type); // 0, 1, or 2
 
-    // World transform of the index fingertip at this closure step.
-    let se3 = lut.get_se_transform(Contact::IndexTip, control);
-    let location = lut.get_location(Contact::IndexTip, control);
+// Control value in [0, max_closure] along the closure path.
+let control = 0.6 * max_closure;
 
-    println!("IndexTip @ {:.2}: pos = [{:.3}, {:.3}, {:.3}]",
-             control, location.x, location.y, location.z);
-    // se3 is a 4x4 nalgebra Matrix4<f64> (rotation + translation).
-    let _rotation = se3.fixed_view::<3, 3>(0, 0);
-}
+// World transform of the index fingertip at this closure step.
+let se3 = lut.get_se_transform(Contact::IndexTip, control);
+let location = lut.get_location(Contact::IndexTip, control);
+
+println!("IndexTip @ {:.2}: pos = [{:.3}, {:.3}, {:.3}]",
+         control, location.x, location.y, location.z);
 '''
-    return save_code(code, "rust", 36, "rust LUT load + use", font_size=12,
-                     title="Loading and querying the finger-contact LUT (Rust)")
+    return save_code(code, "rust", 36, "rust LUT load + grasp type", font_size=12,
+                     title="Loading the LUT and choosing the grasp type (Rust)")
 
 
 # ---------------------------------------------------------------------------
@@ -954,30 +1076,26 @@ def fig_43():
     code = '''// Grasp scoring: geometric alignment and wrench (force-closure) proxy.
 // Source: src/grasp_preshaping/src/planner.rs
 
-/// Alignment: how well each finger's closure force opposes the surface normal.
-/// reward = clamp(mean(max(0, -n . f)), 0, 1)
+// Alignment: how well each finger's closure force opposes the surface normal.
+// reward = clamp( mean( max(0, -n . f) ), 0, 1 )
 fn compute_alignment(contacts: &[ActiveContact]) -> f64 {
-    let (mut sum, mut count) = (0.0, 0usize);
-    for c in contacts {
-        if c.force_direction.norm() < 0.5 { continue; }  // skip weak sweeps
-        let n = c.surface_normal.cast::<f64>();
-        sum += (-n.dot(&c.force_direction)).max(0.0);
-        count += 1;
-    }
-    if count == 0 { 0.0 } else { (sum / count as f64).clamp(0.0, 1.0) }
+    let vals: Vec<f64> = contacts.iter()
+        .filter(|c| c.force_direction.norm() >= 0.5)
+        .map(|c| (-dot(&c.surface_normal, &c.force_direction)).max(0.0))
+        .collect();
+    vals.is_empty() ? 0.0 : clamp(mean(vals), 0.0, 1.0)
 }
 
-/// Wrench proxy: spatial balance of contact normals (no mass estimate needed).
-/// force_closure = clamp(1 - ||mean(n)||, 0, 1)
+// Wrench proxy: spatial balance of contact normals (no mass estimate needed).
+// force_closure = clamp( 1 - ||mean(n)||, 0, 1 )
 fn compute_force_closure(contacts: &[ActiveContact]) -> f64 {
-    if contacts.is_empty() { return 0.0; }
-    let centroid: Vector3<f64> = contacts.iter()
-        .map(|c| c.surface_normal.cast::<f64>())
-        .sum::<Vector3<f64>>() / contacts.len() as f64;
-    (1.0 - centroid.norm()).clamp(0.0, 1.0)
+    let mean_n = contacts.iter()
+        .map(|c| c.surface_normal)
+        .sum::<Vec3>() / contacts.len() as f64;
+    clamp(1.0 - mean_n.norm(), 0.0, 1.0)
 }
 '''
-    return save_code(code, "rust", 43, "alignment + wrench proxy", font_size=11,
+    return save_code(code, "rust", 43, "alignment + wrench proxy", font_size=12,
                      title="Alignment and wrench-proxy scoring (Rust)")
 
 
@@ -987,21 +1105,17 @@ fn compute_force_closure(contacts: &[ActiveContact]) -> f64 {
 def fig_44():
     headers = ["Tier", "Condition", "Score range"]
     rows = [
-        ["Tier 4", "No contact (finger sweep completes without collision)",
-         "[0.00, 0.05]"],
-        ["Tier 3", "Invalid initial contact (palm/hand starts inside object)",
-         "[0.01, 0.09]"],
-        ["Tier 2", "Partial contact (insufficient finger groups engaged)",
-         "[0.00, 0.50]"],
-        ["Tier 1", "Valid contact (thumb + index + required extra fingers)",
-         "[0.80, 1.00]"],
+        ["Tier 4", "No contact (finger sweep clear)", "[0.00, 0.05]"],
+        ["Tier 3", "Invalid start (palm inside object)", "[0.01, 0.09]"],
+        ["Tier 2", "Partial (too few finger groups)", "[0.00, 0.50]"],
+        ["Tier 1", "Valid (thumb + index + extras)", "[0.80, 1.00]"],
     ]
     # Tier 0 (reject) = red tint, Tier 1 (best) = blue tint, greys in between.
     tier_colors = {0: "#FEE2E2", 1: "#DBEAFE", 2: "#F3F4F6", 3: "#E5E7EB"}
     cell_colors = {(i, 0): tier_colors[i] for i in range(4)}
-    fig = new_fig((8.4, 3.6))
+    fig = new_fig((9.6, 3.6))
     ax = fig.add_subplot(111)
-    draw_table(ax, headers, rows, cell_colors=cell_colors, fontsize=10.5,
+    draw_table(ax, headers, rows, cell_colors=cell_colors, fontsize=11,
                row_height=1.9, col_align=["center", "left", "center"],
                title="Tiered grasp scoring hierarchy  (verified vs. planner.rs)")
     fig.text(0.5, 0.03,

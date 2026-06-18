@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
   "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="490.32pt" height="268.182031pt" viewBox="0 0 490.32 268.182031" xmlns="http://www.w3.org/2000/svg" version="1.1">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="557.28pt" height="268.561953pt" viewBox="0 0 557.28 268.561953" xmlns="http://www.w3.org/2000/svg" version="1.1">
  <metadata>
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-06-17T20:56:56.371562</dc:date>
+    <dc:date>2026-06-18T12:45:46.255962</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
@@ -21,188 +21,188 @@
  </defs>
  <g id="figure_1">
   <g id="patch_1">
-   <path d="M 0 268.182031 
-L 490.32 268.182031 
-L 490.32 0 
+   <path d="M 0 268.561953 
+L 557.28 268.561953 
+L 557.28 0 
 L 0 0 
-L 0 268.182031 
+L 0 268.561953 
 z
 " style="fill: none"/>
   </g>
   <g id="axes_1">
    <g id="table_1">
     <g id="patch_2">
-     <path d="M 10.8 100.649891 
-L 167.04 100.649891 
-L 167.04 77.849891 
-L 10.8 77.849891 
+     <path d="M 10.8 101.029812 
+L 189.36 101.029812 
+L 189.36 78.229812 
+L 10.8 78.229812 
 z
 " style="fill: #111827; stroke: #ffffff; stroke-width: 1.5; stroke-linejoin: miter"/>
     </g>
     <g id="text_1">
-     <text style="font-weight: 700; font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="88.92" y="92.147234" transform="rotate(-0 88.92 92.147234)">Tier</text>
+     <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="100.08" y="92.665125" transform="rotate(-0 100.08 92.665125)">Tier</text>
     </g>
     <g id="patch_3">
-     <path d="M 167.04 100.649891 
-L 323.28 100.649891 
-L 323.28 77.849891 
-L 167.04 77.849891 
+     <path d="M 189.36 101.029812 
+L 367.92 101.029812 
+L 367.92 78.229812 
+L 189.36 78.229812 
 z
 " style="fill: #111827; stroke: #ffffff; stroke-width: 1.5; stroke-linejoin: miter"/>
     </g>
     <g id="text_2">
-     <text style="font-weight: 700; font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="245.16" y="92.147234" transform="rotate(-0 245.16 92.147234)">Condition</text>
+     <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="278.64" y="92.665125" transform="rotate(-0 278.64 92.665125)">Condition</text>
     </g>
     <g id="patch_4">
-     <path d="M 323.28 100.649891 
-L 479.52 100.649891 
-L 479.52 77.849891 
-L 323.28 77.849891 
+     <path d="M 367.92 101.029812 
+L 546.48 101.029812 
+L 546.48 78.229812 
+L 367.92 78.229812 
 z
 " style="fill: #111827; stroke: #ffffff; stroke-width: 1.5; stroke-linejoin: miter"/>
     </g>
     <g id="text_3">
-     <text style="font-weight: 700; font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="401.4" y="92.065203" transform="rotate(-0 401.4 92.065203)">Score range</text>
+     <text style="font-weight: 700; font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #ffffff" x="457.2" y="92.579187" transform="rotate(-0 457.2 92.579187)">Score range</text>
     </g>
     <g id="patch_5">
-     <path d="M 10.8 123.449891 
-L 167.04 123.449891 
-L 167.04 100.649891 
-L 10.8 100.649891 
+     <path d="M 10.8 123.829812 
+L 189.36 123.829812 
+L 189.36 101.029812 
+L 10.8 101.029812 
 z
 " style="fill: #fee2e2; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_4">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="88.92" y="114.947234" transform="rotate(-0 88.92 114.947234)">Tier 4</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="100.08" y="115.465125" transform="rotate(-0 100.08 115.465125)">Tier 4</text>
     </g>
     <g id="patch_6">
-     <path d="M 167.04 123.449891 
-L 323.28 123.449891 
-L 323.28 100.649891 
-L 167.04 100.649891 
+     <path d="M 189.36 123.829812 
+L 367.92 123.829812 
+L 367.92 101.029812 
+L 189.36 101.029812 
 z
 " style="fill: #ffffff; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_5">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="173.2896" y="114.947234" transform="rotate(-0 173.2896 114.947234)">No contact (finger sweep completes without collision)</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="196.5024" y="115.465125" transform="rotate(-0 196.5024 115.465125)">No contact (finger sweep clear)</text>
     </g>
     <g id="patch_7">
-     <path d="M 323.28 123.449891 
-L 479.52 123.449891 
-L 479.52 100.649891 
-L 323.28 100.649891 
+     <path d="M 367.92 123.829812 
+L 546.48 123.829812 
+L 546.48 101.029812 
+L 367.92 101.029812 
 z
 " style="fill: #ffffff; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_6">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="401.4" y="114.947234" transform="rotate(-0 401.4 114.947234)">[0.00, 0.05]</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="457.2" y="115.465125" transform="rotate(-0 457.2 115.465125)">[0.00, 0.05]</text>
     </g>
     <g id="patch_8">
-     <path d="M 10.8 146.249891 
-L 167.04 146.249891 
-L 167.04 123.449891 
-L 10.8 123.449891 
+     <path d="M 10.8 146.629812 
+L 189.36 146.629812 
+L 189.36 123.829812 
+L 10.8 123.829812 
 z
 " style="fill: #dbeafe; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_7">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="88.92" y="137.747234" transform="rotate(-0 88.92 137.747234)">Tier 3</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="100.08" y="138.265125" transform="rotate(-0 100.08 138.265125)">Tier 3</text>
     </g>
     <g id="patch_9">
-     <path d="M 167.04 146.249891 
-L 323.28 146.249891 
-L 323.28 123.449891 
-L 167.04 123.449891 
+     <path d="M 189.36 146.629812 
+L 367.92 146.629812 
+L 367.92 123.829812 
+L 189.36 123.829812 
 z
 " style="fill: #f9fafb; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_8">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="173.2896" y="137.747234" transform="rotate(-0 173.2896 137.747234)">Invalid initial contact (palm/hand starts inside object)</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="196.5024" y="138.265125" transform="rotate(-0 196.5024 138.265125)">Invalid start (palm inside object)</text>
     </g>
     <g id="patch_10">
-     <path d="M 323.28 146.249891 
-L 479.52 146.249891 
-L 479.52 123.449891 
-L 323.28 123.449891 
+     <path d="M 367.92 146.629812 
+L 546.48 146.629812 
+L 546.48 123.829812 
+L 367.92 123.829812 
 z
 " style="fill: #f9fafb; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_9">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="401.4" y="137.747234" transform="rotate(-0 401.4 137.747234)">[0.01, 0.09]</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="457.2" y="138.265125" transform="rotate(-0 457.2 138.265125)">[0.01, 0.09]</text>
     </g>
     <g id="patch_11">
-     <path d="M 10.8 169.049891 
-L 167.04 169.049891 
-L 167.04 146.249891 
-L 10.8 146.249891 
+     <path d="M 10.8 169.429812 
+L 189.36 169.429812 
+L 189.36 146.629812 
+L 10.8 146.629812 
 z
 " style="fill: #f3f4f6; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_10">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="88.92" y="160.547234" transform="rotate(-0 88.92 160.547234)">Tier 2</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="100.08" y="161.065125" transform="rotate(-0 100.08 161.065125)">Tier 2</text>
     </g>
     <g id="patch_12">
-     <path d="M 167.04 169.049891 
-L 323.28 169.049891 
-L 323.28 146.249891 
-L 167.04 146.249891 
+     <path d="M 189.36 169.429812 
+L 367.92 169.429812 
+L 367.92 146.629812 
+L 189.36 146.629812 
 z
 " style="fill: #ffffff; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_11">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="173.2896" y="160.547234" transform="rotate(-0 173.2896 160.547234)">Partial contact (insufficient finger groups engaged)</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="196.5024" y="161.065125" transform="rotate(-0 196.5024 161.065125)">Partial (too few finger groups)</text>
     </g>
     <g id="patch_13">
-     <path d="M 323.28 169.049891 
-L 479.52 169.049891 
-L 479.52 146.249891 
-L 323.28 146.249891 
+     <path d="M 367.92 169.429812 
+L 546.48 169.429812 
+L 546.48 146.629812 
+L 367.92 146.629812 
 z
 " style="fill: #ffffff; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_12">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="401.4" y="160.547234" transform="rotate(-0 401.4 160.547234)">[0.00, 0.50]</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="457.2" y="161.065125" transform="rotate(-0 457.2 161.065125)">[0.00, 0.50]</text>
     </g>
     <g id="patch_14">
-     <path d="M 10.8 191.849891 
-L 167.04 191.849891 
-L 167.04 169.049891 
-L 10.8 169.049891 
+     <path d="M 10.8 192.229812 
+L 189.36 192.229812 
+L 189.36 169.429812 
+L 10.8 169.429812 
 z
 " style="fill: #e5e7eb; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_13">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="88.92" y="183.347234" transform="rotate(-0 88.92 183.347234)">Tier 1</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="100.08" y="183.865125" transform="rotate(-0 100.08 183.865125)">Tier 1</text>
     </g>
     <g id="patch_15">
-     <path d="M 167.04 191.849891 
-L 323.28 191.849891 
-L 323.28 169.049891 
-L 167.04 169.049891 
+     <path d="M 189.36 192.229812 
+L 367.92 192.229812 
+L 367.92 169.429812 
+L 189.36 169.429812 
 z
 " style="fill: #f9fafb; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_14">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="173.2896" y="183.347234" transform="rotate(-0 173.2896 183.347234)">Valid contact (thumb + index + required extra fingers)</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #111827" x="196.5024" y="183.865125" transform="rotate(-0 196.5024 183.865125)">Valid (thumb + index + extras)</text>
     </g>
     <g id="patch_16">
-     <path d="M 323.28 191.849891 
-L 479.52 191.849891 
-L 479.52 169.049891 
-L 323.28 169.049891 
+     <path d="M 367.92 192.229812 
+L 546.48 192.229812 
+L 546.48 169.429812 
+L 367.92 169.429812 
 z
 " style="fill: #f9fafb; stroke: #d9e2e9; stroke-width: 0.8; stroke-linejoin: miter"/>
     </g>
     <g id="text_15">
-     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="401.4" y="183.347234" transform="rotate(-0 401.4 183.347234)">[0.80, 1.00]</text>
+     <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="457.2" y="183.865125" transform="rotate(-0 457.2 183.865125)">[0.80, 1.00]</text>
     </g>
    </g>
    <g id="text_16">
-    <text style="font-weight: 700; font-size: 13.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="245.16" y="21.057891" transform="rotate(-0 245.16 21.057891)">Tiered grasp scoring hierarchy  (verified vs. planner.rs)</text>
+    <text style="font-weight: 700; font-size: 14px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #111827" x="278.64" y="21.437812" transform="rotate(-0 278.64 21.437812)">Tiered grasp scoring hierarchy  (verified vs. planner.rs)</text>
    </g>
   </g>
   <g id="text_17">
-   <text style="font-style: italic; font-size: 8.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #555555" x="237.6" y="255.377891" transform="rotate(-0 237.6 255.377891)">Tier 1: 0.8 + 0.2·contact_fraction.   Tier 2: 0.25·contact_fraction + 0.25·proximity_penalty.</text>
+   <text style="font-style: italic; font-size: 8.5px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #555555" x="270" y="255.757812" transform="rotate(-0 270 255.757812)">Tier 1: 0.8 + 0.2·contact_fraction.   Tier 2: 0.25·contact_fraction + 0.25·proximity_penalty.</text>
   </g>
  </g>
 </svg>

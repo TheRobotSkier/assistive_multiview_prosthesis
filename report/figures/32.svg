@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg xmlns="http://www.w3.org/2000/svg" width="589" height="445" viewBox="0 0 589 445">
-<text x="12" y="18" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#111827">Loading the Mia-hand URDF with Pinocchio</text>
-<g font-family="monospace" font-size="14px">
+<svg xmlns="http://www.w3.org/2000/svg" width="687" height="542" viewBox="0 0 687 542">
+<text x="14" y="20" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#111827">Loading the Mia-hand URDF with Pinocchio</text>
+<g font-family="monospace" font-size="14px" transform="translate(0 38)">
 <text x="0" y="14" xml:space="preserve"><tspan fill="#008000" font-weight="bold">import</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#0000FF" font-weight="bold">numpy</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#008000" font-weight="bold">as</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#0000FF" font-weight="bold">np</tspan><tspan fill="#bbbbbb"></tspan></text>
 <text x="0" y="33" xml:space="preserve"><tspan fill="#bbbbbb"></tspan><tspan fill="#008000" font-weight="bold">import</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#0000FF" font-weight="bold">pinocchio</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#008000" font-weight="bold">as</tspan><tspan fill="#bbbbbb">&#160;</tspan><tspan fill="#0000FF" font-weight="bold">pin</tspan><tspan fill="#bbbbbb"></tspan></text>
 <text x="0" y="52" xml:space="preserve"><tspan fill="#bbbbbb"></tspan><tspan fill="#bbbbbb"></tspan></text>

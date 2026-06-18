@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.0//EN" "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
-<svg xmlns="http://www.w3.org/2000/svg" width="589" height="398" viewBox="0 0 589 398">
-<text x="12" y="18" font-family="DejaVu Sans" font-size="15" font-weight="bold" fill="#111827">UDP buffer fix  (make network-tune-all)</text>
-<g font-family="monospace" font-size="14px">
+<svg xmlns="http://www.w3.org/2000/svg" width="687" height="485" viewBox="0 0 687 485">
+<text x="14" y="20" font-family="DejaVu Sans" font-size="17" font-weight="bold" fill="#111827">UDP buffer fix  (make network-tune-all)</text>
+<g font-family="monospace" font-size="14px" transform="translate(0 38)">
 <text x="0" y="14" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic">#&#160;make&#160;network-tune-all&#160;&#160;-&gt;&#160;&#160;tunes&#160;BOTH&#160;host&#160;and&#160;Jetson.</tspan></text>
 <text x="0" y="33" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;Fixes&#160;CycloneDDS&#160;UDP&#160;fragment&#160;drops&#160;from&#160;two&#160;RealSense&#160;PointCloud2&#160;streams</tspan></text>
 <text x="0" y="52" xml:space="preserve"><tspan fill="#3D7B7B" font-style="italic"></tspan><tspan fill="#3D7B7B" font-style="italic">#&#160;(each&#160;5-8&#160;MB,&#160;fragmented&#160;into&#160;~120&#160;RTPS&#160;messages&#160;of&#160;64&#160;KB).</tspan></text>
