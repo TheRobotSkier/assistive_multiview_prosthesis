@@ -1,0 +1,20 @@
+Makefile
+  s_1af9946e906ce9::t_0561cb338e5853 187,197
+  s_1af9946e906ce9::t_5a8c621f0888b9 850
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "bea2c430b8252116444c3c42e3f9a1174a1c2482",
+  "prompts": {},
+  "sessions": {
+    "s_1af9946e906ce9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edb8d-4f00-7601-a1bc-7f3f88f261b9",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
