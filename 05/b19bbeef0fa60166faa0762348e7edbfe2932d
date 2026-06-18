@@ -1,0 +1,20 @@
+scripts/menu_test.sh
+  s_1af9946e906ce9::t_51e7b30d2728d2 99
+  s_1af9946e906ce9::t_3eaefce7d0f152 60-61,95-98,100-189,220-222,252,295,539-541
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "05b19bbeef0fa60166faa0762348e7edbfe2932d",
+  "prompts": {},
+  "sessions": {
+    "s_1af9946e906ce9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edb8d-4f00-7601-a1bc-7f3f88f261b9",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
