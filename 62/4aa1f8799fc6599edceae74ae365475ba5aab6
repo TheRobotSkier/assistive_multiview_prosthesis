@@ -1,0 +1,38 @@
+src/twist_propagation/config/twist_propagation.yaml
+  s_2fcabcb07f35ba::t_73de80e78b313b 46-47
+.dockerignore
+  s_2fcabcb07f35ba::t_7a92add48bf928 6,8,10
+src/twist_propagation/twist_propagation/twist_propagation_node.py
+  s_2fcabcb07f35ba::t_73de80e78b313b 495,653,659-666
+  s_2fcabcb07f35ba::t_ac1adb21bd3330 6-7
+scripts/test_twist_propagation.sh
+  s_2fcabcb07f35ba::t_73de80e78b313b 32-47
+scripts/test_nodes_start.sh
+  s_2fcabcb07f35ba::t_73de80e78b313b 25-27,41
+docker/Dockerfile
+  s_2fcabcb07f35ba::t_0107f36764665d 125-126,128-130
+scripts/test_twist_propagation_integration.py
+  s_2fcabcb07f35ba::t_73de80e78b313b 13,23,38,127-128,148,151,282-290,331,335-338,343-344,346,377-378,380,384,387-388,391-392,394-395,435-437,553
+  s_2fcabcb07f35ba::t_6ab1abd91d3fe5 63,213-214,221-227,323-324
+Makefile
+  s_2fcabcb07f35ba::t_f1827136809425 254
+  s_2fcabcb07f35ba::t_806205e2d119bd 225-229
+config/prosthesis_config.yaml
+  s_2fcabcb07f35ba::t_73de80e78b313b 345,589
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "624aa1f8799fc6599edceae74ae365475ba5aab6",
+  "prompts": {},
+  "sessions": {
+    "s_2fcabcb07f35ba": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ed9a3-c84a-71e1-b44c-2758dea36785",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
