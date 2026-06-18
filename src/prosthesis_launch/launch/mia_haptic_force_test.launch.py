@@ -61,6 +61,7 @@ def _launch_setup(context, *args, **kwargs):
     emg_enable = _as_bool(context, "emg_enable")
     mock_hardware = _as_bool(context, "mock_hardware")
     log_level = LaunchConfiguration("log_level").perform(context)
+    use_multi_node = _as_bool(context, "use_multi_node")
     emg_board_ip = os.environ.get("EMG_BOARD_IP", "")
 
     if not os.path.exists(config_path):
@@ -75,6 +76,33 @@ def _launch_setup(context, *args, **kwargs):
     wrist_cfg = config.get("wrist", {}) if isinstance(config.get("wrist", {}), dict) else {}
 
     nodes = []
+
+    if use_multi_node:
+        # New split-node stack (scripts/mia_haptic_force_test/)
+        script_dir = "/prosthesis_ws/scripts/mia_haptic_force_test"
+        multi_nodes = [
+            ("emg_input_node", emg_enable),
+            ("force_input_node", True),
+            ("supervisor_node", True),
+            ("hand_controller_node", True),
+            ("haptic_node", haptic_enable),
+            ("logger_node", True),
+            ("terminal_ui_node", True),
+        ]
+        for name, enabled in multi_nodes:
+            if not enabled:
+                continue
+            nodes.append(
+                ExecuteProcess(
+                    cmd=["python3", "-m", f"scripts.mia_haptic_force_test.{name}"],
+                    name=name,
+                    output="screen" if name in ("emg_input_node", "supervisor_node", "hand_controller_node", "terminal_ui_node") else "log",
+                    sigkill_timeout="5",
+                    sigterm_timeout="3",
+                    env={"PYTHONPATH": script_dir},
+                )
+            )
+        return nodes
 
     nodes.append(
         IncludeLaunchDescription(
@@ -220,6 +248,11 @@ def generate_launch_description():
                 "log_level",
                 default_value="info",
                 description="ROS log level for the test process.",
+            ),
+            DeclareLaunchArgument(
+                "use_multi_node",
+                default_value="false",
+                description="Launch the new split-node stack instead of the legacy monolithic script.",
             ),
             OpaqueFunction(function=_launch_setup),
         ]
