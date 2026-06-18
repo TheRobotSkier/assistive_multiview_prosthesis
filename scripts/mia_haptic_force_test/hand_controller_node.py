@@ -8,8 +8,10 @@ No C++ fallback needed (mvp-3MS spike validated Python performance).
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import signal
 import sys
 import threading
 import time
@@ -52,8 +54,9 @@ class HandControllerNode(Node):
     """
 
 
-    def __init__(self) -> None:
+    def __init__(self, config_path: Optional[str] = None) -> None:
         super().__init__("hand_controller_node")
+        self._config_path = config_path or os.path.join(_REPO_ROOT, "config", "mia_haptic_force_test.yaml")
         self._load_config()
 
         # ── Cached message state (written by DDS callbacks, read by control loop) ──
@@ -132,11 +135,7 @@ class HandControllerNode(Node):
         """
         import yaml
 
-        config_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "config",
-            "mia_haptic_force_test.yaml",
-        )
+        config_path = self._config_path
 
         try:
             with open(config_path) as f:
@@ -239,8 +238,12 @@ class HandControllerNode(Node):
             self._target_wrist = float(msg.data[0]) if msg.data else 90.0
 
     def _cb_mode(self, msg: String) -> None:
+        new_mode = msg.data.lower()
         with self._lock:
-            self._mode = msg.data.lower()
+            old_mode = self._mode
+            self._mode = new_mode
+        if new_mode != old_mode:
+            self._switch_if_needed(new_mode)
 
     def _cb_enable(self, msg: Bool) -> None:
         with self._lock:
@@ -282,17 +285,19 @@ class HandControllerNode(Node):
         self.get_logger().info(
             f"Switching mode: {self._last_switch_mode} -> {new_mode}"
         )
-
-        if new_mode == "position":
-            self._cm.switch_controllers(
-                activate=["group_pos_ff_controller"],
-                deactivate=VELOCITY_CONTROLLERS,
-            )
-        elif new_mode in ("velocity", "emergency_backoff"):
-            self._cm.switch_controllers(
-                activate=["group_vel_ff_controller"],
-                deactivate=POSITION_CONTROLLERS,
-            )
+        try:
+            if new_mode == "position":
+                self._cm.switch_controllers(
+                    activate=["group_pos_ff_controller"],
+                    deactivate=VELOCITY_CONTROLLERS,
+                )
+            elif new_mode in ("velocity", "hold", "emergency_backoff"):
+                self._cm.switch_controllers(
+                    activate=["group_vel_ff_controller"],
+                    deactivate=POSITION_CONTROLLERS,
+                )
+        except Exception as exc:
+            self.get_logger().warn(f"Controller switch failed: {exc}")
         self._last_switch_mode = new_mode
 
     # ────────────────────────────────────────────────────────────────────────
@@ -322,12 +327,6 @@ class HandControllerNode(Node):
                 )
                 mode = "emergency_backoff"
 
-            # Switch controllers when mode changes
-            try:
-                self._switch_if_needed(mode)
-            except Exception as exc:
-                self.get_logger().warn(f"Controller switch failed: {exc}")
-
             # ── Control output ──────────────────────────────────────────────
             enabled: bool = state["enable"] and mode != "position"
 
@@ -336,7 +335,7 @@ class HandControllerNode(Node):
                 pos_msg.data = self._open_positions
                 self._pos_pub.publish(pos_msg)
 
-            elif mode == "velocity":
+            elif mode in ("velocity", "hold"):
                 velocities: list[float] = []
                 for i in range(FINGER_COUNT):
                     v = hold_velocity(
@@ -473,15 +472,26 @@ class HandControllerNode(Node):
             self._control_thread.join(timeout=2.0)
             self._control_thread = None
 
+    def destroy_node(self) -> None:
+        self.stop()
+        super().destroy_node()
+
 
 def main(args: Optional[list[str]] = None) -> None:
     """Entry point: initialise ROS 2, run the node, spin DDS executor."""
-    rclpy.init(args=args)
-    node = HandControllerNode()
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--config-path", default=None)
+    known, remaining = parser.parse_known_args(args or [])
+    rclpy.init(args=remaining)
+    node = HandControllerNode(config_path=known.config_path)
     executor = SingleThreadedExecutor()
     executor.add_node(node)
 
     node.start()
+
+    def _signal_handler(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, _signal_handler)
 
     try:
         executor.spin()

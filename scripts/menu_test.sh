@@ -86,6 +86,8 @@ _load_yaml_defaults() {
 
     EMG_BOARD_IP="${EMG_BOARD_IP:-10.27.30.3}"
     WRIST_BOARD_IP="${WRIST_BOARD_IP:-}"
+    # The make test menu should launch the repaired split-node stack by default.
+    # Set USE_MULTI_NODE=false explicitly to use the legacy monolithic fallback.
     USE_MULTI_NODE="${USE_MULTI_NODE:-true}"
 
 }
@@ -113,7 +115,7 @@ write_env_file() {
 save_config() {
     local yaml="${CONFIG_PATH:-config/mia_haptic_force_test.yaml}"
     local tmp="${yaml}.tmp"
-    python3 -c "
+    if python3 -c "
 import yaml, sys
 d = yaml.safe_load(open('$yaml'))
 # Apply overrides
@@ -165,8 +167,15 @@ d['wrist']['return_after_open_delay_s'] = float('${W_RETURN_DELAY:-3}')
 d['wrist']['vertical_delay_s'] = float('${W_VERT_DELAY:-3}')
 with open('$tmp','w') as f:
     yaml.dump(d, f, default_flow_style=False, sort_keys=False)
-" 2>/dev/null && mv "$tmp" "$yaml"
-    echo "Saved to $yaml"
+" 2>/dev/null; then
+        mv -f "$tmp" "$yaml"
+        write_env_file
+        echo "Saved to $yaml and /tmp/prosthesis_test_env.sh"
+    else
+        rm -f "$tmp"
+        echo "Failed to save $yaml" >&2
+        return 1
+    fi
 }
 
 # ── Simple inline editor ─────────────────────────────────────────────
@@ -243,7 +252,7 @@ param_editor_grasp() {
         "Return delay (s)"           W_RETURN_DELAY
         "Vertical delay (s)"         W_VERT_DELAY
     )
-    _param_editor "Haptic Force Test" PARAM_LABELS
+    _param_editor "Haptic Force Test" PARAM_LABELS "save-on-start"
 }
 
 param_editor_emg_grasp() {
@@ -278,7 +287,8 @@ param_editor_emg_latency() {
 # ── Generic parameter editor ─────────────────────────────────────────
 _param_editor() {
     local title="$1"; shift
-    local -n labels="$1"
+    local -n labels="$1"; shift
+    local save_on_start="${1:-}"
     local num_p=$(( ${#labels[@]} / 2 ))
     local sel=0 SAVED=0
 
@@ -321,9 +331,9 @@ _param_editor() {
         done
         echo ""
         if [ "$SAVED" = "1" ]; then
-            printf "  ${GREEN}✓ Saved to config${RESET}\n"
+            printf "  ${GREEN}✓ Saved to config + env${RESET}\n"
         else
-            printf "  ${DIM}Changes are ephemeral.  Press ${RESET}${BOLD}s${RESET}${DIM} to save permanently.${RESET}\n"
+            printf "  ${DIM}Press ${RESET}${BOLD}s${RESET}${DIM} to save permanently. Changes apply on next test run.${RESET}\n"
         fi
 
         local key; key=$(read_key)
@@ -346,11 +356,19 @@ _param_editor() {
                 [ -n "$vname" ] && edit_var "${labels[$((sel*2))]}" "$vname"
                 ;;
             s|S)
-                save_config
-                SAVED=1
+                if save_config; then
+                    SAVED=1
+                else
+                    SAVED=0
+                fi
                 ;;
             ' ')
-                write_env_file
+                if [ "$save_on_start" = "save-on-start" ]; then
+                    save_config || { SAVED=0; continue; }
+                    SAVED=1
+                else
+                    write_env_file
+                fi
                 clear_screen; show_cursor
                 echo "test-grasp" > /tmp/prosthesis_test_choice
                 return 0

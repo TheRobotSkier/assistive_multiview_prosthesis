@@ -93,7 +93,16 @@ def _launch_setup(context, *args, **kwargs):
                 continue
             nodes.append(
                 ExecuteProcess(
-                    cmd=["python3", "-m", f"scripts.mia_haptic_force_test.{name}"],
+                    cmd=[
+                        "python3",
+                        "-m",
+                        f"scripts.mia_haptic_force_test.{name}",
+                        "--config-path",
+                        config_path,
+                        "--ros-args",
+                        "--log-level",
+                        log_level,
+                    ],
                     name=name,
                     output="screen" if name in ("emg_input_node", "supervisor_node", "hand_controller_node", "terminal_ui_node") else "log",
                     sigkill_timeout="5",

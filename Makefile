@@ -815,7 +815,7 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test (launched from T
 	test -f config/mia_haptic_force_test.yaml || { echo "Missing config/mia_haptic_force_test.yaml"; exit 1; }; \
 	mkdir -p data models; \
 	echo ""; \
-	echo "[make] Launching with: MIA=$${MIA_PORT:-auto} WRIST=$${WRIST_PORT:-auto} MOCK=$${MOCK_HARDWARE:-auto} MULTI=$${USE_MULTI_NODE:-true} KILL=$${AUTO_KILL_S:-0}s"; \
+	echo "[make] Launching with: MIA=$${MIA_PORT:-auto} WRIST=$${WRIST_PORT:-auto} MOCK=$${MOCK_HARDWARE:-auto} MULTI=$${USE_MULTI_NODE:-false} KILL=$${AUTO_KILL_S:-0}s"; \
 	echo ""; \
 	DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED"; \
 	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}"; \
@@ -833,13 +833,13 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test (launched from T
 		-e EMG_DATA_DIR="$${EMG_DATA_DIR:-/app/data}" \
 		-e EMG_MODEL_DIR="$${EMG_MODEL_DIR:-/app/models}" \
 		-e MIA_SERIAL_PORT="$$MIA_PORT" \
-		-e WRIST_SERIAL_PORT="$$WRIST_SERIAL_ENV" \
+		-e WRIST_SERIAL_PORT="$$WRIST_PORT" \
 		-e CONFIG_PATH="$${CONFIG_PATH:-/prosthesis_ws/config/mia_haptic_force_test.yaml}" \
 		-e WRIST_ENABLE="$$WRIST_MODE" \
 		-e HAPTIC_ENABLE="$$HAPTIC_MODE" \
 		-e FORCE_RETRAIN="$${FORCE_RETRAIN:-false}" \
 		-e MOCK_HARDWARE="$$MOCK_MODE" \
-		-e USE_MULTI_NODE="$${USE_MULTI_NODE:-true}" \
+		-e USE_MULTI_NODE="$${USE_MULTI_NODE:-false}" \
 		-e AUTO_KILL_S="$${AUTO_KILL_S:-0}" \
 		-e HAPTIC_BT_ADDR1="$${HAPTIC_BT_ADDR1:-842E1409E14E}" \
 		-e EMG_BOARD_IP="$${EMG_BOARD_IP:-10.27.30.3}" \

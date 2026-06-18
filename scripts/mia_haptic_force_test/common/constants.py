@@ -168,3 +168,47 @@ MSG_BOOL: Final[str] = "std_msgs/Bool"
 MSG_FORCE_DATA: Final[str] = "mia_hand_msgs/ForceData"
 MSG_MOTOR_DATA: Final[str] = "mia_hand_msgs/MotorData"
 MSG_JOINT_DATA: Final[str] = "mia_hand_msgs/JointData"
+
+# ── Topic → message-type contract ──────────────────────────────────────────
+# Canonical mapping from topic constant to expected ROS message type.
+# All nodes publishing or subscribing to these topics MUST use the listed
+# message type.  Update this table when changing a topic's payload.
+
+# Hand state topics
+#   TOPIC_HAND_JOINT_STATES  → MSG_JOINT_STATE     (sensor_msgs/JointState)
+#   TOPIC_HAND_FORCES        → MSG_FLOAT32_MULTI   (std_msgs/Float32MultiArray)
+#   TOPIC_HAND_FORCE_SOURCE  → MSG_STRING          (std_msgs/String)
+#
+# EMG topics
+#   TOPIC_EMG_GESTURE        → MSG_STRING          (std_msgs/String)
+#   TOPIC_EMG_GESTURE_LABEL  → MSG_INT32           (std_msgs/Int32)
+#   TOPIC_EMG_CONFIDENCE     → MSG_FLOAT32         (std_msgs/Float32)
+#   TOPIC_EMG_PROPORTIONAL   → MSG_FLOAT32         (std_msgs/Float32)
+#
+# Control topics
+#   TOPIC_CONTROL_TARGET_FORCE → MSG_FLOAT64_MULTI (std_msgs/Float64MultiArray)
+#   TOPIC_CONTROL_TARGET_WRIST → MSG_FLOAT64_MULTI (std_msgs/Float64MultiArray)
+#   TOPIC_CONTROL_MODE         → MSG_STRING        (std_msgs/String)
+#   TOPIC_CONTROL_ENABLE       → MSG_BOOL          (std_msgs/Bool)
+#   TOPIC_CONTROL_HOLD_MODE    → MSG_STRING        (std_msgs/String)
+#
+# Test orchestration topics
+#   TOPIC_TEST_STAGE          → MSG_STRING         (std_msgs/String)
+#   TOPIC_TEST_EVENT          → MSG_STRING         (std_msgs/String)
+#   TOPIC_TEST_STATUS         → MSG_STRING         (std_msgs/String)
+#
+# Controller feedback topics
+#   TOPIC_CONTROLLER_FORCE_ERROR   → MSG_FLOAT64_MULTI (std_msgs/Float64MultiArray)
+#   TOPIC_CONTROLLER_ACTIVE        → MSG_BOOL          (std_msgs/Bool)
+#   TOPIC_CONTROLLER_LOOP_TIMING   → MSG_STRING        (std_msgs/String)
+#
+# Haptic band
+#   TOPIC_HAPTIC_BAND_MOTORS → MSG_FLOAT32_MULTI  (std_msgs/Float32MultiArray)
+#
+# Hardware command topics
+#   TOPIC_GROUP_VEL_FF_COMMANDS → MSG_FLOAT64_MULTI (std_msgs/Float64MultiArray)
+#   TOPIC_GROUP_POS_FF_COMMANDS → MSG_FLOAT64_MULTI (std_msgs/Float64MultiArray)
+#
+# Wrist topics
+#   TOPIC_WRIST_SET_POSITION  → MSG_FLOAT64_MULTI (std_msgs/Float64MultiArray)
+#   TOPIC_WRIST_STATE         → MSG_FLOAT64_MULTI (std_msgs/Float64MultiArray)

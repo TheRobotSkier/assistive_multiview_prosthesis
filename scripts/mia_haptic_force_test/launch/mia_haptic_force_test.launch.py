@@ -4,6 +4,16 @@ All nodes are standalone scripts under ``scripts/mia_haptic_force_test/``.
 This launch file lives next to those scripts and is designed to be invoked
 either directly with ``ros2 launch`` from an installed package, or copied
 into ``prosthesis_launch`` as the multi-node entry point.
+
+Each node receives ``--config-path <path>`` as a CLI argument so it can load
+the shared YAML config without hardcoding a path.  Nodes parse this flag via
+``argparse`` (node-side parsing is added by mvp-8uv.2).  Any unknown args
+are forwarded to ``rclpy.init()`` so ROS 2 remapping still works.
+
+Individual nodes can also be launched directly:
+
+    python3 -m scripts.mia_haptic_force_test.emg_input_node \\
+        --config-path /path/to/config.yaml
 """
 
 import os
@@ -26,9 +36,17 @@ def _as_bool(context, name: str) -> bool:
     return value in ("1", "true", "yes", "on")
 
 
-def _node_process(name: str, output: str = "log") -> ExecuteProcess:
+def _node_process(name: str, config_path: str, output: str = "log") -> ExecuteProcess:
+    """Spawn a split-node script as a child process.
+
+    Each node receives ``--config-path <path>`` so it can load the shared
+    YAML config without hardcoding.  The node-side ``argparse`` handler
+    (added by mvp-8uv.2) parses this flag; any remaining ROS args are
+    forwarded unchanged.
+    """
     return ExecuteProcess(
-        cmd=["python3", "-m", f"scripts.mia_haptic_force_test.{name}"],
+        cmd=["python3", "-m", f"scripts.mia_haptic_force_test.{name}",
+             "--config-path", config_path],
         name=name,
         output=output,
         sigkill_timeout="5",
@@ -37,7 +55,13 @@ def _node_process(name: str, output: str = "log") -> ExecuteProcess:
     )
 
 
-def _launch_setup(context, *args, **kwargs):
+def _launch_setup(context, *args, **kwargs):  # noqa: ARG001
+    """Build the list of ``ExecuteProcess`` actions for enabled nodes.
+
+    Reads launch arguments, validates ``config_path`` exists on disk, then
+    returns one ``ExecuteProcess`` per enabled node — each receiving
+    ``--config-path <path>`` so it can load the shared YAML config.
+    """
     config_path = LaunchConfiguration("config_path").perform(context)
     log_level = LaunchConfiguration("log_level").perform(context)
     emg_enable = _as_bool(context, "emg_enable")
@@ -52,20 +76,20 @@ def _launch_setup(context, *args, **kwargs):
 
     # Sensor / input nodes
     if emg_enable:
-        nodes.append(_node_process("emg_input_node", output="screen"))
-    nodes.append(_node_process("force_input_node", output="log"))
+        nodes.append(_node_process("emg_input_node", config_path, output="screen"))
+    nodes.append(_node_process("force_input_node", config_path, output="log"))
 
     # Control + supervisor
-    nodes.append(_node_process("supervisor_node", output="screen"))
-    nodes.append(_node_process("hand_controller_node", output="screen"))
+    nodes.append(_node_process("supervisor_node", config_path, output="screen"))
+    nodes.append(_node_process("hand_controller_node", config_path, output="screen"))
 
     # Feedback / logging / UI
     if haptic_enable:
-        nodes.append(_node_process("haptic_node", output="log"))
+        nodes.append(_node_process("haptic_node", config_path, output="log"))
     if logger:
-        nodes.append(_node_process("logger_node", output="log"))
+        nodes.append(_node_process("logger_node", config_path, output="log"))
     if terminal_ui:
-        nodes.append(_node_process("terminal_ui_node", output="screen"))
+        nodes.append(_node_process("terminal_ui_node", config_path, output="screen"))
 
     return nodes
 

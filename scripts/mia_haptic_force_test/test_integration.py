@@ -104,7 +104,6 @@ def main() -> int:
     executor.add_node(controller)
     executor.add_node(probe)
 
-    supervisor.start()
     controller.start()
 
     run_time_s = 5.0

@@ -101,8 +101,10 @@ def hold_velocity(
     """Compute the signed hold velocity based on force error.
 
     * Returns ``0.0`` when ``abs(error) <= deadzone``.
-    * Scales linearly between *min_overshoot* and *max_overshoot*.
-    * Saturates at *max_velocity*.
+    * Ramps undershoot closure speed from the deadzone boundary to full speed
+      at 50% target error.
+    * Keeps overshoot protection bounded by *min_overshoot* and
+      *max_overshoot*.
 
     Sign matches the direction of the force error (positive → close further).
     """
@@ -110,11 +112,20 @@ def hold_velocity(
     abs_error = abs(error)
     if abs_error <= deadzone:
         return 0.0
+
+    if error > 0.0:
+        full_speed_error = max(target * 0.5, deadzone)
+        ramp_span = full_speed_error - deadzone
+        if ramp_span <= 0.0:
+            return max_velocity
+        scale = clamp((error - deadzone) / ramp_span, 0.0, 1.0)
+        return max_velocity * scale
+
     if max_overshoot <= 0.0:
         return max_velocity if error > 0.0 else -max_velocity
     scaled = min(max(abs_error, min_overshoot), max_overshoot)
     velocity = max_velocity * (scaled / max_overshoot)
-    return velocity if error > 0.0 else -velocity
+    return -velocity
 
 
 # ── Competitors helper ──────────────────────────────────────────────────────

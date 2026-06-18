@@ -13,7 +13,9 @@ Publishes::
 
 from __future__ import annotations
 
+import argparse
 import os
+import signal
 import sys
 import threading
 import time
@@ -45,8 +47,9 @@ from scripts.mia_haptic_force_test.common.constants import (
 class ForceInputNode(Node):
     """Per-finger normal-force publisher."""
 
-    def __init__(self) -> None:
+    def __init__(self, config_path: Optional[str] = None) -> None:
         super().__init__("force_input_node")
+        self._config_path = config_path or os.path.join(_REPO_ROOT, "config", "mia_haptic_force_test.yaml")
         self.declare_parameter("publish_rate_hz", 100.0)
         self.declare_parameter("force_window_size", 5)
         self.declare_parameter("force_stale_timeout_s", 1.0)
@@ -62,6 +65,7 @@ class ForceInputNode(Node):
 
         self._forces_pub = self.create_publisher(Float32MultiArray, TOPIC_HAND_FORCES, 10)
         self._source_pub = self.create_publisher(String, TOPIC_HAND_FORCE_SOURCE, 10)
+        self._joint_states_pub = self.create_publisher(JointState, TOPIC_HAND_JOINT_STATES, 10)
 
         self._lock = threading.Lock()
         self._buffers: list[deque[float]] = [deque(maxlen=self._window) for _ in range(FINGER_COUNT)]
@@ -112,6 +116,25 @@ class ForceInputNode(Node):
                 except (ValueError, IndexError):
                     pass
 
+        # Publish filtered joint state for downstream controllers
+        filtered = JointState()
+        filtered.header = msg.header
+        for i, name in enumerate(FINGER_JOINTS):
+            try:
+                idx = msg.name.index(name)
+                filtered.name.append(name)
+                filtered.position.append(msg.position[idx])
+                if idx < len(msg.velocity):
+                    filtered.velocity.append(msg.velocity[idx])
+                if idx < len(msg.effort):
+                    filtered.effort.append(msg.effort[idx])
+            except (ValueError, IndexError):
+                filtered.name.append(name)
+                filtered.position.append(0.0)
+                filtered.velocity.append(0.0)
+                filtered.effort.append(0.0)
+        self._joint_states_pub.publish(filtered)
+
     def _maybe_fallback(self) -> None:
         """If ForceData is stale, fall back to joint effort estimate."""
         if self._source != "force_data":
@@ -147,16 +170,27 @@ class ForceInputNode(Node):
         if self._thread is not None:
             self._thread.join(timeout=1.0)
 
+    def destroy_node(self) -> None:
+        self.stop()
+        super().destroy_node()
+
 
 def main(args: Optional[list[str]] = None) -> None:
-    rclpy.init(args=args)
-    node = ForceInputNode()
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--config-path", default=None)
+    known, remaining = parser.parse_known_args(args or [])
+    rclpy.init(args=remaining)
+    node = ForceInputNode(config_path=known.config_path)
+
+    def _signal_handler(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, _signal_handler)
+
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
         pass
     finally:
-        node.stop()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()

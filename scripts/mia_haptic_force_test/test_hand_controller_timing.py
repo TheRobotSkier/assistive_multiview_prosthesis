@@ -13,9 +13,15 @@ Usage::
 
 from __future__ import annotations
 
+import os
+import sys
 import threading
 import argparse
 import time
+
+_REPO_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if __name__ == "__main__" and __package__ is None and _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
