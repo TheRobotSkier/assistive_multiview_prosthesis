@@ -1,11 +1,14 @@
 runtime:
-  control_rate_hz: 100.0
-  csv_rate_hz: 5.0
+  control_rate_hz: 50.0
+  csv_rate_hz: 10.0
   haptics_publish_rate_hz: 10.0
   terminal_rate_hz: 4.0
   startup_controller_timeout_s: 30.0
   status_publish_period_s: 1.0
   complete_shutdown_delay_s: 0.2
+  auto_kill_s: 0.0
+  mock_hardware: auto
+  use_multi_node: true
 topics:
   joint_states: /joint_states
   force_data: data_streams/fingers/forces/data
@@ -35,12 +38,13 @@ emg:
   wrist_positive_label: 3
   wrist_negative_label: 4
   confidence_threshold: 0.55
-  activation_hold_s: 0.2
+  activation_hold_s: 1.0
   open_hold_s: 1.0
   open_proportional_threshold: 0.5
-  power_toggle_hold_s: 0.5
+  power_toggle_hold_s: 1.0
   power_rearm_s: 0.4
   stale_timeout_s: 1.0
+  board_ip: 10.27.30.3
 hand:
   open_positions:
     j_thumb_fle: 0.0
@@ -53,14 +57,14 @@ hand:
   open_position_tolerance_rad: 0.08
   opening_min_s: 0.5
   opening_timeout_s: 4.0
-  closing_velocity_start_rad_s: 0.3
-  closing_velocity_end_rad_s: 0.1
+  closing_velocity_start_rad_s: 0.4
+  closing_velocity_end_rad_s: 0.2
   closing_decay_steps: 5
   closing_step_interval_s: 0.2
   hold_deadzone: 20.0
   hold_min_overshoot: 20.0
   hold_max_overshoot: 150.0
-  hold_max_velocity_rad_s: 0.08
+  hold_max_velocity_rad_s: 0.1
 force:
   contact_thresholds:
     j_thumb_fle: 300.0
@@ -70,12 +74,12 @@ force:
     j_thumb_fle: 300.0
     j_index_fle: 300.0
     j_mrl_fle: 300.0
-  target_min: 50.0
+  target_min: 200.0
   target_max: 500.0
-  adjustment_rate_up: 100.0
-  adjustment_rate_down: 200.0
-  emergency_threshold: 800.0
-  emergency_backoff_velocity_rad_s: -0.1
+  adjustment_rate_up: 50.0
+  adjustment_rate_down: 50.0
+  emergency_threshold: 600.0
+  emergency_backoff_velocity_rad_s: -0.2
   stale_timeout_s: 1.0
   require_force_data: true
   haptic_percent_source: measured_average
@@ -85,10 +89,10 @@ wrist:
   vertical_deg: 90.0
   min_deg: 5.0
   max_deg: 300.0
-  acceleration_deg_s2: 180.0
-  control_velocity_deg_s: 45.0
+  acceleration_deg_s2: 45.0
+  control_velocity_deg_s: 20.0
   position_tolerance_deg: 4.0
-  move_timeout_s: 8.0
+  move_timeout_s: 10.0
   settle_s: 0.2
   stale_timeout_s: 1.0
   assume_target_on_timeout: true
