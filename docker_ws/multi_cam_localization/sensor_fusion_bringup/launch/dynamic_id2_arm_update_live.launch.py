@@ -354,6 +354,13 @@ def _setup(context, *args, **kwargs):
                     "-p", f"image.hz:={relay_img_hz}",
                     "-p", f"image.downsample_factor:={str(_arg_or_config(context, 'image.downsample_factor', 1))}",
                     "-p", f"trackhist.hz:={relay_trackhist_hz}",
+                    # Depth channel: NEAREST 2× downscale + throttle for
+                    # host-side depth_image_proc backprojection.  Must use
+                    # aligned_depth_to_color so depth and colour pixels map
+                    # 1:1 without an additional frame transform.
+                    "-p", "depth.enabled:=true",
+                    "-p", f"depth.hz:={relay_img_hz}",
+                    "-p", "depth.downsample_factor:=2",
                     # Enable ArUco relay so marker observations flow to the
                     # host GTSAM tracker as prior/between factors.
                     "-p", "aruco.enabled:=true",

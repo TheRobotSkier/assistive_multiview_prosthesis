@@ -285,13 +285,13 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
   if (_app->get_params().marker_pose_options.enabled) {
     const std::string marker_topic = _app->get_params().marker_pose_options.topic;
     sub_marker_pose = _node->create_subscription<sensor_fusion_msgs::msg::MarkerPoseObservation>(
-        marker_topic, rclcpp::QoS(10), std::bind(&ROS2Visualizer::callback_marker_pose, this, std::placeholders::_1));
+        marker_topic, rclcpp::SensorDataQoS(), std::bind(&ROS2Visualizer::callback_marker_pose, this, std::placeholders::_1));
     PRINT_INFO("subscribing to marker observations: %s\n", marker_topic.c_str());
   }
   if (_app->get_params().dynamic_arm_pose_options.enabled) {
     const std::string dynamic_arm_topic = _app->get_params().dynamic_arm_pose_options.topic;
     sub_dynamic_arm_pose = _node->create_subscription<sensor_fusion_msgs::msg::DynamicArmPoseObservation>(
-        dynamic_arm_topic, rclcpp::QoS(10), std::bind(&ROS2Visualizer::callback_dynamic_arm_pose, this, std::placeholders::_1));
+        dynamic_arm_topic, rclcpp::SensorDataQoS(), std::bind(&ROS2Visualizer::callback_dynamic_arm_pose, this, std::placeholders::_1));
     PRINT_INFO("subscribing to dynamic arm observations: %s\n", dynamic_arm_topic.c_str());
   }
 

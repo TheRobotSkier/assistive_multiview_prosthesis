@@ -9,10 +9,11 @@ republishes under ``/jetson/`` at lower, laptop-friendly rates.
 Supported streams (each independently togglable via ROS2 parameters):
   - PointCloud2     — stride decimation (keep every Nth point) + throttle
   - Image (colour)  — raw passthrough + throttle (NO compression)
-  - Depth image     — raw passthrough + throttle (for SIFT depth lookup)
+  - Depth image     — NEAREST spatial downscale (2×) + throttle (for host-side
+                        depth-to-cloud backprojection via depth_image_proc)
   - ArUco poses     — passthrough (fixed marker observations + dynamic arm pose)
   - trackhist       — resolution downsample + throttle (visualization only)
-  - CameraInfo      — throttle only
+  - CameraInfo      — throttle + K/P intrinsic scaling (to match 2× downsample)
   - Odometry        — throttled (default 50 Hz, to avoid NACK storms)
   - marker_map_locked — latched passthrough (transient_local QoS)
 
@@ -105,8 +106,8 @@ _HEALTH_QOS = QoSProfile(
 _SRC = {
     "head_pc":         "/head/d435i_head/depth/color/points",
     "arm_pc":          "/arm/d435i_arm/depth/color/points",
-    "head_depth":      "/head/d435i_head/depth/image_rect_raw",
-    "arm_depth":       "/arm/d435i_arm/depth/image_rect_raw",
+    "head_depth":      "/head/d435i_head/aligned_depth_to_color/image_raw",
+    "arm_depth":       "/arm/d435i_arm/aligned_depth_to_color/image_raw",
     "head_img":        "/head/d435i_head/color/image_raw",
     "arm_img":         "/arm/d435i_arm/color/image_raw",
     "head_trackhist":  "/ov_msckf/trackhist",
@@ -257,6 +258,89 @@ def downsample_image(msg: Image, factor: int) -> Image:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# Depth downsampler (NEAREST — no interpolation across depth discontinuities)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def downsample_depth(msg: Image, factor: int) -> Image:
+    """Downsample a Z16 depth image by an integer factor using
+    Nearest-Neighbor interpolation (row/col stride — no OpenCV).
+
+    Bilinear/bicubic averaging is strictly prohibited for depth data:
+    it fabricates phantom depth values along structural edges where
+    foreground and background pixels are averaged together.
+
+    Returns the original message unchanged if factor <= 1 or the
+    encoding is not a recognised 16-bit unsigned format.
+    """
+    if factor <= 1:
+        return msg
+    if msg.encoding not in ("16UC1", "mono16"):
+        return msg  # unknown encoding — don't touch it
+
+    raw = np.frombuffer(bytes(msg.data), dtype=np.uint16)
+    try:
+        arr = raw.reshape(msg.height, msg.width)
+    except ValueError:
+        return msg
+
+    # Nearest-neighbour via row/col striding — no interpolation
+    arr_ds = arr[::factor, ::factor]
+
+    out = Image()
+    out.header = msg.header
+    out.height = arr_ds.shape[0]
+    out.width = arr_ds.shape[1]
+    out.encoding = msg.encoding
+    out.step = arr_ds.shape[1] * 2  # 2 bytes per uint16
+    out.data = arr_ds.tobytes()
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CameraInfo intrinsic scaling — match resolution after spatial downsampling
+# ═══════════════════════════════════════════════════════════════════════════
+
+def scale_camera_info(msg: CameraInfo, factor: int) -> CameraInfo:
+    """Divide image dimensions and K/P matrix elements by *factor*.
+
+    Focal lengths (fx, fy) and principal points (cx, cy) are in pixel
+    units — halving the spatial resolution requires halving these values.
+    Distortion coefficients (d) and rectification matrix (R) operate in
+    normalised coordinates and are left unchanged.
+    """
+    if factor <= 1:
+        return msg
+
+    out = CameraInfo()
+    out.header = msg.header
+    out.height = msg.height // factor
+    out.width = msg.width // factor
+    out.distortion_model = msg.distortion_model
+    out.d = msg.d  # normalised coords — unchanged
+
+    # Intrinsic matrix K (3×3 row-major): [fx, 0, cx, 0, fy, cy, 0, 0, 1]
+    k = list(msg.k)
+    k[0] /= factor  # fx
+    k[2] /= factor  # cx
+    k[4] /= factor  # fy
+    k[5] /= factor  # cy
+    out.k = k
+
+    # Projection matrix P (3×4 row-major)
+    p = list(msg.p)
+    p[0] /= factor  # fx'
+    p[2] /= factor  # cx'
+    p[5] /= factor  # fy'
+    p[6] /= factor  # cy'
+    out.p = p
+
+    # Rectification matrix R (3×3) — normalised coords, unchanged
+    out.r = msg.r
+
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # JetsonRelay node
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -278,6 +362,7 @@ class JetsonRelay(Node):
 
         self.declare_parameter("depth.enabled", False)
         self.declare_parameter("depth.hz", 5.0)
+        self.declare_parameter("depth.downsample_factor", 2)
 
         self.declare_parameter("aruco.enabled", False)
 
@@ -304,6 +389,7 @@ class JetsonRelay(Node):
 
         self._depth_enabled = self.get_parameter("depth.enabled").value
         self._depth_hz = self.get_parameter("depth.hz").value
+        self._depth_ds = self.get_parameter("depth.downsample_factor").value
 
         self._aruco_enabled = self.get_parameter("aruco.enabled").value and _HAS_ARUCO_MSGS
 
@@ -510,10 +596,13 @@ class JetsonRelay(Node):
         self._img_pub[camera].publish(msg)
 
     def _on_depth(self, msg: Image, camera: str) -> None:
-        """Throttled depth image relay — stamped with system time."""
+        """Throttled + downsampled depth relay (NEAREST, no interpolation)."""
         if not self._gates[f"depth_{camera}"].should_publish():
             return
-        # Override header stamp with system time.
+        if self._depth_ds > 1:
+            msg = downsample_depth(msg, self._depth_ds)
+        # Override header stamp with system time — same rationale as
+        # pointclouds (RealSense ASIC clock != system clock).
         msg.header.stamp = self.get_clock().now().to_msg()
         self._depth_pub[camera].publish(msg)
 
@@ -527,6 +616,11 @@ class JetsonRelay(Node):
     def _on_ci(self, msg: CameraInfo, camera: str) -> None:
         if not self._gates[f"ci_{camera}"].should_publish():
             return
+        # Scale intrinsics to match the downsampled image/depth resolution.
+        # The same factor is used for both colour and depth channels since
+        # aligned depth is registered to the colour frame.
+        if self._depth_ds > 1:
+            msg = scale_camera_info(msg, self._depth_ds)
         self._ci_pub[camera].publish(msg)
 
     def _on_odom(self, msg: Odometry, camera: str) -> None:

@@ -52,7 +52,10 @@ def generate_launch_description():
             "hold_back_imu_for_frames": ParameterValue(LaunchConfiguration("hold_back_imu_for_frames"), value_type=bool),
             "gyro_fps": 200,
             "accel_fps": 200,
-            "enable_depth": ParameterValue(LaunchConfiguration("enable_pointclouds"), value_type=bool),
+            # Depth stream always ON for host-side depth-to-cloud backprojection.
+            # (Decoupled from enable_pointclouds — the Jetson no longer produces
+            # pointclouds over the wire; the laptop reconstructs them from depth.)
+            "enable_depth": True,
             "enable_infra": False,
             "enable_infra1": False,
             "enable_infra2": False,
@@ -79,7 +82,9 @@ def generate_launch_description():
             "pointcloud__neon_.stream_index_filter": 0,
             "pointcloud__neon_.ordered_pc": False,
             "pointcloud__neon_.allow_no_texture_points": False,
-            "align_depth.enable": False,
+            # Aligned depth (depth registered to colour frame) required for
+            # host-side depth_image_proc::PointCloudXyzrgb backprojection.
+            "align_depth.enable": True,
             "decimation_filter.enable": ParameterValue(pointcloud_decimation_enabled, value_type=bool),
             "decimation_filter.filter_magnitude": ParameterValue(LaunchConfiguration("pointcloud_decimation_magnitude"), value_type=int),
         }],
@@ -161,12 +166,12 @@ def generate_launch_description():
             {"marker_target_frame": "head_imu"},
             {"marker_fixed_ids": "0"},
             {"marker_time_tolerance_s": 0.05},
-            {"marker_chi2_gate": 16.81},
+            {"marker_chi2_gate": 10.83},
             {"marker_noise_multiplier": 1.0},
             {"marker_max_update_translation_m": 0.25},
-            {"marker_max_update_rotation_deg": 25.0},
+            {"marker_max_update_rotation_deg": 15.0},
             {"marker_reset_translation_m": 0.50},
-            {"marker_reset_rotation_deg": 20.0},
+            {"marker_reset_rotation_deg": 12.0},
             {"marker_reset_min_samples": 5},
             {"marker_reset_window_s": 0.50},
             {"marker_reset_min_sample_dt_s": 0.10},
