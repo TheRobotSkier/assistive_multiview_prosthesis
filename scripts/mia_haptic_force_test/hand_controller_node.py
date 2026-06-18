@@ -305,9 +305,12 @@ class HandControllerNode(Node):
         """Dedicated 100 Hz control loop — never blocks on DDS."""
         self._running = True
         self.get_logger().info("Control loop started")
+        next_time: float = time.monotonic()
 
         while rclpy.ok() and self._running:
             loop_start = time.monotonic()
+            period: float = loop_start - next_time + self._dt
+            next_time += self._dt
 
             # Snapshot latest DDS state without blocking
             state = self._snapshot()
@@ -374,18 +377,23 @@ class HandControllerNode(Node):
             wrist_msg.data = [state["target_wrist"], self._acceleration_deg_s2]
             self._wrist_pub.publish(wrist_msg)
 
-            # ── Timing bookkeeping ──────────────────────────────────────────
-            elapsed: float = time.monotonic() - loop_start
-            self._loop_times.append(elapsed)
+            # —— Timing bookkeeping ——————————————————————————————————
+            self._loop_times.append(period)
             self._timing_ticks += 1
 
             if self._timing_ticks % TIMING_PUB_INTERVAL == 0 and self._loop_times:
                 self._publish_timing()
 
-            # Sleep to maintain target rate (allow overrun — keep going)
-            remaining: float = self._dt - elapsed
-            if remaining > 0.0:
-                time.sleep(remaining)
+            # Sleep to maintain target rate; busy-wait the last millisecond for accuracy
+            BUSY_WAIT_THRESHOLD: float = 0.001
+            while True:
+                now: float = time.monotonic()
+                remaining: float = next_time - now
+                if remaining <= 0.0:
+                    break
+                if remaining > BUSY_WAIT_THRESHOLD:
+                    time.sleep(remaining - BUSY_WAIT_THRESHOLD)
+                # else: spin until next_time
 
         self.get_logger().info("Control loop exited")
 
@@ -403,8 +411,9 @@ class HandControllerNode(Node):
         mean_s: float = sum(sorted_times) / n
         mean_hz: float = 1.0 / mean_s if mean_s > 0.0 else 0.0
 
-        # Jitter = absolute deviation from mean period (ms)
-        jitters_ms: list[float] = [abs(t - mean_s) * 1000.0 for t in sorted_times]
+        # Jitter = absolute deviation from target period (ms)
+        target_period: float = self._dt
+        jitters_ms: list[float] = [abs(t - target_period) * 1000.0 for t in sorted_times]
         jitters_sorted: list[float] = sorted(jitters_ms)
 
         p50_ms: float = jitters_sorted[int(n * 0.50)]
@@ -432,7 +441,8 @@ class HandControllerNode(Node):
         mean_s: float = sum(sorted_times) / n
         mean_hz: float = 1.0 / mean_s if mean_s > 0.0 else 0.0
 
-        jitters_ms: list[float] = [abs(t - mean_s) * 1000.0 for t in sorted_times]
+        target_period: float = self._dt
+        jitters_ms: list[float] = [abs(t - target_period) * 1000.0 for t in sorted_times]
         jitters_sorted: list[float] = sorted(jitters_ms)
 
         return {
