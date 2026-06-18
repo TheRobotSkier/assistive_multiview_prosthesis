@@ -1,0 +1,27 @@
+Makefile
+  s_2fcabcb07f35ba::t_b64ce9d1ba4fd8 822,838-839,841
+  s_2fcabcb07f35ba::t_c5e56cb1bda70e 789-791,793-794,797,821,829
+scripts/detect_usb_host.sh
+  s_2fcabcb07f35ba::t_e40517521c6709 23-29,31,58-101,114-115,117
+  s_2fcabcb07f35ba::t_4d47e3c50812fa 30,39
+docker/docker-compose.yml
+  s_2fcabcb07f35ba::t_f619d675665c33 123
+scripts/setup_usb_devices.sh
+  s_2fcabcb07f35ba::t_0853e5c117192a 31-36,42-47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "8c9e01aa961a19f02c7d9b32ea7e8f785233e819",
+  "prompts": {},
+  "sessions": {
+    "s_2fcabcb07f35ba": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ed9a3-c84a-71e1-b44c-2758dea36785",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
