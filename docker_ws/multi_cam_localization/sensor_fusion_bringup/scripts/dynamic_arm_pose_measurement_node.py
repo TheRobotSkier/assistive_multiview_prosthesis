@@ -33,6 +33,14 @@ _BEST_EFFORT_QOS = QoSProfile(
     depth=10,
 )
 
+# Reliable QoS for the DynamicArmPoseObservation output that feeds
+# jetson_relay → run_subscribe_msckf_marker (compiled C++ EKF).
+_RELIABLE_OBS_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.RELIABLE,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=10,
+)
+
 from aruco_marker_pose_node import (
     R_to_rotvec,
     T_inv,
@@ -370,8 +378,8 @@ class DynamicArmPoseMeasurementNode(Node):
                 self.head_pose_cb,
                 qos,
             )
-        self.measurement_pub = self.create_publisher(DynamicArmPoseObservation, self.output_topic, _BEST_EFFORT_QOS)
-        self.status_pub = self.create_publisher(String, self.status_topic, _BEST_EFFORT_QOS)
+        self.measurement_pub = self.create_publisher(DynamicArmPoseObservation, self.output_topic, _RELIABLE_OBS_QOS)
+        self.status_pub = self.create_publisher(String, self.status_topic, _RELIABLE_OBS_QOS)
 
         self.head_buffer: deque[HeadPoseMeasurementSample] = deque()
         self.get_logger().info(f"Dynamic observation topic: {self.dynamic_topic}")

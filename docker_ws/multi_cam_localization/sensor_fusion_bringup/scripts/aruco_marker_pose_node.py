@@ -55,6 +55,15 @@ _BEST_EFFORT_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
     depth=10,
 )
+
+# Reliable QoS for observation/validation topics that feed
+# run_subscribe_msckf_marker (compiled C++ EKF node).
+# The BestEffort→Reliable RxO mismatch previously blinded the EKF.
+_RELIABLE_OBS_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.RELIABLE,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=10,
+)
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Int32, String
 from std_srvs.srv import Trigger
@@ -835,17 +844,17 @@ class ArucoMarkerPoseNode(Node):
         self.camera_pose_raw_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_pose_raw", _BEST_EFFORT_QOS)
         self.camera_body_pose_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_body_pose", _BEST_EFFORT_QOS)
         self.imu_pose_pub = self.create_publisher(PoseWithCovarianceStamped, f"{self.output_prefix}/imu_pose", _BEST_EFFORT_QOS)
-        self.marker_observation_pub = self.create_publisher(MarkerPoseObservation, f"{self.output_prefix}/observation", _BEST_EFFORT_QOS)
+        self.marker_observation_pub = self.create_publisher(MarkerPoseObservation, f"{self.output_prefix}/observation", _RELIABLE_OBS_QOS)
         self.dynamic_marker_observation_pub = self.create_publisher(
             DynamicMarkerObservation,
             self.dynamic_observation_topic,
-            _BEST_EFFORT_QOS,
+            _RELIABLE_OBS_QOS,
         )
         self.corrected_odom_pub = self.create_publisher(Odometry, f"{self.output_prefix}/ov_corrected_odom", _BEST_EFFORT_QOS)
         self.marker_quality_pub = self.create_publisher(String, f"{self.output_prefix}/marker_quality", _BEST_EFFORT_QOS)
         self.active_marker_pub = self.create_publisher(Int32, f"{self.output_prefix}/active_marker_id", _BEST_EFFORT_QOS)
-        self.marker_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/marker_valid", _BEST_EFFORT_QOS)
-        self.vio_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/vio_valid", _BEST_EFFORT_QOS)
+        self.marker_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/marker_valid", _RELIABLE_OBS_QOS)
+        self.vio_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/vio_valid", _RELIABLE_OBS_QOS)
         self.reanchor_event_pub = self.create_publisher(String, f"{self.output_prefix}/reanchor_event", _BEST_EFFORT_QOS)
         self.reanchor_srv = self.create_service(Trigger, f"{self.output_prefix}/request_reanchor", self.request_reanchor_cb)
 

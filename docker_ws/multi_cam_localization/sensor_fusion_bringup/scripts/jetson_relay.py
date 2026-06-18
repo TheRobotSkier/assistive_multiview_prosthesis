@@ -99,6 +99,16 @@ _HEALTH_QOS = QoSProfile(
     depth=1,
 )
 
+# Reliable QoS for ArUco marker observation relay topics.
+# Must match the Reliable publishers in aruco_marker_pose_node.py
+# and dynamic_arm_pose_measurement_node.py so the compiled C++
+# run_subscribe_msckf_marker EKF node can receive observations.
+_ARUCO_RELIABLE_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.RELIABLE,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=10,
+)
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Source -> destination topic map  (head + arm camera pair)
@@ -568,36 +578,36 @@ class JetsonRelay(Node):
                 MarkerPoseObservation,
                 f"/{cam}/marker_pose/observation",
                 lambda m, c=cam: self._on_aruco_obs(m, c),
-                _SENSOR_QOS,
+                _ARUCO_RELIABLE_QOS,
             )
         # Dynamic observation: head camera sees marker ID 2 on arm
         self.create_subscription(
             DynamicMarkerObservation,
             "/head/marker_pose/dynamic_observation",
             self._on_aruco_dynamic_obs,
-            _SENSOR_QOS,
+            _ARUCO_RELIABLE_QOS,
         )
         # Arm-side dynamic arm pose (converted by dynamic_arm_updater)
         self.create_subscription(
             DynamicArmPoseObservation,
             "/arm/marker_pose/dynamic_arm_pose_observation",
             self._on_aruco_dynamic_arm_pose,
-            _SENSOR_QOS,
+            _ARUCO_RELIABLE_QOS,
         )
         self._aruco_obs_pub = {
             cam: self.create_publisher(
-                MarkerPoseObservation, _DST[f"{cam}_aruco_obs"], _SENSOR_QOS
+                MarkerPoseObservation, _DST[f"{cam}_aruco_obs"], _ARUCO_RELIABLE_QOS
             )
             for cam in CAMERAS
         }
         self._aruco_dyn_pub = self.create_publisher(
-            DynamicMarkerObservation, _DST["arm_aruco_dyn"], _SENSOR_QOS
+            DynamicMarkerObservation, _DST["arm_aruco_dyn"], _ARUCO_RELIABLE_QOS
         )
         # Separate publisher for DynamicArmPoseObservation — this is a
         # distinct message type from DynamicMarkerObservation.  Publishing
         # through the wrong-type publisher silently drops the message.
         self._aruco_arm_pose_pub = self.create_publisher(
-            DynamicArmPoseObservation, _DST["arm_aruco_arm"], _SENSOR_QOS
+            DynamicArmPoseObservation, _DST["arm_aruco_arm"], _ARUCO_RELIABLE_QOS
         )
 
     def _setup_trackhist(self) -> None:
@@ -655,11 +665,10 @@ class JetsonRelay(Node):
             return
         if self._pc_dec_enabled and self._pc_dec_step > 1:
             msg = decimate_pointcloud(msg, self._pc_dec_step)
-        # Override header stamp with system time so clouds are in the
-        # same clock domain as odometry (OpenVINS uses system time).
-        # The RealSense driver stamps with the ASIC hardware clock,
-        # which is not synced via chrony and drifts independently.
-        msg.header.stamp = self.get_clock().now().to_msg()
+        # Preserve original RealSense hardware timestamp — the ASIC clock is
+        # the same domain for both depth and colour frames from a single
+        # D435i, so the temporal bond needed by depth_image_proc's
+        # approximate-time synchronizer is preserved.
         self._pc_pub[camera].publish(msg)
 
     def _on_img(self, msg: Image, camera: str) -> None:
@@ -667,9 +676,7 @@ class JetsonRelay(Node):
             return
         if self._img_ds > 1:
             msg = downsample_image(msg, self._img_ds)
-        # Override header stamp with system time — same rationale as
-        # pointclouds (RealSense ASIC clock != system clock).
-        msg.header.stamp = self.get_clock().now().to_msg()
+        # Preserve original hardware timestamp (see _on_pc comment).
         if self._img_compress:
             msg = compress_image_jpeg(msg, self._img_compress_qty)
         self._img_pub[camera].publish(msg)
@@ -680,9 +687,10 @@ class JetsonRelay(Node):
             return
         if self._depth_ds > 1:
             msg = downsample_depth(msg, self._depth_ds)
-        # Override header stamp with system time — same rationale as
-        # pointclouds (RealSense ASIC clock != system clock).
-        msg.header.stamp = self.get_clock().now().to_msg()
+        # Preserve original hardware timestamp — depth and colour frames
+        # from the same D435i share the same ASIC clock domain, so the
+        # temporal bond needed by depth_image_proc's approximate-time
+        # synchronizer is preserved.
         if self._depth_compress:
             msg = compress_depth_png(msg)
         self._depth_pub[camera].publish(msg)
