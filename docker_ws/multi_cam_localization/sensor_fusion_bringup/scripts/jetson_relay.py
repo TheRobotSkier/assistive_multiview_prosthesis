@@ -713,8 +713,11 @@ class JetsonRelay(Node):
         self._trackhist_pub[camera].publish(msg)
 
     def _on_ci(self, msg: CameraInfo, camera: str) -> None:
-        if not self._gates[f"ci_{camera}"].should_publish():
-            return
+        # CameraInfo is tiny text-only metadata (~1 KB).  Pass it through
+        # unthrottled so the host-side depth_image_proc 3-way synchronizer
+        # (depth + rgb + camera_info) always has a fresh calibration matrix
+        # in its buffer.  Throttling to 1 Hz starves the synchronizer and
+        # causes 100% backprojection drops.
         # Scale intrinsics to match the downsampled image/depth resolution.
         # The same factor is used for both colour and depth channels since
         # aligned depth is registered to the colour frame.

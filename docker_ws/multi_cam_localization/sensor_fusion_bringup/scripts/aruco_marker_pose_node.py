@@ -2168,11 +2168,13 @@ class ArucoMarkerPoseNode(Node):
         chi2: Optional[float] = None,
         marker_quality: Optional[dict[str, Any]] = None,
     ) -> None:
-        event_key = (correction_mode, reason, marker_id, correction_accepted)
+        # Strict 1.0 s debounce latch on ALL reanchor events.  Without this,
+        # accepted corrections bypass the existing conditional debounce and
+        # flood the network at >1 kHz, exhausting Jetson CPU threads and
+        # repeatedly wiping OpenVINS landmark history.
         wall_now = self.now_sec()
-        if not correction_accepted and self.last_event_key == event_key and wall_now - self.last_event_wall_time_sec < 1.0:
+        if wall_now - self.last_event_wall_time_sec < 1.0:
             return
-        self.last_event_key = event_key
         self.last_event_wall_time_sec = wall_now
 
         event = {
