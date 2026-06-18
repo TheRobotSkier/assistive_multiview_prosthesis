@@ -22,8 +22,9 @@ check_node() {
     local package="$3"
 
     echo "  Starting ${node_name}..."
-    # Start the node in background
-    ros2 run "$package" "$executable" &
+    # Start the node in its own process group so cleanup also catches children
+    # spawned by the ros2 CLI wrapper.
+    setsid ros2 run "$package" "$executable" &
     local pid=$!
 
     # Wait for the node to appear in ros2 node list
@@ -37,7 +38,7 @@ check_node() {
     done
 
     # Kill the node
-    kill "$pid" 2>/dev/null || true
+    kill -TERM "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
 
     if [ "$found" -eq 1 ]; then

@@ -10,8 +10,7 @@ are available.  Exercises the node end-to-end:
   4. Activates the node via /twist_propagation/activate.
   5. Verifies /hand_twist (TwistStamped) is published with non-zero linear velocity.
   6. Verifies /segmentation/click_positive is published (hit detected).
-  7. Publishes a mock segmented cloud and verifies the preshaping service
-     is called (via a stand-in service server).
+  7. Publishes a mock segmented cloud and verifies the node returns to IDLE.
   8. Tests deactivation.
   9. Verifies that no clicks are published when inactive.
 
@@ -21,6 +20,7 @@ Timeout: 30 seconds total.
 from __future__ import annotations
 
 import math
+import json
 import struct
 import sys
 import threading
@@ -35,7 +35,7 @@ from nav_msgs.msg import Path
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
-from visualization_msgs.msg import Marker, MarkerArray
+from visualization_msgs.msg import MarkerArray
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,7 +60,7 @@ def _fail(name: str, detail: str = ""):
     print(msg)
 
 
-def _make_cloud(xyz_points, frame_id: str = "camera_front_depth",
+def _make_cloud(xyz_points, frame_id: str = "world",
                 stamp_sec: float = 0.0) -> PointCloud2:
     """Build a PointCloud2 message from an (N, 3) array."""
     msg = PointCloud2()
@@ -124,8 +124,8 @@ class TestHarness(Node):
         self._status_msgs: list[String] = []
         self._path_msgs: list[Path] = []
         self._sphere_marker_msgs: list[MarkerArray] = []
-        self._hit_marker_msgs: list[Marker] = []
-        self._trajectory_marker_msgs: list[Marker] = []
+        self._hit_marker_msgs: list[MarkerArray] = []
+        self._trajectory_marker_msgs: list[MarkerArray] = []
 
         self.create_subscription(
             TwistStamped, "/hand_twist",
@@ -145,10 +145,10 @@ class TestHarness(Node):
             MarkerArray, "/twist_propagation/collision_spheres",
             lambda m: self._sphere_marker_msgs.append(m), 10)
         self.create_subscription(
-            Marker, "/twist_propagation/hit_marker",
+            MarkerArray, "/twist_propagation/hit_marker",
             lambda m: self._hit_marker_msgs.append(m), 10)
         self.create_subscription(
-            Marker, "/twist_propagation/trajectory_line",
+            MarkerArray, "/twist_propagation/trajectory_line",
             lambda m: self._trajectory_marker_msgs.append(m), 10)
 
         # ── Service clients ────────────────────────────────────────────────
@@ -210,17 +210,21 @@ class TestHarness(Node):
             time.sleep(dt * 0.5)  # publish faster than dt for realism
 
     def publish_cloud_with_target(self, target_x=0.5, target_y=0.0,
-                                  target_z=0.5, n_points=200, spread=0.02):
+                                  target_z=0.5, n_points=200, spread=0.02,
+                                  include_background=True):
         """Publish a cloud with a cluster of points near (target_x, target_y, target_z)."""
         import numpy as np
         rng = np.random.default_rng(42)
         # Cluster near target
         cluster = rng.normal(loc=[target_x, target_y, target_z],
                              scale=spread, size=(n_points, 3))
-        # Some background points far away
-        bg = rng.uniform(low=-1.0, high=2.0, size=(100, 3))
-        bg[:, 2] = rng.uniform(0.3, 1.5, size=100)
-        pts = np.vstack([cluster, bg])
+        if include_background:
+            # Some background points far away
+            bg = rng.uniform(low=-1.0, high=2.0, size=(100, 3))
+            bg[:, 2] = rng.uniform(0.3, 1.5, size=100)
+            pts = np.vstack([cluster, bg])
+        else:
+            pts = cluster
         cloud = _make_cloud(pts, stamp_sec=time.time())
         self.cloud_pub.publish(cloud)
 
@@ -275,6 +279,15 @@ class TestHarness(Node):
     def latest_path(self) -> Path | None:
         return self._path_msgs[-1] if self._path_msgs else None
 
+    @property
+    def latest_status(self) -> dict:
+        if not self._status_msgs:
+            return {}
+        try:
+            return json.loads(self._status_msgs[-1].data)
+        except json.JSONDecodeError:
+            return {}
+
 
 # ---------------------------------------------------------------------------
 # Test cases
@@ -307,27 +320,30 @@ def test_twist_published(harness: TestHarness):
     harness.clear()
     # The node needs a cloud to enter its idle cycle and publish twists.
     # Publish a cloud first so the node has data to work with.
-    harness.publish_cloud_with_target(target_x=0.6, target_y=0.0, target_z=0.5)
+    harness.publish_cloud_with_target(
+        target_x=5.0, target_y=5.0, target_z=5.0, include_background=False)
     # Give the node a moment to receive the cloud
     rclpy.spin_once(harness, timeout_sec=0.5)
     harness.publish_poses_moving(start_x=0.0, start_y=0.0, start_z=0.5,
                                  vx=0.2, n=10, dt=0.05)
     # Poll for twist messages -- the node's cycle runs every 0.1s so we need
     # several spin iterations to give it time to process and publish.
+    best_mag = 0.0
     for _ in range(40):
         rclpy.spin_once(harness, timeout_sec=0.2)
         if harness.twist_count > 0:
+            tw = harness.latest_twist
+            lin = tw.twist.linear
+            best_mag = max(best_mag, math.sqrt(lin.x ** 2 + lin.y ** 2 + lin.z ** 2))
+        if best_mag > 0.01:
             break
 
     if harness.twist_count > 0:
         _ok(f"twist messages published (count={harness.twist_count})")
-        tw = harness.latest_twist
-        lin = tw.twist.linear
-        mag = math.sqrt(lin.x ** 2 + lin.y ** 2 + lin.z ** 2)
-        if mag > 0.01:
-            _ok(f"twist linear magnitude > 0.01 (got {mag:.4f})")
+        if best_mag > 0.01:
+            _ok(f"twist linear magnitude > 0.01 (got {best_mag:.4f})")
         else:
-            _fail("twist linear magnitude > 0.01", f"got {mag:.4f}")
+            _fail("twist linear magnitude > 0.01", f"got {best_mag:.4f}")
     else:
         _fail("twist messages published", "no messages received")
 
@@ -358,24 +374,25 @@ def test_hit_detected(harness: TestHarness):
         _fail("click_positive published", "no click received")
 
 
-def test_preshaping_called_after_seg_cloud(harness: TestHarness):
-    """After a click, publishing a segmented cloud should trigger preshaping."""
+def test_returns_idle_after_seg_cloud(harness: TestHarness):
+    """After a click, publishing a segmented cloud should return the node to IDLE."""
     # The node should be in WAITING_FOR_SEGMENTATION after the click above
-    # Publish a segmented cloud to trigger preshaping
+    # Publish a segmented cloud to signal segmentation completion.
     harness._preshaping_called.clear()
     harness.publish_seg_cloud()
 
-    # Wait for preshaping to be called
+    reached_idle = False
     for _ in range(60):
         rclpy.spin_once(harness, timeout_sec=0.2)
-        if harness.preshaping_called:
+        if harness.latest_status.get("state") == "IDLE":
+            reached_idle = True
             break
 
-    if harness.preshaping_called:
-        _ok("preshaping service called after segmented cloud")
+    if reached_idle:
+        _ok("returns to IDLE after segmented cloud")
     else:
-        _fail("preshaping service called after segmented cloud",
-              "service was not called")
+        _fail("returns to IDLE after segmented cloud",
+              f"latest status={harness.latest_status}")
 
 
 def test_deactivation(harness: TestHarness):
@@ -415,7 +432,9 @@ def test_visualization_published(harness: TestHarness):
     # Wait for the cycle to run
     for _ in range(40):
         rclpy.spin_once(harness, timeout_sec=0.2)
-        if harness.path_count > 0:
+        if (harness.path_count > 0
+                and harness.sphere_marker_count > 0
+                and harness.trajectory_marker_count > 0):
             break
 
     # Predicted path should be published
@@ -531,7 +550,7 @@ def main():
         test_activation(harness)
         test_twist_published(harness)
         test_hit_detected(harness)
-        test_preshaping_called_after_seg_cloud(harness)
+        test_returns_idle_after_seg_cloud(harness)
         test_visualization_published(harness)
         test_hit_marker_on_collision(harness)
         test_deactivation(harness)

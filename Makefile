@@ -222,9 +222,11 @@ test-emg-sim: ## Offline prediction simulator - replay raw data with tunable par
 	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null
 	-$(DOCKER_CMD) rm -f emg 2>/dev/null
 	cd $(COMPOSE_DIR) && $(COMPOSE) up -d emg
-	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis emg /bin/bash -lc 'source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge prediction_simulator --model-dir /app/models --data-root /app/data/latency --config /prosthesis_ws/config/emg_latency_test.yaml' || true
-	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null
-	-$(DOCKER_CMD) rm -f emg 2>/dev/null
+	status=0; \
+	cd $(COMPOSE_DIR) && $(COMPOSE) exec --user prosthesis emg /bin/bash -lc 'source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge prediction_simulator --model-dir /app/models --data-root /app/data/latency --config /prosthesis_ws/config/emg_latency_test.yaml' || status=$$?; \
+	$(DOCKER_CMD) stop --time 1 emg 2>/dev/null || true; \
+	$(DOCKER_CMD) rm -f emg 2>/dev/null || true; \
+	exit $$status
 
 # ── Test ───────────────────────────────────────────────────────────────────
 test: ## Interactive test selector
@@ -249,7 +251,7 @@ test: ## Interactive test selector
 	esac
 
 test-smoke: ## Existing containerized smoke test suite
-	cd $(COMPOSE_DIR) && $(COMPOSE) build prosthesis && $(COMPOSE) run --rm test
+	cd $(COMPOSE_DIR) && $(COMPOSE) --profile test build test && $(COMPOSE) --profile test run --rm test
 
 # ── Shell into running container ──────────────────────────────────────────
 shell:

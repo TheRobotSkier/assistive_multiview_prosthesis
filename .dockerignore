@@ -3,8 +3,11 @@ src/grasp_preshaping/target/
 
 # Python bytecode
 __pycache__/
+**/__pycache__/
 *.pyc
+**/*.pyc
 *.pyo
+**/*.pyo
 
 # IDE / editor
 .vscode/

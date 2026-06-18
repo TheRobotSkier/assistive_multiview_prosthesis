@@ -122,6 +122,9 @@ COPY rviz/ rviz/
 COPY scripts/ scripts/
 COPY tests/ tests/
 
-RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true
+RUN chmod +x scripts/*.sh scripts/*.py 2>/dev/null || true \
+    && chown -R prosthesis:prosthesis /prosthesis_ws
 
-USER prosthesis
+# Keep the production image's entrypoint contract the same as the base image:
+# start as root for setup, then /entrypoint.sh drops to the prosthesis user.
+USER root

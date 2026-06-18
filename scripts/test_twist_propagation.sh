@@ -29,4 +29,19 @@ if [ ! -f "$TEST_SCRIPT" ]; then
     exit 1
 fi
 
-python3 "$TEST_SCRIPT"
+NODE_LOG="/tmp/twist_propagation_node.log"
+setsid ros2 run twist_propagation twist_propagation_node > "$NODE_LOG" 2>&1 &
+NODE_PID=$!
+
+cleanup() {
+    kill -TERM "-$NODE_PID" 2>/dev/null || kill "$NODE_PID" 2>/dev/null || true
+    wait "$NODE_PID" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+if ! python3 "$TEST_SCRIPT"; then
+    echo "--- twist_propagation_node LOG ---"
+    cat "$NODE_LOG"
+    echo "--- END NODE LOG ---"
+    exit 1
+fi

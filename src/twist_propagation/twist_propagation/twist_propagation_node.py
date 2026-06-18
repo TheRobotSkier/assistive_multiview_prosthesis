@@ -3,8 +3,8 @@
 
 Estimates the hand twist from sequential pose messages, propagates it forward
 in time against the live point cloud, and when a propagated position
-intersects a cluster of points within a configurable threshold, triggers
-segmentation and then grasp preshaping.
+intersects a cluster of points within a configurable threshold, publishes
+segmentation click(s) and contact state for the downstream grasp pipeline.
 
 Internal state machine:
   IDLE                     -- active, running propagation each cycle
@@ -492,7 +492,7 @@ class TwistPropagationNode(Node):
         self.declare_parameter("odom_topic", "")  # optional: nav_msgs/Odometry
         self.declare_parameter("click_positive_topic", "/segmentation/click_positive")
         self.declare_parameter("hand_twist_topic", "/hand_twist")
-        self.declare_parameter("hand_twist_input_topic", "/hand_twist")  # external twist source
+        self.declare_parameter("hand_twist_input_topic", "")  # optional external twist source
         self.declare_parameter("external_twist_max_age_s", 2.0)
         self.declare_parameter("segmentation_reset_topic", "/segmentation/reset")
 
@@ -650,13 +650,20 @@ class TwistPropagationNode(Node):
         input_cloud_topic = self.get_parameter("input_cloud_topic").value
         seg_cloud_topic = self.get_parameter("segmented_cloud_topic").value
         odom_topic = self.get_parameter("odom_topic").value
+        twist_topic = self.get_parameter("hand_twist_topic").value
 
         self.create_subscription(PoseStamped, hand_pose_topic, self._on_hand_pose, 10)
 
         # Optional external twist subscription (e.g. from odom_to_pose_relay)
         hand_twist_input = self.get_parameter("hand_twist_input_topic").value
-        self._has_external_twist_sub = bool(hand_twist_input)
-        if hand_twist_input:
+        self._has_external_twist_sub = bool(hand_twist_input) and hand_twist_input != twist_topic
+        if hand_twist_input == twist_topic and hand_twist_input:
+            self.get_logger().warn(
+                "Ignoring hand_twist_input_topic because it matches "
+                "hand_twist_topic; subscribing would feed this node's own "
+                "published twist back as an external twist."
+            )
+        elif hand_twist_input:
             self.create_subscription(TwistStamped, hand_twist_input, self._on_hand_twist, 10)
 
         # RELIABLE — the fusion node publishes with RELIABLE QoS; the
@@ -675,7 +682,6 @@ class TwistPropagationNode(Node):
             self.create_subscription(Odometry, odom_topic, self._on_odom, 10)
 
         # ── Publishers ─────────────────────────────────────────────────────
-        twist_topic = self.get_parameter("hand_twist_topic").value
         click_topic = self.get_parameter("click_positive_topic").value
 
         self._twist_pub = self.create_publisher(

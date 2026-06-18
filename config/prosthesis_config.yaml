@@ -342,7 +342,7 @@ twist_propagation:
         odom_topic: ""
         click_positive_topic: "/segmentation/click_positive"
         hand_twist_topic: "/hand_twist"
-        hand_twist_input_topic: "/hand_twist"
+        hand_twist_input_topic: ""
         external_twist_max_age_s: 2.0
         segmentation_reset_topic: "/segmentation/reset"
         segmentation_retarget_distance_m: 0.10
@@ -586,7 +586,7 @@ _reference:
             odom_topic: ""
             click_positive_topic: "/segmentation/click_positive"
             hand_twist_topic: "/hand_twist"
-            hand_twist_input_topic: "/hand_twist"
+            hand_twist_input_topic: ""
             external_twist_max_age_s: 2.0
             segmentation_reset_topic: "/segmentation/reset"
             segmentation_retarget_distance_m: 0.10

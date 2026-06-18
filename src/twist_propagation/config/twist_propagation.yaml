@@ -43,6 +43,8 @@ twist_propagation:
     odom_topic: ""  # optional: nav_msgs/Odometry for covariance
     click_positive_topic: "/segmentation/click_positive"
     hand_twist_topic: "/hand_twist"
+    hand_twist_input_topic: ""
+    external_twist_max_age_s: 2.0
     segmentation_reset_topic: "/segmentation/reset"
 
     # ── Segmentation retarget policy ───────────────────────────────────────
