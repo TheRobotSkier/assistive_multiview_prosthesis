@@ -22,8 +22,12 @@ err() { echo -e "${_red}$*${_reset}"; }
 
 EMG_DATA_DIR="${EMG_DATA_DIR:-/app/data}"
 EMG_MODEL_DIR="${EMG_MODEL_DIR:-/app/models}"
-MIA_PORT="${MIA_PORT:-${MIA_SERIAL_PORT:-/dev/ttyUSB0}}"
-WRIST_PORT="${WRIST_PORT:-${WRIST_SERIAL_PORT:-/dev/ttyUSB1}}"
+# IMPORTANT: do NOT default to /dev/ttyUSB0 / /dev/ttyUSB1 here. Those are the
+# xacro defaults; if the env var is missing we want the launch file's own
+# DeclareLaunchArgument defaults (/dev/ttyMiaHand / /dev/ttyDynamixel) to take
+# over, not the xacro defaults, otherwise we end up opening the wrong device.
+MIA_PORT="${MIA_PORT:-${MIA_SERIAL_PORT:-}}"
+WRIST_PORT="${WRIST_PORT:-${WRIST_SERIAL_PORT:-}}"
 CONFIG_PATH="${CONFIG_PATH:-/prosthesis_ws/config/mia_haptic_force_test.yaml}"
 WRIST_ENABLE="${WRIST_ENABLE:-true}"
 HAPTIC_ENABLE="${HAPTIC_ENABLE:-true}"
@@ -33,6 +37,7 @@ MOCK_HARDWARE="${MOCK_HARDWARE:-false}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 AUTO_KILL_S="${AUTO_KILL_S:-0}"
 USE_MULTI_NODE="${USE_MULTI_NODE:-false}"
+KEYBOARD_EMG="${KEYBOARD_EMG:-false}"
 
 set +u
 source /opt/ros/jazzy/setup.bash
@@ -54,6 +59,7 @@ echo "  FORCE_RETRAIN  = $FORCE_RETRAIN"
 echo "  MOCK_HARDWARE  = $MOCK_HARDWARE"
 echo "  LOG_LEVEL      = $LOG_LEVEL"
 echo "  USE_MULTI_NODE = $USE_MULTI_NODE"
+echo "  KEYBOARD_EMG   = $KEYBOARD_EMG"
 echo ""
 
 if [ ! -f "$CONFIG_PATH" ]; then
@@ -78,7 +84,12 @@ set -u
 
 mkdir -p "$EMG_DATA_DIR" "$EMG_MODEL_DIR"
 
-if [ "$EMG_ENABLE" = "true" ]; then
+if [ "$KEYBOARD_EMG" = "true" ]; then
+    ok "Keyboard EMG emulation enabled — skipping bracelet data collection, "
+    ok "classifier training, and /app/models/classifier.pkl requirement."
+    warn "Use arrow keys or WASD to drive gestures:"
+    warn "  ←/A OPEN   →/D POWER   ↓/S FLEXION   ↑/W EXTENSION"
+elif [ "$EMG_ENABLE" = "true" ]; then
     MODEL_FILE="$EMG_MODEL_DIR/classifier.pkl"
     NPZ_COUNT=$(ls -1 "$EMG_DATA_DIR"/*.npz 2>/dev/null | wc -l || true)
 
@@ -125,18 +136,24 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT
 
-LAUNCH_CMD=(
-    ros2 launch prosthesis_launch mia_haptic_force_test.launch.py
+LAUNCH_CMD=(ros2 launch prosthesis_launch mia_haptic_force_test.launch.py)
+# Only forward port launch args when non-empty.  ros2 launch rejects empty
+# values ("malformed launch argument 'mia_port:='"), and an empty string
+# would also override the launch file's own DeclareLaunchArgument default.
+# When the env var is missing, let the launch file's _resolve_port pick the
+# env var (from os.environ) or the hard default instead.
+[ -n "$MIA_PORT" ]   && LAUNCH_CMD+=("mia_port:=$MIA_PORT")
+[ -n "$WRIST_PORT" ] && LAUNCH_CMD+=("wrist_port:=$WRIST_PORT")
+LAUNCH_CMD+=(
     config_path:="$CONFIG_PATH"
     emg_model_dir:="$EMG_MODEL_DIR"
-    mia_port:="$MIA_PORT"
-    wrist_port:="$WRIST_PORT"
     wrist_enable:="$WRIST_ENABLE"
     haptic_enable:="$HAPTIC_ENABLE"
     emg_enable:="$EMG_ENABLE"
     mock_hardware:="$MOCK_HARDWARE"
     log_level:="$LOG_LEVEL"
     use_multi_node:="$USE_MULTI_NODE"
+    keyboard_emg:="$KEYBOARD_EMG"
 )
 
 if [ "$AUTO_KILL_S" = "0" ]; then

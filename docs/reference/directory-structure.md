@@ -6,7 +6,7 @@ Use this as the primary navigation map for the repository.
 
 - `config/`: central runtime configuration, network/timesync config, scenario config
 - `docker/`: container definitions and compose files
-- `docs/`: canonical architecture and navigation documentation
+- `docs/`: canonical architecture, navigation, and Autopilot-maintained agent memory
 - `logs/`: historical log captures, not source-of-truth docs
 - `models/`: model assets used by runtime or experiments
 - `data/`: persisted EMG recordings and latency benchmark outputs
@@ -132,6 +132,12 @@ Use this as the primary navigation map for the repository.
 
 - Start: `Makefile`, `Makefile.workspace`, `scripts/run_tests.sh`
 
+
+### Review Autopilot-maintained agent memory and bugfix knowledge
+
+- Start: `docs/autopilot/README.md`
+- Bugfile: `docs/autopilot/BUGFILE.md`
+
 ## Documentation Cross-Reference
 
 - Overview: `docs/architecture/overview.md`
@@ -140,3 +146,4 @@ Use this as the primary navigation map for the repository.
 - Control and actuation: `docs/architecture/control-and-actuation.md`
 - Package map: `docs/architecture/packages.md`
 - Validation workflows: `docs/reference/validation-and-workflows.md`
+- Autopilot memory: `docs/autopilot/README.md`

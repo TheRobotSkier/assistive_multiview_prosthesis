@@ -32,6 +32,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
+
 _DEFAULT_CONFIG = os.environ.get(
     "MIA_HAPTIC_FORCE_TEST_CONFIG",
     "/prosthesis_ws/config/mia_haptic_force_test.yaml",
@@ -41,6 +42,25 @@ _DEFAULT_CONFIG = os.environ.get(
 def _as_bool(context, name: str) -> bool:
     value = LaunchConfiguration(name).perform(context).lower()
     return value in ("1", "true", "yes", "on")
+
+
+def _resolve_port(context, name: str, env_var: str, default: str) -> str:
+    """Resolve a device-port launch arg, falling back to the env var and
+    then a hard default when the launch arg is empty.
+
+    Prevents the xacro defaults (``/dev/ttyUSB0`` / ``/dev/ttyUSB1``) from
+    leaking into the URDF when the upstream env-var chain is broken
+    (e.g. ``podman exec -e KEY=""`` unsets the variable, the shell script
+    then falls back to its own hard-coded default, and the launch arg
+    override is an empty string that ``xacro`` resolves to its own default).
+    """
+    value = LaunchConfiguration(name).perform(context).strip()
+    if value:
+        return value
+    env_value = os.environ.get(env_var, "").strip()
+    if env_value:
+        return env_value
+    return default
 
 
 def _load_yaml(path: str) -> dict:
@@ -54,19 +74,21 @@ def _load_yaml(path: str) -> dict:
 def _launch_setup(context, *args, **kwargs):
     config_path = LaunchConfiguration("config_path").perform(context)
     emg_model_dir = LaunchConfiguration("emg_model_dir").perform(context)
-    mia_port = LaunchConfiguration("mia_port").perform(context)
-    wrist_port = LaunchConfiguration("wrist_port").perform(context)
+    mia_port = _resolve_port(context, "mia_port", "MIA_SERIAL_PORT", "/dev/ttyMiaHand")
+    wrist_port = _resolve_port(context, "wrist_port", "WRIST_SERIAL_PORT", "/dev/ttyDynamixel")
     wrist_enable = _as_bool(context, "wrist_enable")
     haptic_enable = _as_bool(context, "haptic_enable")
     emg_enable = _as_bool(context, "emg_enable")
     mock_hardware = _as_bool(context, "mock_hardware")
     log_level = LaunchConfiguration("log_level").perform(context)
     use_multi_node = _as_bool(context, "use_multi_node")
+    keyboard_emg = _as_bool(context, "keyboard_emg")
     emg_board_ip = os.environ.get("EMG_BOARD_IP", "")
 
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Mia haptic force test config not found: {config_path}")
-    if emg_enable and not os.path.isdir(emg_model_dir):
+    # Keyboard emulation replaces the live EMG classifier; no model dir needed.
+    if emg_enable and not keyboard_emg and not os.path.isdir(emg_model_dir):
         raise FileNotFoundError(
             f"EMG model directory not found: {emg_model_dir}. "
             "Run scripts/mia_haptic_force_test.sh so data/model setup happens first."
@@ -79,8 +101,16 @@ def _launch_setup(context, *args, **kwargs):
 
     if use_multi_node:
         # New split-node stack (scripts/mia_haptic_force_test/)
+        # Keyboard emulation, when enabled, replaces the live EMG input node
+        # so the test runs without the MindRove bracelet.
+        if keyboard_emg:
+            emg_node_name = "keyboard_emg_node"
+            emg_node_enabled = True
+        else:
+            emg_node_name = "emg_input_node"
+            emg_node_enabled = emg_enable
         multi_nodes = [
-            ("emg_input_node", emg_enable),
+            (emg_node_name, emg_node_enabled),
             ("force_input_node", True),
             ("supervisor_node", True),
             ("hand_controller_node", True),
@@ -91,6 +121,15 @@ def _launch_setup(context, *args, **kwargs):
         for name, enabled in multi_nodes:
             if not enabled:
                 continue
+            # Inherit the full parent launch process environment
+            # (LD_LIBRARY_PATH, PATH, AMENT_PREFIX_PATH, ...).  An ExecuteProcess
+            # `env` dict REPLACES the child environment, so passing only
+            # {"PYTHONPATH": ...} strips LD_LIBRARY_PATH and rclpy's C
+            # extension then dies with:
+            #   ImportError: librcl_action.so: cannot open shared object file
+            # We copy the parent env and only override PYTHONPATH so the
+            # scripts/ package is importable alongside the ROS 2 site-packages.
+            _child_env = os.environ.copy()
             nodes.append(
                 ExecuteProcess(
                     cmd=[
@@ -104,13 +143,12 @@ def _launch_setup(context, *args, **kwargs):
                         log_level,
                     ],
                     name=name,
-                    output="screen" if name in ("emg_input_node", "supervisor_node", "hand_controller_node", "terminal_ui_node") else "log",
+                    output="screen" if name in ("emg_input_node", "keyboard_emg_node", "supervisor_node", "hand_controller_node", "terminal_ui_node") else "log",
                     sigkill_timeout="5",
                     sigterm_timeout="3",
-                    env={"PYTHONPATH": "/prosthesis_ws/scripts"},
+                    env=_child_env,
                 )
             )
-
         # Shared hardware drivers (same as legacy path)
         nodes.append(
             IncludeLaunchDescription(
@@ -187,7 +225,32 @@ def _launch_setup(context, *args, **kwargs):
         )
     )
 
-    if emg_enable:
+    if keyboard_emg:
+        # Keyboard emulation replaces the live EMG classifier in the legacy
+        # monolithic path too, so the toggle is not half-wired.
+        # Same env fix as the multi-node path: inherit parent env so
+        # LD_LIBRARY_PATH survives and rclpy can find its C libs.
+        _child_env = os.environ.copy()
+        _child_env["PYTHONPATH"] = "/prosthesis_ws/scripts:" + _child_env.get("PYTHONPATH", "")
+        nodes.append(
+            ExecuteProcess(
+                cmd=[
+                    "python3",
+                    "-m",
+                    "scripts.mia_haptic_force_test.keyboard_emg_node",
+                    "--config-path",
+                    config_path,
+                    "--ros-args",
+                    "--log-level",
+                    log_level,
+                ],
+                name="keyboard_emg_node",
+                sigkill_timeout="5",
+                sigterm_timeout="3",
+                env=_child_env,
+            )
+        )
+    elif emg_enable:
         nodes.append(
             Node(
                 package="emg_bridge",
@@ -313,6 +376,15 @@ def generate_launch_description():
                 "use_multi_node",
                 default_value="false",
                 description="Launch the new split-node stack instead of the legacy monolithic script.",
+            ),
+            DeclareLaunchArgument(
+                "keyboard_emg",
+                default_value="false",
+                description=(
+                    "Replace the live EMG bracelet with keyboard arrow-key "
+                    "emulation (←OPEN →POWER ↓FLEXION ↑EXTENSION, release→REST). "
+                    "Requires a TTY for the keyboard_emg_node."
+                ),
             ),
             OpaqueFunction(function=_launch_setup),
         ]

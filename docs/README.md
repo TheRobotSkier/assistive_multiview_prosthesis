@@ -12,6 +12,7 @@ Start here:
 - `docs/reference/directory-structure.md`: Directory map for fast repo navigation.
 - `docs/reference/validation-and-workflows.md`: Build, test, and run entry points.
 - `docs/reference/documentation-maintenance.md`: Required process for keeping these docs current.
+- `docs/autopilot/README.md`: Autopilot-maintained agent memory and bugfile index.
 
 Documentation rules:
 

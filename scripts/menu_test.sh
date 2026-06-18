@@ -52,7 +52,7 @@ read_key() {
     IFS= read -rsn1 key 2>/dev/null || { echo "q"; return; }
     if [[ $key == $'\e' ]]; then
         IFS= read -rsn2 -t 0.001 key 2>/dev/null || true
-        case "$key" in '[A') echo UP ;; '[B') echo DOWN ;; *) echo ESC ;; esac
+        case "$key" in '[A') echo UP ;; '[B') echo DOWN ;; '[C') echo RIGHT ;; '[D') echo LEFT ;; *) echo ESC ;; esac
     elif [[ $key == '' ]]; then
         echo ENTER
     else
@@ -64,6 +64,7 @@ _load_yaml_defaults() {
     # Baked defaults from config/mia_haptic_force_test.yaml.
     # These are used when pyyaml is unavailable on the host.
     AUTO_KILL_S="${AUTO_KILL_S:-0}"
+    KEYBOARD_EMG="${KEYBOARD_EMG:-false}"
     MOCK_HARDWARE="${MOCK_HARDWARE:-auto}"
     CONTROL_RATE_HZ="${CONTROL_RATE_HZ:-50.0}"
     CSV_RATE_HZ="${CSV_RATE_HZ:-10.0}"
@@ -136,6 +137,7 @@ paths = {
     "AUTO_KILL_S": "runtime.auto_kill_s",
     "MOCK_HARDWARE": "runtime.mock_hardware",
     "USE_MULTI_NODE": "runtime.use_multi_node",
+    "KEYBOARD_EMG": "runtime.keyboard_emg",
     "CONTROL_RATE_HZ": "runtime.control_rate_hz",
     "CSV_RATE_HZ": "runtime.csv_rate_hz",
     "HAPTICS_RATE_HZ": "runtime.haptics_publish_rate_hz",
@@ -202,7 +204,7 @@ write_env_file() {
         for v in MIA_PORT WRIST_PORT MOCK_HARDWARE WRIST_ENABLE HAPTIC_ENABLE \
                  FORCE_RETRAIN AUTO_KILL_S CONFIG_PATH CONTROL_RATE_HZ CSV_RATE_HZ \
                  HAPTICS_RATE_HZ TERMINAL_RATE_HZ STARTUP_TIMEOUT_S EMG_BOARD_IP \
-                 USE_MULTI_NODE \
+                 USE_MULTI_NODE KEYBOARD_EMG \
                  OPEN_THUMB OPEN_INDEX OPEN_MRL MAXCLOSE_THUMB MAXCLOSE_INDEX MAXCLOSE_MRL \
                  OPEN_TOLERANCE OPEN_MIN_S OPEN_TIMEOUT_S CLOSE_VEL_START CLOSE_VEL_END \
                  CLOSE_DECAY CLOSE_INTERVAL HOLD_DEADZONE HOLD_MIN_OVER HOLD_MAX_OVER \
@@ -226,6 +228,7 @@ d.setdefault('runtime',{})
 d['runtime']['auto_kill_s'] = float('${AUTO_KILL_S:-0}')
 d['runtime']['mock_hardware'] = '${MOCK_HARDWARE:-auto}'
 d['runtime']['use_multi_node'] = str('${USE_MULTI_NODE:-true}').lower() in ('1','true','yes','on')
+d['runtime']['keyboard_emg'] = str('${KEYBOARD_EMG:-false}').lower() in ('1','true','yes','on')
 d['runtime']['control_rate_hz'] = float('${CONTROL_RATE_HZ:-50.0}')
 d['runtime']['csv_rate_hz'] = float('${CSV_RATE_HZ:-10.0}')
 d['runtime']['haptics_publish_rate_hz'] = float('${HAPTICS_RATE_HZ:-10.0}')
@@ -300,6 +303,7 @@ edit_var() {
 param_editor_grasp() {
     _load_yaml_defaults
     local PARAM_LABELS=(
+        "Keyboard EMG (no bracelet)" KEYBOARD_EMG
         "── Runtime ──"              ""
         "Main loop rate (Hz)"        CONTROL_RATE_HZ
         "CSV sample rate (Hz)"       CSV_RATE_HZ
@@ -400,6 +404,24 @@ _param_editor() {
     local num_p=$(( ${#labels[@]} / 2 ))
     local sel=0 SAVED=0
 
+    # Variables that should be toggled with ENTER / LEFT / RIGHT instead of
+    # opened in the text editor.  Keep this list small and explicit.
+    _is_bool() {
+        case "$1" in
+            KEYBOARD_EMG|USE_MULTI_NODE) return 0 ;;
+            *) return 1 ;;
+        esac
+    }
+    _toggle_bool() {
+        local varname="$1"
+        local cur="${!varname}"
+        if [ "$cur" = "true" ]; then
+            printf -v "$varname" '%s' "false"
+        else
+            printf -v "$varname" '%s' "true"
+        fi
+    }
+
     while true; do
         # Render
         local visible_start=0
@@ -418,7 +440,7 @@ _param_editor() {
         echo "╭──────────────────────────────────────────────────────────╮"
         printf "│  ${BOLD}%s — Parameters${RESET}\n" "$title"
         echo "├──────────────────────────────────────────────────────────┤"
-        printf "│  ${DIM}space${RESET}=start test  ${DIM}enter${RESET}=edit  ${DIM}s${RESET}=save  ${DIM}↑↓${RESET}=nav  ${DIM}q${RESET}=back      │\n"
+        printf "│  ${DIM}space${RESET}=start  ${DIM}enter${RESET}=edit/toggle  ${DIM}←→${RESET}=toggle  ${DIM}↑↓${RESET}=nav  ${DIM}s${RESET}=save  ${DIM}q${RESET}=back │\n"
         echo "╰──────────────────────────────────────────────────────────╯"
         echo ""
         local shown=0
@@ -461,7 +483,17 @@ _param_editor() {
                 ;;
             ENTER)
                 local vname="${labels[$((sel*2+1))]}"
-                [ -n "$vname" ] && edit_var "${labels[$((sel*2))]}" "$vname"
+                if [ -n "$vname" ] && _is_bool "$vname"; then
+                    _toggle_bool "$vname"
+                elif [ -n "$vname" ]; then
+                    edit_var "${labels[$((sel*2))]}" "$vname"
+                fi
+                ;;
+            LEFT|RIGHT)
+                local vname="${labels[$((sel*2+1))]}"
+                if [ -n "$vname" ] && _is_bool "$vname"; then
+                    _toggle_bool "$vname"
+                fi
                 ;;
             s|S)
                 if save_config; then
