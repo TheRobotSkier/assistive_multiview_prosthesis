@@ -819,6 +819,7 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test (launched from T
 	echo ""; \
 	DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED"; \
 	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}"; \
+	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-}}"; \
 	MOCK_MODE="$${MOCK_HARDWARE:-auto}"; \
 	if [ "$$MOCK_MODE" = "auto" ]; then \
 		if [ -e "$$MIA_PORT" ]; then MOCK_MODE=false; else MOCK_MODE=true; fi; \

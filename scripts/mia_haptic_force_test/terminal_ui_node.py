@@ -144,9 +144,6 @@ class TerminalUINode(Node):
         self._contact_reason: str = ""
         self._fault_reason: str = ""
 
-        # ── TTY detection ────────────────────────────────────────────────
-        self._is_tty: bool = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
-
         # ── Subscriptions ────────────────────────────────────────────────
         self.create_subscription(String, TOPIC_TEST_STAGE, self._on_stage, 10)
         self.create_subscription(String, TOPIC_EMG_GESTURE, self._on_gesture, 10)
@@ -259,10 +256,7 @@ class TerminalUINode(Node):
 
     def _render(self) -> None:
         """Clear and repaint the terminal, matching legacy layout."""
-        if self._is_tty:
-            sys.stdout.write(_CLEAR)
-        else:
-            sys.stdout.write("\n")
+        sys.stdout.write(_CLEAR)
 
         with self._lock:
             stage = self._stage

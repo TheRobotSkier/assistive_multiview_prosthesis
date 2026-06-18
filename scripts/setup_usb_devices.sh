@@ -26,10 +26,18 @@ echo "[setup-usb] Configuration:"
 echo "[setup-usb]   MIA_SERIAL_PORT  = $MIA_PORT"
 echo "[setup-usb]   WRIST_SERIAL_PORT = $WRIST_PORT"
 
+link_symlink() {
+    if [ "$(id -u)" -eq 0 ]; then
+        ln -sf "$1" "$2"
+    else
+        sudo -n ln -sf "$1" "$2"
+    fi
+}
+
 # ── Create symlinks ───────────────────────────────────────────────────────
 if [ -e "$MIA_PORT" ]; then
-    if ln -sf "$MIA_PORT" "$MIA_HAND_LINK" \
-        && ln -sf "$MIA_PORT" "/dev/mia_hand"; then
+    if link_symlink "$MIA_PORT" "$MIA_HAND_LINK" \
+        && link_symlink "$MIA_PORT" "/dev/mia_hand"; then
         echo "[setup-usb] Linked $MIA_PORT → $MIA_HAND_LINK, /dev/mia_hand"
     else
         echo "[setup-usb] WARNING: could not create MIA device symlinks"
@@ -39,8 +47,8 @@ else
 fi
 
 if [ -e "$WRIST_PORT" ]; then
-    if ln -sf "$WRIST_PORT" "$WRIST_LINK" \
-        && ln -sf "$WRIST_PORT" "/dev/wrist_motor"; then
+    if link_symlink "$WRIST_PORT" "$WRIST_LINK" \
+        && link_symlink "$WRIST_PORT" "/dev/wrist_motor"; then
         echo "[setup-usb] Linked $WRIST_PORT → $WRIST_LINK, /dev/wrist_motor"
     else
         echo "[setup-usb] WARNING: could not create wrist device symlinks"

@@ -1386,10 +1386,7 @@ class MiaHapticForceTest(Node):
         self._ui_last_stage = self._stage
         self._ui_last_mode = self._control_mode
 
-        if self._ui_is_tty:
-            sys.stdout.write("\033[2J\033[H")
-        else:
-            sys.stdout.write("\n")
+        sys.stdout.write("\033[2J\033[H")
 
         if not self._activation_seen and self._stage in (
             Stage.INITIALISING,
