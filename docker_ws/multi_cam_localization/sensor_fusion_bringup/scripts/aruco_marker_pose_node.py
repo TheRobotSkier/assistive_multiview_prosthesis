@@ -49,10 +49,18 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_fusion_msgs.msg import DynamicMarkerObservation, MarkerPoseObservation
+
+_BEST_EFFORT_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=10,
+)
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Int32, String
 from std_srvs.srv import Trigger
 from tf2_ros import TransformBroadcaster
+
+import time as _time_
 
 
 def T_inv(T: np.ndarray) -> np.ndarray:
@@ -824,21 +832,21 @@ class ArucoMarkerPoseNode(Node):
         self.image_sub = self.create_subscription(Image, self.image_topic, self.image_cb, sensor_qos)
         self.odom_sub = self.create_subscription(Odometry, self.odom_topic, self.odom_cb, odom_qos)
 
-        self.camera_pose_raw_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_pose_raw", 10)
-        self.camera_body_pose_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_body_pose", 10)
-        self.imu_pose_pub = self.create_publisher(PoseWithCovarianceStamped, f"{self.output_prefix}/imu_pose", 10)
-        self.marker_observation_pub = self.create_publisher(MarkerPoseObservation, f"{self.output_prefix}/observation", 10)
+        self.camera_pose_raw_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_pose_raw", _BEST_EFFORT_QOS)
+        self.camera_body_pose_pub = self.create_publisher(PoseStamped, f"{self.output_prefix}/camera_body_pose", _BEST_EFFORT_QOS)
+        self.imu_pose_pub = self.create_publisher(PoseWithCovarianceStamped, f"{self.output_prefix}/imu_pose", _BEST_EFFORT_QOS)
+        self.marker_observation_pub = self.create_publisher(MarkerPoseObservation, f"{self.output_prefix}/observation", _BEST_EFFORT_QOS)
         self.dynamic_marker_observation_pub = self.create_publisher(
             DynamicMarkerObservation,
             self.dynamic_observation_topic,
-            10,
+            _BEST_EFFORT_QOS,
         )
-        self.corrected_odom_pub = self.create_publisher(Odometry, f"{self.output_prefix}/ov_corrected_odom", 20)
-        self.marker_quality_pub = self.create_publisher(String, f"{self.output_prefix}/marker_quality", 10)
-        self.active_marker_pub = self.create_publisher(Int32, f"{self.output_prefix}/active_marker_id", 10)
-        self.marker_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/marker_valid", 10)
-        self.vio_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/vio_valid", 10)
-        self.reanchor_event_pub = self.create_publisher(String, f"{self.output_prefix}/reanchor_event", 10)
+        self.corrected_odom_pub = self.create_publisher(Odometry, f"{self.output_prefix}/ov_corrected_odom", _BEST_EFFORT_QOS)
+        self.marker_quality_pub = self.create_publisher(String, f"{self.output_prefix}/marker_quality", _BEST_EFFORT_QOS)
+        self.active_marker_pub = self.create_publisher(Int32, f"{self.output_prefix}/active_marker_id", _BEST_EFFORT_QOS)
+        self.marker_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/marker_valid", _BEST_EFFORT_QOS)
+        self.vio_valid_pub = self.create_publisher(Bool, f"{self.output_prefix}/vio_valid", _BEST_EFFORT_QOS)
+        self.reanchor_event_pub = self.create_publisher(String, f"{self.output_prefix}/reanchor_event", _BEST_EFFORT_QOS)
         self.reanchor_srv = self.create_service(Trigger, f"{self.output_prefix}/request_reanchor", self.request_reanchor_cb)
 
         self.odom_buffer: deque[Odometry] = deque()
@@ -849,6 +857,15 @@ class ArucoMarkerPoseNode(Node):
         self.last_vio_valid = False
         self.vio_valid = False
         self.vio_forced_invalid_until_sec: Optional[float] = None
+        # Rate-limit tracking for throttled publishers (wire spray reduction)
+        self._last_vio_valid_publish: float = 0.0
+        self._last_corrected_odom_publish: float = 0.0
+        self._last_marker_valid_publish: float = 0.0
+        self._last_marker_quality_publish: float = 0.0
+        self._vio_valid_hz: float = 50.0
+        self._corrected_odom_hz: float = 50.0
+        self._marker_valid_hz: float = 10.0
+        self._marker_quality_hz: float = 5.0
         self.vio_forced_invalid_reason = ""
         self.last_odom_msg: Optional[Odometry] = None
         self.last_odom_wall_time_sec: Optional[float] = None
@@ -1460,6 +1477,11 @@ class ArucoMarkerPoseNode(Node):
         )
 
     def publish_marker_state(self, marker_valid: bool, marker_id: int) -> None:
+        # Rate-limit: cap marker state publish to 10 Hz
+        now = _time_.time()
+        if marker_valid == self.last_marker_valid and now - self._last_marker_valid_publish < 1.0 / self._marker_valid_hz:
+            return
+        self._last_marker_valid_publish = now
         valid_msg = Bool()
         valid_msg.data = bool(marker_valid)
         self.marker_valid_pub.publish(valid_msg)
@@ -1602,6 +1624,11 @@ class ArucoMarkerPoseNode(Node):
         }
 
     def publish_marker_quality(self, measurement: MarkerMeasurement, hard_gate_status: str) -> None:
+        # Rate-limit: cap marker quality to 5 Hz (diagnostics-only topic)
+        now = _time_.time()
+        if now - self._last_marker_quality_publish < 1.0 / self._marker_quality_hz:
+            return
+        self._last_marker_quality_publish = now
         event = {
             "event_type": "marker_quality",
             "stamp": round(float(measurement.stamp_sec), 9),
@@ -1702,6 +1729,11 @@ class ArucoMarkerPoseNode(Node):
         self.vio_valid = valid
         out = Bool()
         out.data = bool(valid)
+        # Rate-limit: cap vio_valid publish to 50 Hz to avoid NACK storms
+        now = _time_.time()
+        if valid == self.last_vio_valid and now - self._last_vio_valid_publish < 1.0 / self._vio_valid_hz:
+            return
+        self._last_vio_valid_publish = now
         self.vio_valid_pub.publish(out)
 
         if valid != self.last_vio_valid:
@@ -1981,6 +2013,11 @@ class ArucoMarkerPoseNode(Node):
         out.pose.covariance = covariance_from_diag(self.corrected_pose_covariance_diag(msg))
 
         self.fill_corrected_twist(out, msg, T_global_imu, stamp_to_sec(msg.header.stamp))
+        # Rate-limit: cap corrected_odom publish to 50 Hz to avoid NACK storms
+        now = _time_.time()
+        if now - self._last_corrected_odom_publish < 1.0 / self._corrected_odom_hz:
+            return
+        self._last_corrected_odom_publish = now
         self.corrected_odom_pub.publish(out)
         self.publish_tf(msg.header.stamp, self.map_frame, out.child_frame_id, T_map_imu_corrected)
 

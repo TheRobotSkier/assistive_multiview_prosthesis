@@ -27,6 +27,12 @@ from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
 from sensor_fusion_msgs.msg import DynamicArmPoseObservation, DynamicMarkerObservation
 from std_msgs.msg import String
 
+_BEST_EFFORT_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=10,
+)
+
 from aruco_marker_pose_node import (
     R_to_rotvec,
     T_inv,
@@ -364,8 +370,8 @@ class DynamicArmPoseMeasurementNode(Node):
                 self.head_pose_cb,
                 qos,
             )
-        self.measurement_pub = self.create_publisher(DynamicArmPoseObservation, self.output_topic, 10)
-        self.status_pub = self.create_publisher(String, self.status_topic, 10)
+        self.measurement_pub = self.create_publisher(DynamicArmPoseObservation, self.output_topic, _BEST_EFFORT_QOS)
+        self.status_pub = self.create_publisher(String, self.status_topic, _BEST_EFFORT_QOS)
 
         self.head_buffer: deque[HeadPoseMeasurementSample] = deque()
         self.get_logger().info(f"Dynamic observation topic: {self.dynamic_topic}")

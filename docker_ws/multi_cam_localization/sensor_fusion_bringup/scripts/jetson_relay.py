@@ -13,7 +13,7 @@ Supported streams (each independently togglable via ROS2 parameters):
   - ArUco poses     — passthrough (fixed marker observations + dynamic arm pose)
   - trackhist       — resolution downsample + throttle (visualization only)
   - CameraInfo      — throttle only
-  - Odometry        — passthrough (no throttling — they are tiny)
+  - Odometry        — throttled (default 50 Hz, to avoid NACK storms)
   - marker_map_locked — latched passthrough (transient_local QoS)
 
 IMU is deliberately NOT relayed — no laptop node subscribes to it, and the
@@ -289,6 +289,7 @@ class JetsonRelay(Node):
         self.declare_parameter("camera_info.hz", 1.0)
 
         self.declare_parameter("odometry.enabled", True)
+        self.declare_parameter("odometry.hz", 50.0)
         self.declare_parameter("marker_map_locked.enabled", True)
 
         # ── read parameters ─────────────────────────────────────────────
@@ -314,6 +315,7 @@ class JetsonRelay(Node):
         self._ci_hz = self.get_parameter("camera_info.hz").value
 
         self._odom_enabled = self.get_parameter("odometry.enabled").value
+        self._odom_hz = self.get_parameter("odometry.hz").value
         self._mml_enabled = self.get_parameter("marker_map_locked.enabled").value
 
         # ── rate gates (one per stream per camera) ──────────────────────
@@ -324,6 +326,7 @@ class JetsonRelay(Node):
             self._gates[f"depth_{cam}"] = RateGate(self._depth_hz)
             self._gates[f"trackhist_{cam}"] = RateGate(self._trackhist_hz)
             self._gates[f"ci_{cam}"] = RateGate(self._ci_hz)
+            self._gates[f"odom_{cam}"] = RateGate(self._odom_hz)
 
         # ── setup pubs/subs ─────────────────────────────────────────────
         if self._pc_enabled:
@@ -527,6 +530,8 @@ class JetsonRelay(Node):
         self._ci_pub[camera].publish(msg)
 
     def _on_odom(self, msg: Odometry, camera: str) -> None:
+        if not self._gates[f"odom_{camera}"].should_publish():
+            return
         self._odom_pub[camera].publish(msg)
 
     def _on_mml(self, msg: Bool, camera: str) -> None:
@@ -571,7 +576,7 @@ class JetsonRelay(Node):
         info(f"  trackhist:   enabled={self._trackhist_enabled}  hz={self._trackhist_hz:.1f}  "
              f"ds={self._trackhist_ds}x")
         info(f"  camera_info: enabled={self._ci_enabled}  hz={self._ci_hz:.1f}")
-        info(f"  odometry:    enabled={self._odom_enabled}  (passthrough at source rate)")
+        info(f"  odometry:    enabled={self._odom_enabled}  hz={self._odom_hz:.1f}")
         info(f"  marker_map_locked: enabled={self._mml_enabled}  (latched)")
         info("  health:      /jetson/relay/health @ 1 Hz")
         info("──────────────────────────────────────────────────")
