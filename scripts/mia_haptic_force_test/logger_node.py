@@ -27,7 +27,11 @@ _REPO_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspat
 if __name__ == "__main__" and __package__ is None and _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from scripts.mia_haptic_force_test.common.constants import FINGER_LABELS, MOTOR_COUNT
+from scripts.mia_haptic_force_test.common.constants import (
+    FINGER_LABELS,
+    MOTOR_COUNT,
+    TOPIC_EMG_GESTURE,
+)
 
 
 class LoggerNode(Node):
@@ -66,7 +70,7 @@ class LoggerNode(Node):
         self.create_subscription(Float32MultiArray, "/hand/forces", self._on_forces, 10)
         self.create_subscription(String, "/hand/force_source", self._on("force_source"), 10)
         self.create_subscription(JointState, "/hand/joint_states", self._on_joint_states, 10)
-        self.create_subscription(String, "/emg/gesture", self._on("gesture"), 10)
+        self.create_subscription(String, TOPIC_EMG_GESTURE, self._on("gesture"), 10)
         self.create_subscription(Int32, "/emg/gesture_label", self._on_int("gesture_label"), 10)
         self.create_subscription(Float32, "/emg/confidence", self._on_float("confidence"), 10)
         self.create_subscription(Float32, "/emg/proportional", self._on_float("proportional"), 10)

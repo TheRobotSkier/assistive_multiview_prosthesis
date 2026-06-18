@@ -34,6 +34,7 @@ from scripts.mia_haptic_force_test.common.constants import (
     FINGER_COUNT,
     FINGER_JOINTS,
     POSITION_CONTROLLERS,
+    TOPIC_EMG_GESTURE,
     VELOCITY_CONTROLLERS,
 )
 from scripts.mia_haptic_force_test.common.conversions import dict_get, hold_velocity
@@ -93,7 +94,7 @@ class HandControllerNode(Node):
         # ── Subscriptions ───────────────────────────────────────────────────
         self.create_subscription(Float32MultiArray, "/hand/forces", self._cb_forces, 10)
         self.create_subscription(JointState, "/hand/joint_states", self._cb_joint_states, 10)
-        self.create_subscription(String, "/emg/gesture", self._cb_gesture, 10)
+        self.create_subscription(String, TOPIC_EMG_GESTURE, self._cb_gesture, 10)
         self.create_subscription(Int32, "/emg/gesture_label", self._cb_gesture_label, 10)
         self.create_subscription(Float32, "/emg/confidence", self._cb_confidence, 10)
         self.create_subscription(Float32, "/emg/proportional", self._cb_proportional, 10)

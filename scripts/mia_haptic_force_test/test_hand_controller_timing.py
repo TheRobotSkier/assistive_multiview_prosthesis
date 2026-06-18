@@ -21,8 +21,9 @@ import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool, Float32, Float32MultiArray, Float64, Float64MultiArray, Int32, String
+from std_msgs.msg import Bool, Float32, Float32MultiArray, Float64MultiArray, Int32, String
 
+from scripts.mia_haptic_force_test.common.constants import FINGER_COUNT, TOPIC_EMG_GESTURE
 from scripts.mia_haptic_force_test.hand_controller_node import HandControllerNode
 
 # ── CLI: --duration (default 10 s, pass 60 for longer soak) ────────────
@@ -40,12 +41,12 @@ class SimulatedPublisher(Node):
 
         self._force_pub = self.create_publisher(Float32MultiArray, "/hand/forces", 10)
         self._js_pub = self.create_publisher(JointState, "/hand/joint_states", 10)
-        self._gesture_pub = self.create_publisher(String, "/emg/gesture", 10)
+        self._gesture_pub = self.create_publisher(String, TOPIC_EMG_GESTURE, 10)
         self._label_pub = self.create_publisher(Int32, "/emg/gesture_label", 10)
         self._conf_pub = self.create_publisher(Float32, "/emg/confidence", 10)
         self._prop_pub = self.create_publisher(Float32, "/emg/proportional", 10)
         self._tf_pub = self.create_publisher(Float64MultiArray, "/control/target_force", 10)
-        self._tw_pub = self.create_publisher(Float64, "/control/target_wrist", 10)
+        self._tw_pub = self.create_publisher(Float64MultiArray, "/control/target_wrist", 10)
         self._mode_pub = self.create_publisher(String, "/control/mode", 10)
         self._enable_pub = self.create_publisher(Bool, "/control/enable", 10)
         self._hold_mode_pub = self.create_publisher(String, "/control/hold_mode", 10)
@@ -69,7 +70,9 @@ class SimulatedPublisher(Node):
         tf_msg.data = [350.0, 350.0, 350.0]
         self._tf_pub.publish(tf_msg)
 
-        self._tw_pub.publish(Float64(data=90.0))
+        tw_msg = Float64MultiArray()
+        tw_msg.data = [90.0, 0.0]
+        self._tw_pub.publish(tw_msg)
         self._mode_pub.publish(String(data="velocity"))
         self._enable_pub.publish(Bool(data=True))
         self._hold_mode_pub.publish(String(data="force"))

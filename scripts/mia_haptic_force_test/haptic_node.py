@@ -23,7 +23,7 @@ _REPO_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspat
 if __name__ == "__main__" and __package__ is None and _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from scripts.mia_haptic_force_test.common.constants import MOTOR_COUNT
+from scripts.mia_haptic_force_test.common.constants import MOTOR_COUNT, TOPIC_EMG_GESTURE
 from scripts.mia_haptic_force_test.common.conversions import force_haptics, wrist_haptics
 
 
@@ -47,7 +47,7 @@ class HapticNode(Node):
         self._pub = self.create_publisher(Float32MultiArray, "/haptic_band/motors", 10)
 
         self.create_subscription(String, "/test/stage", self._on_stage, 10)
-        self.create_subscription(String, "/emg/gesture", self._on_gesture, 10)
+        self.create_subscription(String, TOPIC_EMG_GESTURE, self._on_gesture, 10)
         self.create_subscription(Float32, "/emg/proportional", self._on_proportional, 10)
         self.create_subscription(Float64MultiArray, "/wrist/state", self._on_wrist_state, 10)
         self.create_subscription(Float32MultiArray, "/hand/forces", self._on_forces, 10)

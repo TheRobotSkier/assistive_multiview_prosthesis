@@ -79,7 +79,6 @@ def _launch_setup(context, *args, **kwargs):
 
     if use_multi_node:
         # New split-node stack (scripts/mia_haptic_force_test/)
-        script_dir = "/prosthesis_ws/scripts/mia_haptic_force_test"
         multi_nodes = [
             ("emg_input_node", emg_enable),
             ("force_input_node", True),
@@ -102,6 +101,58 @@ def _launch_setup(context, *args, **kwargs):
                     env={"PYTHONPATH": "/prosthesis_ws/scripts"},
                 )
             )
+
+        # Shared hardware drivers (same as legacy path)
+        nodes.append(
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    [
+                        PathJoinSubstitution(
+                            [
+                                FindPackageShare("mia_hand_ros2_control"),
+                                "launch",
+                                "mia_hand_system_interface_launch.py",
+                            ]
+                        )
+                    ]
+                ),
+                launch_arguments={
+                    "serial_port": mia_port,
+                    "controller": "group_pos_ff_controller",
+                    "use_mock_hardware": "true" if mock_hardware else "false",
+                    "rviz2_gui": "false",
+                    "robot_ns": "mia_hand",
+                }.items(),
+            )
+        )
+
+        if wrist_enable:
+            nodes.append(
+                Node(
+                    package="wrist_driver",
+                    executable="wrist_driver_node",
+                    name="wrist_driver",
+                    parameters=[
+                        {
+                            "port": wrist_port,
+                            "min_position_deg": wrist_cfg.get("min_deg", 5.0),
+                            "max_position_deg": wrist_cfg.get("max_deg", 300.0),
+                        }
+                    ],
+                    output="screen",
+                )
+            )
+
+        if haptic_enable:
+            nodes.append(
+                Node(
+                    package="haptic_bridge",
+                    executable="bridge_node",
+                    name="haptic_bridge_node",
+                    output="screen",
+                )
+            )
+
         return nodes
 
     nodes.append(

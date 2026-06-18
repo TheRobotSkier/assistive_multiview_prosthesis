@@ -111,7 +111,7 @@ TOPIC_HAND_FORCES: Final[str] = "/hand/forces"
 TOPIC_HAND_FORCE_SOURCE: Final[str] = "/hand/force_source"
 
 # EMG
-TOPIC_EMG_GESTURE: Final[str] = "/emg/gesture"
+TOPIC_EMG_GESTURE: Final[str] = "/emg/gesture_name"
 TOPIC_EMG_GESTURE_LABEL: Final[str] = "/emg/gesture_label"
 TOPIC_EMG_CONFIDENCE: Final[str] = "/emg/confidence"
 TOPIC_EMG_PROPORTIONAL: Final[str] = "/emg/proportional"

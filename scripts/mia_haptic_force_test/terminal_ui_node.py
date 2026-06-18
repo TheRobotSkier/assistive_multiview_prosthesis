@@ -23,7 +23,7 @@ _REPO_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspat
 if __name__ == "__main__" and __package__ is None and _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from scripts.mia_haptic_force_test.common.constants import FINGER_LABELS, MOTOR_COUNT
+from scripts.mia_haptic_force_test.common.constants import FINGER_LABELS, MOTOR_COUNT, TOPIC_EMG_GESTURE
 
 
 class TerminalUINode(Node):
@@ -49,7 +49,7 @@ class TerminalUINode(Node):
         self._joint_positions: list[float] = [0.0] * len(FINGER_LABELS)
 
         self.create_subscription(String, "/test/stage", self._on_string("stage"), 10)
-        self.create_subscription(String, "/emg/gesture", self._on_string("gesture"), 10)
+        self.create_subscription(String, TOPIC_EMG_GESTURE, self._on_string("gesture"), 10)
         self.create_subscription(Float32MultiArray, "/hand/forces", self._on_forces, 10)
         self.create_subscription(Float64MultiArray, "/control/target_force", self._on_target_force, 10)
         self.create_subscription(String, "/control/mode", self._on_string("mode"), 10)

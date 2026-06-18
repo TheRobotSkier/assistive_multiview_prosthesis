@@ -30,7 +30,7 @@ subscribes to an inter-node topic **must** use the name listed here
 
 | Topic | Type | Publisher | Subscriber(s) | Semantics |
 |---|---|---|---|---|
-| `/emg/gesture` | `std_msgs/String` | `emg_input_node` | `hand_controller_node`, `haptic_node` | Gesture name string, e.g. `"REST"`, `"POWER"`, `"OPEN"`. |
+| `/emg/gesture_name` | `std_msgs/String` | `emg_input_node` | `hand_controller_node`, `haptic_node` | Gesture name string, e.g. `"REST"`, `"POWER"`, `"OPEN"`. |
 | `/emg/gesture_label` | `std_msgs/Int32` | `emg_input_node` | `hand_controller_node` | Numeric gesture label (0-4+). See `EMG_*_LABEL` constants in `constants.py`. |
 | `/emg/confidence` | `std_msgs/Float32` | `emg_input_node` | `hand_controller_node` | Classifier confidence `[0.0, 1.0]`. |
 | `/emg/proportional` | `std_msgs/Float32` | `emg_input_node` | `hand_controller_node` | Proportional EMG signal `[0.0, 1.0]` for continuous control. |

@@ -2,12 +2,12 @@
 """MVP-HJ3: emg_input_node.
 
 Wraps the existing emg_bridge board reader and classifier, predicts gesture at
-~50 Hz, and publishes::
+Publishes::
 
-    /emg/gesture      (std_msgs/String)   human-readable gesture name
+    /emg/gesture_name  (std_msgs/String)   human-readable gesture name
     /emg/gesture_label (std_msgs/Int32)   numeric class label
-    /emg/confidence   (std_msgs/Float32)  classifier confidence
-    /emg/proportional (std_msgs/Float32)  continuous 0-1 proportional value
+    /emg/confidence    (std_msgs/Float32)  classifier confidence
+    /emg/proportional  (std_msgs/Float32)  continuous 0-1 proportional value
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ _REPO_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspat
 if __name__ == "__main__" and __package__ is None and _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from scripts.mia_haptic_force_test.common.constants import GESTURES, REST_GESTURE_LABEL
+from scripts.mia_haptic_force_test.common.constants import GESTURES, REST_GESTURE_LABEL, TOPIC_EMG_GESTURE
 
 
 class EmgInputNode(Node):
@@ -40,7 +40,7 @@ class EmgInputNode(Node):
         rate_hz = float(self.get_parameter("publish_rate_hz").value)
         self._dt = 1.0 / max(rate_hz, 1.0)
 
-        self._gesture_pub = self.create_publisher(String, "/emg/gesture", 10)
+        self._gesture_pub = self.create_publisher(String, TOPIC_EMG_GESTURE, 10)
         self._label_pub = self.create_publisher(Int32, "/emg/gesture_label", 10)
         self._conf_pub = self.create_publisher(Float32, "/emg/confidence", 10)
         self._prop_pub = self.create_publisher(Float32, "/emg/proportional", 10)
