@@ -184,6 +184,7 @@ run: up-hw
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec \
 		-e MIA_SERIAL_PORT="$$DETECTED_MIA_PORT" \
 		-e WRIST_SERIAL_PORT="$$DETECTED_WRIST_PORT" \
+		--user root \
 		prosthesis /bin/bash -lc 'make setup-usb' && \
 	$(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run'
 
@@ -193,6 +194,7 @@ run-emg-grasp: up-hw
 	cd $(COMPOSE_DIR) && $(COMPOSE) exec \
 		-e MIA_SERIAL_PORT="$$DETECTED_MIA_PORT" \
 		-e WRIST_SERIAL_PORT="$$DETECTED_WRIST_PORT" \
+		--user root \
 		prosthesis /bin/bash -lc 'make setup-usb' && \
 	$(COMPOSE) exec --user prosthesis prosthesis /bin/bash -lc 'make run-emg-grasp'
 
@@ -845,7 +847,7 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test (launched from T
 		-e HAPTIC_BT_ADDR1="$${HAPTIC_BT_ADDR1:-842E1409E14E}" \
 		-e EMG_BOARD_IP="$${EMG_BOARD_IP:-10.27.30.3}" \
 		mia-haptic-force-test \
-		/bin/bash -lc 'make setup-usb || true; /prosthesis_ws/scripts/mia_haptic_force_test.sh'
+		/bin/bash -lc '/prosthesis_ws/scripts/mia_haptic_force_test.sh'
 test-reset: ## Reset hand (open), zero haptics, stop wrist.  Container must be running.
 	@echo "[reset] Copying script to container..."
 	@$(COMPOSE) --profile mia-haptic-force-test cp scripts/reset-hand.sh mia-haptic-force-test:/prosthesis_ws/src/reset-hand.sh 2>/dev/null || \

@@ -54,15 +54,6 @@ echo "  FORCE_RETRAIN  = $FORCE_RETRAIN"
 echo "  MOCK_HARDWARE  = $MOCK_HARDWARE"
 echo "  LOG_LEVEL      = $LOG_LEVEL"
 echo "  USE_MULTI_NODE = $USE_MULTI_NODE"
-if [ "$USE_MULTI_NODE" = "true" ]; then
-    warn "=========================================================="
-    warn "  WARNING: USE_MULTI_NODE=true — split-node path is under"
-    warn "  active repair (mvp-8uv epic).  Safety gaps may exist."
-    warn "  Use USE_MULTI_NODE=false for the validated legacy path."
-    warn "=========================================================="
-else
-    info "Using legacy monolithic path (USE_MULTI_NODE=false)"
-fi
 echo ""
 
 if [ ! -f "$CONFIG_PATH" ]; then
