@@ -1,0 +1,38 @@
+src/prosthesis_launch/launch/mia_haptic_force_test.launch.py
+  s_1af9946e906ce9::t_e4d5c55b92a238 96-105
+scripts/mia_haptic_force_test/common/conversions.py
+  s_1af9946e906ce9::t_83c12e540710f7 104-107,115-123,128
+scripts/mia_haptic_force_test/terminal_ui_node.py
+  s_1af9946e906ce9::t_3088bbcc765d6b 46-84,88,90,92,97-124,126-135,139-141,144-145,147-162,164,166,171-172,179-199,209-225,234-241,243-248,254,258-259,261-266,271-374
+scripts/mia_haptic_force_test/test_conversions.py
+  s_1af9946e906ce9::t_a121261f22fb68 1-78
+docs/mia_haptic_force_test_multi_node_audit.md
+  s_2fcabcb07f35ba::t_19c0948965bb5b 1-132
+scripts/menu_test.sh
+  s_1af9946e906ce9::t_bbbf30b43f33ee 89-90,170-178,255,290-291,334,336,359-363,366-371
+  s_1af9946e906ce9::t_e6089a9fcf254e 118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "24b759a38cd5451056081df90cb3f9c6f5c1e3c9",
+  "prompts": {},
+  "sessions": {
+    "s_1af9946e906ce9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edb8d-4f00-7601-a1bc-7f3f88f261b9",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    },
+    "s_2fcabcb07f35ba": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ed9a3-c84a-71e1-b44c-2758dea36785",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
