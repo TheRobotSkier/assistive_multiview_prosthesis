@@ -354,6 +354,9 @@ def _setup(context, *args, **kwargs):
                     "-p", f"image.hz:={relay_img_hz}",
                     "-p", f"image.downsample_factor:={str(_arg_or_config(context, 'image.downsample_factor', 1))}",
                     "-p", f"trackhist.hz:={relay_trackhist_hz}",
+                    # Enable ArUco relay so marker observations flow to the
+                    # host GTSAM tracker as prior/between factors.
+                    "-p", "aruco.enabled:=true",
                 ],
                 name="jetson_relay",
                 output="screen",

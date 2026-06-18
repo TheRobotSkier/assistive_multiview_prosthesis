@@ -47,8 +47,8 @@ correction:
   enabled: true
   enable_periodic_marker_correction: true
   periodic_correction_interval_s: 0.2
-  reanchor_cooldown_s: 1.0
-  max_periodic_translation_correction_m: 0.10
+  reanchor_cooldown_s: 5.0
+  max_periodic_translation_correction_m: 0.30
   max_periodic_rotation_correction_deg: 5.0
   correction_chi2_gate: 16.8
   max_position_correction_step_m: 0.05
@@ -108,7 +108,7 @@ vio_health:
   max_position_norm_m: 50.0
   max_linear_velocity_mps: 2.0
   max_pose_covariance_trace: 10.0
-  startup_grace_period_s: 10.0
+  startup_grace_period_s: 20.0
 
 markers:
   0:

@@ -137,6 +137,7 @@ _DST = {
     "head_aruco_obs":  "/jetson/head/aruco_observation",
     "arm_aruco_obs":   "/jetson/arm/aruco_observation",
     "arm_aruco_dyn":   "/jetson/arm/aruco_dynamic_observation",
+    "arm_aruco_arm":   "/jetson/arm/aruco_arm_pose_observation",
 }
 
 CAMERAS = ("head", "arm")
@@ -426,6 +427,12 @@ class JetsonRelay(Node):
         self._aruco_dyn_pub = self.create_publisher(
             DynamicMarkerObservation, _DST["arm_aruco_dyn"], _SENSOR_QOS
         )
+        # Separate publisher for DynamicArmPoseObservation — this is a
+        # distinct message type from DynamicMarkerObservation.  Publishing
+        # through the wrong-type publisher silently drops the message.
+        self._aruco_arm_pose_pub = self.create_publisher(
+            DynamicArmPoseObservation, _DST["arm_aruco_arm"], _SENSOR_QOS
+        )
 
     def _setup_trackhist(self) -> None:
         for cam in CAMERAS:
@@ -534,8 +541,14 @@ class JetsonRelay(Node):
         self._aruco_dyn_pub.publish(msg)
 
     def _on_aruco_dynamic_arm_pose(self, msg) -> None:
-        """Converted dynamic arm pose (arm-side)."""
-        self._aruco_dyn_pub.publish(msg)
+        """Converted dynamic arm pose (arm-side).
+
+        This is a DynamicArmPoseObservation (arm pose in marker_map from
+        head-observed ID2).  Must be published on a matching-type publisher
+        — publishing through the DynamicMarkerObservation publisher silently
+        drops the message.
+        """
+        self._aruco_arm_pose_pub.publish(msg)
 
     # ── health ───────────────────────────────────────────────────────────
 
