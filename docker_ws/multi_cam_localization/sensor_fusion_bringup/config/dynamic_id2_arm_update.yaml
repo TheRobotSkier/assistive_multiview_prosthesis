@@ -26,7 +26,7 @@ launch:
 pointcloud:
   # Keep the 30 Hz RGB stream for OpenVINS. Pointclouds are opt-in for grasping
   # runs because depth processing adds Jetson load.
-  enable: false
+  enable: true
   # Preserve the current grasping/RViz behavior by starting the Jetson
   # marker_map republishers whenever pointclouds are explicitly enabled.
   enable_marker_map: true
