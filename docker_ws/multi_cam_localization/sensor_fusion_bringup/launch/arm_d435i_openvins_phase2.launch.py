@@ -73,7 +73,7 @@ def generate_launch_description():
             "pointcloud.stream_filter": 2,
             "pointcloud.stream_index_filter": 0,
             "pointcloud.ordered_pc": False,
-            "pointcloud.allow_no_texture_points": False,
+            "pointcloud.allow_no_texture_points": True,
             "pointcloud__neon_.enable": False,  # NEON workaround obsolete; single pointcloud stream suffices
             "pointcloud__neon_.stream_filter": 2,
             "pointcloud__neon_.stream_index_filter": 0,
