@@ -61,6 +61,7 @@ def _launch_setup(context, *args, **kwargs):
     emg_enable = _as_bool(context, "emg_enable")
     mock_hardware = _as_bool(context, "mock_hardware")
     log_level = LaunchConfiguration("log_level").perform(context)
+    emg_board_ip = os.environ.get("EMG_BOARD_IP", "")
 
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Mia haptic force test config not found: {config_path}")
@@ -104,8 +105,7 @@ def _launch_setup(context, *args, **kwargs):
                 package="emg_bridge",
                 executable="run_classifier",
                 name="emg_bridge",
-                arguments=["--model-dir", emg_model_dir],
-                output="screen",
+                arguments=["--model-dir", emg_model_dir] + ([f"--ip={emg_board_ip}"] if emg_board_ip else []),
             )
         )
 

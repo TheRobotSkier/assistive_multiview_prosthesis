@@ -23,11 +23,14 @@ Usage::
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Optional
 
 from controller_manager_msgs.msg import ControllerState
 from controller_manager_msgs.srv import (
+    ConfigureController,
+    ConfigureController_Request,
     ListControllers,
     ListControllers_Request,
     LoadController,
@@ -51,15 +54,64 @@ class ControllerManagerClient:
     STRICT = SwitchController_Request.STRICT          # 2
     BEST_EFFORT = SwitchController_Request.BEST_EFFORT  # 1
 
-    def __init__(self, node: Node, service_ns: str = "/controller_manager") -> None:
+    def __init__(
+        self,
+        node: Node,
+        service_ns: str = "/controller_manager",
+        *,
+        use_private_executor: bool = False,
+    ) -> None:
+        self._owner_node = node
         self._node = node
         self._log = node.get_logger()
         self._ns = service_ns
+        self._helper_executor = None
+        self._helper_thread: Optional[threading.Thread] = None
+
+        if use_private_executor:
+            import rclpy
+            from rclpy.executors import SingleThreadedExecutor
+
+            owner_name = getattr(node, "get_name", lambda: "node")()
+            helper_name = f"{owner_name}_cm_client_{id(self) & 0xffff:x}"
+            self._node = rclpy.create_node(
+                helper_name,
+                context=getattr(node, "context", None),
+                use_global_arguments=False,
+            )
+            self._helper_executor = SingleThreadedExecutor()
+            self._helper_executor.add_node(self._node)
+            self._helper_thread = threading.Thread(
+                target=self._helper_executor.spin,
+                name=f"{helper_name}_executor",
+                daemon=True,
+            )
+            self._helper_thread.start()
 
         # Create service clients (lazy — discovery happens on first call)
-        self._list_cli = node.create_client(ListControllers, f"{service_ns}/list_controllers")
-        self._load_cli = node.create_client(LoadController, f"{service_ns}/load_controller")
-        self._switch_cli = node.create_client(SwitchController, f"{service_ns}/switch_controller")
+        self._list_cli = self._node.create_client(
+            ListControllers, f"{service_ns}/list_controllers"
+        )
+        self._load_cli = self._node.create_client(
+            LoadController, f"{service_ns}/load_controller"
+        )
+        self._switch_cli = self._node.create_client(
+            SwitchController, f"{service_ns}/switch_controller"
+        )
+        self._configure_cli = self._node.create_client(
+            ConfigureController, f"{service_ns}/configure_controller"
+        )
+
+    def shutdown(self) -> None:
+        """Stop any private helper executor owned by this client."""
+        if self._helper_executor is None:
+            return
+        self._helper_executor.shutdown()
+        if self._helper_thread is not None:
+            self._helper_thread.join(timeout=1.0)
+        self._node.destroy_node()
+        self._helper_executor = None
+        self._helper_thread = None
 
     # ── Service readiness ────────────────────────────────────────────────
 
@@ -97,24 +149,47 @@ class ControllerManagerClient:
         """
         response = self._call_service(self._list_cli, ListControllers_Request())
         return {entry.name: entry.state for entry in response.controller}
-
-    # ── Controller lifecycle ─────────────────────────────────────────────
-
     def ensure_controller_loaded(self, name: str) -> None:
-        """Load a controller if it is not already known to the manager.
+        """Load and configure a controller if it is not already known.
 
-        Raises ``RuntimeError`` if loading fails.
+        Jazzy's ``load_controller`` does NOT auto-configure — the controller
+        is left in ``unconfigured`` state.  This method also calls
+        ``configure_controller`` so the controller is ``inactive`` and
+        ready for ``switch_controllers`` to activate.
+
+        Raises ``RuntimeError`` if loading or configuration fails.
         """
         states = self.list_controller_states()
-        if name in states:
-            return  # already loaded (any state)
+        if name in states and states[name] != "unconfigured":
+            return  # already loaded and configured
 
-        self._log.info(f"Loading controller '{name}'...")
-        req = LoadController_Request()
+        if name not in states:
+            self._log.info(f"Loading controller '{name}'...")
+            req = LoadController_Request()
+            req.name = name
+            response = self._call_service(self._load_cli, req)
+            if not response.ok:
+                raise RuntimeError(f"Failed to load controller '{name}'")
+
+        # Always configure — load_controller in Jazzy does not auto-configure.
+        self._log.info(f"Configuring controller '{name}'...")
+        self.configure_controller(name)
+
+    def configure_controller(self, name: str) -> None:
+        """Explicitly configure a loaded controller.
+
+        ``load_controller`` in Jazzy does NOT auto-configure — the controller
+        is left in ``unconfigured`` state.  ``switch_controller`` only activates
+        controllers that are already ``inactive`` (i.e. configured).  Call this
+        after ``ensure_controller_loaded`` and before ``switch_controllers``.
+
+        Raises ``RuntimeError`` if configuration fails.
+        """
+        req = ConfigureController_Request()
         req.name = name
-        response = self._call_service(self._load_cli, req)
+        response = self._call_service(self._configure_cli, req)
         if not response.ok:
-            raise RuntimeError(f"Failed to load controller '{name}'")
+            raise RuntimeError(f"Failed to configure controller '{name}'")
 
     def switch_controllers(
         self,
@@ -166,16 +241,17 @@ class ControllerManagerClient:
         strictness: int,
         timeout_sec: float,
     ) -> bool:
-        """Execute a single switch_controller service call."""
         req = SwitchController_Request()
-        req.start_controllers = activate
-        req.stop_controllers = deactivate
+        req.activate_controllers = activate
+        req.deactivate_controllers = deactivate
         req.strictness = strictness
-        req.start_asap = True
-        req.timeout = timeout_sec
+        req.activate_asap = True
+        sec = int(timeout_sec)
+        req.timeout.sec = sec
+        req.timeout.nanosec = int(round((timeout_sec - sec) * 1_000_000_000))
 
         self._log.info(
-            f"Switching controllers: start={activate}, stop={deactivate}, "
+            f"Switching controllers: activate={activate}, deactivate={deactivate}, "
             f"strictness={strictness}, timeout={timeout_sec}s"
         )
         response = self._call_service(self._switch_cli, req)
@@ -195,10 +271,24 @@ class ControllerManagerClient:
                 raise RuntimeError(f"Service {client.srv_name} is not available")
 
         future = client.call_async(request)
-        # Spin the node's executor until the future completes
-        self._node.executor.spin_until_future_complete(
-            future, timeout_sec=call_timeout_sec
-        )
+        executor = getattr(self._node, "executor", None)
+        if self._helper_executor is not None:
+            done = threading.Event()
+            future.add_done_callback(lambda _: done.set())
+            if future.done():
+                done.set()
+            done.wait(timeout=call_timeout_sec)
+        elif executor is not None:
+            # Spin the node's executor until the future completes
+            executor.spin_until_future_complete(
+                future, timeout_sec=call_timeout_sec
+            )
+        else:
+            import rclpy
+
+            rclpy.spin_until_future_complete(
+                self._node, future, timeout_sec=call_timeout_sec
+            )
         if not future.done():
             raise TimeoutError(
                 f"Service call to {client.srv_name} timed out after {call_timeout_sec}s"

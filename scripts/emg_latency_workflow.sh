@@ -149,7 +149,7 @@ run_collection() {
         return
     fi
     bold "Step 1/4: EMG data collection"
-    container_exec "source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge collect_data --reps ${COLLECT_REPS} --duration ${COLLECT_DURATION} --output-dir ${DATA_DIR}"
+    container_exec "source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && ros2 run emg_bridge collect_data --reps ${COLLECT_REPS} --duration ${COLLECT_DURATION} --output-dir ${DATA_DIR} ${EMG_BOARD_IP:+--ip ${EMG_BOARD_IP}}"
 }
 
 run_training() {
@@ -164,7 +164,7 @@ run_training() {
 run_latency_benchmark() {
     bold "Step 3/4: Interactive latency benchmark"
     mkdir -p "$RESULT_DIR_HOST"
-    container_exec "source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && mkdir -p /app/data/latency/${RESULT_DIR_NAME} && ros2 run emg_bridge latency_benchmark --model-dir ${MODEL_DIR} --output-dir /app/data/latency/${RESULT_DIR_NAME} --repeats ${REPEATS} --baseline-s ${BASELINE_S} --tail-s ${TAIL_S} --threshold ${THRESHOLD} --smooth ${SMOOTH} --countdown-s ${COUNTDOWN_S} --auto-stop-confidence ${AUTO_STOP_CONFIDENCE} --auto-stop-hold-s ${AUTO_STOP_HOLD_S} --max-trial-duration-s ${MAX_TRIAL_DURATION_S} --min-active-samples ${MIN_ACTIVE_SAMPLES} --max-gap-samples ${MAX_GAP_SAMPLES} --pre-onset-search-samples ${PRE_ONSET_SEARCH_SAMPLES} --onset-lookback-windows ${ONSET_LOOKBACK_WINDOWS}"
+    container_exec "source /opt/ros/jazzy/setup.bash && cd /prosthesis_ws && colcon build --packages-select emg_bridge --cmake-args -DCMAKE_BUILD_TYPE=Release && source /prosthesis_ws/install/setup.bash && mkdir -p /app/data/latency/${RESULT_DIR_NAME} && ros2 run emg_bridge latency_benchmark --model-dir ${MODEL_DIR} --output-dir /app/data/latency/${RESULT_DIR_NAME} --repeats ${REPEATS} --baseline-s ${BASELINE_S} --tail-s ${TAIL_S} --threshold ${THRESHOLD} --smooth ${SMOOTH} --countdown-s ${COUNTDOWN_S} --auto-stop-confidence ${AUTO_STOP_CONFIDENCE} --auto-stop-hold-s ${AUTO_STOP_HOLD_S} --max-trial-duration-s ${MAX_TRIAL_DURATION_S} --min-active-samples ${MIN_ACTIVE_SAMPLES} --max-gap-samples ${MAX_GAP_SAMPLES} --pre-onset-search-samples ${PRE_ONSET_SEARCH_S} --onset-lookback-windows ${ONSET_LOOKBACK_WINDOWS} ${EMG_BOARD_IP:+--ip ${EMG_BOARD_IP}}"
 }
 
 commit_and_push_results() {
@@ -196,7 +196,11 @@ main() {
     ensure_container
     run_collection
     run_training
-    run_latency_benchmark
+    if [ "${EMG_SKIP_BENCHMARK:-false}" != "true" ]; then
+        run_latency_benchmark
+    else
+        green "Skipping benchmark (EMG_SKIP_BENCHMARK=true)."
+    fi
     commit_and_push_results
 
     green "Workflow complete. Results saved under data/latency/${RESULT_DIR_NAME}"

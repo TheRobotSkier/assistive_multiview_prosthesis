@@ -20,6 +20,7 @@ import importlib
 # Create mock modules for ROS 2 dependencies
 mock_rclpy = MagicMock()
 mock_rclpy_node = MagicMock()
+mock_rclpy_executors = MagicMock()
 mock_controller_manager_msgs = MagicMock()
 mock_controller_manager_msgs_srv = MagicMock()
 mock_controller_manager_msgs_msg = MagicMock()
@@ -58,6 +59,7 @@ mock_controller_manager_msgs.msg = MagicMock(ControllerState=mock_cs)
 # imports ForceControllerNode which has many ROS 2 dependencies.
 sys.modules['rclpy'] = mock_rclpy
 sys.modules['rclpy.node'] = mock_rclpy_node
+sys.modules['rclpy.executors'] = mock_rclpy_executors
 sys.modules['rclpy.qos'] = MagicMock()
 sys.modules['controller_manager_msgs'] = mock_controller_manager_msgs
 sys.modules['controller_manager_msgs.srv'] = mock_controller_manager_msgs_srv
@@ -108,24 +110,70 @@ class TestControllerManagerClient(unittest.TestCase):
     """Tests for the ControllerManagerClient class."""
 
     def setUp(self):
+        mock_rclpy.create_node.reset_mock(return_value=True, side_effect=True)
+        mock_rclpy.spin_until_future_complete.reset_mock()
+        mock_rclpy_executors.SingleThreadedExecutor.reset_mock(
+            return_value=True, side_effect=True
+        )
+
         self.mock_node = MagicMock()
         self.mock_logger = MagicMock()
         self.mock_node.get_logger.return_value = self.mock_logger
         self.mock_executor = MagicMock()
         self.mock_node.executor = self.mock_executor
+        self.mock_node.context = object()
 
         # Mock service clients
         self.mock_list_cli = MagicMock()
         self.mock_load_cli = MagicMock()
         self.mock_switch_cli = MagicMock()
+        self.mock_configure_cli = MagicMock()
 
         self.mock_node.create_client.side_effect = [
             self.mock_list_cli,
             self.mock_load_cli,
             self.mock_switch_cli,
+            self.mock_configure_cli,
         ]
 
         self.client = ControllerManagerClient(self.mock_node)
+
+    def test_private_executor_uses_helper_node(self):
+        """Private executor mode keeps service clients off the owner node."""
+        owner = MagicMock()
+        owner.get_logger.return_value = self.mock_logger
+        owner.get_name.return_value = "owner_node"
+        owner.context = object()
+
+        helper_node = MagicMock()
+        helper_list_cli = MagicMock()
+        helper_load_cli = MagicMock()
+        helper_switch_cli = MagicMock()
+        helper_configure_cli = MagicMock()
+        helper_node.create_client.side_effect = [
+            helper_list_cli,
+            helper_load_cli,
+            helper_switch_cli,
+            helper_configure_cli,
+        ]
+        mock_rclpy.create_node.return_value = helper_node
+
+        helper_executor = MagicMock()
+        mock_rclpy_executors.SingleThreadedExecutor.return_value = helper_executor
+
+        client = ControllerManagerClient(owner, use_private_executor=True)
+
+        args, kwargs = mock_rclpy.create_node.call_args
+        self.assertRegex(args[0], r"^owner_node_cm_client_[0-9a-f]+$")
+        self.assertIs(kwargs["context"], owner.context)
+        self.assertFalse(kwargs["use_global_arguments"])
+        self.assertEqual(helper_node.create_client.call_count, 4)
+        owner.create_client.assert_not_called()
+
+        client.shutdown()
+
+        helper_executor.shutdown.assert_called_once()
+        helper_node.destroy_node.assert_called_once()
 
     def _setup_service_call(self, client_mock, response):
         """Configure a mock service client to return the given response."""
@@ -390,11 +438,13 @@ class TestControllerManagerClient(unittest.TestCase):
 
         # Inspect the request that was passed to call_async
         req = self.mock_switch_cli.call_async.call_args[0][0]
-        self.assertEqual(req.start_controllers, ["group_vel_ff_controller"])
-        self.assertEqual(req.stop_controllers, ["group_pos_ff_controller"])
+        self.assertEqual(req.activate_controllers, ["group_vel_ff_controller"])
+        self.assertEqual(req.deactivate_controllers, ["group_pos_ff_controller"])
         self.assertEqual(req.strictness, 2)  # STRICT
-        self.assertTrue(req.start_asap)
-        self.assertEqual(req.timeout, 5.0)
+        self.assertTrue(req.activate_asap)
+        self.assertEqual(req.timeout.sec, 5)
+        self.assertEqual(req.timeout.nanosec, 0)
+
 
     # ── services_ready ───────────────────────────────────────────────────
 
@@ -441,6 +491,50 @@ class TestControllerManagerClient(unittest.TestCase):
             self.client.list_controller_states()
 
         self.assertIn("DDS connection lost", str(ctx.exception))
+
+    def test_service_call_with_private_executor_uses_event_wait(self):
+        """With private executor, uses threading.Event instead of spin_until_future_complete."""
+        resp = _make_list_response([("group_pos_ff_controller", "active")])
+
+        future = MagicMock()
+        future.done.return_value = True
+        future.result.return_value = resp
+        future.exception.return_value = None
+        future.add_done_callback.side_effect = lambda cb: cb(future)
+
+        helper_list_cli = MagicMock()
+        helper_list_cli.call_async.return_value = future
+        helper_list_cli.service_is_ready.return_value = True
+        mock_rclpy.create_node.return_value.create_client.return_value = helper_list_cli
+
+        client = ControllerManagerClient(self.mock_node, use_private_executor=True)
+
+        states = client.list_controller_states()
+
+        self.assertEqual(states, {"group_pos_ff_controller": "active"})
+        future.add_done_callback.assert_called_once()
+        self.mock_executor.spin_until_future_complete.assert_not_called()
+
+        client.shutdown()
+
+    def test_service_call_with_no_attached_executor_uses_rclpy_spin(self):
+        """Falls back to rclpy.spin_until_future_complete without an executor."""
+        self.mock_node.executor = None
+        resp = _make_list_response([("group_pos_ff_controller", "active")])
+
+        future = MagicMock()
+        future.done.return_value = True
+        future.result.return_value = resp
+        future.exception.return_value = None
+        self.mock_list_cli.call_async.return_value = future
+        self.mock_list_cli.service_is_ready.return_value = True
+
+        states = self.client.list_controller_states()
+
+        self.assertEqual(states, {"group_pos_ff_controller": "active"})
+        mock_rclpy.spin_until_future_complete.assert_called_once_with(
+            self.mock_node, future, timeout_sec=15.0
+        )
 
 
 if __name__ == "__main__":

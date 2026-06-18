@@ -43,7 +43,7 @@ controller_manager:
       type: velocity_controllers/JointGroupVelocityController
 
     group_vel_ff_controller:
-      type: velocity_controllers/JointGroupPositionController
+      type: velocity_controllers/JointGroupVelocityController
 
     wrist_vel_ff_controller:
       type: velocity_controllers/JointGroupVelocityController

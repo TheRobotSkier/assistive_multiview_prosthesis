@@ -218,6 +218,11 @@ test-emg-latency-notrain: ## Reuse existing EMG model and run latency benchmark 
 	@test -f config/emg_latency_test.yaml || { echo "Missing config/emg_latency_test.yaml"; exit 1; }
 	EMG_SKIP_TRAIN=true bash ./scripts/emg_latency_workflow.sh
 
+emg-collect-train: ## Collect EMG data + train model (no benchmark)
+	@test -f scripts/emg_latency_workflow.sh || { echo "Missing scripts/emg_latency_workflow.sh"; exit 1; }
+	@test -f config/emg_latency_test.yaml || { echo "Missing config/emg_latency_test.yaml"; exit 1; }
+	EMG_SKIP_BENCHMARK=true bash ./scripts/emg_latency_workflow.sh
+
 test-emg-sim: ## Offline prediction simulator - replay raw data with tunable parameters
 	-$(DOCKER_CMD) stop --time 1 emg 2>/dev/null
 	-$(DOCKER_CMD) rm -f emg 2>/dev/null
@@ -229,27 +234,20 @@ test-emg-sim: ## Offline prediction simulator - replay raw data with tunable par
 	exit $$status
 
 # ── Test ───────────────────────────────────────────────────────────────────
-test: ## Interactive test selector
-	@printf "\nProsthesis test selector\n"
-	@printf "Run one focused workflow from this checkout. EMG test defaults live in config/emg_latency_test.yaml; the Mia haptic grasp defaults live in config/mia_haptic_force_test.yaml.\n\n"
-	@printf "  1) test-emg-latency          Collect EMG data, train, then run latency benchmark\n"
-	@printf "  2) test-emg-latency-notrain  Reuse existing EMG model/data and run latency benchmark\n"
-	@printf "  3) test-emg-sim              Replay latest latency raw data with parameter tuning UI\n"
-	@printf "  4) test-grasp                Run Mia EMG wrist/force/haptic CSV logger; reuse cached model by default\n"
-	@printf "  5) test-smoke                Run the existing containerized smoke test suite\n"
-	@printf "  q) quit\n\n"
-	@printf "Choice: "; \
-	read -r choice; \
-	case "$$choice" in \
-		1|test-emg-latency) $(MAKE) test-emg-latency ;; \
-		2|test-emg-latency-notrain) $(MAKE) test-emg-latency-notrain ;; \
-		3|test-emg-sim) $(MAKE) test-emg-sim ;; \
-		4|test-grasp) $(MAKE) test-grasp ;; \
-		5|test-smoke) $(MAKE) test-smoke ;; \
-		q|Q|"") echo "No test selected." ;; \
-		*) echo "Unknown selection: $$choice"; exit 2 ;; \
-	esac
-
+test: ## Interactive test selector (TUI)
+	@test -f scripts/menu_test.sh || { echo "Missing scripts/menu_test.sh"; exit 1; }; \
+	bash scripts/menu_test.sh; RET=$$?; \
+	if [ $$RET -ne 0 ]; then exit 0; fi; \
+	if [ -f /tmp/prosthesis_test_env.sh ]; then . /tmp/prosthesis_test_env.sh; fi; \
+	if [ -f /tmp/prosthesis_test_choice ]; then \
+		CHOICE=$$(cat /tmp/prosthesis_test_choice); \
+		echo ""; \
+		echo "[make] Running: make $$CHOICE"; \
+		echo ""; \
+		$(MAKE) "$$CHOICE"; \
+	else \
+		echo "No test selected."; \
+	fi
 test-smoke: ## Existing containerized smoke test suite
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile test build test && $(COMPOSE) --profile test run --rm test
 
@@ -794,62 +792,67 @@ test-grasp-up: ## Start isolated container for Mia haptic force testing
 	elif [ ! -e "$$WRIST_PORT" ]; then echo "[host] Wrist device missing at $$WRIST_PORT; run target will default to WRIST_ENABLE=false."; fi && \
 	$(DOCKER_CMD) rm -f mia-haptic-force-test >/dev/null 2>&1 || true && \
 	cd $(COMPOSE_DIR) && \
-	MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="$$WRIST_SERIAL_ENV" \
-	$(COMPOSE) --profile mia-haptic-force-test up -d --build mia-haptic-force-test
+	if $(DOCKER_CMD) image inspect localhost/prosthesis:latest >/dev/null 2>&1; then \
+		echo "[host] Image exists — skipping rebuild (use 'make test-build' to force)"; \
+		MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="$$WRIST_SERIAL_ENV" \
+		$(COMPOSE) --profile mia-haptic-force-test up -d mia-haptic-force-test; \
+	else \
+		echo "[host] Image not found — building..."; \
+		MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="$$WRIST_SERIAL_ENV" \
+		$(COMPOSE) --profile mia-haptic-force-test up -d --build mia-haptic-force-test; \
+	fi
 
-test-grasp: test-grasp-up ## Run isolated EMG/haptic force test and CSV logger
-	@echo "=== Mia Hand EMG Haptic Force Test ==="
-	@echo ""
-	@echo "Env overrides (optional):"
-	@echo "  EMG_DATA_DIR=$${EMG_DATA_DIR:-/app/data}              Training data directory"
-	@echo "  EMG_MODEL_DIR=$${EMG_MODEL_DIR:-/app/models}          Model directory"
-	@echo "  CONFIG_PATH=$${CONFIG_PATH:-/prosthesis_ws/config/mia_haptic_force_test.yaml}"
-	@echo "  MIA_PORT=$${MIA_PORT:-<auto-detect>}                  Mia hand serial port"
-	@echo "  WRIST_PORT=$${WRIST_PORT:-<auto-detect>}              Wrist Dynamixel port"
-	@echo "  MOCK_HARDWARE=$${MOCK_HARDWARE:-auto}                 auto=true when Mia is absent"
-	@echo "  WRIST_ENABLE=$${WRIST_ENABLE:-auto}                   auto=false when wrist is absent"
-	@echo "  HAPTIC_ENABLE=$${HAPTIC_ENABLE:-true}                 set false when Vibro8 is absent"
-	@echo "  HAPTIC_BT_ADDR1=$${HAPTIC_BT_ADDR1:-842E1409E14E}     Vibro8 Bluetooth address"
-	@echo "  FORCE_RETRAIN=$${FORCE_RETRAIN:-false}                false reuses cached classifier.pkl; true re-trains"
-	@echo "  AUTO_KILL_S=$${AUTO_KILL_S:-0}                        0 means no timeout"
-	@echo ""
-	@test -f scripts/mia_haptic_force_test.sh || { echo "Missing scripts/mia_haptic_force_test.sh"; exit 1; }
-	@test -f config/mia_haptic_force_test.yaml || { echo "Missing config/mia_haptic_force_test.yaml"; exit 1; }
-	@mkdir -p data models
+test-build: ## Rebuild Docker image for haptic force test
 	@DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED" && \
-	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}" && \
-	WRIST_PORT="$${WRIST_PORT:-$${DETECTED_WRIST_PORT:-}}" && \
-	WRIST_SERIAL_ENV="$${WRIST_PORT:-/dev/nonexistent-wrist}" && \
-	MOCK_MODE="$${MOCK_HARDWARE:-auto}" && \
+	MIA_PORT="$${DETECTED_MIA_PORT:-/dev/ttyUSB0}" && \
+	cd $(COMPOSE_DIR) && \
+	MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="/dev/nonexistent-wrist" \
+	$(COMPOSE) --profile mia-haptic-force-test build --no-cache mia-haptic-force-test
+	@echo "[host] Build complete.  Run 'make test-grasp-up' to start."
+
+test-grasp: test-grasp-up ## Run isolated EMG/haptic force test (launched from TUI)
+	@test -f scripts/mia_haptic_force_test.sh || { echo "Missing scripts/mia_haptic_force_test.sh"; exit 1; }; \
+	test -f config/mia_haptic_force_test.yaml || { echo "Missing config/mia_haptic_force_test.yaml"; exit 1; }; \
+	mkdir -p data models; \
+	echo ""; \
+	echo "[make] Launching with: MIA=$${MIA_PORT:-auto} WRIST=$${WRIST_PORT:-auto} MOCK=$${MOCK_HARDWARE:-auto} KILL=$${AUTO_KILL_S:-0}s"; \
+	echo ""; \
+	DETECTED=$$(bash scripts/detect_usb_host.sh) && eval "$$DETECTED"; \
+	MIA_PORT="$${MIA_PORT:-$${DETECTED_MIA_PORT:-/dev/ttyUSB0}}"; \
+	MOCK_MODE="$${MOCK_HARDWARE:-auto}"; \
 	if [ "$$MOCK_MODE" = "auto" ]; then \
 		if [ -e "$$MIA_PORT" ]; then MOCK_MODE=false; else MOCK_MODE=true; fi; \
-	fi && \
-	WRIST_MODE="$${WRIST_ENABLE:-auto}" && \
+	fi; \
+	WRIST_MODE="$${WRIST_ENABLE:-auto}"; \
 	if [ "$$WRIST_MODE" = "auto" ]; then \
 		if [ -n "$$WRIST_PORT" ] && [ -e "$$WRIST_PORT" ]; then WRIST_MODE=true; else WRIST_MODE=false; fi; \
-	fi && \
-	HAPTIC_MODE="$${HAPTIC_ENABLE:-true}" && \
-	if [ "$$MOCK_MODE" = "true" ] && [ -z "$${HAPTIC_ENABLE+x}" ]; then HAPTIC_MODE=false; fi && \
-	echo "[host] Executing in mia-haptic-force-test: MIA=$$MIA_PORT WRIST=$$WRIST_PORT MOCK_HARDWARE=$$MOCK_MODE WRIST_ENABLE=$$WRIST_MODE HAPTIC_ENABLE=$$HAPTIC_MODE" && \
+	fi; \
+	HAPTIC_MODE="$${HAPTIC_ENABLE:-true}"; \
 	cd $(COMPOSE_DIR) && \
 	$(COMPOSE) --profile mia-haptic-force-test exec -T --user prosthesis \
 		-e EMG_DATA_DIR="$${EMG_DATA_DIR:-/app/data}" \
 		-e EMG_MODEL_DIR="$${EMG_MODEL_DIR:-/app/models}" \
 		-e MIA_SERIAL_PORT="$$MIA_PORT" \
 		-e WRIST_SERIAL_PORT="$$WRIST_SERIAL_ENV" \
-		-e MIA_PORT="$$MIA_PORT" \
-		-e WRIST_PORT="$$WRIST_SERIAL_ENV" \
 		-e CONFIG_PATH="$${CONFIG_PATH:-/prosthesis_ws/config/mia_haptic_force_test.yaml}" \
 		-e WRIST_ENABLE="$$WRIST_MODE" \
 		-e HAPTIC_ENABLE="$$HAPTIC_MODE" \
-		-e EMG_ENABLE="$${EMG_ENABLE:-true}" \
 		-e FORCE_RETRAIN="$${FORCE_RETRAIN:-false}" \
 		-e MOCK_HARDWARE="$$MOCK_MODE" \
-		-e LOG_LEVEL="$${LOG_LEVEL:-info}" \
 		-e AUTO_KILL_S="$${AUTO_KILL_S:-0}" \
 		-e HAPTIC_BT_ADDR1="$${HAPTIC_BT_ADDR1:-842E1409E14E}" \
-		mia-haptic-force-test /bin/bash -lc 'make setup-usb || true; /prosthesis_ws/scripts/mia_haptic_force_test.sh'
-
+		-e EMG_BOARD_IP="$${EMG_BOARD_IP:-10.27.30.3}" \
+		mia-haptic-force-test \
+		/bin/bash -lc 'make setup-usb || true; /prosthesis_ws/scripts/mia_haptic_force_test.sh'
+test-reset: ## Reset hand (open), zero haptics, stop wrist.  Container must be running.
+	@echo "[reset] Copying script to container..."
+	@$(COMPOSE) --profile mia-haptic-force-test cp scripts/reset-hand.sh mia-haptic-force-test:/prosthesis_ws/src/reset-hand.sh 2>/dev/null || \
+		podman cp scripts/reset-hand.sh mia-haptic-force-test:/prosthesis_ws/src/reset-hand.sh
+	@echo "[reset] Running reset..."
+	@$(COMPOSE) --profile mia-haptic-force-test exec mia-haptic-force-test \
+		bash /prosthesis_ws/src/reset-hand.sh 2>/dev/null || \
+		podman exec -w /prosthesis_ws mia-haptic-force-test \
+		bash /prosthesis_ws/src/reset-hand.sh
 test-grasp-down: ## Stop and remove the isolated haptic force-test container
 	$(DOCKER_CMD) stop --time 1 mia-haptic-force-test || true
 	$(DOCKER_CMD) rm -f mia-haptic-force-test || true

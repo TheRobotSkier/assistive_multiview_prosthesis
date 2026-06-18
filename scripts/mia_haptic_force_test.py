@@ -35,6 +35,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float32, Float32MultiArray, Float64MultiArray, Int32, String
+from std_srvs.srv import Trigger
 
 from force_controller.controller_manager_client import ControllerManagerClient
 from mia_hand_msgs.msg import ForceData, JointData, MotorData
@@ -82,6 +83,9 @@ class HoldControl(str, Enum):
 class Config:
     raw: dict[str, Any]
     control_rate_hz: float
+    csv_rate_hz: float
+    haptics_publish_rate_hz: float
+    terminal_rate_hz: float
     startup_controller_timeout_s: float
     status_publish_period_s: float
     complete_shutdown_delay_s: float
@@ -157,6 +161,9 @@ def _load_config(path: str) -> Config:
             _get(raw, "runtime.startup_controller_timeout_s", 30.0)
         ),
         status_publish_period_s=float(_get(raw, "runtime.status_publish_period_s", 1.0)),
+        csv_rate_hz=float(_get(raw, "runtime.csv_rate_hz", 10.0)),
+        haptics_publish_rate_hz=float(_get(raw, "runtime.haptics_publish_rate_hz", 10.0)),
+        terminal_rate_hz=float(_get(raw, "runtime.terminal_rate_hz", 2.0)),
         complete_shutdown_delay_s=float(
             _get(raw, "runtime.complete_shutdown_delay_s", 0.2)
         ),
@@ -584,11 +591,15 @@ class MiaHapticForceTest(Node):
         self.create_subscription(Float32, t["emg_proportional"], self._on_proportional, 10)
         self.create_subscription(Float64MultiArray, t["wrist_state"], self._on_wrist_state, 10)
 
-        self._cm_client = ControllerManagerClient(self)
+        self._cm_client = ControllerManagerClient(self, use_private_executor=True)
 
         now = time.monotonic()
         self._start_time = now
         self._last_tick_time = now
+        self._last_csv_time = now
+        self._last_haptic_time = now
+        self._last_terminal_time = now
+        self._last_force_delta = 0.0
         self._stage = Stage.INITIALISING
         self._stage_started_at = now
         self._control_mode = HoldControl.FORCE
@@ -766,12 +777,27 @@ class MiaHapticForceTest(Node):
         self._got_wrist_state = True
         self._last_wrist_state_time = time.monotonic()
 
+    _tick_running: bool = False
+
     def _tick(self) -> None:
+        """Timer callback — guard against overload pile-up."""
+        if self._tick_running:
+            self.get_logger().warn(
+                "Tick overload — skipping (previous tick still running)"
+            )
+            return
+        self._tick_running = True
+        try:
+            self._tick_impl()
+        finally:
+            self._tick_running = False
+
+    def _tick_impl(self) -> None:
         now = time.monotonic()
         dt = max(0.001, now - self._last_tick_time)
         self._last_tick_time = now
 
-        if not self._initialised:
+        if self._stage == Stage.INITIALISING and not self._initialised:
             self._initialise_runtime()
         elif self._stage not in (Stage.COMPLETE, Stage.FAULT) and self._open_safety_active():
             self._begin_open_release("OPEN held")
@@ -791,15 +817,24 @@ class MiaHapticForceTest(Node):
             self._run_return_delay()
         elif self._stage == Stage.RETURN_WRIST:
             self._run_return_wrist()
-        elif self._stage == Stage.FAULT:
-            self._run_fault_recovery()
-        elif self._stage == Stage.COMPLETE:
-            self._run_complete()
+        # ── Rate-limited: haptics ──────────────────────────────────
+        if now - self._last_haptic_time >= 1.0 / max(self._cfg.haptics_publish_rate_hz, 1.0):
+            self._publish_haptics(self._compute_haptics())
+            self._last_haptic_time = now
 
-        self._publish_haptics(self._compute_haptics())
+        # ── Rate-limited: CSV ──────────────────────────────────────
+        if now - self._last_csv_time >= 1.0 / max(self._cfg.csv_rate_hz, 1.0):
+            self._write_sample()
+            self._last_csv_time = now
+
+        # ── Always: status (internally rate-limited) ────────────────
         self._publish_status()
-        self._write_sample()
-        self._render_terminal_ui()
+
+        # ── Rate-limited: terminal ─────────────────────────────────
+        if now - self._last_terminal_time >= 1.0 / max(self._cfg.terminal_rate_hz, 1.0):
+            self._render_terminal_ui()
+            self._last_terminal_time = now
+
 
     def _initialise_runtime(self) -> None:
         try:
@@ -808,7 +843,42 @@ class MiaHapticForceTest(Node):
             ):
                 self._fault("controller_manager services unavailable")
                 return
-            self._switch_position_controller()
+            # Clear any residual emergency-stop state in the hardware interface.
+            # The CppDriver emergency_stop_on_ flag (which gates all movement
+            # commands) may be spuriously set after process restart due to an
+            # uninitialised bool in the upstream driver.  The system interface
+            # exposes a ~/play service on its diagnostics node that calls
+            # CppDriver::play() to clear the flag.  Fire-and-forget is safe
+            # here because we are inside a spin_once timer callback and cannot
+            # spin_until_future_complete without deadlocking.
+            play_cli = self.create_client(
+                Trigger, "/mia_hand_system_interface_diagnostics/play"
+            )
+            if play_cli.wait_for_service(timeout_sec=2.0):
+                play_cli.call_async(Trigger.Request())
+                self.get_logger().info("Called play service to clear emergency-stop flag.")
+            else:
+                self.get_logger().warn(
+                    "Play service (/mia_hand_system_interface_diagnostics/play) "
+                    "unavailable — hand may be in emergency stop."
+                )
+            # Wait for the spawner to configure and activate the position
+            # controller.  Calling switch_controllers ourselves would race:
+            # the controller may still be unconfigured, causing a silent
+            # BEST_EFFORT "success" that leaves jnt_cmd_modes_ at kNone.
+            start = time.monotonic()
+            while time.monotonic() - start < self._cfg.startup_controller_timeout_s:
+                states = self._cm_client.list_controller_states()
+                if states.get("group_pos_ff_controller") == "active":
+                    break
+                time.sleep(0.1)
+            else:
+                self._fault("position controller not active after timeout")
+                return
+            self.get_logger().info(
+                f"Controller active after {time.monotonic() - start:.1f}s; "
+                "position commands will be processed."
+            )
             self._publish_velocity([0.0] * FINGER_COUNT, force=True)
             self._publish_position(self._cfg.open_positions, force=True)
             self._publish_wrist(float(self._cfg.wrist["horizontal_deg"]), force=True)
@@ -989,6 +1059,7 @@ class MiaHapticForceTest(Node):
             _competitors(["group_pos_ff_controller"]),
         )
         self._controller_mode = "position"
+        self._verify_controller_active("group_pos_ff_controller")
 
     def _switch_velocity_controller(self) -> None:
         self._cm_client.switch_controllers(
@@ -996,24 +1067,29 @@ class MiaHapticForceTest(Node):
             _competitors(["group_vel_ff_controller"]),
         )
         self._controller_mode = "velocity"
+        self._verify_controller_active("group_vel_ff_controller")
+
+    def _verify_controller_active(self, name: str) -> None:
+        try:
+            states = self._cm_client.list_controller_states()
+            state = states.get(name, "unknown")
+            if state != "active":
+                self.get_logger().error(
+                    f"Controller '{name}' is '{state}' after switch! "
+                    "Velocity/position commands may be silently dropped."
+                )
+            else:
+                self.get_logger().info(f"Controller '{name}' confirmed active.")
+        except Exception as exc:
+            self.get_logger().warn(f"Could not verify controller state: {exc}")
 
     def _publish_velocity(self, velocities: list[float], force: bool = False) -> None:
-        if not force and all(
-            math.isclose(a, b, abs_tol=1e-5)
-            for a, b in zip(velocities, self._last_vel_cmd)
-        ):
-            return
         msg = Float64MultiArray()
         msg.data = [float(v) for v in velocities]
         self._vel_pub.publish(msg)
         self._last_vel_cmd = list(msg.data)
 
     def _publish_position(self, positions: list[float], force: bool = False) -> None:
-        if not force and all(
-            math.isclose(a, b, abs_tol=1e-5)
-            for a, b in zip(positions, self._last_pos_cmd)
-        ):
-            return
         msg = Float64MultiArray()
         msg.data = [float(p) for p in positions]
         self._pos_pub.publish(msg)
@@ -1029,9 +1105,6 @@ class MiaHapticForceTest(Node):
         )
         self._wrist_target_deg = target
         cmd = [target, float(self._cfg.wrist["acceleration_deg_s2"])]
-        if not force and self._last_wrist_cmd is not None:
-            if all(math.isclose(a, b, abs_tol=0.05) for a, b in zip(cmd, self._last_wrist_cmd)):
-                return
         msg = Float64MultiArray()
         msg.data = cmd
         self._wrist_pub.publish(msg)
@@ -1117,12 +1190,31 @@ class MiaHapticForceTest(Node):
             self._control_mode = HoldControl.FORCE
             self._write_event("control_mode", "wrist->force")
 
+
+    def _adjustment_active(self) -> bool:
+        """True when FLEXION or EXTENSION gesture is currently adjusting."""
+        if self._control_mode == HoldControl.FORCE:
+            return self._active_gesture(int(self._cfg.emg["increase_force_label"])) or \
+                   self._active_gesture(int(self._cfg.emg["decrease_force_label"]))
+        return self._active_gesture(int(self._cfg.emg["wrist_positive_label"])) or \
+               self._active_gesture(int(self._cfg.emg["wrist_negative_label"]))
+
+    def _update_force_delta(self, dt: float) -> None:
+        """Update _last_force_delta for UI display."""
+        if self._active_gesture(int(self._cfg.emg["increase_force_label"])):
+            self._last_force_delta = self._cfg.adjustment_rate_up * self._proportional
+        elif self._active_gesture(int(self._cfg.emg["decrease_force_label"])):
+            self._last_force_delta = -self._cfg.adjustment_rate_down * self._proportional
+        else:
+            self._last_force_delta = 0.0
+
     def _adjust_force_target(self, dt: float) -> None:
         delta = 0.0
         if self._active_gesture(int(self._cfg.emg["increase_force_label"])):
             delta = self._cfg.adjustment_rate_up * self._proportional * dt
         elif self._active_gesture(int(self._cfg.emg["decrease_force_label"])):
             delta = -self._cfg.adjustment_rate_down * self._proportional * dt
+        self._update_force_delta(dt)
         if delta == 0.0:
             return
         self._target_forces = [
@@ -1310,91 +1402,110 @@ class MiaHapticForceTest(Node):
 
     def _print_intro_ui(self) -> None:
         print("Mia Hand EMG Haptic Force Test")
-        print(f"Config YAML: {self._config_path}")
-        print(f"CSV output: {self._log.run_dir}")
+        print(f"Config: {Path(self._config_path).name}  |  CSV: {self._log.run_dir}")
         print("")
-        print("Stages:")
-        print("  1. Start horizontal and open. POWER activates the test.")
-        print("  2. Light activation buzz, then wrist rotates vertical while haptics show thumb angle.")
-        print(
-            "  3. After the wrist reaches vertical, "
-            f"a {float(self._cfg.wrist['vertical_delay_s']):.1f} s countdown runs before closure."
-        )
-        print("  4. Brief buzz starts force closure. Contact threshold enters force-hold.")
-        print("  5. In force-hold, FLEXION/EXTENSION adjust grasp force.")
-        print("  6. POWER toggles wrist-control mode; FLEXION/EXTENSION then move the wrist.")
-        print(
-            "  7. Hold OPEN for "
-            f"{float(self._cfg.emg['open_hold_s']):.1f} s to open, wait "
-            f"{float(self._cfg.wrist['return_after_open_delay_s']):.1f} s, "
-            "and return horizontal."
-        )
+        print("Stages:  1. POWER starts → 2. Wrist vertical → 3. Countdown")
+        print("         4. Force closure → 5. Force-hold (adjust with EMG)")
+        print("         6. POWER toggles force/wrist control")
+        print(f"         7. Hold OPEN {float(self._cfg.emg['open_hold_s']):.1f}s → open → return horizontal")
         print("")
-        print("Controls now: POWER starts. OPEN held stops. Ctrl-C aborts the launch.")
+        print("Controls now: POWER starts.  OPEN held stops.  Ctrl-C aborts.")
         print("------")
-        for line in self._ui_live_lines():
-            print(line)
 
+        # Minimal live info
+        elapsed = self._elapsed()
+        gest_str = self._gesture_name or "?"
+        conf = self._confidence
+        prop = self._proportional
+        emg_age = time.monotonic() - self._last_emg_time if self._last_emg_time > 0.0 else 999.0
+        print(f"  State        \033[1m{self._human_stage()}\033[0m")
+        if conf >= float(self._cfg.emg["confidence_threshold"]):
+            print(f"  EMG          \033[92m{gest_str}\033[0m  conf={conf:.2f}  prop={prop:.2f}  age={emg_age:.3f}s")
+        else:
+            print(f"  EMG          \033[2m{gest_str}\033[0m  conf={conf:.2f}  prop={prop:.2f}  age={emg_age:.3f}s")
+        print("------")
+        print(f"CSV           {self._log.run_dir}")
     def _print_state_ui(self) -> None:
-        print("Mia Hand EMG Haptic Force Test")
-        print(f"State: {self._human_stage()} | Mode: {self._control_mode.value}")
-        for line in self._ui_control_lines():
-            print(line)
-        print("------")
-        for line in self._ui_live_lines():
-            print(line)
-
-    def _ui_control_lines(self) -> list[str]:
+        """Terminal UI: header → ----- → dynamic data → ----- → footer."""
         open_s = float(self._cfg.emg["open_hold_s"])
-        if self._stage == Stage.ROTATING_TO_VERTICAL:
-            return [f"Controls: keep hand open; OPEN held {open_s:.1f}s stops."]
-        if self._stage == Stage.VERTICAL_DELAY:
-            return [f"Controls: OPEN held {open_s:.1f}s stops. Closure starts after countdown."]
-        if self._stage == Stage.FORCE_CLOSING:
-            return [f"Controls: OPEN held {open_s:.1f}s stops. Waiting for force threshold."]
-        if self._stage == Stage.FORCE_HOLD and self._control_mode == HoldControl.FORCE:
-            return [
-                f"Controls: FLEXION increases force, EXTENSION decreases, POWER switches wrist, OPEN held {open_s:.1f}s stops."
-            ]
-        if self._stage == Stage.FORCE_HOLD and self._control_mode == HoldControl.WRIST:
-            return [
-                f"Controls: FLEXION/EXTENSION move wrist, POWER switches force, OPEN held {open_s:.1f}s stops."
-            ]
-        if self._stage == Stage.OPENING_HAND:
-            return ["Controls: opening hand before wrist return."]
-        if self._stage == Stage.RETURN_DELAY:
-            return ["Controls: waiting before returning the wrist horizontal."]
-        if self._stage == Stage.RETURN_WRIST:
-            return ["Controls: returning the wrist to horizontal."]
-        if self._stage == Stage.COMPLETE:
-            return ["Controls: complete; haptics are zeroed and shutdown is pending."]
-        if self._stage == Stage.FAULT:
-            return [f"Controls: fault recovery is opening the hand. Reason: {self._fault_reason}"]
-        return [f"Controls: OPEN held {open_s:.1f}s stops."]
 
-    def _ui_live_lines(self) -> list[str]:
-        normal_forces, source = self._current_normal_forces()
-        avg_force = sum(normal_forces) / FINGER_COUNT
-        max_force = max(normal_forces)
-        target_avg = sum(self._target_forces) / FINGER_COUNT
-        emg_age = "none" if self._last_emg_time <= 0.0 else f"{time.monotonic() - self._last_emg_time:.2f}s"
-        haptic = " ".join(f"{v:.0f}" for v in self._last_haptics)
-        lines = [
-            f"Elapsed: {self._elapsed():.1f}s | State time: {self._stage_elapsed():.1f}s",
-            f"EMG: {self._gesture_name} label={self._gesture_label} conf={self._confidence:.2f} prop={self._proportional:.2f} age={emg_age}",
-            f"Force ({source}): avg={avg_force:.1f} max={max_force:.1f} target_avg={target_avg:.1f} haptic_force={self._force_percent():.1f}%",
-            f"Wrist: current={self._wrist_position_deg:.1f} deg target={self._wrist_target_deg:.1f} deg error={_circ_delta_deg(self._wrist_target_deg, self._wrist_position_deg):.1f} deg",
-            f"Haptics: {self._haptic_phase} motors_pct=[{haptic}]",
-            f"CSV: {self._log.run_dir}",
-        ]
+        # ── Header ──────────────────────────────────────────────────
+        print("Mia Hand EMG Haptic Force Test")
+        print(f"Config: {Path(self._config_path).name}")
+
+        # ── Control hint ────────────────────────────────────────────
+        hint = self._ui_control_hint()
+        if hint:
+            print(f"Controls: {hint}")
+
+        print("------")
+
+        # ── Dynamic info (most important at bottom) ─────────────────
+        elapsed = self._elapsed()
+        state_elapsed = self._stage_elapsed()
+        stage_str = self._human_stage()
+        mode_str = self._control_mode.value
+        gest_str = self._gesture_name or "?"
+        conf = self._confidence
+        prop = self._proportional
+        emg_age = time.monotonic() - self._last_emg_time if self._last_emg_time > 0.0 else 999.0
+
+        print(f"  Elapsed      {elapsed:.1f}s")
         countdown = self._ui_countdown_s()
         if countdown is not None:
-            lines.insert(1, f"Countdown: {countdown:.1f}s")
+            print(f"  Countdown    {countdown:.1f}s")
+        print(f"  State        \033[1m{stage_str}\033[0m  ·  {mode_str}")
+
+        # EMG — green if above confidence threshold
+        if conf >= float(self._cfg.emg["confidence_threshold"]):
+            print(f"  EMG          \033[92m{gest_str}\033[0m  conf={conf:.2f}  prop={prop:.2f}  age={emg_age:.3f}s")
+        else:
+            print(f"  EMG          \033[2m{gest_str}\033[0m  conf={conf:.2f}  prop={prop:.2f}  age={emg_age:.3f}s")
+
+        # Force + wrist
+        normal_forces, source = self._current_normal_forces()
+        avg_f = sum(normal_forces) / FINGER_COUNT if normal_forces else 0.0
+        max_f = max(normal_forces) if normal_forces else 0.0
+        target_avg = sum(self._target_forces) / FINGER_COUNT
+        fpct = self._force_percent()
+        # Show hold velocity if in FORCE_HOLD
+        vel_str = ""
+        if self._stage == Stage.FORCE_HOLD and normal_forces:
+            vels = [
+                _hold_velocity(normal_forces[i], self._target_forces[i],
+                               self._cfg.hold_deadzone, self._cfg.hold_max_velocity_rad_s,
+                               self._cfg.hold_min_overshoot, self._cfg.hold_max_overshoot)
+                for i in range(FINGER_COUNT)
+            ]
+            if any(abs(v) > 0.001 for v in vels):
+                vel_str = f"  \033[93mvel=[{vels[0]:+.3f} {vels[1]:+.3f} {vels[2]:+.3f}]\033[0m"
+        print(f"  Force        avg={avg_f:.1f}  max={max_f:.1f}  target={target_avg:.1f}  haptic={fpct:.0f}%{vel_str}")
+
+        w_err = _circ_delta_deg(self._wrist_target_deg, self._wrist_position_deg)
+        print(f"  Wrist        {self._wrist_position_deg:.1f}° → {self._wrist_target_deg:.1f}°  (err={w_err:+.1f}°)")
+
+        # Adjustment status (only in FORCE_HOLD)
+        if self._stage == Stage.FORCE_HOLD:
+            if self._adjustment_active():
+                if self._control_mode == HoldControl.FORCE:
+                    print(f"  Adjust       \033[93m▲ adjusting force\033[0m  Δ={self._last_force_delta:+.1f}/s")
+                else:
+                    print(f"  Adjust       \033[93m◀▶ adjusting wrist\033[0m  vel={float(self._cfg.wrist['control_velocity_deg_s'])*max(prop,0.15):.1f}°/s")
+            else:
+                print(f"  Adjust       idle  (need conf ≥ {float(self._cfg.emg['confidence_threshold']):.2f}, got {conf:.2f})")
+
+        # Haptics
+        haptic = " ".join(f"{v:.0f}" for v in self._last_haptics)
+        print(f"  Haptics      {self._haptic_phase:20s} [{haptic}]")
+
+        print("------")
+        # EMG prediction as the main "what's happening now" line
+        print(f"  Gesture      {gest_str}  conf={conf:.2f}  prop={prop:.2f}")
+        print(f"  CSV          {self._log.run_dir}")
         if self._contact_reason:
-            lines.append(f"Contact: {self._contact_reason}")
+            print(f"  Contact      {self._contact_reason}")
         if self._fault_reason:
-            lines.append(f"Fault: {self._fault_reason}")
-        return lines
+            print(f"  \033[91mFault        {self._fault_reason}\033[0m")
 
     def _ui_countdown_s(self) -> Optional[float]:
         if self._stage == Stage.VERTICAL_DELAY:
@@ -1405,6 +1516,33 @@ class MiaHapticForceTest(Node):
                 float(self._cfg.wrist["return_after_open_delay_s"]) - self._stage_elapsed(),
             )
         return None
+
+    def _ui_control_hint(self) -> str:
+        """Single-line control hint for the current stage."""
+        open_s = float(self._cfg.emg["open_hold_s"])
+        if self._stage == Stage.WAITING_FOR_ACTIVATION:
+            return f"keep hand open; POWER held {float(self._cfg.emg['activation_hold_s']):.1f}s starts; OPEN held {open_s:.1f}s stops"
+        if self._stage == Stage.ROTATING_TO_VERTICAL:
+            return f"keep hand open; OPEN held {open_s:.1f}s stops"
+        if self._stage == Stage.VERTICAL_DELAY:
+            return f"OPEN held {open_s:.1f}s stops; closure starts after countdown"
+        if self._stage == Stage.FORCE_CLOSING:
+            return f"OPEN held {open_s:.1f}s stops; waiting for force threshold"
+        if self._stage == Stage.FORCE_HOLD and self._control_mode == HoldControl.FORCE:
+            return f"FLEXION ↑force  EXTENSION ↓force  POWER→wrist  OPEN held {open_s:.1f}s stops"
+        if self._stage == Stage.FORCE_HOLD and self._control_mode == HoldControl.WRIST:
+            return f"FLEXION/EXTENSION move wrist  POWER→force  OPEN held {open_s:.1f}s stops"
+        if self._stage == Stage.OPENING_HAND:
+            return "opening hand before wrist return"
+        if self._stage == Stage.RETURN_DELAY:
+            return "waiting before returning wrist horizontal"
+        if self._stage == Stage.RETURN_WRIST:
+            return "returning wrist to horizontal"
+        if self._stage == Stage.COMPLETE:
+            return "complete; haptics zeroed, shutdown pending"
+        if self._stage == Stage.FAULT:
+            return f"fault recovery underway: {self._fault_reason}"
+        return f"OPEN held {open_s:.1f}s stops"
 
     def _human_stage(self) -> str:
         return self._stage.value.replace("_", " ")
@@ -1521,17 +1659,30 @@ class MiaHapticForceTest(Node):
         return f"{float(value):.6f}"
 
     def destroy_node(self) -> bool:
+        """Shutdown: open hand, return wrist horizontal, zero haptics.
+
+        Runs on ANY termination path — clean COMPLETE, FAULT, SIGTERM,
+        or KeyboardInterrupt.  Publishes are best-effort; if the ROS 2
+        context is already torn down the exceptions are swallowed.
+        """
         try:
             self._publish_haptics([0.0] * int(self._cfg.haptics["motor_count"]))
             self._publish_velocity([0.0] * FINGER_COUNT, force=True)
             if self._initialised and self._cm_client.services_ready():
                 self._switch_position_controller()
             self._publish_position(self._cfg.open_positions, force=True)
+            self._publish_wrist(
+                float(self._cfg.wrist["horizontal_deg"]), force=True
+            )
         except Exception:
             pass
         try:
             self._write_event("shutdown", "node destroyed")
             self._log.close()
+        except Exception:
+            pass
+        try:
+            self._cm_client.shutdown()
         except Exception:
             pass
         return super().destroy_node()

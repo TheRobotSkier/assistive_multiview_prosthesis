@@ -40,6 +40,7 @@ ADDR_GOAL_VELOCITY = 104
 ADDR_PRESENT_VELOCITY = 128
 ADDR_PROFILE_ACCELERATION = 108
 ADDR_PROFILE_VELOCITY = 112
+ADDR_OPERATING_MODE = 11
 
 TORQUE_ENABLE = 1
 TORQUE_DISABLE = 0
@@ -86,20 +87,31 @@ class WristDriverNode(Node):
         self._packet_handler = PacketHandler(protocol)
 
         if not self._port_handler.openPort():
-            self.get_logger().error(f'Failed to open port {port}')
+            self.get_logger().error(f"Failed to open port {port}")
             return
 
         if not self._port_handler.setBaudRate(baudrate):
-            self.get_logger().error(f'Failed to set baudrate to {baudrate}')
+            self.get_logger().error(f"Failed to set baudrate to {baudrate}")
             return
 
-        # Enable torque
+        # Disable torque, set Position Control mode, then re-enable.
+        # Torque may be left on from a previous session; Dynamixel X-series
+        # rejects Operating Mode writes while torque is active.
+        self._packet_handler.write1ByteTxRx(
+            self._port_handler, self._motor_id,
+            ADDR_TORQUE_ENABLE, TORQUE_DISABLE)
+        self._packet_handler.write1ByteTxRx(
+            self._port_handler, self._motor_id,
+            ADDR_OPERATING_MODE, 3)  # 3 = Position Control
         dxl_comm_result, dxl_error = self._packet_handler.write1ByteTxRx(
             self._port_handler, self._motor_id, ADDR_TORQUE_ENABLE, TORQUE_ENABLE)
         if dxl_comm_result != COMM_SUCCESS:
-            self.get_logger().error(f'Failed to enable torque: {self._packet_handler.getTxRxResult(dxl_comm_result)}')
+            self.get_logger().error(
+                f"Failed to enable torque: "
+                f"{self._packet_handler.getTxRxResult(dxl_comm_result)}")
             return
-        self.get_logger().info(f'Wrist motor connected on {port}, ID={self._motor_id}')
+        self.get_logger().info(
+            f"Wrist motor connected on {port}, ID={self._motor_id}")
 
         self._pub = self.create_publisher(Float64MultiArray, '/wrist/state', 10)
         self.create_subscription(

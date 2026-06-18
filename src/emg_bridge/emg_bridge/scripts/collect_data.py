@@ -136,6 +136,10 @@ def main() -> None:
                         help="Directory to save .npz files (default: /app/data)")
     parser.add_argument("--gesture-names", nargs="+", default=GESTURE_NAMES,
                         help="Gesture names (space-separated, must start with REST)")
+    parser.add_argument("--ip", type=str, default="",
+                        help="MindRove board IP address (default: auto-detect)")
+    parser.add_argument("--port", type=int, default=4210,
+                        help="MindRove board port (default: 4210)")
     args = parser.parse_args()
 
     gesture_names: list[str] = args.gesture_names
@@ -152,11 +156,9 @@ def main() -> None:
     print(f"  Duration   : {args.duration} s per rep per gesture")
     print(f"  Output dir : {output_dir}")
     print()
-
-    # ── Connect ───────────────────────────────────────────────────────────────
+    reader = BoardReader(ip_address=args.ip, ip_port=args.port)
     print(_cyan("Connecting to MindRove WiFi board …"))
     try:
-        reader = BoardReader()
         reader.connect()
     except Exception as exc:
         print(f"\033[91mFailed to connect: {exc}\033[0m")

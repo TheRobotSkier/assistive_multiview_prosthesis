@@ -178,6 +178,8 @@ def main() -> None:
                         help=f"Confidence threshold (default: {CONFIDENCE_THRESHOLD})")
     parser.add_argument("--smooth", type=int, default=PREDICTION_SMOOTHING_FRAMES,
                         help=f"Smoothing window in frames (default: {PREDICTION_SMOOTHING_FRAMES})")
+    parser.add_argument("--ip", type=str, default="", help="MindRove board IP (default: auto-detect)")
+    parser.add_argument("--port", type=int, default=4210, help="MindRove board port (default: 4210)")
     args = parser.parse_args()
 
     print()
@@ -213,7 +215,7 @@ def main() -> None:
     # ── Connect ───────────────────────────────────────────────────────────────
     print(_cyan("Connecting to MindRove WiFi board …"))
     try:
-        reader = BoardReader()
+        reader = BoardReader(ip_address=args.ip, ip_port=args.port)
         reader.connect()
     except Exception as exc:
         print(_red(f"Failed to connect: {exc}"))

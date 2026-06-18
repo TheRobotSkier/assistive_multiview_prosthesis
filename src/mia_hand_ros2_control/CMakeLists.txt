@@ -16,6 +16,7 @@ find_package(hardware_interface REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(mia_hand_driver REQUIRED)
 find_package(mia_hand_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/${PROJECT_NAME}/mia_hand_system_interface.cpp
@@ -26,6 +27,7 @@ ament_target_dependencies(${PROJECT_NAME}
   rclcpp_lifecycle
   hardware_interface
   pluginlib
+  std_srvs
   mia_hand_driver
   mia_hand_msgs
 )

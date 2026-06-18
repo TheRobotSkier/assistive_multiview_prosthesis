@@ -2,6 +2,7 @@
 
 #include <limits>
 
+#include <std_srvs/srv/trigger.hpp>
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/logging.hpp"
@@ -156,6 +157,27 @@ hardware_interface::CallbackReturn MiaHandSystemInterface::on_configure(
 
       result = hardware_interface::CallbackReturn::ERROR;
     }
+  }
+
+  /* Expose a /play service that clears the internal emergency-stop flag.
+   * The flag gates all movement commands and may be spuriously set after
+   * process restart if heap memory is non-zero (upstream CppDriver bug).
+   * The haptic force test calls this service during initialisation so that
+   * position/velocity commands are not silently rejected.
+   */
+  if (hardware_interface::CallbackReturn::ERROR != result && diagnostics_node_)
+  {
+    play_srv_ = diagnostics_node_->create_service<std_srvs::srv::Trigger>(
+      "~/play",
+      [this](
+        const std_srvs::srv::Trigger::Request::SharedPtr /* req */,
+        std_srvs::srv::Trigger::Response::SharedPtr rsp)
+      {
+        mia_hand_->play();
+        rsp->success = true;
+        rsp->message = "Mia Hand emergency stop cleared (play called).";
+      });
+    RCLCPP_INFO(*logger_, "Exposed ~/play service for emergency-stop recovery.");
   }
 
   return result;

@@ -10,6 +10,7 @@
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
 #include "mia_hand_msgs/msg/force_data.hpp"
+#include <std_srvs/srv/trigger.hpp>
 #include "rclcpp/node.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/publisher.hpp"
@@ -188,6 +189,7 @@ private:
 
   rclcpp::Node::SharedPtr diagnostics_node_;  //!< Publishes raw force diagnostics.
   rclcpp::Publisher<mia_hand_msgs::msg::ForceData>::SharedPtr force_pub_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr play_srv_;
 };
 }  // namespace
 

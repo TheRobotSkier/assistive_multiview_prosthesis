@@ -1,6 +1,7 @@
 build/
 install/
 log/
+data/
 .env
 .vscode
 .github/

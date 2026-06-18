@@ -631,6 +631,8 @@ def main() -> None:
     parser.add_argument("--max-gap-samples", type=int, default=2, help="Maximum inactive gap inside one activation run")
     parser.add_argument("--pre-onset-search-samples", type=int, default=20, help="How many samples before prediction support to search for onset")
     parser.add_argument("--onset-lookback-windows", type=int, default=PREDICTION_SMOOTHING_FRAMES, help="How many recent target-predicting windows to require consistent channel support across")
+    parser.add_argument("--ip", type=str, default="", help="MindRove board IP (default: auto-detect)")
+    parser.add_argument("--port", type=int, default=4210, help="MindRove board port (default: 4210)")
     args = parser.parse_args()
 
     if not sys.stdin.isatty() or not sys.stdout.isatty():
@@ -696,7 +698,7 @@ def main() -> None:
     outcomes: list[TrialOutcome] = []
     trials = plan_trials(args.repeats)
 
-    with BoardReader() as reader, \
+    with BoardReader(ip_address=args.ip, ip_port=args.port) as reader, \
         samples_path.open("w", newline="", encoding="utf-8") as samples_file, \
         frames_path.open("w", newline="", encoding="utf-8") as frames_file, \
         trials_path.open("w", newline="", encoding="utf-8") as trials_file:
