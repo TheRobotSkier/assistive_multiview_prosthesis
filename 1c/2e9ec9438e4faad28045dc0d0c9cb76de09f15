@@ -1,0 +1,25 @@
+scripts/setup_usb_devices.sh
+  s_1af9946e906ce9::t_b472507399046b 29-36,39-40,50-51
+Makefile
+  s_1af9946e906ce9::t_b472507399046b 822
+scripts/mia_haptic_force_test/terminal_ui_node.py
+  s_1af9946e906ce9::t_b472507399046b 259
+scripts/mia_haptic_force_test.py
+  s_1af9946e906ce9::t_b472507399046b 1389
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "1c2e9ec9438e4faad28045dc0d0c9cb76de09f15",
+  "prompts": {},
+  "sessions": {
+    "s_1af9946e906ce9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019edb8d-4f00-7601-a1bc-7f3f88f261b9",
+        "model": "gpt-5.4-mini"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
