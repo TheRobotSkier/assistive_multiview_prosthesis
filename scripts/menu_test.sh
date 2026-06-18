@@ -57,6 +57,8 @@ read_key() {
 _load_yaml_defaults() {
     # Baked defaults from config/mia_haptic_force_test.yaml.
     # These are used when pyyaml is unavailable on the host.
+    AUTO_KILL_S="${AUTO_KILL_S:-0}"
+    MOCK_HARDWARE="${MOCK_HARDWARE:-auto}"
     CONTROL_RATE_HZ="${CONTROL_RATE_HZ:-50.0}"
     CSV_RATE_HZ="${CSV_RATE_HZ:-10.0}"
     HAPTICS_RATE_HZ="${HAPTICS_RATE_HZ:-10.0}"
@@ -90,6 +92,101 @@ _load_yaml_defaults() {
     # Set USE_MULTI_NODE=false explicitly to use the legacy monolithic fallback.
     USE_MULTI_NODE="${USE_MULTI_NODE:-true}"
 
+    local yaml="${CONFIG_PATH:-config/mia_haptic_force_test.yaml}"
+    [ -f "$yaml" ] || return 0
+
+    local assignments
+    assignments="$(python3 - "$yaml" 2>/dev/null <<'PY'
+import shlex
+import sys
+
+import yaml
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as f:
+    data = yaml.safe_load(f) or {}
+
+
+def get(path, default=None):
+    cur = data
+    for part in path.split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return default
+        cur = cur[part]
+    return cur
+
+
+def emit(name, value):
+    if value is None:
+        return
+    if isinstance(value, bool):
+        value = "true" if value else "false"
+    else:
+        value = str(value)
+    print(f"{name}={shlex.quote(value)}")
+
+
+paths = {
+    "AUTO_KILL_S": "runtime.auto_kill_s",
+    "MOCK_HARDWARE": "runtime.mock_hardware",
+    "USE_MULTI_NODE": "runtime.use_multi_node",
+    "CONTROL_RATE_HZ": "runtime.control_rate_hz",
+    "CSV_RATE_HZ": "runtime.csv_rate_hz",
+    "HAPTICS_RATE_HZ": "runtime.haptics_publish_rate_hz",
+    "TERMINAL_RATE_HZ": "runtime.terminal_rate_hz",
+    "STARTUP_TIMEOUT_S": "runtime.startup_controller_timeout_s",
+    "OPEN_THUMB": "hand.open_positions.j_thumb_fle",
+    "OPEN_INDEX": "hand.open_positions.j_index_fle",
+    "OPEN_MRL": "hand.open_positions.j_mrl_fle",
+    "MAXCLOSE_THUMB": "hand.max_closure_positions.j_thumb_fle",
+    "MAXCLOSE_INDEX": "hand.max_closure_positions.j_index_fle",
+    "MAXCLOSE_MRL": "hand.max_closure_positions.j_mrl_fle",
+    "OPEN_TOLERANCE": "hand.open_position_tolerance_rad",
+    "OPEN_MIN_S": "hand.opening_min_s",
+    "OPEN_TIMEOUT_S": "hand.opening_timeout_s",
+    "CLOSE_VEL_START": "hand.closing_velocity_start_rad_s",
+    "CLOSE_VEL_END": "hand.closing_velocity_end_rad_s",
+    "CLOSE_DECAY": "hand.closing_decay_steps",
+    "CLOSE_INTERVAL": "hand.closing_step_interval_s",
+    "HOLD_DEADZONE": "hand.hold_deadzone",
+    "HOLD_MIN_OVER": "hand.hold_min_overshoot",
+    "HOLD_MAX_OVER": "hand.hold_max_overshoot",
+    "HOLD_MAX_VEL": "hand.hold_max_velocity_rad_s",
+    "F_THUMB": "force.contact_thresholds.j_thumb_fle",
+    "F_INDEX": "force.contact_thresholds.j_index_fle",
+    "F_MRL": "force.contact_thresholds.j_mrl_fle",
+    "F_INIT_THUMB": "force.initial_hold_targets.j_thumb_fle",
+    "F_INIT_INDEX": "force.initial_hold_targets.j_index_fle",
+    "F_INIT_MRL": "force.initial_hold_targets.j_mrl_fle",
+    "F_TARGET_MIN": "force.target_min",
+    "F_TARGET_MAX": "force.target_max",
+    "F_ADJ_UP": "force.adjustment_rate_up",
+    "F_ADJ_DOWN": "force.adjustment_rate_down",
+    "F_EMERGENCY": "force.emergency_threshold",
+    "F_BACKOFF": "force.emergency_backoff_velocity_rad_s",
+    "EMG_BOARD_IP": "emg.board_ip",
+    "EMG_CONF": "emg.confidence_threshold",
+    "EMG_ACTIVATION_HOLD": "emg.activation_hold_s",
+    "EMG_OPEN_HOLD": "emg.open_hold_s",
+    "EMG_TOGGLE_HOLD": "emg.power_toggle_hold_s",
+    "EMG_STALE_TIMEOUT": "emg.stale_timeout_s",
+    "W_HORIZONTAL": "wrist.horizontal_deg",
+    "W_VERTICAL": "wrist.vertical_deg",
+    "W_MIN_DEG": "wrist.min_deg",
+    "W_MAX_DEG": "wrist.max_deg",
+    "W_ACCEL": "wrist.acceleration_deg_s2",
+    "W_CTRL_VEL": "wrist.control_velocity_deg_s",
+    "W_TOLERANCE": "wrist.position_tolerance_deg",
+    "W_TIMEOUT": "wrist.move_timeout_s",
+    "W_RETURN_DELAY": "wrist.return_after_open_delay_s",
+    "W_VERT_DELAY": "wrist.vertical_delay_s",
+}
+
+for name, yaml_path in paths.items():
+    emit(name, get(yaml_path))
+PY
+)" || return 0
+    eval "$assignments"
 }
 # ── Write env file ───────────────────────────────────────────────────
 write_env_file() {
@@ -120,6 +217,9 @@ import yaml, sys
 d = yaml.safe_load(open('$yaml'))
 # Apply overrides
 d.setdefault('runtime',{})
+d['runtime']['auto_kill_s'] = float('${AUTO_KILL_S:-0}')
+d['runtime']['mock_hardware'] = '${MOCK_HARDWARE:-auto}'
+d['runtime']['use_multi_node'] = str('${USE_MULTI_NODE:-true}').lower() in ('1','true','yes','on')
 d['runtime']['control_rate_hz'] = float('${CONTROL_RATE_HZ:-50.0}')
 d['runtime']['csv_rate_hz'] = float('${CSV_RATE_HZ:-10.0}')
 d['runtime']['haptics_publish_rate_hz'] = float('${HAPTICS_RATE_HZ:-10.0}')
@@ -149,6 +249,7 @@ d['force']['adjustment_rate_down'] = float('${F_ADJ_DOWN:-200}')
 d['force']['emergency_threshold'] = float('${F_EMERGENCY:-800}')
 d['force']['emergency_backoff_velocity_rad_s'] = float('${F_BACKOFF:--0.1}')
 d.setdefault('emg',{})
+d['emg']['board_ip'] = '${EMG_BOARD_IP:-10.27.30.3}'
 d['emg']['confidence_threshold'] = float('${EMG_CONF:-0.55}')
 d['emg']['activation_hold_s'] = float('${EMG_ACTIVATION_HOLD:-0.2}')
 d['emg']['open_hold_s'] = float('${EMG_OPEN_HOLD:-1.0}')
@@ -191,6 +292,7 @@ edit_var() {
 
 # ── Parameter editor — test-grasp ────────────────────────────────────
 param_editor_grasp() {
+    _load_yaml_defaults
     local PARAM_LABELS=(
         "── Runtime ──"              ""
         "Main loop rate (Hz)"        CONTROL_RATE_HZ
@@ -434,4 +536,6 @@ run_menu() {
     done
 }
 
-run_menu
+if [ "${MENU_TEST_NO_RUN:-false}" != "true" ]; then
+    run_menu
+fi
