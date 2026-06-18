@@ -490,7 +490,7 @@ class JetsonRelay(Node):
             self._gates[f"img_{cam}"] = RateGate(self._img_hz)
             self._gates[f"depth_{cam}"] = RateGate(self._depth_hz)
             self._gates[f"trackhist_{cam}"] = RateGate(self._trackhist_hz)
-            self._gates[f"ci_{cam}"] = RateGate(self._ci_hz)
+            self._gates[f"ci_{cam}"] = RateGate(self._img_hz)
             self._gates[f"odom_{cam}"] = RateGate(self._odom_hz)
 
         # ── setup pubs/subs ─────────────────────────────────────────────
@@ -624,7 +624,7 @@ class JetsonRelay(Node):
                 lambda m, c=cam: self._on_trackhist(m, c), _SENSOR_QOS,
             )
         self._trackhist_pub = {
-            cam: self.create_publisher(Image, _DST[f"{cam}_trackhist"], _SENSOR_QOS)
+            cam: self.create_publisher(Image, _DST[f"{cam}_trackhist"], _ARUCO_RELIABLE_QOS)
             for cam in CAMERAS
         }
 
@@ -713,11 +713,16 @@ class JetsonRelay(Node):
         self._trackhist_pub[camera].publish(msg)
 
     def _on_ci(self, msg: CameraInfo, camera: str) -> None:
-        # CameraInfo is tiny text-only metadata (~1 KB).  Pass it through
-        # unthrottled so the host-side depth_image_proc 3-way synchronizer
-        # (depth + rgb + camera_info) always has a fresh calibration matrix
-        # in its buffer.  Throttling to 1 Hz starves the synchronizer and
-        # causes 100% backprojection drops.
+        # Rate-gate CameraInfo to match the image frame rate so the host-side
+        # depth_image_proc 3-way synchronizer (depth + rgb + camera_info)
+        # receives a balanced queue.  A dedicated ci_{cam} gate set to the
+        # image Hz avoids both the 1 Hz starvation (100% drops) and the
+        # 30 Hz flood (evicts slower image frames from the message filter
+        # queue).  Sharing the image gate instance directly would let
+        # camera_info steal the image publication budget, so a separate gate
+        # at the same rate is used instead.
+        if not self._gates[f"ci_{camera}"].should_publish():
+            return
         # Scale intrinsics to match the downsampled image/depth resolution.
         # The same factor is used for both colour and depth channels since
         # aligned depth is registered to the colour frame.
