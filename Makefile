@@ -83,7 +83,7 @@ test-help: ## Show interactive test commands and config files
 	@printf "  %-32s %s\n" "Config YAML" "config/emg_latency_test.yaml"
 	@echo ""
 	@echo "Mia haptic grasp test:"
-	@printf "  %-32s %s\n" "make test-grasp" "Run the no-camera Mia Hand EMG wrist/force/haptic CSV logger."
+	@printf "  %-32s %s\n" "make test-grasp" "Run the no-camera Mia Hand EMG wrist/force/haptic CSV logger; reuses cached model by default."
 	@printf "  %-32s %s\n" "make test-grasp-up" "Build and start the isolated test container."
 	@printf "  %-32s %s\n" "make test-grasp-down" "Stop and remove the isolated test container."
 	@printf "  %-32s %s\n" "make test-grasp-logs" "Follow logs from the isolated test container."
@@ -235,7 +235,7 @@ test: ## Interactive test selector
 	@printf "  1) test-emg-latency          Collect EMG data, train, then run latency benchmark\n"
 	@printf "  2) test-emg-latency-notrain  Reuse existing EMG model/data and run latency benchmark\n"
 	@printf "  3) test-emg-sim              Replay latest latency raw data with parameter tuning UI\n"
-	@printf "  4) test-grasp                Run Mia EMG wrist/force/haptic CSV logger without cameras\n"
+	@printf "  4) test-grasp                Run Mia EMG wrist/force/haptic CSV logger; reuse cached model by default\n"
 	@printf "  5) test-smoke                Run the existing containerized smoke test suite\n"
 	@printf "  q) quit\n\n"
 	@printf "Choice: "; \
@@ -790,6 +790,7 @@ test-grasp-up: ## Start isolated container for Mia haptic force testing
 	echo "[host] Mia haptic force test devices: MIA=$$MIA_PORT WRIST=$$WRIST_PORT" && \
 	if [ ! -e "$$MIA_PORT" ]; then echo "[host] MIA device missing; container will still start and run target will default to MOCK_HARDWARE=true."; fi && \
 	if [ ! -e "$$WRIST_PORT" ]; then echo "[host] Wrist device missing; run target will default to WRIST_ENABLE=false."; fi && \
+	$(DOCKER_CMD) rm -f mia-haptic-force-test >/dev/null 2>&1 || true && \
 	cd $(COMPOSE_DIR) && \
 	MIA_SERIAL_PORT="$$MIA_PORT" WRIST_SERIAL_PORT="$$WRIST_PORT" \
 	$(COMPOSE) --profile mia-haptic-force-test up -d --build mia-haptic-force-test
@@ -807,7 +808,7 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test and CSV logger
 	@echo "  WRIST_ENABLE=$${WRIST_ENABLE:-auto}                   auto=false when wrist is absent"
 	@echo "  HAPTIC_ENABLE=$${HAPTIC_ENABLE:-true}                 set false when Vibro8 is absent"
 	@echo "  HAPTIC_BT_ADDR1=$${HAPTIC_BT_ADDR1:-842E1409E14E}     Vibro8 Bluetooth address"
-	@echo "  FORCE_RETRAIN=$${FORCE_RETRAIN:-false}                Re-train classifier"
+	@echo "  FORCE_RETRAIN=$${FORCE_RETRAIN:-false}                false reuses cached classifier.pkl; true re-trains"
 	@echo "  AUTO_KILL_S=$${AUTO_KILL_S:-0}                        0 means no timeout"
 	@echo ""
 	@test -f scripts/mia_haptic_force_test.sh || { echo "Missing scripts/mia_haptic_force_test.sh"; exit 1; }
@@ -828,7 +829,7 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test and CSV logger
 	if [ "$$MOCK_MODE" = "true" ] && [ -z "$${HAPTIC_ENABLE+x}" ]; then HAPTIC_MODE=false; fi && \
 	echo "[host] Executing in mia-haptic-force-test: MIA=$$MIA_PORT WRIST=$$WRIST_PORT MOCK_HARDWARE=$$MOCK_MODE WRIST_ENABLE=$$WRIST_MODE HAPTIC_ENABLE=$$HAPTIC_MODE" && \
 	cd $(COMPOSE_DIR) && \
-	$(COMPOSE) --profile mia-haptic-force-test exec --user prosthesis \
+	$(COMPOSE) --profile mia-haptic-force-test exec -T --user prosthesis \
 		-e EMG_DATA_DIR="$${EMG_DATA_DIR:-/app/data}" \
 		-e EMG_MODEL_DIR="$${EMG_MODEL_DIR:-/app/models}" \
 		-e MIA_PORT="$$MIA_PORT" \
@@ -845,8 +846,8 @@ test-grasp: test-grasp-up ## Run isolated EMG/haptic force test and CSV logger
 		mia-haptic-force-test /bin/bash -lc 'make setup-usb || true; /prosthesis_ws/scripts/mia_haptic_force_test.sh'
 
 test-grasp-down: ## Stop and remove the isolated haptic force-test container
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test stop mia-haptic-force-test || true
-	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test rm -f mia-haptic-force-test || true
+	$(DOCKER_CMD) stop --time 1 mia-haptic-force-test || true
+	$(DOCKER_CMD) rm -f mia-haptic-force-test || true
 
 test-grasp-logs: ## Follow logs for the isolated haptic force-test container
 	cd $(COMPOSE_DIR) && $(COMPOSE) --profile mia-haptic-force-test logs -f mia-haptic-force-test

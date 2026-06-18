@@ -114,6 +114,7 @@ services:
             args:
                 USER_UID: ${USER_UID:-1000}
                 USER_GID: ${USER_GID:-1000}
+        command: ["sleep", "infinity"]
         environment:
             - DISPLAY=${DISPLAY:-:0}
             - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
@@ -141,8 +142,6 @@ services:
             - ../models:/app/models:rw
         privileged: true
         ipc: host
-        stdin_open: true
-        tty: true
         profiles:
             - mia-haptic-force-test
 

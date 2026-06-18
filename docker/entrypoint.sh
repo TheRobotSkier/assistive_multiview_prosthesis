@@ -61,15 +61,21 @@ done
 # Create persistent symlinks so ROS2 launch files can refer to devices by name.
 # This mirrors what the host udev rules do with SYMLINK+=.
 if [ -e "$MIA_SERIAL_PORT" ] && [ ! -e /dev/ttyMiaHand ]; then
-    ln -sf "$MIA_SERIAL_PORT" /dev/ttyMiaHand
-    ln -sf "$MIA_SERIAL_PORT" /dev/mia_hand
-    echo "[entrypoint] Symlinked $MIA_SERIAL_PORT -> /dev/ttyMiaHand, /dev/mia_hand"
+    if ln -sf "$MIA_SERIAL_PORT" /dev/ttyMiaHand \
+        && ln -sf "$MIA_SERIAL_PORT" /dev/mia_hand; then
+        echo "[entrypoint] Symlinked $MIA_SERIAL_PORT -> /dev/ttyMiaHand, /dev/mia_hand"
+    else
+        echo "[entrypoint] WARNING: could not create MIA device symlinks"
+    fi
 fi
 
 if [ -e "$WRIST_SERIAL_PORT" ] && [ ! -e /dev/ttyDynamixel ]; then
-    ln -sf "$WRIST_SERIAL_PORT" /dev/ttyDynamixel
-    ln -sf "$WRIST_SERIAL_PORT" /dev/wrist_motor
-    echo "[entrypoint] Symlinked $WRIST_SERIAL_PORT -> /dev/ttyDynamixel, /dev/wrist_motor"
+    if ln -sf "$WRIST_SERIAL_PORT" /dev/ttyDynamixel \
+        && ln -sf "$WRIST_SERIAL_PORT" /dev/wrist_motor; then
+        echo "[entrypoint] Symlinked $WRIST_SERIAL_PORT -> /dev/ttyDynamixel, /dev/wrist_motor"
+    else
+        echo "[entrypoint] WARNING: could not create wrist device symlinks"
+    fi
 fi
 
 # Drop root privileges — run as the prosthesis user
