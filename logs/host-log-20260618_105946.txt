@@ -1,0 +1,19 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-18-10-59-47-278631-KingBob-413
+[INFO] [launch]: Default logging verbosity is set to INFO
+[pipeline] fusion_mode='legacy'
+[INFO] [pipeline_manager_node-1]: process started with pid [419]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [420]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [421]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [422]
+[INFO] [odom_to_pose_relay-5]: process started with pid [423]
+[INFO] [openvins_odom_tf_relay-6]: process started with pid [424]
+[INFO] [pointcloud_fusion_node-7]: process started with pid [425]
+[INFO] [pipeline_diagnostics_node-8]: process started with pid [426]
+[INFO] [segmentation_ros2_node-9]: process started with pid [427]
+[INFO] [twist_propagation_node-10]: process started with pid [428]
+[INFO] [preshaping_service_bridge_node-11]: process started with pid [429]
+[INFO] [grasp_proximity_controller_node.py-12]: process started with pid [430]
+[INFO] [rviz2-13]: process started with pid [431]
+[preshaping_service_bridge_node-11] [INFO] [1781780387.883633762] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-11] [INFO] [1781780387.890828658] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-13] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'

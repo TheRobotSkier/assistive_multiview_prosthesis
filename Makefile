@@ -99,7 +99,7 @@ else
   COMPOSE_PROFILE_FLAG := --profile mobile-sam-gpu
 endif
 
-.PHONY: help build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test test-unit test-baseline test-fresh test-replay test-replay-baseline shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill mounts-viz mounts-viz-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-bag record-bag-mock record-debug analyze-log analyze-bag analyze-bag-meta inspect-bag run-camera-log run-camera-log-debug run-tui jetson-fetch-log jetson-analyze-log
+.PHONY: help build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test test-unit test-baseline test-fresh test-replay test-replay-baseline shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill mounts-viz mounts-viz-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-bag record-bag-mock record-debug analyze-log analyze-bag analyze-bag-meta inspect-bag run-camera-log run-camera-log-debug run-tui jetson-fetch-log analyze-jetson
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -174,7 +174,7 @@ help:
 	@echo "    make jetson-sync            Push code to Jetson"
 	@echo "    make jetson-cameras         Sync + start cameras + RViz"
 	@echo "    make jetson-fetch-log       Copy latest Jetson log + sysmon to logs/"
-	@echo "    make jetson-analyze-log     Fetch + analyze latest Jetson log (runs analyze_log.py --plot)"
+	@echo "    make analyze-jetson          Analyze latest local Jetson log + sysmon (runs analyze_log.py --plot)"
 	@echo "    make timesync               Sync clocks (host + Jetson)"
 	@echo "    make network-tune           Tune UDP buffers on host (needs sudo)"
 	@echo "    make network-tune-jetson    Tune UDP buffers on Jetson (remote)"
@@ -899,14 +899,17 @@ jetson-list-cameras: robotlab-connect
 	ssh $(JETSON_HOST) "cd $(JETSON_DEPLOY_DIR)/jetson && make list-cameras"
 
 # ── Jetson log fetch + analysis ────────────────────────────────────────────
-# Fetches Docker container logs + sysmon JSONL from the Jetson.
-# Tries multiple container names to handle both old (miahand_*) and
-# new (cameras_test / openvins) naming schemes.
+# Fetches the runtime log + sysmon JSONL from the Jetson.
 #
-#   make jetson-fetch-log          # fetch Docker logs + sysmon from Jetson
+# The Jetson's 'make run-log-debug' captures the full ROS 2 launch output
+# (RealSense cameras + OpenVINS + relay) to logs/run-jetson-debug-<ts>.txt.
+# These ephemeral container logs are the authoritative source — the old
+# persistent containers (miahand_realsense_camera, etc.) are stale.
+#
+#   make jetson-fetch-log          # fetch latest run-jetson-debug log + sysmon
 #   make jetson-fetch-log JETSON_LOG=run-jetson-debug-20260617_120000.txt  # specific
 #
-#   make jetson-analyze-log        # analyze the latest LOCAL jetson log
+#   make analyze-jetson            # analyze the latest LOCAL jetson log
 JETSON_LOG ?=
 
 jetson-fetch-log: robotlab-connect
@@ -927,41 +930,36 @@ jetson-fetch-log: robotlab-connect
 			echo " (no sysmon jsonl found)"; \
 		fi; \
 	else \
-		TS=$$(date +%Y%m%d_%H%M%S); \
-		echo "=== Fetching Jetson logs ($$TS) ==="; \
-		echo "--- Docker container logs ---"; \
-		for CONTAINER in cameras_test openvins miahand_realsense_camera miahand_ros2; do \
-			echo "  $$CONTAINER ..."; \
-			ssh $(JETSON_HOST) "echo robotlab | sudo -S docker logs --tail 5000 $$CONTAINER 2>&1" > "$(CURDIR)/logs/jetson-$$CONTAINER-$$TS.txt" 2>&1 || true; \
-			if [ -s "$(CURDIR)/logs/jetson-$$CONTAINER-$$TS.txt" ]; then \
-				echo "    saved: logs/jetson-$$CONTAINER-$$TS.txt"; \
-			else \
-				rm -f "$(CURDIR)/logs/jetson-$$CONTAINER-$$TS.txt"; \
-				echo "    (no logs / container not found)"; \
-			fi; \
-		done; \
-		echo ""; \
-		echo "--- Sysmon (JSONL) ---"; \
-		SYSMON_REMOTE=$$(ssh $(JETSON_HOST) 'ls -t $(JETSON_LOG_DIR)/run-jetson-debug-*.jsonl 2>/dev/null | head -1'); \
-		if [ -n "$$SYSMON_REMOTE" ]; then \
-			SYSMON_BASE=$$(basename "$$SYSMON_REMOTE"); \
+		echo "=== Fetching latest Jetson runtime log ==="; \
+		LOG_REMOTE=$$(ssh $(JETSON_HOST) 'ls -t $(JETSON_LOG_DIR)/run-jetson-debug-*.txt 2>/dev/null | head -1'); \
+		if [ -z "$$LOG_REMOTE" ]; then \
+			echo "ERROR: no run-jetson-debug-*.txt found on Jetson."; \
+			echo "       Run 'make run-log-debug' on the Jetson first."; \
+			exit 1; \
+		fi; \
+		LOG_BASE=$$(basename "$$LOG_REMOTE") && \
+		scp $(JETSON_HOST):"$$LOG_REMOTE" "$(CURDIR)/logs/jetson-$$LOG_BASE" && \
+		echo "  + log: logs/jetson-$$LOG_BASE"; \
+		SYSMON_REMOTE=$$(echo "$$LOG_REMOTE" | sed 's/\.txt$$/\.jsonl/') && \
+		if ssh $(JETSON_HOST) "test -f $$SYSMON_REMOTE"; then \
+			SYSMON_BASE=$$(basename "$$SYSMON_REMOTE") && \
 			scp $(JETSON_HOST):"$$SYSMON_REMOTE" "$(CURDIR)/logs/jetson-$$SYSMON_BASE" && \
-			echo "  saved: logs/jetson-$$SYSMON_BASE"; \
+			echo "  + sysmon: logs/jetson-$$SYSMON_BASE"; \
 		else \
-			echo "  (no sysmon jsonl found on Jetson)"; \
+			echo "  (no matching sysmon jsonl found)"; \
 		fi; \
 		echo "Done."; \
 	fi
 
-jetson-analyze-log: ## Analyze the latest locally-fetched Jetson log
-	@LOCAL_PATH=$$(ls -t $(CURDIR)/logs/jetson-cameras_test-*.txt $(CURDIR)/logs/jetson-miahand_realsense_camera-*.txt 2>/dev/null | head -1); \
+analyze-jetson: ## Analyze the latest locally-fetched Jetson log + sibling sysmon
+	@LOCAL_PATH=$$(ls -t $(CURDIR)/logs/jetson-run-jetson-debug-*.txt 2>/dev/null | grep -v '_analysis\.txt' | head -1); \
 	if [ -z "$$LOCAL_PATH" ]; then \
 		echo "ERROR: no local jetson logs found. Run 'make jetson-fetch-log' first."; \
 		exit 1; \
 	fi; \
 	echo "Analyzing: $$LOCAL_PATH"; \
 	echo ""; \
-	python3 $(CURDIR)/scripts/analyze_log.py --plot "$$LOCAL_PATH"
+	python3 $(CURDIR)/scripts/analyze_log.py --plot --jetson "$$LOCAL_PATH"
 
 # ── Jetson OpenVINS (cameras + VIO containers + host RViz) ───────────────────
 # Syncs the repo, starts both Jetson containers, and opens the Phase 2 RViz.

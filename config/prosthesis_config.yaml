@@ -473,10 +473,16 @@ gtsam_tracker:
         # TF frames for the TF fallback
         head_tf_target_frame: "marker_map"
         head_tf_source_frame: "head_imu"
-        # ArUco topics (graceful degradation if absent)
-        aruco_marker_topic: "/aruco/marker_pose"
-        aruco_dynamic_topic: "/aruco/dynamic_marker"
-        aruco_arm_pose_topic: "/aruco/arm_pose"
+        # ArUco topics — must match jetson_relay.py _DST outputs.
+        # aruco_marker_topic: head's fixed-marker (ID 0) observation
+        #   → MarkerPoseObservation → ArUco prior on head chain.
+        # aruco_dynamic_topic: head's observation of arm marker (ID 2)
+        #   → DynamicMarkerObservation → between-factor constraint.
+        # aruco_arm_pose_topic: converted arm pose from dynamic measurement
+        #   → DynamicArmPoseObservation → ArUco prior on arm chain.
+        aruco_marker_topic: "/jetson/head/aruco_observation"
+        aruco_dynamic_topic: "/jetson/arm/aruco_dynamic_observation"
+        aruco_arm_pose_topic: "/jetson/arm/aruco_arm_pose_observation"
         # Visual factor topic (from cross_camera_features)
         visual_factor_topic: "/vis/head_arm_pose"
         # Graph parameters

@@ -47,30 +47,8 @@ from dataclasses import dataclass, field
 
 BAGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "bags")
 
-# Nominal topic rates (Hz) — shared with analyze_log.py and the diagnostics node.
-EXPECTED_HZ = {
-    "/jetson/head/points": 15.0,
-    "/jetson/arm/points": 15.0,
-    "/jetson/head/image/compressed": 30.0,
-    "/jetson/arm/image/compressed": 30.0,
-    "/jetson/head/image": 30.0,
-    "/jetson/arm/image": 30.0,
-    "/jetson/head/camera_info": 15.0,
-    "/jetson/arm/camera_info": 15.0,
-    "/jetson/head/odom": 30.0,
-    "/jetson/arm/odom": 30.0,
-    "/gtsam/head_pose": 15.0,
-    "/gtsam/arm_pose": 15.0,
-    "/vis/head_arm_pose": 30.0,
-    "/segmentation/object_cloud": 5.0,
-    "/keyframe_buffer/diagnostics": 1.0,
-    "/tf": 50.0,
-    "/tf_static": 1.0,
-}
-
-# Health thresholds
-RATE_STARVED_FRAC = 0.5   # <50% of nominal = STARVED
-RATE_FLOODED_FRAC = 1.5   # >150% of nominal = FLOODED
+# Health thresholds (used for absolute-rate comparisons, not nominal-relative)
+RATE_MIN_HZ = 1.0         # topics below this are flagged as low-rate
 GAP_WARN_FRAC = 2.0       # inter-msg gap > 2x median = gap event
 
 # Pose analysis thresholds
@@ -150,19 +128,18 @@ class TopicInfo:
     name: str
     msg_type: str
     count: int
-    expected_hz: float | None = None
     effective_hz: float | None = None
-    health: str = "OK"  # OK, ABSENT, STARVED, FLOODED
     # Tier B fields (filled during deep replay)
     sizes: list = field(default_factory=list)       # message sizes (bytes)
     stamps: list = field(default_factory=list)      # publish timestamps (ns)
     recv_times: list = field(default_factory=list)  # receive/log times (ns)
     median_dt_ms: float | None = None
     max_gap_ms: float | None = None
+    min_gap_ms: float | None = None
     n_gaps: int = 0
+    cv_dt: float | None = None
     avg_size_kb: float | None = None
     bandwidth_mbs: float | None = None
-
 
 @dataclass
 class PoseSample:
@@ -266,9 +243,8 @@ def _parse_metadata_yaml(meta_path: str, rep: BagReport) -> BagReport:
             name=name,
             msg_type=t["topic_metadata"]["type"],
             count=t["message_count"],
-            expected_hz=EXPECTED_HZ.get(name),
         )
-        _compute_topic_health(ti, rep.duration_s)
+        _compute_topic_rate(ti, rep.duration_s)
         rep.topics[name] = ti
     return rep
 
@@ -350,9 +326,8 @@ def _parse_metadata_mcap(bag_dir: str, rep: BagReport) -> BagReport:
             name=name,
             msg_type=topic_types.get(name, "unknown"),
             count=count,
-            expected_hz=EXPECTED_HZ.get(name),
         )
-        _compute_topic_health(ti, rep.duration_s)
+        _compute_topic_rate(ti, rep.duration_s)
         rep.topics[name] = ti
 
     print(f"[analyze_bag] MCAP fallback: {total_msgs} msgs across "
@@ -360,17 +335,10 @@ def _parse_metadata_mcap(bag_dir: str, rep: BagReport) -> BagReport:
     return rep
 
 
-def _compute_topic_health(ti: TopicInfo, duration_s: float):
-    """Compute health flags for a topic (shared by yaml and mcap paths)."""
+def _compute_topic_rate(ti: TopicInfo, duration_s: float):
+    """Compute effective Hz for a topic from metadata counts."""
     if ti.count > 0 and duration_s > 0:
         ti.effective_hz = ti.count / duration_s
-    if ti.count == 0:
-        ti.health = "ABSENT"
-    elif ti.expected_hz and ti.effective_hz:
-        if ti.effective_hz < ti.expected_hz * RATE_STARVED_FRAC:
-            ti.health = "STARVED"
-        elif ti.effective_hz > ti.expected_hz * RATE_FLOODED_FRAC:
-            ti.health = "FLOODED"
 
 
 # ---------------------------------------------------------------------------
@@ -782,9 +750,16 @@ def _deep_replay_decoded(rep: BagReport, mcap_files: list,
                for i in range(1, len(ti.stamps))]
         dts_ms = sorted(dts)
         ti.median_dt_ms = dts_ms[len(dts_ms) // 2] if dts_ms else None
+        ti.min_gap_ms = dts_ms[0] if dts_ms else None
         med = ti.median_dt_ms or 1.0
         ti.max_gap_ms = max(dts) if dts else None
         ti.n_gaps = sum(1 for d in dts if d > med * GAP_WARN_FRAC)
+        # Coefficient of variation (variability metric)
+        if len(dts) > 1:
+            mean_dt = sum(dts) / len(dts)
+            if mean_dt > 1e-9:
+                std_dt = (sum((d - mean_dt) ** 2 for d in dts) / len(dts)) ** 0.5
+                ti.cv_dt = round(std_dt / mean_dt, 3)
         # Bandwidth
         ti.avg_size_kb = sum(ti.sizes) / len(ti.sizes) / 1024.0
         if ti.effective_hz:
@@ -849,9 +824,16 @@ def _deep_replay_raw(rep: BagReport, mcap_files: list,
                for i in range(1, len(ti.stamps))]
         dts_ms = sorted(dts)
         ti.median_dt_ms = dts_ms[len(dts_ms) // 2] if dts_ms else None
+        ti.min_gap_ms = dts_ms[0] if dts_ms else None
         med = ti.median_dt_ms or 1.0
         ti.max_gap_ms = max(dts) if dts else None
         ti.n_gaps = sum(1 for d in dts if d > med * GAP_WARN_FRAC)
+        # Coefficient of variation (variability metric)
+        if len(dts) > 1:
+            mean_dt = sum(dts) / len(dts)
+            if mean_dt > 1e-9:
+                std_dt = (sum((d - mean_dt) ** 2 for d in dts) / len(dts)) ** 0.5
+                ti.cv_dt = round(std_dt / mean_dt, 3)
         ti.avg_size_kb = sum(ti.sizes) / len(ti.sizes) / 1024.0
         if ti.effective_hz:
             ti.bandwidth_mbs = ti.avg_size_kb * ti.effective_hz / 1024.0
@@ -898,11 +880,6 @@ def _load_sysmon(bag_dir: str) -> dict | None:
 # Reporting
 # ---------------------------------------------------------------------------
 
-def _health_flag(ti: TopicInfo) -> str:
-    flags = {"ABSENT": "ABSENT", "STARVED": "STARVED", "FLOODED": "FLOODED", "OK": ""}
-    return flags.get(ti.health, "")
-
-
 def print_tier_a(rep: BagReport, out):
     p = lambda *a, **kw: print(*a, file=out, **kw)
     p("=" * 90)
@@ -914,33 +891,22 @@ def print_tier_a(rep: BagReport, out):
     p(f"Started:    {rep.start_iso}")
     p("")
     p("-" * 90)
-    p("TIER A — TOPIC HEALTH (from metadata.yaml)")
+    p("TIER A — TOPIC OVERVIEW (from metadata.yaml)")
     p("-" * 90)
-    p(f"  {'TOPIC':<36} {'TYPE':<20} {'COUNT':>7} {'EFF_HZ':>7} {'NOM_HZ':>7}  HEALTH")
-    p(f"  {'-'*36} {'-'*20} {'-'*7} {'-'*7} {'-'*7}  {'-'*10}")
+    p(f"  {'TOPIC':<36} {'TYPE':<20} {'COUNT':>7} {'EFF_HZ':>7}")
+    p(f"  {'-'*36} {'-'*20} {'-'*7} {'-'*7}")
     for name in sorted(rep.topics):
         ti = rep.topics[name]
         eff = f"{ti.effective_hz:.1f}" if ti.effective_hz else "—"
-        nom = f"{ti.expected_hz:.0f}" if ti.expected_hz else "—"
-        flag = _health_flag(ti)
-        p(f"  {name:<36} {ti.msg_type:<20.20} {ti.count:>7} {eff:>7} {nom:>7}  {flag}")
+        absent_flag = "  ABSENT" if ti.count == 0 else ""
+        p(f"  {name:<36} {ti.msg_type:<20.20} {ti.count:>7} {eff:>7}{absent_flag}")
     p("")
-
-    # Summary of health issues
-    issues = [t for t in rep.topics.values() if t.health != "OK"]
-    if issues:
-        p("  HEALTH ISSUES:")
-        for ti in issues:
-            p(f"    {ti.name}: {ti.health}", end="")
-            if ti.health == "STARVED" and ti.expected_hz:
-                p(f" ({ti.effective_hz:.1f} Hz vs {ti.expected_hz:.0f} Hz nominal)")
-            elif ti.health == "ABSENT":
-                p(" (0 messages recorded)")
-            else:
-                p("")
-        p("")
-    else:
-        p("  All topics healthy.")
+    # Summary of absent topics
+    absent = [t for t in rep.topics.values() if t.count == 0]
+    if absent:
+        p("  ABSENT TOPICS (0 messages):")
+        for ti in absent:
+            p(f"    {ti.name}")
         p("")
 
 
@@ -956,16 +922,20 @@ def print_tier_b(rep: BagReport, out):
         return
 
     # Timing / jitter table
-    p("  Inter-message timing & bandwidth:")
-    p(f"  {'TOPIC':<36} {'MED_DT':>7} {'MAX_GAP':>8} {'GAPS':>5} {'AVG_KB':>8} {'MB/s':>7}")
-    p(f"  {'-'*36} {'-'*7} {'-'*8} {'-'*5} {'-'*8} {'-'*7}")
+    p("  Inter-message timing — Hz stats & variability:")
+    p(f"  {'TOPIC':<36} {'MIN_HZ':>7} {'MED_HZ':>7} {'MAX_HZ':>7} {'CV':>5} {'AVG_KB':>8} {'MB/s':>7}")
+    p(f"  {'-'*36} {'-'*7} {'-'*7} {'-'*7} {'-'*5} {'-'*8} {'-'*7}")
     for name in sorted(rep.topics):
         ti = rep.topics[name]
         if ti.median_dt_ms is None:
             continue
-        p(f"  {name:<36} {ti.median_dt_ms:>6.1f}m {ti.max_gap_ms:>7.0f}m {ti.n_gaps:>5} "
+        min_hz = 1000.0 / ti.max_gap_ms if ti.max_gap_ms and ti.max_gap_ms > 0 else 0
+        med_hz = 1000.0 / ti.median_dt_ms if ti.median_dt_ms > 0 else 0
+        max_hz = 1000.0 / ti.min_gap_ms if ti.min_gap_ms and ti.min_gap_ms > 0 else 0
+        cv_str = f"{ti.cv_dt:.2f}" if ti.cv_dt is not None else "—"
+        p(f"  {name:<36} {min_hz:>7.1f} {med_hz:>7.1f} {max_hz:>7.1f} {cv_str:>5} "
           f"{ti.avg_size_kb:>7.1f}K {ti.bandwidth_mbs or 0:>6.2f}")
-    p("  (m = ms, K = KB)")
+    p("  (CV = coefficient of variation of inter-message interval; K = KB)")
 
     # Full 6-DOF pose analysis
     if rep.pose_stats:
@@ -1112,23 +1082,24 @@ def print_sysmon(rep: BagReport, out):
             return None
         return min(vals), sum(vals) / len(vals), max(vals)
 
-    # Host CPU
+    # Host local machine — collected via psutil directly on the analysis workstation
     if host:
+        p("  ── HOST (local) ──")
         cpu = _stats(host, "cpu_pct")
         if cpu:
-            p(f"  Host CPU:     min={cpu[0]:.0f}%  avg={cpu[1]:.0f}%  max={cpu[2]:.0f}%")
+            p(f"  CPU:     min={cpu[0]:.0f}%  avg={cpu[1]:.0f}%  max={cpu[2]:.0f}%")
         mem = _stats(host, "mem_pct")
         if mem:
-            p(f"  Host RAM:     min={mem[0]:.0f}%  avg={mem[1]:.0f}%  max={mem[2]:.0f}%")
+            p(f"  RAM:     min={mem[0]:.0f}%  avg={mem[1]:.0f}%  max={mem[2]:.0f}%")
         gpu = _stats(host, "gpu", "util_pct")
         if gpu:
-            p(f"  Host GPU:     min={gpu[0]:.0f}%  avg={gpu[1]:.0f}%  max={gpu[2]:.0f}%")
+            p(f"  GPU:     min={gpu[0]:.0f}%  avg={gpu[1]:.0f}%  max={gpu[2]:.0f}%")
         gpumem = _stats(host, "gpu", "mem_used_mb")
         if gpumem:
-            p(f"  Host VRAM:    min={gpumem[0]:.0f}MB  avg={gpumem[1]:.0f}MB  max={gpumem[2]:.0f}MB")
+            p(f"  VRAM:    min={gpumem[0]:.0f}MB  avg={gpumem[1]:.0f}MB  max={gpumem[2]:.0f}MB")
         drift = _stats(host, "drift", "system_offset_s")
         if drift:
-            p(f"  Host drift:   min={drift[0]*1000:.1f}ms  avg={drift[1]*1000:.1f}ms  "
+            p(f"  Drift:   min={drift[0]*1000:.1f}ms  avg={drift[1]*1000:.1f}ms  "
               f"max={drift[2]*1000:.1f}ms")
         # NIC stats on DDS interface
         iface = meta.get("host_dds_iface") if meta else None
@@ -1141,27 +1112,28 @@ def print_sysmon(rep: BagReport, out):
                     nic_rx.append(net.get("rx_mbs", 0))
                     nic_drop.append(net.get("dropin", 0) + net.get("dropout", 0))
             if nic_rx:
-                p(f"  Host NIC [{iface}]: rx avg={sum(nic_rx)/len(nic_rx):.1f} MB/s  "
+                p(f"  NIC [{iface}]: rx avg={sum(nic_rx)/len(nic_rx):.1f} MB/s  "
                   f"max={max(nic_rx):.1f} MB/s  drops={sum(nic_drop)}")
 
-    # Jetson
+    # Jetson — collected by host via SSH (remote psutil)
     if jetson:
         p("")
+        p("  ── JETSON (collected by host via SSH) ──")
         cpu = _stats(jetson, "cpu_pct")
         if cpu:
-            p(f"  Jetson CPU:   min={cpu[0]:.0f}%  avg={cpu[1]:.0f}%  max={cpu[2]:.0f}%")
+            p(f"  CPU:     min={cpu[0]:.0f}%  avg={cpu[1]:.0f}%  max={cpu[2]:.0f}%")
         mem = _stats(jetson, "mem_pct")
         if mem:
-            p(f"  Jetson RAM:   min={mem[0]:.0f}%  avg={mem[1]:.0f}%  max={mem[2]:.0f}%")
+            p(f"  RAM:     min={mem[0]:.0f}%  avg={mem[1]:.0f}%  max={mem[2]:.0f}%")
         gpu = _stats(jetson, "gpu", "gpu_util_pct")
         if gpu:
-            p(f"  Jetson GPU:   min={gpu[0]:.0f}%  avg={gpu[1]:.0f}%  max={gpu[2]:.0f}%")
+            p(f"  GPU:     min={gpu[0]:.0f}%  avg={gpu[1]:.0f}%  max={gpu[2]:.0f}%")
         drift = _stats(jetson, "drift", "system_offset_s")
         if drift:
-            p(f"  Jetson drift: min={drift[0]*1000:.1f}ms  avg={drift[1]*1000:.1f}ms  "
+            p(f"  Drift:   min={drift[0]*1000:.1f}ms  avg={drift[1]*1000:.1f}ms  "
               f"max={drift[2]*1000:.1f}ms")
     elif meta and meta.get("jetson_enabled"):
-        p("  Jetson: ENABLED but no samples received (Jetson was offline?)")
+        p("  JETSON (via SSH): ENABLED but no samples received (Jetson was offline?)")
     p("")
 
     # Correlation callouts
@@ -1191,22 +1163,24 @@ def _correlate(rep: BagReport, out):
             s.get("net", {}).get(iface, {}).get("dropin", 0) +
             s.get("net", {}).get(iface, {}).get("dropout", 0)
             for s in host)
-        starved = [t for t in rep.topics.values() if t.health == "STARVED"]
-        if total_drops > 0 and starved:
-            names = ", ".join(t.name for t in starved[:3])
+        low_rate = [t for t in rep.topics.values()
+                     if t.effective_hz is not None and t.effective_hz < RATE_MIN_HZ and t.count > 0]
+        if total_drops > 0 and low_rate:
+            names = ", ".join(t.name for t in low_rate[:3])
             callouts.append(
-                f"NIC [{iface}] dropped {total_drops} packets AND topics are starved "
-                f"({names}) — packet loss is likely degrading cloud delivery.")
+                f"NIC [{iface}] dropped {total_drops} packets AND topics are low-rate "
+                f"({names}) — packet loss is likely degrading delivery.")
 
-    # 3. Jetson CPU saturation vs starved cloud topics
+    # 3. Jetson CPU saturation vs low-rate cloud topics
     jetson = rep.sysmon.get("jetson", [])
     if jetson:
         cpu_vals = [s.get("cpu_pct") for s in jetson if isinstance(s.get("cpu_pct"), (int, float))]
-        cloud_starved = [t for t in rep.topics.values()
-                         if t.health == "STARVED" and "points" in t.name]
-        if cpu_vals and max(cpu_vals) > 90 and cloud_starved:
+        low_cloud = [t for t in rep.topics.values()
+                     if t.effective_hz is not None and t.effective_hz < RATE_MIN_HZ
+                     and "points" in t.name and t.count > 0]
+        if cpu_vals and max(cpu_vals) > 90 and low_cloud:
             callouts.append(
-                f"Jetson CPU hit {max(cpu_vals):.0f}% AND pointcloud topics are starved — "
+                f"Jetson CPU hit {max(cpu_vals):.0f}% AND pointcloud topics are low-rate — "
                 f"Jetson compute saturation is likely throttling cloud publishing.")
 
     if callouts:
@@ -1241,7 +1215,7 @@ def print_plot(rep: BagReport, out_png: str):
         axes = [axes]
     row = 0
 
-    # Topic effective vs nominal rates (log scale — rates span 0.01 to >1000 Hz)
+    # Topic effective rates (log scale — rates span 0.01 to >1000 Hz)
     ax = axes[row]
     row += 1
     topics_with_data = [(name, t) for name, t in sorted(rep.topics.items()) if t.count > 0]
@@ -1250,10 +1224,8 @@ def print_plot(rep: BagReport, out_png: str):
         # Clip to a small floor so log scale can render zero/near-zero rates
         log_floor = 0.01
         eff = [max(t.effective_hz or 0, log_floor) for _, t in topics_with_data]
-        nom = [max(t.expected_hz or 0, log_floor) for _, t in topics_with_data]
         x = range(len(names))
-        ax.bar([i - 0.15 for i in x], eff, width=0.3, label="effective", color="steelblue")
-        ax.bar([i + 0.15 for i in x], nom, width=0.3, label="nominal", color="orange", alpha=0.6)
+        ax.bar(x, eff, color="steelblue", label="effective rate (Hz)")
         ax.set_xticks(list(x))
         ax.set_xticklabels([n.replace("/jetson/", "/j/").replace("/gtsam/", "/g/") for n in names],
                            rotation=45, ha="right", fontsize=6)
@@ -1393,8 +1365,6 @@ def to_metrics(rep: BagReport) -> dict:
         topics[name] = {
             "count": ti.count,
             "effective_hz": round(ti.effective_hz, 3) if ti.effective_hz else None,
-            "expected_hz": ti.expected_hz,
-            "health": ti.health,
         }
     m["topics"] = topics
 

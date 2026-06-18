@@ -1,16 +1,26 @@
 ==============================================================================
-LOG ANALYSIS — jetson-miahand_realsense_camera-20260617_160828_analysis.txt
+LOG ANALYSIS — jetson-run-jetson-debug-20260618_140816.txt
 ==============================================================================
-File:       /home/daniel/multiview_prosthesis/logs/jetson-miahand_realsense_camera-20260617_160828_analysis.txt
-Lines:      39
-Time span:  n/a
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260618_140816.txt
+Lines:      13437
+Time span:  14:08:20 – 14:09:45 (85.0s)
 
-Nodes started (0):
+Nodes started (5):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=180
 
 ------------------------------------------------------------------------------
 SEVERITY TALLY (per node)
 ------------------------------------------------------------------------------
   NODE                                         ERR   WARN    INFO
+  aruco_marker_pose_node.py                      0     47      64
+  jetson_relay                                   0      2      12
+  dynamic_arm_pose_measurement_node.py           0      0       7
+  realsense2_camera_node                         0      0       2
+  run_subscribe_msckf_marker                     0      0       2
 
 ------------------------------------------------------------------------------
 KNOWN-FAILURE DIGEST
@@ -28,8 +38,10 @@ ERRORS
   (no [ERROR] lines)
 
 ------------------------------------------------------------------------------
-CRASH / PROCESS-DEATH DETECTED
+JETSON SYSMON (from native jsonl)
 ------------------------------------------------------------------------------
-  line 37: line 205: [INFO] [ros2-4]: process has finished cleanly [pid 118]
-  line 38: line 206: [INFO] [ros2-3]: process has finished cleanly [pid 117]
+  Samples:    46
+  CPU:        min=0.0%  avg=74.3%  max=94.1%
+  RAM:        min=11.8%  avg=19.1%  max=19.9%  (total 7619.9 MB)
+  NIC [enP8p1s0]: rx avg=0.7 Mbps  max=3.2 Mbps  tx avg=464.7 Mbps  max=504.2 Mbps
 

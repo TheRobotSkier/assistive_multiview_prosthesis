@@ -420,33 +420,14 @@ class OpenVINSOdomTFRelay(Node):
         else:
             self._last_arm_pos = (x, y, z)
 
-        # ── Dynamic TF broadcast ──────────────────────────────────────────
-        # When ``publish_dynamic_tf`` is False (e.g. when the V6 GTSAM tracker
-        # owns the dynamic TF tree via broadcast_tf=true), skip broadcasting
-        # the marker_map -> *_imu edge.  The relay still runs its init guard,
-        # outlier suppression, and self-calibration so that the odometry is
-        # validated and the static *_imu -> *_cam0 extrinsics are maintained,
-        # but the smoothed trajectory from GTSAM is what feeds downstream TF
-        # consumers (V6 §6.3).
-        if not self._publish_dynamic_tf:
-            # Throttled log so the operator knows the relay is alive but
-            # deferring to GTSAM for the dynamic TF.
-            count_attr = f"_{name}_count"
-            count = getattr(self, count_attr)
-            count += 1
-            setattr(self, count_attr, count)
-            if count % 200 == 1:
-                self.get_logger().info(
-                    f"Relay #{count} ({name}): publish_dynamic_tf=False — "
-                    f"deferring {parent} -> {child} to GTSAM tracker"
-                )
-            return
-
         # ── Corrected TF republishing ───────────────────────────────────
         # When use_corrected_tf=True, look up the ArUco-corrected frame
         # (e.g. marker_map -> head_imu_openvins_corrected) and rebroadcast
         # it as the raw frame name.  This replaces the jumping raw VIO
         # trajectory with the more stable ArUco-corrected one transparently.
+        # This path runs regardless of publish_dynamic_tf so that the
+        # corrected trajectory is available even when GTSAM owns the raw
+        # TF edges (publish_dynamic_tf=False, broadcast_tf=True).
         corrected_frame = f"{child}_openvins_corrected"
         published_corrected = False
         if self._use_corrected_tf:
@@ -465,11 +446,19 @@ class OpenVINSOdomTFRelay(Node):
                 self._tf_broadcaster.sendTransform(rebroadcast)
                 published_corrected = True
             except Exception:
-                # Corrected frame not available; fall through to raw odom path.
+                # Corrected frame not available; fall through.
                 pass
 
-        # ── Raw odom TF broadcast (fallback when corrected unavailable) ──
-        if not published_corrected:
+        # ── Raw odom TF broadcast ───────────────────────────────────────
+        # When publish_dynamic_tf is False (e.g. when the V6 GTSAM tracker
+        # owns the dynamic TF tree via broadcast_tf=true), skip broadcasting
+        # the marker_map -> *_imu edge UNLESS we already published a
+        # corrected frame above.  The relay still runs its init guard,
+        # outlier suppression, and self-calibration so that the odometry is
+        # validated and the static *_imu -> *_cam0 extrinsics are maintained,
+        # but the smoothed trajectory from GTSAM is what feeds downstream TF
+        # consumers (V6 §6.3).
+        if not published_corrected and self._publish_dynamic_tf:
             # Stamp with the host clock so all edges in the TF chain
             # (relay, bridge, camera mounts) share the same time domain.
             # Using the Jetson odom timestamp created a ~10s clock gap that
@@ -481,8 +470,19 @@ class OpenVINSOdomTFRelay(Node):
                 host_stamp,
             )
             self._tf_broadcaster.sendTransform(tf_msg)
+        elif not published_corrected:
+            # Neither corrected nor dynamic TF — log throttled.
+            count_attr = f"_{name}_count"
+            count = getattr(self, count_attr)
+            count += 1
+            setattr(self, count_attr, count)
+            if count % 200 == 1:
+                self.get_logger().info(
+                    f"Relay #{count} ({name}): publish_dynamic_tf=False — "
+                    f"deferring {parent} -> {child} to GTSAM tracker"
+                )
 
-        # ── Self-calibration attempt (once per camera) ────────────────────
+        # ── Self-calibration attempt (once per camera) ──────────────────
         if (self._self_calibrate and not getattr(self, calibrated_attr)
                 and getattr(self, init_attr)):
             self._try_self_calibrate(name, child, cam_frame,

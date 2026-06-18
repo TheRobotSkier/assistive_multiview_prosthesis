@@ -1,1 +1,0 @@
-[sudo] password for robotlab: Error response from daemon: No such container: cameras_test

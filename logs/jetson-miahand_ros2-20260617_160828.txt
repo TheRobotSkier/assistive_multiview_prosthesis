@@ -1,2 +1,0 @@
-[sudo] password for robotlab: groups: cannot find name for group ID 994
-[?2004huser@ubuntu:[32m/miahand_ws[0m$ 

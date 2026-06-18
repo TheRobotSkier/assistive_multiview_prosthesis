@@ -57,18 +57,22 @@ import json, os, re, subprocess, sys, time
 INTERVAL = float(os.environ.get("SYSMON_INTERVAL", "1"))
 
 def read_proc_stat():
-    """Return (aggregate_jiff, per_core_jiffs) from /proc/stat."""
+    """Return (aggregate_jiff, idle_jiff, per_core_jiffs, per_core_idle)."""
     with open("/proc/stat") as f:
         lines = f.read().splitlines()
     agg = None
+    idle = None
     cores = []
+    cores_idle = []
     for ln in lines:
         parts = ln.split()
         if parts[0] == "cpu":
             agg = sum(int(x) for x in parts[1:])
+            idle = int(parts[4])  # idle column
         elif parts[0].startswith("cpu"):
             cores.append(sum(int(x) for x in parts[1:]))
-    return agg, cores
+            cores_idle.append(int(parts[4]))
+    return agg, idle, cores, cores_idle
 
 def read_meminfo():
     d = {}
@@ -151,13 +155,13 @@ def parse_tegrastats(line):
     return out
 
 def main():
-    prev_agg, prev_cores = read_proc_stat()
+    prev_agg, prev_idle, prev_cores, prev_cores_idle = read_proc_stat()
     prev_net = read_netdev()
     teg = start_tegrastats()
     while True:
         time.sleep(INTERVAL)
         t = time.time()
-        agg, cores = read_proc_stat()
+        agg, idle, cores, cores_idle = read_proc_stat()
         mem = read_meminfo()
         net = read_netdev()
 
@@ -166,16 +170,18 @@ def main():
         if prev_agg is not None:
             rec["cpu_pct"] = round(100.0 * (1.0 - ( (agg - prev_agg) / max(1, (INTERVAL * os.cpu_count() * 100.0)) )), 1) if False else None
         # Simpler: per-core utilization from jiffies
-        if prev_cores and len(cores) == len(prev_cores):
+        # CPU percent: use (total - idle) / total * 100
+        if prev_cores and len(cores) == len(prev_cores) and len(cores_idle) == len(prev_cores_idle):
             per = []
-            for c, p in zip(cores, prev_cores):
+            for c, p, ci, pi in zip(cores, prev_cores, cores_idle, prev_cores_idle):
                 dt = c - p
-                # each jiffy ~10ms; over INTERVAL seconds, max jiffies = INTERVAL*100
-                pct = round(100.0 * dt / max(1.0, INTERVAL * 100.0), 1)
+                di = ci - pi
+                busy = dt - di
+                # each jiffy ~10ms; over INTERVAL seconds, max jiffies = INTERVAL * 100
+                pct = round(100.0 * busy / max(1.0, INTERVAL * 100.0), 1)
                 per.append(min(100.0, max(0.0, pct)))
             rec["cpu_per_core"] = per
             rec["cpu_pct"] = round(sum(per) / max(1, len(per)), 1) if per else 0.0
-        # Memory
         total_kb = mem.get("MemTotal", 0)
         avail_kb = mem.get("MemAvailable", mem.get("MemFree", 0))
         used_kb = total_kb - avail_kb
@@ -223,7 +229,7 @@ def main():
 
         print(json.dumps(rec, separators=(",", ":")), flush=True)
         sys.stdout.flush()
-        prev_agg, prev_cores = agg, cores
+        prev_agg, prev_idle, prev_cores, prev_cores_idle = agg, idle, cores, cores_idle
         prev_net = net
 
 if __name__ == "__main__":

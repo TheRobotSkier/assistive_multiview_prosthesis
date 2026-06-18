@@ -217,7 +217,11 @@ RECORD_TOPICS_V6 := \
 	/segmentation/object_cloud \
 	/keyframe_buffer/diagnostics \
 	/tf \
-	/tf_static
+	/tf_static \
+	/head/marker_pose/reanchor_event \
+	/head/marker_pose/vio_valid \
+	/arm/marker_pose/reanchor_event \
+	/arm/marker_pose/vio_valid
 
 RECORD_TOPICS_MOCK := \
 	/fused_pointcloud \

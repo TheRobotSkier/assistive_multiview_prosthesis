@@ -40,20 +40,6 @@ from dataclasses import dataclass, field
 
 LOGS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
 
-# Nominal topic rates (Hz) — used to flag starvation in the rate timeline.
-# Kept in sync with the diagnostics node and Makefile.workspace topic list.
-EXPECTED_HZ = {
-    "/jetson/head/points": 15.0,
-    "/jetson/arm/points": 15.0,
-    "/jetson/head/image/compressed": 30.0,
-    "/jetson/arm/image/compressed": 30.0,
-    "/jetson/head/odom": 30.0,
-    "/jetson/arm/odom": 30.0,
-    "/gtsam/head_pose": 15.0,
-    "/gtsam/arm_pose": 15.0,
-    "/vis/head_arm_pose": 30.0,
-}
-
 # Thresholds reused from pipeline_diagnostics_node (jump=0.05m) and the
 # keyframe_buffer (norm warn=1.0m, crit=2.0m) so offline matches live.
 TF_JUMP_THRESHOLD_M = 0.05
@@ -418,15 +404,9 @@ def print_timeline(rep: LogReport, out):
             series = [b.rates[topic][0] for b in rep.diag_blocks if topic in b.rates]
             if not series:
                 continue
-            exp = EXPECTED_HZ.get(topic)
             mid = series[len(series) // 2]
-            flag = ""
-            if exp and max(series) > 0 and max(series) < exp * 0.5:
-                flag = f"  <-- STARVED (nominal {exp} Hz)"
-            elif exp and max(series) > exp * 1.5:
-                flag = f"  <-- FLOODED (nominal {exp} Hz)"
             p(f"    {topic:<34} {series[0]:>5.1f} / {mid:>5.1f} / {series[-1]:>5.1f}"
-              f"   (min {min(series):.1f}, max {max(series):.1f}){flag}")
+              f"   (min {min(series):.1f}, max {max(series):.1f})")
         p("")
     # Clock offset — max absolute across topics per block
     p("  Clock offset (max |clock_off| across topics per block):")
@@ -567,13 +547,15 @@ def print_plot(rep: LogReport, out_png: str):
     print(f"[analyze_log] plot written to {out_png}", file=sys.stderr)
 
 
-def report(rep: LogReport, out, plot_path: str | None = None):
+def report(rep: LogReport, out, plot_path: str | None = None, jetson_sysmon: dict | None = None):
     print_header(rep, out)
     print_severity(rep, out)
     print_failures(rep, out)
     print_timeline(rep, out)
     print_errors(rep, out)
     print_crashes(rep, out)
+    if jetson_sysmon:
+        print_jetson_sysmon(jetson_sysmon, out)
     if plot_path:
         print_plot(rep, plot_path)
 
@@ -649,6 +631,116 @@ def to_metrics(rep: LogReport) -> dict:
 # Main
 # ---------------------------------------------------------------------------
 
+def _find_sibling_jsonl(log_path: str) -> str | None:
+    """Find the jetson sysmon jsonl whose timestamp best matches the log.
+
+    Tries to match by extracting the timestamp from the log filename and finding
+    the jsonl with the closest timestamp. Falls back to the latest jsonl.
+    """
+    base = os.path.basename(log_path)
+    # Extract timestamp from log name: jetson-<container>-<ts>.txt
+    m = re.search(r"-(\d{8}_\d{6})\.txt$", base)
+    ts_str = m.group(1) if m else None
+
+    jsonls = glob.glob(os.path.join(LOGS_DIR, "jetson-run-jetson-debug-*.jsonl"))
+    if not jsonls:
+        return None
+
+    if ts_str:
+        # Try exact match first
+        exact = [f for f in jsonls if ts_str in f]
+        if exact:
+            return exact[0]
+        # Try prefix match (jsonl may start slightly earlier)
+        prefix = ts_str[:8]
+        candidates = [f for f in jsonls if prefix in f]
+        if candidates:
+            return max(candidates, key=os.path.getmtime)
+
+    # Fallback: latest jsonl
+    return max(jsonls, key=os.path.getmtime)
+
+
+def _load_jetson_sysmon(path: str) -> dict | None:
+    """Load a jetson-native sysmon jsonl and return summary stats.
+
+    The jetson-native sysmon schema differs from the host sysmon:
+      cpu_pct, mem_pct, mem_total_mb, mem_used_mb, net.*.rx_mbps, tx_mbps, etc.
+    """
+    samples = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if obj.get("source") == "jetson" and "cpu_pct" in obj:
+                samples.append(obj)
+    if not samples:
+        return None
+
+    cpus = [s["cpu_pct"] for s in samples if isinstance(s.get("cpu_pct"), (int, float))]
+    mems = [s["mem_pct"] for s in samples if isinstance(s.get("mem_pct"), (int, float))]
+    total_mb = samples[0].get("mem_total_mb", 0)
+
+    # Network stats (pick the DDS interface enP8p1s0 or first non-lo)
+    net_stats = defaultdict(list)
+    for s in samples:
+        net = s.get("net", {})
+        for iface, stats in net.items():
+            if iface == "lo":
+                continue
+            for key in ("rx_mbps", "tx_mbps"):
+                val = stats.get(key)
+                if isinstance(val, (int, float)):
+                    net_stats[f"{iface}_{key}"].append(val)
+
+    return {
+        "samples": len(samples),
+        "cpu_pct": {"min": round(min(cpus), 1), "avg": round(sum(cpus) / len(cpus), 1),
+                     "max": round(max(cpus), 1)} if cpus else None,
+        "mem_pct": {"min": round(min(mems), 1), "avg": round(sum(mems) / len(mems), 1),
+                     "max": round(max(mems), 1)} if mems else None,
+        "mem_total_mb": total_mb,
+        "net": {k: {"min": round(min(v), 1), "avg": round(sum(v) / len(v), 1),
+                      "max": round(max(v), 1)} for k, v in net_stats.items()},
+    }
+
+
+def print_jetson_sysmon(sysmon: dict, out):
+    """Print a condensed sysmon summary for the Jetson native sysmon data."""
+    p = lambda *a: print(*a, file=out)
+    p("-" * 78)
+    p("JETSON SYSMON (from native jsonl)")
+    p("-" * 78)
+    p(f"  Samples:    {sysmon['samples']}")
+    cpu = sysmon.get("cpu_pct")
+    if cpu:
+        p(f"  CPU:        min={cpu['min']}%  avg={cpu['avg']}%  max={cpu['max']}%")
+    mem = sysmon.get("mem_pct")
+    if mem:
+        mb = sysmon.get("mem_total_mb", 0)
+        p(f"  RAM:        min={mem['min']}%  avg={mem['avg']}%  max={mem['max']}%"
+          f"  (total {mb} MB)")
+    net = sysmon.get("net", {})
+    # Pick the first non-empty interface and show rx/tx
+    iface_keys = sorted(net.keys())
+    if iface_keys:
+        # Infer interface name (everything before the first _ in the key)
+        sample_key = iface_keys[0]
+        iface_name = sample_key.rsplit("_", 2)[0] if sample_key.endswith("_rx_mbps") or sample_key.endswith("_tx_mbps") else sample_key
+        rx_key = f"{iface_name}_rx_mbps"
+        tx_key = f"{iface_name}_tx_mbps"
+        rx_stats = net.get(rx_key)
+        tx_stats = net.get(tx_key)
+        rx_str = f"rx avg={rx_stats['avg']:.1f} Mbps  max={rx_stats['max']:.1f} Mbps" if rx_stats else ""
+        tx_str = f"tx avg={tx_stats['avg']:.1f} Mbps  max={tx_stats['max']:.1f} Mbps" if tx_stats else ""
+        p(f"  NIC [{iface_name}]: {rx_str}{'  ' + tx_str if tx_str else ''}")
+    p("")
+
 def _latest_log():
     """Return the most-recently-modified raw host-log, or None.
 
@@ -671,6 +763,7 @@ def main():
     ap.add_argument("--plot", action="store_true", help="Write PNG timeline (needs matplotlib)")
     ap.add_argument("-o", "--output", help="Write report to file (default: <log>_analysis.txt)")
     ap.add_argument("--json", metavar="PATH", help="Write scalar metrics to JSON (for replay-test comparison)")
+    ap.add_argument("--jetson", action="store_true", help="Jetson mode: also load sibling sysmon jsonl")
     args = ap.parse_args()
 
     if args.all:
@@ -699,11 +792,22 @@ def main():
         out = open(output_path, "w")
 
         rep = parse_log(logpath)
+
+        # Jetson mode: load sibling sysmon jsonl and overlay
+        jetson_sysmon = None
+        if args.jetson:
+            jsonl_path = _find_sibling_jsonl(logpath)
+            if jsonl_path:
+                print(f"[analyze_log] jetson sysmon: {jsonl_path}", file=sys.stderr)
+                jetson_sysmon = _load_jetson_sysmon(jsonl_path)
+            else:
+                print("[analyze_log] no sibling jetson sysmon jsonl found", file=sys.stderr)
+
         plot_path = None
         if args.plot:
             base = os.path.splitext(logpath)[0]
             plot_path = base + "_analysis.png"
-        report(rep, out, plot_path)
+        report(rep, out, plot_path, jetson_sysmon)
 
         out.close()
         print(f"[analyze_log] report written to {output_path}", file=sys.stderr)
