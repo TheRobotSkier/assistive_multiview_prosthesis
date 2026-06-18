@@ -30,16 +30,11 @@
              would attempt to replay megabytes of history per heartbeat
              under CPU pressure, driving the effective wire rate to
              440+ Mbps of pure protocol overhead.
-
-             RetransmitMerging / RetransmitMergingPeriod: 5 ms — bundles
-             retransmission responses to reduce per-reader unicast overhead.
         ─────────────────────────────────────────────────────────────────── -->
         <Internal>
             <SocketReceiveBufferSize min="50MB"/>
             <SocketSendBufferSize min="50MB"/>
             <MaxQueuedRexmitBytes>5MB</MaxQueuedRexmitBytes>
-            <RetransmitMerging>true</RetransmitMerging>
-            <RetransmitMergingPeriod>5ms</RetransmitMergingPeriod>
         </Internal>
     </Domain>
 </CycloneDDS>
