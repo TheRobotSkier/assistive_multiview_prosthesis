@@ -14,6 +14,7 @@ Usage::
 from __future__ import annotations
 
 import threading
+import argparse
 import time
 
 import rclpy
@@ -24,8 +25,11 @@ from std_msgs.msg import Bool, Float32, Float32MultiArray, Float64, Float64Multi
 
 from scripts.mia_haptic_force_test.hand_controller_node import HandControllerNode
 
-# ── Test duration ────────────────────────────────────────────────────────────
-TEST_DURATION_S: float = 62.0
+# ── CLI: --duration (default 10 s, pass 60 for longer soak) ────────────
+_DURATION_PARSER = argparse.ArgumentParser(add_help=False)
+_DURATION_PARSER.add_argument("--duration", type=float, default=10.0)
+_DURATION_ARGS, _ = _DURATION_PARSER.parse_known_args()
+TEST_DURATION_S: float = _DURATION_ARGS.duration
 
 
 class SimulatedPublisher(Node):

@@ -12,6 +12,8 @@ No C++ fallback needed.
 from __future__ import annotations
 
 import json
+import os
+import sys
 import threading
 import time
 from collections import deque
@@ -24,31 +26,24 @@ from rclpy.publisher import Publisher
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool, Float32, Float32MultiArray, Float64, Float64MultiArray, Int32, String
 
+# ── sys.path bootstrap for direct execution ──────────────────────────────
+_REPO_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if __name__ == "__main__" and __package__ is None and _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+
 from force_controller.controller_manager_client import ControllerManagerClient
 from scripts.mia_haptic_force_test.common.constants import (
     FINGER_COUNT,
+    FINGER_JOINTS,
     POSITION_CONTROLLERS,
     VELOCITY_CONTROLLERS,
 )
-from scripts.mia_haptic_force_test.common.conversions import hold_velocity
+from scripts.mia_haptic_force_test.common.conversions import dict_get, hold_velocity
 
-# ── Rate configuration ──────────────────────────────────────────────────────
-CONTROL_RATE_HZ: float = 100.0
-CONTROL_DT: float = 1.0 / CONTROL_RATE_HZ
+# ── Timing window (not in config; used for statistics) ─────────────────────
 TIMING_WINDOW: int = 1000           # ~10 s at 100 Hz
 TIMING_PUB_INTERVAL: int = 100      # publish every 100 loops (~1 Hz)
-
-# ── Default open positions (all zeros) ──────────────────────────────────────
-_OPEN_POSITIONS: list[float] = [0.0, 0.0, 0.0]
-
-# ── Velocity mode parameters (mirror config defaults) ──────────────────────
-_HOLD_DEADZONE: float = 0.0
-_HOLD_MAX_VEL: float = 0.08
-_HOLD_MIN_OVERSHOOT: float = 0.0
-_HOLD_MAX_OVERSHOOT: float = 0.0
-
-# ── Emergency backoff velocity ──────────────────────────────────────────────
-_BACKOFF_VEL: float = -0.05
 
 
 class HandControllerNode(Node):
@@ -58,8 +53,10 @@ class HandControllerNode(Node):
     messages are cached under a lock; the control loop never blocks on DDS.
     """
 
+
     def __init__(self) -> None:
         super().__init__("hand_controller_node")
+        self._load_config()
 
         # ── Cached message state (written by DDS callbacks, read by control loop) ──
         self._lock = threading.Lock()
@@ -124,6 +121,82 @@ class HandControllerNode(Node):
         self.get_logger().info("HandControllerNode initialized")
 
     # ────────────────────────────────────────────────────────────────────────
+
+    # ────────────────────────────────────────────────────────────────────────
+    # Config loading
+    # ────────────────────────────────────────────────────────────────────────
+
+    def _load_config(self) -> None:
+        """Load configuration from config/mia_haptic_force_test.yaml.
+
+        Declares ROS parameters for introspection and sets instance
+        attributes used by the control-loop hot path.
+        """
+        import yaml
+
+        config_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "config",
+            "mia_haptic_force_test.yaml",
+        )
+
+        try:
+            with open(config_path) as f:
+                raw = yaml.safe_load(f) or {}
+        except Exception as exc:
+            self.get_logger().warn(f"Config load failed ({config_path}): {exc}")
+            raw = {}
+
+        def _walk(path: str, default):
+            cur = raw
+            parts = path.split(".")
+            for i, part in enumerate(parts):
+                if isinstance(cur, dict):
+                    fallback = default if i == len(parts) - 1 else {}
+                    cur = cur.get(part, fallback)
+                else:
+                    return default
+            return cur
+
+        # Hand open positions (dict -> list in FINGER_JOINTS order)
+        open_raw = _walk("hand.open_positions", {})
+        if isinstance(open_raw, dict):
+            self._open_positions = [float(open_raw.get(j, 0.0)) for j in FINGER_JOINTS]
+        else:
+            self._open_positions = [0.0] * FINGER_COUNT
+        self.declare_parameter("hand.open_positions", self._open_positions)
+
+        # Hold-velocity parameters
+        self._hold_deadzone = float(_walk("hand.hold_deadzone", 0.0))
+        self.declare_parameter("hand.hold_deadzone", self._hold_deadzone)
+
+        self._hold_max_velocity = float(_walk("hand.hold_max_velocity_rad_s", 0.08))
+        self.declare_parameter("hand.hold_max_velocity_rad_s", self._hold_max_velocity)
+
+        self._hold_min_overshoot = float(_walk("hand.hold_min_overshoot", 0.0))
+        self.declare_parameter("hand.hold_min_overshoot", self._hold_min_overshoot)
+
+        self._hold_max_overshoot = float(_walk("hand.hold_max_overshoot", 0.0))
+        self.declare_parameter("hand.hold_max_overshoot", self._hold_max_overshoot)
+
+        # Emergency backoff
+        self._emergency_backoff_velocity = float(
+            _walk("force.emergency_backoff_velocity_rad_s", -0.05)
+        )
+        self.declare_parameter(
+            "force.emergency_backoff_velocity_rad_s", self._emergency_backoff_velocity
+        )
+        self._emergency_threshold = float(_walk("force.emergency_threshold", float("inf")))
+        self.declare_parameter("force.emergency_threshold", self._emergency_threshold)
+
+        # Control rate
+        self._control_rate_hz = float(_walk("runtime.control_rate_hz", 100.0))
+        self.declare_parameter("runtime.control_rate_hz", self._control_rate_hz)
+        self._dt = 1.0 / self._control_rate_hz if self._control_rate_hz > 0.0 else 0.01
+
+        # Wrist acceleration
+        self._acceleration_deg_s2 = float(_walk("wrist.acceleration_deg_s2", 180.0))
+        self.declare_parameter("wrist.acceleration_deg_s2", self._acceleration_deg_s2)
     # DDS callbacks (run on the executor thread)
     # ────────────────────────────────────────────────────────────────────────
 
@@ -240,6 +313,14 @@ class HandControllerNode(Node):
             state = self._snapshot()
             mode: str = state["mode"]
 
+            # Autonomous emergency backoff (override mode locally)
+            if mode != "position" and max(state["forces"]) > self._emergency_threshold:
+                self.get_logger().warn(
+                    f"Emergency backoff triggered: force {max(state['forces']):.1f} "
+                    f"> {self._emergency_threshold}"
+                )
+                mode = "emergency_backoff"
+
             # Switch controllers when mode changes
             try:
                 self._switch_if_needed(mode)
@@ -251,7 +332,7 @@ class HandControllerNode(Node):
 
             if mode == "position":
                 pos_msg = Float64MultiArray()
-                pos_msg.data = _OPEN_POSITIONS
+                pos_msg.data = self._open_positions
                 self._pos_pub.publish(pos_msg)
 
             elif mode == "velocity":
@@ -260,10 +341,10 @@ class HandControllerNode(Node):
                     v = hold_velocity(
                         target=state["target_force"][i],
                         force=state["forces"][i],
-                        deadzone=_HOLD_DEADZONE,
-                        max_velocity=_HOLD_MAX_VEL,
-                        min_overshoot=_HOLD_MIN_OVERSHOOT,
-                        max_overshoot=_HOLD_MAX_OVERSHOOT,
+                        deadzone=self._hold_deadzone,
+                        max_velocity=self._hold_max_velocity,
+                        min_overshoot=self._hold_min_overshoot,
+                        max_overshoot=self._hold_max_overshoot,
                     )
                     velocities.append(v)
                 vel_msg = Float64MultiArray()
@@ -280,7 +361,7 @@ class HandControllerNode(Node):
 
             elif mode == "emergency_backoff":
                 vel_msg = Float64MultiArray()
-                vel_msg.data = [_BACKOFF_VEL] * FINGER_COUNT
+                vel_msg.data = [self._emergency_backoff_velocity] * FINGER_COUNT
                 self._vel_pub.publish(vel_msg)
 
             # Active flag
@@ -288,9 +369,9 @@ class HandControllerNode(Node):
             active_msg.data = enabled
             self._active_pub.publish(active_msg)
 
-            # Wrist position
+            # Wrist position (target + acceleration)
             wrist_msg = Float64MultiArray()
-            wrist_msg.data = [state["target_wrist"]]
+            wrist_msg.data = [state["target_wrist"], self._acceleration_deg_s2]
             self._wrist_pub.publish(wrist_msg)
 
             # ── Timing bookkeeping ──────────────────────────────────────────
@@ -301,8 +382,8 @@ class HandControllerNode(Node):
             if self._timing_ticks % TIMING_PUB_INTERVAL == 0 and self._loop_times:
                 self._publish_timing()
 
-            # Sleep to maintain 100 Hz (allow overrun — keep going)
-            remaining: float = CONTROL_DT - elapsed
+            # Sleep to maintain target rate (allow overrun — keep going)
+            remaining: float = self._dt - elapsed
             if remaining > 0.0:
                 time.sleep(remaining)
 
