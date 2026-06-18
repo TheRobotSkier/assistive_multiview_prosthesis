@@ -89,6 +89,17 @@ EMG_DECREASE_FORCE_LABEL: Final[int] = 4
 EMG_WRIST_POSITIVE_LABEL: Final[int] = 3
 EMG_WRIST_NEGATIVE_LABEL: Final[int] = 4
 
+GESTURES: Final[dict[str, int]] = {
+    "REST": EMG_REST_LABEL,
+    "POWER": EMG_ACTIVATION_LABEL,
+    "OPEN": EMG_OPEN_LABEL,
+    "FLEXION": EMG_INCREASE_FORCE_LABEL,
+    "EXTENSION": EMG_DECREASE_FORCE_LABEL,
+}
+"""Default mapping from gesture name to numeric label."""
+
+REST_GESTURE_LABEL: Final[int] = EMG_REST_LABEL
+
 
 # ── Default topic names ─────────────────────────────────────────────────────
 # Multi-node topic contract.  These are the canonical inter-node topics;

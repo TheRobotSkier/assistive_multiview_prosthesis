@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-"""MVP-3MS: Python hand_controller_node — 100 Hz control loop timing spike.
+"""MVP-CJ2: hand_controller_node — final 100 Hz Python control loop.
 
 Python 3.12 / ROS 2 Jazzy.
-PASS: mean_hz >= 100, p99_jitter_ms <= 2.0.
-
-Verification (2026-06-18): ``python -m py_compile`` passes on both
-``hand_controller_node.py`` and ``test_hand_controller_timing.py``.
-No C++ fallback needed.
+Targets ≥ 100 Hz mean loop rate with ≤ 2 ms p99 period jitter.
+No C++ fallback needed (mvp-3MS spike validated Python performance).
 """
 
 from __future__ import annotations
@@ -24,7 +21,7 @@ from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.publisher import Publisher
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool, Float32, Float32MultiArray, Float64, Float64MultiArray, Int32, String
+from std_msgs.msg import Bool, Float32, Float32MultiArray, Float64MultiArray, Int32, String
 
 # ── sys.path bootstrap for direct execution ──────────────────────────────
 _REPO_ROOT: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -101,7 +98,7 @@ class HandControllerNode(Node):
         self.create_subscription(Float32, "/emg/confidence", self._cb_confidence, 10)
         self.create_subscription(Float32, "/emg/proportional", self._cb_proportional, 10)
         self.create_subscription(Float64MultiArray, "/control/target_force", self._cb_target_force, 10)
-        self.create_subscription(Float64, "/control/target_wrist", self._cb_target_wrist, 10)
+        self.create_subscription(Float64MultiArray, "/control/target_wrist", self._cb_target_wrist, 10)
         self.create_subscription(String, "/control/mode", self._cb_mode, 10)
         self.create_subscription(Bool, "/control/enable", self._cb_enable, 10)
         self.create_subscription(String, "/control/hold_mode", self._cb_hold_mode, 10)
@@ -236,9 +233,9 @@ class HandControllerNode(Node):
                 list(msg.data) if len(msg.data) >= FINGER_COUNT else [0.0] * FINGER_COUNT
             )
 
-    def _cb_target_wrist(self, msg: Float64) -> None:
+    def _cb_target_wrist(self, msg: Float64MultiArray) -> None:
         with self._lock:
-            self._target_wrist = msg.data
+            self._target_wrist = float(msg.data[0]) if msg.data else 90.0
 
     def _cb_mode(self, msg: String) -> None:
         with self._lock:
