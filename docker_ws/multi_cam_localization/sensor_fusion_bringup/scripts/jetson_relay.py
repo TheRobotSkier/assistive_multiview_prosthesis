@@ -522,16 +522,22 @@ class JetsonRelay(Node):
     # ── setup helpers ────────────────────────────────────────────────────
 
     def _setup_pointclouds(self) -> None:
+        # Host-side backprojection (depth_image_proc::PointCloudXyzrgbNode) now
+        # publishes /jetson/{head,arm}/points locally on the laptop.  Even with
+        # enable_pointclouds:=false the publisher declaration below registered a
+        # competing QoS profile on /jetson/*/points that triggered a middleware
+        # INCOMPATIBLE_QoS block.  Commented out to eliminate the ghost publisher.
         for cam in CAMERAS:
             key = f"{cam}_pc"
             self.create_subscription(
                 PointCloud2, _SRC[key],
                 lambda m, c=cam: self._on_pc(m, c), _SENSOR_QOS,
             )
-        self._pc_pub = {
-            cam: self.create_publisher(PointCloud2, _DST[f"{cam}_pc"], _SENSOR_QOS)
-            for cam in CAMERAS
-        }
+        # self._pc_pub = {
+        #     cam: self.create_publisher(PointCloud2, _DST[f"{cam}_pc"], _SENSOR_QOS)
+        #     for cam in CAMERAS
+        # }
+        self._pc_pub = {}
 
     def _setup_images(self) -> None:
         for cam in CAMERAS:
@@ -661,6 +667,10 @@ class JetsonRelay(Node):
     # ── callbacks ─────────────────────────────────────────────────────────
 
     def _on_pc(self, msg: PointCloud2, camera: str) -> None:
+        # PointCloud2 publishers disabled — host-side backprojection
+        # (depth_image_proc::PointCloudXyzrgbNode) now owns /jetson/*/points.
+        if not self._pc_pub:
+            return
         if not self._gates[f"pc_{camera}"].should_publish():
             return
         if self._pc_dec_enabled and self._pc_dec_step > 1:

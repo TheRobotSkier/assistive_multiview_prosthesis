@@ -40,6 +40,14 @@ def generate_launch_description():
         output="screen",
         emulate_tty=True,
         condition=IfCondition(LaunchConfiguration("start_camera")),
+        # Contain raw camera topics to localhost shared memory only.
+        # Clears CYCLONEDDS_URI so this node ignores the global wire
+        # config and binds to the loopback transport. The Jetson relay
+        # still bridges the throttled, compressed streams to the network.
+        additional_env={
+            "CYCLONEDDS_URI": "",
+            "ROS_LOCALHOST_ONLY": "1",
+        },
         parameters=[{
             "camera_name": "d435i_arm",
             "serial_no": "_310622071850",

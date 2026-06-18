@@ -40,6 +40,15 @@ def generate_launch_description():
         output="screen",
         emulate_tty=True,
         condition=IfCondition(LaunchConfiguration("start_camera")),
+        # Isolate the raw 614 KB depth/color frames to localhost shared
+        # memory only.  Clearing CYCLONEDDS_URI forces CycloneDDS to use its
+        # default localhost-only profile for this node, so the heavy raw
+        # topics never escape onto enP8p1s0.  The jetson_relay node retains
+        # the global XML config so it can still cross the Cat5e wire.
+        additional_env={
+            "CYCLONEDDS_URI": "",
+            "ROS_LOCALHOST_ONLY": "1",
+        },
         parameters=[{
             "camera_name": "d435i_head",
             "serial_no": "_336222071386",
