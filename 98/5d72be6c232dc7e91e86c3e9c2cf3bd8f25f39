@@ -1,0 +1,26 @@
+docker/docker-compose.yml
+  s_2fcabcb07f35ba::t_5afbfb8e26bc24 117
+docker/entrypoint.sh
+  s_2fcabcb07f35ba::t_c8bc242c8121ca 64-69,73-78
+Makefile
+  s_2fcabcb07f35ba::t_49d5e5cc22483f 849
+  s_2fcabcb07f35ba::t_9db5fa3fd1aa06 793,850
+  s_2fcabcb07f35ba::t_5cc1f5a45ae1c9 86,238,811
+  s_2fcabcb07f35ba::t_3f0f8e89832bf3 832
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "985d72be6c232dc7e91e86c3e9c2cf3bd8f25f39",
+  "prompts": {},
+  "sessions": {
+    "s_2fcabcb07f35ba": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019ed9a3-c84a-71e1-b44c-2758dea36785",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Asger <asger.frederiksen@gmail.com>"
+    }
+  }
+}
