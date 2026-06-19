@@ -83,6 +83,8 @@ def _launch_setup(context, *args, **kwargs):
     log_level = LaunchConfiguration("log_level").perform(context)
     use_multi_node = _as_bool(context, "use_multi_node")
     keyboard_emg = _as_bool(context, "keyboard_emg")
+    terminal_ui = _as_bool(context, "terminal_ui")
+    logger_enable = _as_bool(context, "logger")
     emg_board_ip = os.environ.get("EMG_BOARD_IP", "")
 
     if not os.path.exists(config_path):
@@ -115,9 +117,14 @@ def _launch_setup(context, *args, **kwargs):
             ("supervisor_node", True),
             ("hand_controller_node", True),
             ("haptic_node", haptic_enable),
-            ("logger_node", True),
-            ("terminal_ui_node", True),
+            ("logger_node", logger_enable),
+            ("terminal_ui_node", terminal_ui),
         ]
+        # In mock mode, launch the hand/wrist simulator BEFORE the
+        # input nodes so that /hand_sim/joint_states and /wrist/state
+        # are already publishing when force_input_node subscribes.
+        if mock_hardware:
+            multi_nodes.insert(0, ("hand_simulator_node", True))
         for name, enabled in multi_nodes:
             if not enabled:
                 continue
@@ -130,26 +137,38 @@ def _launch_setup(context, *args, **kwargs):
             # We copy the parent env and only override PYTHONPATH so the
             # scripts/ package is importable alongside the ROS 2 site-packages.
             _child_env = os.environ.copy()
+            cmd = [
+                "python3",
+                "-m",
+                f"scripts.mia_haptic_force_test.{name}",
+                "--config-path",
+                config_path,
+                "--ros-args",
+                "--log-level",
+                log_level,
+            ]
+            # In mock mode, point force_input_node at the simulator's
+            # joint-state topic.  force_input_node does NOT read this
+            # from the YAML `topics:` section, so it must be passed
+            # via the command line.  We do NOT override
+            # force_data_topic because the simulator publishes the
+            # canonical ForceData on data_streams/fingers/forces/data
+            # (the default), and /hand_sim/forces is a Float32MultiArray
+            # passthrough that would cause a type-hash mismatch.
+            if mock_hardware and name == "force_input_node":
+                cmd += [
+                    "-p", "joint_states_topic:=/hand_sim/joint_states",
+                ]
             nodes.append(
                 ExecuteProcess(
-                    cmd=[
-                        "python3",
-                        "-m",
-                        f"scripts.mia_haptic_force_test.{name}",
-                        "--config-path",
-                        config_path,
-                        "--ros-args",
-                        "--log-level",
-                        log_level,
-                    ],
+                    cmd=cmd,
                     name=name,
-                    output="screen" if name in ("emg_input_node", "keyboard_emg_node", "supervisor_node", "hand_controller_node", "terminal_ui_node") else "log",
+                    output="screen" if name in ("emg_input_node", "keyboard_emg_node", "supervisor_node", "hand_controller_node", "hand_simulator_node", "terminal_ui_node") else "log",
                     sigkill_timeout="5",
                     sigterm_timeout="3",
                     env=_child_env,
                 )
             )
-        # Shared hardware drivers (same as legacy path)
         nodes.append(
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
@@ -384,6 +403,22 @@ def generate_launch_description():
                     "Replace the live EMG bracelet with keyboard arrow-key "
                     "emulation (←OPEN →POWER ↓FLEXION ↑EXTENSION, release→REST). "
                     "Requires a TTY for the keyboard_emg_node."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "terminal_ui",
+                default_value="true",
+                description=(
+                    "Launch terminal_ui_node (split-node only).  Set to "
+                    "false for headless CI runs."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "logger",
+                default_value="true",
+                description=(
+                    "Launch logger_node (split-node only).  Set to false "
+                    "for headless CI runs."
                 ),
             ),
             OpaqueFunction(function=_launch_setup),

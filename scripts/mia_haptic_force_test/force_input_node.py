@@ -54,14 +54,32 @@ class ForceInputNode(Node):
         self.declare_parameter("force_window_size", 5)
         self.declare_parameter("force_stale_timeout_s", 1.0)
         self.declare_parameter("force_data_topic", TOPIC_HW_FINGER_FORCES)
-        self.declare_parameter("joint_states_topic", TOPIC_HW_JOINT_STATES)
         self.declare_parameter("use_effort_fallback", True)
+        self.declare_parameter("require_force_data", True)
 
         rate_hz = float(self.get_parameter("publish_rate_hz").value)
         self._dt = 1.0 / max(rate_hz, 1.0)
         self._window = max(int(self.get_parameter("force_window_size").value), 1)
+        # Read the YAML config to honour overlay values for
+        # force_stale_timeout_s, use_effort_fallback, and
+        # require_force_data when they are not passed via -p.
+        try:
+            import yaml
+            with open(self._config_path) as f:
+                _raw_cfg = yaml.safe_load(f) or {}
+            _force_cfg = _raw_cfg.get("force", {}) if isinstance(_raw_cfg, dict) else {}
+            if isinstance(_force_cfg, dict):
+                if "stale_timeout_s" in _force_cfg:
+                    self.declare_parameter("force_stale_timeout_s", float(_force_cfg["stale_timeout_s"]))
+                if "use_effort_fallback" in _force_cfg:
+                    self.declare_parameter("use_effort_fallback", bool(_force_cfg["use_effort_fallback"]))
+                if "require_force_data" in _force_cfg:
+                    self.declare_parameter("require_force_data", bool(_force_cfg["require_force_data"]))
+        except Exception:
+            pass
         self._stale_timeout = float(self.get_parameter("force_stale_timeout_s").value)
         self._use_effort_fallback = bool(self.get_parameter("use_effort_fallback").value)
+        self._require_force_data = bool(self.get_parameter("require_force_data").value)
 
         self._forces_pub = self.create_publisher(Float32MultiArray, TOPIC_HAND_FORCES, 10)
         self._source_pub = self.create_publisher(String, TOPIC_HAND_FORCE_SOURCE, 10)
