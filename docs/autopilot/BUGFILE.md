@@ -100,3 +100,33 @@ Each entry records error-message fixes that should help future agents avoid redi
 - Fix: Moved `keyboard_gesture_state` and `DEFAULT_KEY_IDLE_TIMEOUT_S` to `scripts/mia_haptic_force_test/common/keyboard_idle.py` (no rclpy import). Updated `keyboard_emg_node.py` to import from the common module. Updated the test to import from the common module.
 - Verification: `python3 -m pytest tests/mia_haptic_force_test/test_topic_contracts.py -q` → 21 passed, 1 skipped.
 - Related: None.
+
+### Forced audit found 4 BLOCKERs in the integration layer
+
+- Date: 2026-06-18
+- Beads: mvp-1dc.2, mvp-1dc.4, mvp-1dc.6, mvp-1dc.7
+- Components/files: `src/prosthesis_launch/launch/mia_haptic_force_test.launch.py`, `tests/mia_haptic_force_test/offline_suite.py`, `scripts/mia_haptic_force_test/force_input_node.py`
+- Root cause: The implementation was declared complete prematurely. The integration layer had structural blockers that were never verified: (1) simulator wiring was in the wrong launch file (scripts/ vs src/prosthesis_launch/launch/); (2) the scripts/ launch disabled emg_input_node in mock mode but launched no keyboard_emg_node, so nothing published /emg/gesture_name; (3) the offline suite's main() set fault_ok = True with "skipped in this run" — the fault-path scenario was never implemented; (4) the launch passed -p force_data_topic:=/hand_sim/forces but the simulator published /hand_sim/forces as Float32MultiArray while force_input_node subscribed with ForceData — type-hash mismatch.
+- Fix: Ported simulator wiring to the INSTALLED launch file; added terminal_ui and logger DeclareLaunchArguments; in mock mode, force_input_node is pointed at /hand_sim/joint_states via --ros-args -p (the force_data_topic override was dropped to avoid the type mismatch); the offline suite now launches with use_multi_node:=true keyboard_emg:=true; added a GestureInjector that publishes /emg/gesture_name directly via DDS as a reliable fallback; added setsid + TIOCSCTTY in a preexec_fn so the PTY slave becomes the child's controlling terminal; implemented the fault-path scenario as a separate launch with use_effort_fallback:=false + require_force_data:=true; added require_force_data as a declared param in force_input_node and made it read the YAML config for fallback values.
+- Verification: All 5 modified/new files have valid syntax. The 97 local tests still pass. The rclpy-dependent tests (test_node_contracts.py, test_tui_node.py, test_simulator_health.py) are skipped locally and will run in Docker.
+- Related: None.
+
+### Topic contract tests only tested pure functions, not node contracts
+
+- Date: 2026-06-18
+- Beads: mvp-1dc.7
+- Components/files: `tests/mia_haptic_force_test/test_node_contracts.py` (new)
+- Root cause: The original test_topic_contracts.py only tested pure functions/constants/enums (Stage values, hold_velocity math, force_haptics/wrist_haptics). It did not drive the actual node callbacks.
+- Fix: Created test_node_contracts.py with rclpy-dependent tests: SupervisorStageTransitionTest drives the supervisor's _tick() through stage transitions, ControllerSwitchTest drives hand_controller_node._cb_mode with a fake ControllerManagerClient, HapticNodeMappingTest drives haptic_node._on_forces/_on_wrist_state → /haptic_band/motors.
+- Verification: File syntax is valid. Tests are skipped locally without rclpy and will run in Docker.
+- Related: None.
+
+### TUI smoke tests only tested the pure renderer, not the node
+
+- Date: 2026-06-18
+- Beads: mvp-1dc.3
+- Components/files: `tests/mia_haptic_force_test/test_tui_node.py` (new)
+- Root cause: The original test_tui_smoke.py only called render_terminal_frame/render_haptic_ring directly and wrote ANSI bytes to a sink manually. It never constructed the actual TerminalUINode.
+- Fix: Created test_tui_node.py with rclpy-dependent tests that construct the actual node, exercise _build_snapshot(), _render(sink=...), verify the haptic ring changes with synthetic inputs via DDS, and verify clean destroy_node().
+- Verification: File syntax is valid. Tests are skipped locally without rclpy and will run in Docker.
+- Related: None.
