@@ -108,7 +108,7 @@ up_msckf_chi2_multipler: 1
 up_slam_sigma_px: 1
 up_slam_chi2_multipler: 1
 up_aruco_sigma_px: 2
-up_aruco_chi2_multipler: 2
+up_aruco_chi2_multipler: 1
 
 # masks for our images
 use_mask: false

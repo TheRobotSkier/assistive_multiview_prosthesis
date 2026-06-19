@@ -48,9 +48,9 @@ correction:
   enable_periodic_marker_correction: true
   periodic_correction_interval_s: 0.2
   reanchor_cooldown_s: 5.0
-  max_periodic_translation_correction_m: 0.60
+  max_periodic_translation_correction_m: 0.30
   max_periodic_rotation_correction_deg: 5.0
-  correction_chi2_gate: 50.0
+  correction_chi2_gate: 16.8
   max_position_correction_step_m: 0.05
   max_rotation_correction_step_deg: 2.0
 

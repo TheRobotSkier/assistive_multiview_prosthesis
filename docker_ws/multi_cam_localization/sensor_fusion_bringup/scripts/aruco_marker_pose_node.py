@@ -69,8 +69,6 @@ from std_msgs.msg import Bool, Int32, String
 from std_srvs.srv import Trigger
 from tf2_ros import TransformBroadcaster
 
-import time as _time_
-
 
 def T_inv(T: np.ndarray) -> np.ndarray:
     R = T[:3, :3]
@@ -696,6 +694,9 @@ class ArucoMarkerPoseNode(Node):
         self.image_topic = topics_cfg.get("image", "/head/d435i_head/color/image_raw")
         self.odom_topic = topics_cfg.get("openvins_odom", "/ov_msckf/odomimu")
         self.output_prefix = topics_cfg.get("output_prefix", "/head/marker_pose").rstrip("/")
+        # Short tag (e.g. "head" / "arm") for the [MARKER_REJECT] structured log
+        # lines consumed by analyze_log.py (side=(\w+) contract).
+        self.side = self.output_prefix.strip("/").split("/")[0]
         dynamic_suffix = topics_cfg.get("dynamic_observation_topic_suffix", "dynamic_observation").strip("/")
         self.dynamic_observation_topic = f"{self.output_prefix}/{dynamic_suffix}"
 
@@ -1487,7 +1488,7 @@ class ArucoMarkerPoseNode(Node):
 
     def publish_marker_state(self, marker_valid: bool, marker_id: int) -> None:
         # Rate-limit: cap marker state publish to 10 Hz
-        now = _time_.time()
+        now = time.time()
         if marker_valid == self.last_marker_valid and now - self._last_marker_valid_publish < 1.0 / self._marker_valid_hz:
             return
         self._last_marker_valid_publish = now
@@ -1634,7 +1635,7 @@ class ArucoMarkerPoseNode(Node):
 
     def publish_marker_quality(self, measurement: MarkerMeasurement, hard_gate_status: str) -> None:
         # Rate-limit: cap marker quality to 5 Hz (diagnostics-only topic)
-        now = _time_.time()
+        now = time.time()
         if now - self._last_marker_quality_publish < 1.0 / self._marker_quality_hz:
             return
         self._last_marker_quality_publish = now
@@ -1741,7 +1742,7 @@ class ArucoMarkerPoseNode(Node):
         # Unconditional 1.0s debounce latch — caps the maximum publication
         # rate to <=1 Hz regardless of state flicker. This prevents the
         # 667 Hz storm that was choking the EKF estimation loops.
-        now = _time_.time()
+        now = time.time()
         if now - self._last_vio_valid_publish < 1.0:
             return
         self._last_vio_valid_publish = now
@@ -2036,7 +2037,7 @@ class ArucoMarkerPoseNode(Node):
 
         self.fill_corrected_twist(out, msg, T_global_imu, stamp_to_sec(msg.header.stamp))
         # Rate-limit: cap corrected_odom publish to 50 Hz to avoid NACK storms
-        now = _time_.time()
+        now = time.time()
         if now - self._last_corrected_odom_publish < 1.0 / self._corrected_odom_hz:
             return
         self._last_corrected_odom_publish = now
