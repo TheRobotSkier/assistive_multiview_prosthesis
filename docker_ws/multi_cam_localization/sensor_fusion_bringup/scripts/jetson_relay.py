@@ -747,17 +747,20 @@ class JetsonRelay(Node):
         """Return True if *stamp* matches the approved image-frame token.
 
         A depth or camera_info frame is only forwarded when its hardware
-        timestamp falls within 10 ms of the most recent image frame that
+        timestamp falls within 40 ms of the most recent image frame that
         cleared the master cam_{cam} gate.  This locks the three streams
         into a synchronous triplet and eliminates the phase drift that
-        caused 100 % host-side backprojection drops.
+        caused 100 % host-side backprojection drops.  The 40 ms window
+        accommodates the natural 15-23 ms timestamp gap between Intel
+        RealSense color and depth sensor exposure without letting
+        different subsequent frames slip through.
         """
         token = self._approved_stamp.get(camera)
         if token is None:
             return False
         stamp_sec = stamp.sec + stamp.nanosec * 1e-9
         token_sec = token.sec + token.nanosec * 1e-9
-        return abs(stamp_sec - token_sec) <= 0.01
+        return abs(stamp_sec - token_sec) <= 0.04
 
     def _on_odom(self, msg: Odometry, camera: str) -> None:
         if not self._gates[f"odom_{camera}"].should_publish():

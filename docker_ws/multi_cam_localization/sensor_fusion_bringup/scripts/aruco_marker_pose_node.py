@@ -1738,9 +1738,11 @@ class ArucoMarkerPoseNode(Node):
         self.vio_valid = valid
         out = Bool()
         out.data = bool(valid)
-        # Rate-limit: cap vio_valid publish to 50 Hz to avoid NACK storms
+        # Unconditional 1.0s debounce latch — caps the maximum publication
+        # rate to <=1 Hz regardless of state flicker. This prevents the
+        # 667 Hz storm that was choking the EKF estimation loops.
         now = _time_.time()
-        if valid == self.last_vio_valid and now - self._last_vio_valid_publish < 1.0 / self._vio_valid_hz:
+        if now - self._last_vio_valid_publish < 1.0:
             return
         self._last_vio_valid_publish = now
         self.vio_valid_pub.publish(out)
