@@ -1833,7 +1833,13 @@ class ArucoMarkerPoseNode(Node):
             return True, "accepted"
 
         if not self.vio_valid:
-            if self.last_hard_reanchor_time_sec is not None and measurement.stamp_sec - self.last_hard_reanchor_time_sec < self.reanchor_cooldown_s:
+            # When the filter is already broken (vio_valid=False), a long cooldown
+            # would permanently blind the tracker — the 5.0s reanchor_cooldown_s is
+            # designed to protect a *working* filter from thrashing, not to prevent
+            # a broken filter from recovering. Shorten to 0.2s so high-confidence
+            # frames can still snap the state back to map reality.
+            recovery_cooldown_s = 0.2
+            if self.last_hard_reanchor_time_sec is not None and measurement.stamp_sec - self.last_hard_reanchor_time_sec < recovery_cooldown_s:
                 self._diag_corrections_rejected += 1
                 self._diag_rejection_reasons["reanchor_cooldown_active"] += 1
                 self.publish_reanchor_event_from_measurement(
@@ -1891,6 +1897,9 @@ class ArucoMarkerPoseNode(Node):
         if trans_norm > self.max_periodic_translation_correction_m or rot_deg > self.max_periodic_rotation_correction_deg:
             self._diag_corrections_rejected += 1
             self._diag_rejection_reasons["valid_vio_correction_jump_too_large"] += 1
+            # Structured machine-parsable rejection log (consumed by analyze_log.py)
+            print(f"[MARKER_REJECT] side={self.side} type=translation val={trans_norm:.4f} lim={self.max_periodic_translation_correction_m:.4f}", flush=True)
+            print(f"[MARKER_REJECT] side={self.side} type=rotation val={rot_deg:.4f} lim={self.max_periodic_rotation_correction_deg:.4f}", flush=True)
             self.hold_vio_invalid(measurement.stamp_sec, "marker_innovation_jump")
             self.update_vio_valid(matched_odom, force_invalid=True)
             self.publish_reanchor_event_from_measurement(
@@ -1908,6 +1917,8 @@ class ArucoMarkerPoseNode(Node):
         if chi2 > self.correction_chi2_gate:
             self._diag_corrections_rejected += 1
             self._diag_rejection_reasons["innovation_chi2_rejected"] += 1
+            # Structured machine-parsable rejection log (consumed by analyze_log.py)
+            print(f"[MARKER_REJECT] side={self.side} type=chi2 val={chi2:.4f} lim={self.correction_chi2_gate:.4f}", flush=True)
             self.hold_vio_invalid(measurement.stamp_sec, "marker_innovation_chi2")
             self.update_vio_valid(matched_odom, force_invalid=True)
             self.publish_reanchor_event_from_measurement(

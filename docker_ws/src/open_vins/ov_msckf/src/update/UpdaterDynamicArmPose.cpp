@@ -141,14 +141,17 @@ DynamicArmPoseUpdateResult UpdaterDynamicArmPose::innovation(std::shared_ptr<Sta
 
   if (result.chi2 > _options.chi2_gate) {
     result.reason = "chi2_rejected";
+    printf("[MARKER_REJECT] side=arm type=chi2 val=%.2f lim=%.2f\n", result.chi2, _options.chi2_gate);
     return result;
   }
   if (result.translation_norm_m > _options.max_update_translation_m) {
     result.reason = "translation_jump_rejected";
+    printf("[MARKER_REJECT] side=arm type=translation val=%.3f lim=%.3f\n", result.translation_norm_m, _options.max_update_translation_m);
     return result;
   }
   if (result.rotation_deg > _options.max_update_rotation_deg) {
     result.reason = "rotation_jump_rejected";
+    printf("[MARKER_REJECT] side=arm type=rotation val=%.2f lim=%.2f\n", result.rotation_deg, _options.max_update_rotation_deg);
     return result;
   }
 
