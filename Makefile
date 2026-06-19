@@ -876,13 +876,13 @@ test-grasp-topics: test-grasp-up ## Fast topic-contract + helper tests (no Docke
 	@$(DOCKER_CMD) exec -T --user prosthesis \
 		-e PYTHONPATH=/miahand_ws \
 		mia-haptic-force-test \
-		bash -lc 'cd /miahand_ws && python3 -m pytest tests/mia_haptic_force_test/test_topic_contracts.py tests/mia_haptic_force_test/test_hand_simulation.py tests/mia_haptic_force_test/test_rendering.py tests/mia_haptic_force_test/test_log_retention.py tests/mia_haptic_force_test/test_simulator_health.py -q'
+		bash -lc 'cd /miahand_ws && python3 -m pytest tests/mia_haptic_force_test/test_topic_contracts.py tests/mia_haptic_force_test/test_node_contracts.py tests/mia_haptic_force_test/test_hand_simulation.py tests/mia_haptic_force_test/test_rendering.py tests/mia_haptic_force_test/test_log_retention.py tests/mia_haptic_force_test/test_simulator_health.py -q'
 
 test-grasp-tui: test-grasp-up ## TUI smoke test (no Docker rebuild)
 	@$(DOCKER_CMD) exec -T --user prosthesis \
 		-e PYTHONPATH=/miahand_ws \
 		mia-haptic-force-test \
-		bash -lc 'cd /miahand_ws && python3 -m pytest tests/mia_haptic_force_test/test_tui_smoke.py -q'
+		bash -lc 'cd /miahand_ws && python3 -m pytest tests/mia_haptic_force_test/test_tui_smoke.py tests/mia_haptic_force_test/test_tui_node.py -q'
 
 test-grasp-offline: test-grasp-up ## Full PTY-driven offline end-to-end suite (additive; keep test-grasp interactive)
 	@$(DOCKER_CMD) exec -T --user prosthesis \
