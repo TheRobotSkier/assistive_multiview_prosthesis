@@ -13,7 +13,7 @@ calib_cam_intrinsics: false # use offline Kalibr intrinsics for initial bringup
 # calib_cam_intrinsics: true
 calib_cam_timeoffset: false # use offline Kalibr time offset for initial bringup
 # calib_cam_timeoffset: true
-calib_imu_intrinsics: true # if imu intrinsics should be calibrated (rotation and skew-scale matrix)
+calib_imu_intrinsics: false # DISABLED: online intrinsic estimation corrupted accel bias (0.4 m/s^2), causing arm divergence. Head camera uses false and is stable. Offline Kalibr calibration is sufficient.
 calib_imu_g_sensitivity: true # if gyroscope gravity sensitivity (Tg) should be calibrated
 
 max_clones: 8 # Jetson-safe dual-camera sliding window

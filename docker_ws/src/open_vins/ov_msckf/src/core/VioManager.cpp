@@ -235,10 +235,21 @@ void VioManager::feed_measurement_marker(const MarkerPoseMeasurement &message) {
   if (should_marker_reset(message, innovation)) {
     Eigen::Vector3d velocity = Eigen::Vector3d::Zero();
     Eigen::Matrix3d velocity_covariance = Eigen::Matrix3d::Identity();
-    if (!marker_velocity_fit(velocity, velocity_covariance)) {
+    // Catastrophic divergence bypass: when the innovation is very large
+    // (>5m), the estimator state is already catastrophically wrong.
+    // Zero velocity is strictly better than a diverged state with runaway
+    // velocity, so bypass the velocity-fit gate and reset immediately.
+    // The marker correction layer (Python) will continue refining after.
+    const double catastrophic_reset_m = 5.0;
+    const bool catastrophic = innovation.translation_norm_m > catastrophic_reset_m;
+    if (!catastrophic && !marker_velocity_fit(velocity, velocity_covariance)) {
       PRINT_WARNING(YELLOW "[MARKER]: reset requested for marker %d but velocity fit is not reliable yet (%s)\n" RESET, message.marker_id,
                     innovation.reason.c_str());
       return;
+    }
+    if (catastrophic) {
+      PRINT_WARNING(YELLOW "[MARKER]: catastrophic divergence (%.2fm) — bypassing velocity-fit gate, resetting with zero velocity\n" RESET,
+                    innovation.translation_norm_m);
     }
     if (reset_to_marker_map(message, velocity, velocity_covariance,
                             is_marker_global_initialized ? innovation.reason : "first_marker_map_lock")) {

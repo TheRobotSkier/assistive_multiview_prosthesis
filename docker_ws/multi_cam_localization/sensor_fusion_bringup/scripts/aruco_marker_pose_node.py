@@ -730,17 +730,12 @@ class ArucoMarkerPoseNode(Node):
         self.max_periodic_translation_correction_m = float(correction_cfg.get("max_periodic_translation_correction_m", 0.10))
         self.max_periodic_rotation_correction_deg = float(correction_cfg.get("max_periodic_rotation_correction_deg", 5.0))
         self.correction_chi2_gate = float(correction_cfg.get("correction_chi2_gate", 16.8))
-        # Dual-mode chi2 gate (Phase 3.1): when VIO is diverging (recently
-        # invalid), use a relaxed gate so marker corrections can pull the
-        # estimate back gradually instead of being rejected.  When VIO is
-        # healthy, the tight gate protects smoothness and rejects noise.
-        # Default 10000.0 effectively disables the statistical gate during
-        # divergence; the geometric hard walls (translation/rotation) remain.
-        self.correction_chi2_gate_relaxed = float(correction_cfg.get("correction_chi2_gate_relaxed", 10000.0))
-        # How long after VIO becomes valid to keep using the relaxed gate.
-        # This gives the estimator time to settle after recovery before
-        # switching back to the tight gate.
-        self.chi2_relax_recovery_window_s = float(correction_cfg.get("chi2_relax_recovery_window_s", 5.0))
+        # Rotation plausibility wall for hard reanchors (VIO-invalid path and
+        # fallback path).  solvePnP on planar ArUco markers has a known pose
+        # ambiguity that can return a ~180-degree-flipped solution with low
+        # reprojection error.  Rejecting large rotations before they enter
+        # T_map_global prevents the axis-flip-and-never-recover failure mode.
+        self.max_hard_reanchor_rotation_deg = float(correction_cfg.get("max_hard_reanchor_rotation_deg", 90.0))
         self.max_position_correction_step_m = float(correction_cfg.get("max_position_correction_step_m", 0.05))
         self.max_rotation_correction_step_deg = float(correction_cfg.get("max_rotation_correction_step_deg", 2.0))
 
@@ -878,8 +873,6 @@ class ArucoMarkerPoseNode(Node):
         self.last_vio_valid = False
         self.vio_valid = False
         self.vio_forced_invalid_until_sec: Optional[float] = None
-        # Track when VIO was last invalid for the dual-mode chi2 gate.
-        self._last_vio_invalid_time_sec: Optional[float] = None
         # Rate-limit tracking for throttled publishers (wire spray reduction)
         self._last_vio_valid_publish: float = 0.0
         self._last_corrected_odom_publish: float = 0.0
@@ -1779,9 +1772,6 @@ class ArucoMarkerPoseNode(Node):
             reason = "pose_covariance_too_large"
 
         self.vio_valid = valid
-        # Track the last time VIO was invalid for the dual-mode chi2 gate.
-        if not valid:
-            self._last_vio_invalid_time_sec = stamp_sec
         out = Bool()
         out.data = bool(valid)
         # Unconditional 1.0s debounce latch — caps the maximum publication
@@ -1887,6 +1877,30 @@ class ArucoMarkerPoseNode(Node):
         trans_norm = float(np.linalg.norm(innovation[:3]))
         rot_deg = math.degrees(float(np.linalg.norm(innovation[3:])))
 
+        # Rotation plausibility wall — block hard reanchors with implausibly
+        # large rotation.  solvePnP on planar ArUco markers has a known pose
+        # ambiguity: a ~180-degree-flipped solution can have low reprojection
+        # error.  Without this check, the flipped pose enters T_map_global via
+        # hard_set_correction and the system gets trapped (the correct pose
+        # then has huge innovation, perpetuating the flip).  This check does
+        # NOT apply to the initial lock (T_map_global is None) or to soft
+        # updates (which are clamped by step limits).
+        if rot_deg > self.max_hard_reanchor_rotation_deg:
+            self._diag_corrections_rejected += 1
+            self._diag_rejection_reasons["hard_reanchor_rotation_implausible"] += 1
+            print(f"[MARKER_REJECT] side={self.side} type=rotation_hard val={rot_deg:.4f} lim={self.max_hard_reanchor_rotation_deg:.4f}", flush=True)
+            self.hold_vio_invalid(measurement.stamp_sec, "hard_reanchor_rotation_implausible")
+            self.publish_reanchor_event_from_measurement(
+                measurement,
+                correction_accepted=False,
+                correction_mode="rejected",
+                reason="hard_reanchor_rotation_implausible",
+                odom_match_dt=odom_dt,
+                correction_translation_norm_m=trans_norm,
+                correction_rotation_deg=rot_deg,
+            )
+            return False, "hard_reanchor_rotation_implausible"
+
         if force_manual:
             self._diag_corrections_accepted += 1
             self.hard_set_correction(T_meas_map_global, measurement.covariance_diag, P_ov_diag, measurement.stamp_sec)
@@ -1984,19 +1998,11 @@ class ArucoMarkerPoseNode(Node):
             return False, "valid_vio_correction_jump_too_large"
 
         chi2 = self.innovation_chi2(innovation, measurement.covariance_diag, P_ov_diag)
-        # Dual-mode chi2 gate (Phase 3.1): use a relaxed gate when VIO was
-        # recently invalid, so marker corrections can pull the estimate back
-        # gradually instead of being rejected by the tight gate.
-        effective_gate = self.correction_chi2_gate
-        if self._last_vio_invalid_time_sec is not None:
-            time_since_invalid = measurement.stamp_sec - self._last_vio_invalid_time_sec
-            if time_since_invalid < self.chi2_relax_recovery_window_s:
-                effective_gate = self.correction_chi2_gate_relaxed
-        if chi2 > effective_gate:
+        if chi2 > self.correction_chi2_gate:
             self._diag_corrections_rejected += 1
             self._diag_rejection_reasons["innovation_chi2_rejected"] += 1
             # Structured machine-parsable rejection log (consumed by analyze_log.py)
-            print(f"[MARKER_REJECT] side={self.side} type=chi2 val={chi2:.4f} lim={effective_gate:.4f}", flush=True)
+            print(f"[MARKER_REJECT] side={self.side} type=chi2 val={chi2:.4f} lim={self.correction_chi2_gate:.4f}", flush=True)
             self.hold_vio_invalid(measurement.stamp_sec, "marker_innovation_chi2")
             self.update_vio_valid(matched_odom, force_invalid=True)
             self.publish_reanchor_event_from_measurement(
