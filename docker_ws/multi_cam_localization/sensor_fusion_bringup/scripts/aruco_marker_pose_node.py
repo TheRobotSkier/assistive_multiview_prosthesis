@@ -889,6 +889,14 @@ class ArucoMarkerPoseNode(Node):
         self._diag_quality_rejections: Counter = Counter()
         self._diag_last_log_sec: float = 0.0
 
+        # ── Drift-onset telemetry ────────────────────────────────────
+        # Track position-norm history to compute the growth slope that the
+        # [DRIFT-INCIDENT] structured event reports.  The analyzer ingests
+        # these events to build a causal timeline of runaway drift.
+        self._pos_norm_history: deque[tuple[float, float]] = deque(maxlen=50)
+        self._odom_ready_emitted: bool = False
+        self._startup_emitted: bool = False
+
         self.T_map_global: Optional[np.ndarray] = None
         self.P_correction_diag = self.default_pose_cov_diag.copy()
         self.last_correction_time_sec: Optional[float] = None
@@ -983,6 +991,10 @@ class ArucoMarkerPoseNode(Node):
             self.get_logger().info(
                 f"First marker detection — startup grace period active for {self.startup_grace_period_s:.1f}s "
                 f"(relaxed VIO health checks)"
+            )
+            self.get_logger().info(
+                f"[STARTUP] phase=first_marker side={self.side} "
+                f"marker_ids={marker_ids}"
             )
 
         self._diag_markers_detected += len(ids)
@@ -1655,6 +1667,14 @@ class ArucoMarkerPoseNode(Node):
         self.odom_buffer.append(msg)
         self.prune_odom_buffer(stamp_to_sec(msg.header.stamp))
 
+        # ── Startup-phase telemetry: emit odom_ready once ───────────
+        if not self._odom_ready_emitted:
+            self._odom_ready_emitted = True
+            self.get_logger().info(
+                f"[STARTUP] phase=odom_ready side={self.side} "
+                f"topic={self.odom_topic}"
+            )
+
         self.update_vio_valid(msg)
 
         if self.T_map_global is None:
@@ -1691,6 +1711,12 @@ class ArucoMarkerPoseNode(Node):
         reason = ""
         stamp_sec = stamp_to_sec(msg.header.stamp)
 
+        # ── Track position norm for drift-slope telemetry ───────────
+        T_global_imu = odom_to_T(msg)
+        position = T_global_imu[:3, 3]
+        position_norm = float(np.linalg.norm(position))
+        self._pos_norm_history.append((stamp_sec, position_norm))
+
         if (
             self.vio_forced_invalid_until_sec is not None
             and stamp_sec <= self.vio_forced_invalid_until_sec
@@ -1698,18 +1724,16 @@ class ArucoMarkerPoseNode(Node):
             valid = False
             reason = self.vio_forced_invalid_reason
 
-        T_global_imu = odom_to_T(msg)
         if not is_finite_array(T_global_imu):
             valid = False
             reason = "non_finite_odom_pose"
 
-        position = T_global_imu[:3, 3]
-        if valid and float(np.linalg.norm(position)) > self.max_position_norm_m:
+        if valid and position_norm > self.max_position_norm_m:
             if self._startup_grace_active:
                 grace_elapsed = self.now_sec() - (self._first_marker_detection_wall_sec or 0.0)
                 if grace_elapsed < self.startup_grace_period_s:
                     self.get_logger().debug(
-                        f"VIO position norm {float(np.linalg.norm(position)):.1f}m exceeds "
+                        f"VIO position norm {position_norm:.1f}m exceeds "
                         f"{self.max_position_norm_m:.1f}m but within startup grace period "
                         f"({grace_elapsed:.1f}/{self.startup_grace_period_s:.1f}s)"
                     )
@@ -1717,6 +1741,10 @@ class ArucoMarkerPoseNode(Node):
                     self._startup_grace_active = False
                     self.get_logger().info(
                         f"Startup grace period ended — enforcing full VIO health checks"
+                    )
+                    self.get_logger().info(
+                        f"[STARTUP] phase=grace_ended side={self.side} "
+                        f"reason=position_exceeded"
                     )
                     valid = False
                     reason = "position_outside_workspace"
@@ -1753,12 +1781,36 @@ class ArucoMarkerPoseNode(Node):
                 self.get_logger().info("VIO health is valid")
             else:
                 self.get_logger().warning(f"VIO health is invalid: {reason}")
+                # ── Emit structured drift-incident event ──────────────
+                # The analyzer ingests these to build a causal timeline.
+                # Compute position-norm growth slope over the recent window.
+                pos_slope = self._compute_pos_norm_slope()
+                self.get_logger().warning(
+                    f"[DRIFT-INCIDENT] side={self.side} reason={reason} "
+                    f"pos_norm={position_norm:.2f}m speed={speed:.2f}mps "
+                    f"pos_slope={pos_slope:.2f}mps"
+                )
             self.last_vio_valid = valid
 
     def hold_vio_invalid(self, stamp_sec: float, reason: str) -> None:
         hold_s = max(1.0, self.periodic_correction_interval_s)
         self.vio_forced_invalid_until_sec = stamp_sec + hold_s
         self.vio_forced_invalid_reason = reason
+
+    def _compute_pos_norm_slope(self) -> float:
+        """Estimate position-norm growth rate (m/s) from recent history.
+
+        Used by the [DRIFT-INCIDENT] event to distinguish a slow drift from
+        a runaway acceleration.  Returns 0.0 if insufficient history.
+        """
+        if len(self._pos_norm_history) < 2:
+            return 0.0
+        first_t, first_n = self._pos_norm_history[0]
+        last_t, last_n = self._pos_norm_history[-1]
+        dt = last_t - first_t
+        if dt <= 1e-6:
+            return 0.0
+        return (last_n - first_n) / dt
 
     def try_apply_marker_correction(self, measurement: MarkerMeasurement, force_manual: bool) -> tuple[bool, str]:
         if not self.reanchor_enabled:
