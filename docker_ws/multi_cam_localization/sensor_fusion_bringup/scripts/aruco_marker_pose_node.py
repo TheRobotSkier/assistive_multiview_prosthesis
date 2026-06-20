@@ -985,6 +985,8 @@ class ArucoMarkerPoseNode(Node):
             self.publish_marker_state(False, -1)
             return
 
+        marker_ids = [int(marker_id_arr[0]) for marker_id_arr in ids]
+
         if self._first_marker_detection_wall_sec is None:
             self._first_marker_detection_wall_sec = self.now_sec()
             self._startup_grace_active = True
@@ -999,7 +1001,6 @@ class ArucoMarkerPoseNode(Node):
 
         self._diag_markers_detected += len(ids)
 
-        marker_ids = [int(marker_id_arr[0]) for marker_id_arr in ids]
         id_counts = Counter(marker_ids)
         fixed_candidates = []
         dynamic_measurements = []

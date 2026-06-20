@@ -81,7 +81,7 @@ _ODOM_QOS = QoSProfile(
 )
 
 _CAMINFO_QOS = QoSProfile(
-    reliability=ReliabilityPolicy.RELIABLE,
+    reliability=ReliabilityPolicy.BEST_EFFORT,
     history=HistoryPolicy.KEEP_LAST,
     depth=5,
 )
@@ -445,7 +445,7 @@ class JetsonRelay(Node):
         self.declare_parameter("trackhist.downsample_factor", 2)
 
         self.declare_parameter("camera_info.enabled", True)
-        self.declare_parameter("camera_info.hz", 1.0)
+        self.declare_parameter("camera_info.hz", 30.0)
 
         self.declare_parameter("odometry.enabled", True)
         self.declare_parameter("odometry.hz", 50.0)
@@ -642,6 +642,7 @@ class JetsonRelay(Node):
                 CameraInfo, _SRC[key],
                 lambda m, c=cam: self._on_ci(m, c), _CAMINFO_QOS,
             )
+            self._gates[f"ci_{cam}"] = RateGate(self._ci_hz)
         self._ci_pub = {
             cam: self.create_publisher(CameraInfo, _DST[f"{cam}_ci"], _CAMINFO_QOS)
             for cam in CAMERAS
@@ -735,6 +736,11 @@ class JetsonRelay(Node):
         # receives a perfectly balanced queue — no starvation, no flood,
         # no frame eviction.
         if not self._stamp_matches_token(msg.header.stamp, camera):
+            return
+        # Hard rate cap as a safety net against flooding.  Placed after
+        # the token check so the gate only consumes its allowance on
+        # token-matched (synchronised) frames.
+        if not self._gates[f"ci_{camera}"].should_publish():
             return
         # Scale intrinsics to match the downsampled image/depth resolution.
         # The same factor is used for both colour and depth channels since

@@ -39,6 +39,7 @@ def generate_launch_description():
             executable="aruco_marker_pose_node.py",
             name="aruco_marker_pose_node_arm_phase2",
             output="screen",
+            respawn=True,
             remappings=[
                 ("/tf", "/tf_raw"),
             ],
