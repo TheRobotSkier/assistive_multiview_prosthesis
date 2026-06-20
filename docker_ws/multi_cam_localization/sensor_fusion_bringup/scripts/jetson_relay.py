@@ -707,37 +707,52 @@ class JetsonRelay(Node):
         if not self._gates[f"cam_{camera}"].should_publish():
             return
         # Register this frame's hardware timestamp as the approved token —
-        # depth and camera_info will only forward when their stamp matches.
+        # depth will only forward when its ASIC stamp matches this one.
+        # NOTE: the token is captured BEFORE restamping so the depth token
+        # gate still compares ASIC stamps (see _on_depth).
         self._approved_stamp[camera] = msg.header.stamp
         if self._img_ds > 1:
             msg = downsample_image(msg, self._img_ds)
-        # Preserve original hardware timestamp (see _on_pc comment).
+        # Restamp with Jetson system clock (see _on_depth comment) so all
+        # downstream consumers share a unified time domain with TF.
+        msg.header.stamp = self.get_clock().now().to_msg()
         if self._img_compress:
             msg = compress_image_jpeg(msg, self._img_compress_qty)
         self._img_pub[camera].publish(msg)
 
     def _on_depth(self, msg: Image, camera: str) -> None:
-        """Rate-gated + token-gated depth relay (NEAREST), then compressed.
+        """Token-gated + rate-gated depth relay (NEAREST), then compressed.
 
-        Two-stage gating:
-          1. RateGate (depth.hz, default 15 Hz) — a hard ceiling that
-             prevents depth from flooding the wire regardless of token
-             matching.
-          2. Token gate (token_window_ms, default 100 ms) — forwards only
+        Two-stage gating (token FIRST, then rate):
+          1. Token gate (token_window_ms, default 100 ms) — forwards only
              when this frame's hardware timestamp matches the approved
              image-frame token, guaranteeing depth and colour arrive as a
              locked pair.
+          2. RateGate (depth.hz, default 15 Hz) — a hard ceiling that
+             prevents depth from flooding the wire regardless of token
+             matching.
+
+        Ordering rationale: the token check must run BEFORE the rate gate.
+        ``RateGate.should_publish()`` consumes a rate slot as a side effect
+        of returning True.  If the rate gate ran first, a depth frame that
+        passed the rate limiter but failed the token check would waste the
+        slot, starving the next token-matching frame (Issue A — cascaded
+        gate budget waste).
         """
-        if not self._gates[f"depth_{camera}"].should_publish():
-            return
         if not self._stamp_matches_token(msg.header.stamp, camera):
+            return
+        if not self._gates[f"depth_{camera}"].should_publish():
             return
         if self._depth_ds > 1:
             msg = downsample_depth(msg, self._depth_ds)
-        # Preserve original hardware timestamp — depth and colour frames
-        # from the same D435i share the same ASIC clock domain, so the
-        # temporal bond needed by depth_image_proc's approximate-time
-        # synchronizer is preserved.
+        # Restamp with Jetson system clock so all downstream consumers
+        # (host decompress bridge, custom pointcloud assembler, TF lookups)
+        # share a single time domain.  The Jetson↔host chrony drift is
+        # ~0.1 ms, so this puts the stamp in the same domain as the TF
+        # tree (driven by OpenVINS using system clock).  This is done
+        # AFTER the token gate, which relies on the original ASIC stamp
+        # to pair depth with colour.
+        msg.header.stamp = self.get_clock().now().to_msg()
         if self._depth_compress:
             msg = compress_depth_png(msg)
         self._depth_pub[camera].publish(msg)
@@ -759,8 +774,8 @@ class JetsonRelay(Node):
         with software time rather than hardware (ASIC) time — which would
         be offset by the full Jetson↔host clock skew.  The RateGate
         alone (camera_info.hz, default 30 Hz) is sufficient to prevent
-        flooding.  The host-side depth_image_proc synchronizer matches
-        camera_info to the nearest depth/RGB pair within its slop window.
+        flooding.  The host-side custom pointcloud assembler caches
+        camera_info on arrival and ignores its timestamp entirely.
         """
         if not self._gates[f"ci_{camera}"].should_publish():
             return
@@ -769,6 +784,8 @@ class JetsonRelay(Node):
         # aligned depth is registered to the colour frame.
         if self._depth_ds > 1:
             msg = scale_camera_info(msg, self._depth_ds)
+        # Restamp with Jetson system clock for a unified time domain.
+        msg.header.stamp = self.get_clock().now().to_msg()
         self._ci_pub[camera].publish(msg)
 
     def _stamp_matches_token(self, stamp, camera: str) -> bool:

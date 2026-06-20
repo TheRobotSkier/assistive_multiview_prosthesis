@@ -88,7 +88,9 @@ def _setup(context, *args, **kwargs):
     marker_detection_rate_hz = str(_arg_or_config(context, "marker_detection_rate_hz", launch_cfg.get("marker_detection_rate_hz", 15.0)))
     pointcloud_max_rate_hz = str(_arg_or_config(context, "pointcloud_max_rate_hz", pointcloud_cfg.get("max_rate_hz", 15.0)))
     relay_pc_hz = str(_arg_or_config(context, "relay_pc_hz", launch_cfg.get("relay_pc_hz", pointcloud_max_rate_hz)))
-    relay_pc_hz = launch_cfg.get("relay_pc_hz") or pointcloud_max_rate_hz
+    # NOTE: the final relay_pc_hz is recomputed below (lines ~335-337) using
+    # the relay_hz master override, so the value here is only a preliminary
+    # default for early reference.  Do not add a second assignment here.
     pointcloud_voxel_leaf_m = str(_arg_or_config(context, "pointcloud_voxel_leaf_m", pointcloud_cfg.get("voxel_leaf_m", 0.01)))
     pointcloud_max_range_m = str(_arg_or_config(context, "pointcloud_max_range_m", pointcloud_cfg.get("max_range_m", 2.0)))
     pointcloud_decimation_magnitude = str(
@@ -466,8 +468,8 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "relay_img_hz",
-                default_value="5.0",
-                description="Image relay throttle frequency in Hz.",
+                default_value="",
+                description="Image relay throttle frequency in Hz (empty = use relay_hz master override).",
             ),
             DeclareLaunchArgument(
                 "relay_trackhist_hz",
