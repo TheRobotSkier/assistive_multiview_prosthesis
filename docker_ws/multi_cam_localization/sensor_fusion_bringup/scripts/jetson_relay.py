@@ -434,6 +434,13 @@ class JetsonRelay(Node):
         self.declare_parameter("depth.downsample_factor", 2)
         self.declare_parameter("depth.compress", True)
         self.declare_parameter("depth.compress_format", "png")
+        # Token-gate window (milliseconds) for matching depth frames to
+        # the approved image-frame timestamp.  The default of 100 ms
+        # accommodates the observed 15-80 ms RealSense depth-colour
+        # timestamp offset while still rejecting frames from different
+        # exposure cycles.  Camera_info does NOT use this gate (see
+        # _on_ci).
+        self.declare_parameter("depth.token_window_ms", 100.0)
 
         self.declare_parameter("image.compress", True)
         self.declare_parameter("image.compress_quality", 75)
@@ -466,6 +473,9 @@ class JetsonRelay(Node):
         self._depth_ds = self.get_parameter("depth.downsample_factor").value
         self._depth_compress = self.get_parameter("depth.compress").value
         self._depth_compress_fmt = self.get_parameter("depth.compress_format").value
+        self._token_window_s = (
+            float(self.get_parameter("depth.token_window_ms").value) / 1000.0
+        )
 
         self._img_compress = self.get_parameter("image.compress").value
         self._img_compress_qty = self.get_parameter("image.compress_quality").value
@@ -484,22 +494,26 @@ class JetsonRelay(Node):
         self._mml_enabled = self.get_parameter("marker_map_locked.enabled").value
 
         # ── rate gates ─────────────────────────────────────────────────
-        # Unified master gate per camera (cam_{cam}) drives depth, colour
-        # AND camera_info as a locked triplet so the host-side
-        # depth_image_proc 3-way synchronizer always sees matching-rate
-        # frames.  An approved-stamp registry records the timestamp of the
-        # last image frame that cleared the gate; depth and camera_info are
-        # only forwarded when their hardware timestamp matches that token
-        # (within a tight 10 ms micro-threshold), eliminating the 4.2 vs
-        # 4.6 Hz phase drift that caused 100 % backprojection drops.
+        # Unified master gate per camera (cam_{cam}) drives colour AND
+        # depth as a locked pair so the host-side depth_image_proc
+        # synchronizer always sees matching-rate frames.  An
+        # approved-stamp registry records the timestamp of the last image
+        # frame that cleared the gate; depth is only forwarded when its
+        # hardware timestamp matches that token (within the configurable
+        # token_window_ms threshold, default 100 ms), eliminating the
+        # phase drift that caused 100 % backprojection drops.
+        #
+        # camera_info does NOT use the token gate — intrinsics are
+        # constant, so timestamp synchronization is unnecessary (see
+        # _on_ci).  Its own RateGate (30 Hz) is sufficient.
         self._gates: dict[str, RateGate] = {}
         for cam in CAMERAS:
             self._gates[f"pc_{cam}"] = RateGate(self._pc_hz)
             self._gates[f"cam_{cam}"] = RateGate(self._img_hz)
+            self._gates[f"depth_{cam}"] = RateGate(self._depth_hz)
             self._gates[f"trackhist_{cam}"] = RateGate(self._trackhist_hz)
             self._gates[f"odom_{cam}"] = RateGate(self._odom_hz)
         self._approved_stamp = {cam: None for cam in CAMERAS}
-
         # ── setup pubs/subs ─────────────────────────────────────────────
         if self._pc_enabled:
             self._setup_pointclouds()
@@ -703,12 +717,19 @@ class JetsonRelay(Node):
         self._img_pub[camera].publish(msg)
 
     def _on_depth(self, msg: Image, camera: str) -> None:
-        """Token-gated depth relay (NEAREST), then compressed.
+        """Rate-gated + token-gated depth relay (NEAREST), then compressed.
 
-        Forwards only when this frame's hardware timestamp matches the
-        approved image-frame token (within a 10 ms micro-threshold),
-        guaranteeing depth and colour arrive as a locked pair.
+        Two-stage gating:
+          1. RateGate (depth.hz, default 15 Hz) — a hard ceiling that
+             prevents depth from flooding the wire regardless of token
+             matching.
+          2. Token gate (token_window_ms, default 100 ms) — forwards only
+             when this frame's hardware timestamp matches the approved
+             image-frame token, guaranteeing depth and colour arrive as a
+             locked pair.
         """
+        if not self._gates[f"depth_{camera}"].should_publish():
+            return
         if not self._stamp_matches_token(msg.header.stamp, camera):
             return
         if self._depth_ds > 1:
@@ -729,17 +750,18 @@ class JetsonRelay(Node):
         self._trackhist_pub[camera].publish(msg)
 
     def _on_ci(self, msg: CameraInfo, camera: str) -> None:
-        # Token-gated CameraInfo: forward only when this message's stamp
-        # matches the approved image-frame token (within 10 ms).  This
-        # locks camera_info to the exact image frame rate so the host-side
-        # depth_image_proc 3-way synchronizer (depth + rgb + camera_info)
-        # receives a perfectly balanced queue — no starvation, no flood,
-        # no frame eviction.
-        if not self._stamp_matches_token(msg.header.stamp, camera):
-            return
-        # Hard rate cap as a safety net against flooding.  Placed after
-        # the token check so the gate only consumes its allowance on
-        # token-matched (synchronised) frames.
+        """Rate-gated CameraInfo relay (no token gate).
+
+        Camera intrinsics are constant for a given resolution, so there
+        is no need to synchronize camera_info timestamps with image
+        frames.  The token gate that was previously applied here could
+        silently drop all camera_info if the RealSense driver stamps it
+        with software time rather than hardware (ASIC) time — which would
+        be offset by the full Jetson↔host clock skew.  The RateGate
+        alone (camera_info.hz, default 30 Hz) is sufficient to prevent
+        flooding.  The host-side depth_image_proc synchronizer matches
+        camera_info to the nearest depth/RGB pair within its slop window.
+        """
         if not self._gates[f"ci_{camera}"].should_publish():
             return
         # Scale intrinsics to match the downsampled image/depth resolution.
@@ -752,21 +774,30 @@ class JetsonRelay(Node):
     def _stamp_matches_token(self, stamp, camera: str) -> bool:
         """Return True if *stamp* matches the approved image-frame token.
 
-        A depth or camera_info frame is only forwarded when its hardware
-        timestamp falls within 40 ms of the most recent image frame that
-        cleared the master cam_{cam} gate.  This locks the three streams
-        into a synchronous triplet and eliminates the phase drift that
-        caused 100 % host-side backprojection drops.  The 40 ms window
-        accommodates the natural 15-23 ms timestamp gap between Intel
-        RealSense color and depth sensor exposure without letting
-        different subsequent frames slip through.
+        A depth frame is only forwarded when its hardware timestamp falls
+        within ``token_window_ms`` (default 100 ms) of the most recent
+        image frame that cleared the master cam_{cam} gate.  This locks
+        depth and colour into a synchronous pair and eliminates the phase
+        drift that caused 100 % host-side backprojection drops.  The
+        default 100 ms window accommodates the observed 15-80 ms timestamp
+        gap between Intel RealSense color and depth sensor exposure
+        without letting different subsequent frames slip through.
+
+        Note: camera_info does NOT use this gate — see _on_ci.
         """
         token = self._approved_stamp.get(camera)
         if token is None:
             return False
         stamp_sec = stamp.sec + stamp.nanosec * 1e-9
         token_sec = token.sec + token.nanosec * 1e-9
-        return abs(stamp_sec - token_sec) <= 0.04
+        delta = abs(stamp_sec - token_sec)
+        if delta > self._token_window_s:
+            self.get_logger().debug(
+                f"token miss: {camera} delta={delta * 1000:.1f}ms "
+                f"window={self._token_window_s * 1000:.0f}ms"
+            )
+            return False
+        return True
 
     def _on_odom(self, msg: Odometry, camera: str) -> None:
         if not self._gates[f"odom_{camera}"].should_publish():
@@ -809,7 +840,7 @@ class JetsonRelay(Node):
         info(f"  image:       enabled={self._img_enabled}  hz={self._img_hz:.1f}  "
              f"ds={self._img_ds}x")
         info(f"  depth:       enabled={self._depth_enabled}  hz={self._depth_hz:.1f}  "
-             f"(raw passthrough)")
+             f"token_window={self._token_window_s * 1000:.0f}ms (rate+token gated)")
         info(f"  aruco:       enabled={self._aruco_enabled}  "
              f"(msgs_available={_HAS_ARUCO_MSGS})")
         info(f"  trackhist:   enabled={self._trackhist_enabled}  hz={self._trackhist_hz:.1f}  "
