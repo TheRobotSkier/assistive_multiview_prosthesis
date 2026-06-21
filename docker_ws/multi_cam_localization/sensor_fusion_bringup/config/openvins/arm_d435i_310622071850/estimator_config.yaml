@@ -11,8 +11,8 @@ calib_cam_extrinsics: false # use offline Kalibr camera-IMU calibration for init
 # calib_cam_extrinsics: true
 calib_cam_intrinsics: false # use offline Kalibr intrinsics for initial bringup
 # calib_cam_intrinsics: true
-calib_cam_timeoffset: false # use offline Kalibr time offset for initial bringup
-# calib_cam_timeoffset: true
+calib_cam_timeoffset: true # use offline Kalibr time offset for initial bringup
+# calib_cam_timeoffset: false
 calib_imu_intrinsics: 0 # disabled: online intrinsic estimation caused arm divergence; matches head config
 calib_imu_g_sensitivity: true # if gyroscope gravity sensitivity (Tg) should be calibrated
 

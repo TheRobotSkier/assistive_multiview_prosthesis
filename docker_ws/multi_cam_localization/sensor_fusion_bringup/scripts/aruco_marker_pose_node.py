@@ -730,6 +730,16 @@ class ArucoMarkerPoseNode(Node):
         self.max_periodic_translation_correction_m = float(correction_cfg.get("max_periodic_translation_correction_m", 0.10))
         self.max_periodic_rotation_correction_deg = float(correction_cfg.get("max_periodic_rotation_correction_deg", 5.0))
         self.correction_chi2_gate = float(correction_cfg.get("correction_chi2_gate", 16.8))
+        # Adaptive chi2 gate for recovery mode.  When VIO is invalid AND the
+        # position divergence exceeds ``recovery_pos_divergence_threshold_m``,
+        # the chi2 gate is widened by ``recovery_chi2_gate_multiplier``.  This
+        # prevents the tight innovation covariance (tuned for a converged
+        # filter) from rejecting the large-but-correct innovations that arise
+        # when VIO has diverged and needs to snap back to the marker-anchored
+        # pose.  Observed failure: 68 chi2 rejections with mean=98.22 vs
+        # gate=16.81 while VIO was invalid.
+        self.recovery_chi2_gate_multiplier = float(correction_cfg.get("recovery_chi2_gate_multiplier", 5.0))
+        self.recovery_pos_divergence_threshold_m = float(correction_cfg.get("recovery_pos_divergence_threshold_m", 0.5))
         # Rotation plausibility wall for hard reanchors (VIO-invalid path and
         # fallback path).  solvePnP on planar ArUco markers has a known pose
         # ambiguity that can return a ~180-degree-flipped solution with low
@@ -1152,6 +1162,28 @@ class ArucoMarkerPoseNode(Node):
         self.publish_marker_quality(measurement, hard_gate_status="accepted")
         self.try_apply_marker_correction(measurement, force_manual=False)
 
+    def _previous_cam_marker_pose(self) -> Optional[np.ndarray]:
+        """Return the previous frame's T_cam_marker for temporal disambiguation.
+
+        Prefers ``last_marker_measurement.T_cam_marker`` (the accepted pose
+        from the most recent frame) and falls back to the last entry in
+        ``marker_histories`` (T_map_imu, which is in a different frame and
+        therefore only usable as a coarse continuity hint when nothing else
+        is available).
+        """
+        meas = self.last_marker_measurement
+        if meas is not None and meas.T_cam_marker is not None:
+            T = np.asarray(meas.T_cam_marker, dtype=float).reshape(4, 4)
+            if is_finite_array(T):
+                return T
+        return None
+
+    def _rotation_delta_deg(self, T_a: np.ndarray, T_b: np.ndarray) -> float:
+        """Rotation angle (degrees) between two poses' orientations."""
+        R_rel = np.asarray(T_a, dtype=float).reshape(4, 4)[:3, :3] @ np.asarray(
+            T_b, dtype=float).reshape(4, 4)[:3, :3].T
+        return rotation_angle_deg(R_rel)
+
     def solve_marker_pose(
         self,
         marker_cfg: dict[str, Any],
@@ -1160,15 +1192,16 @@ class ArucoMarkerPoseNode(Node):
         size_m = marker_cfg["size_m"]
         obj_points = marker_object_points(size_m)
 
-        ok, rvec, tvec = cv2.solvePnP(
-            obj_points,
-            image_points,
-            self.K,
-            self.D,
-            flags=cv2.SOLVEPNP_ITERATIVE,
-        )
-        if not ok:
-            return None, None, "solvepnp_failed"
+        rvec, tvec = self._solve_pnp_ippe(obj_points, image_points)
+        if rvec is None:
+            # IPPE failed (e.g. OpenCV version/segfault guard) — fall back to
+            # the iterative solver seeded with the previous frame's pose via
+            # useExtrinsicGuess=True.  This is far more robust than the old
+            # from-scratch iterative solve because the previous pose steers
+            # the optimisation away from the flipped local minimum.
+            rvec, tvec = self._solve_pnp_iterative_seeded(obj_points, image_points)
+            if rvec is None:
+                return None, None, "solvepnp_failed"
 
         R_cam_marker, _ = cv2.Rodrigues(rvec)
         T_cam_marker = np.eye(4)
@@ -1193,6 +1226,144 @@ class ArucoMarkerPoseNode(Node):
             area_px2=abs(float(cv2.contourArea(image_points))),
         )
         return T_cam_marker, metrics, ""
+
+    def _solve_pnp_ippe(
+        self,
+        obj_points: np.ndarray,
+        image_points: np.ndarray,
+    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        """Solve PnP using SOLVEPNP_IPPE_SQUARE with temporal disambiguation.
+
+        IPPE analytically computes both ambiguous solutions for planar square
+        targets and returns them with their reprojection errors.  We then
+        disambiguate using temporal continuity (the correct pose changes
+        smoothly between frames, while the flipped pose is a physically
+        impossible jump) rather than reprojection error alone, which is
+        nearly identical for both solutions.
+
+        ``SOLVEPNP_IPPE_SQUARE`` mandates a specific object-point ordering
+        (per the OpenCV docs):
+          pt0 = [-L/2, +L/2, 0], pt1 = [+L/2, +L/2, 0],
+          pt2 = [+L/2, -L/2, 0], pt3 = [-L/2, -L/2, 0]
+        This is the reverse of the ArUco convention used by
+        ``marker_object_points`` (TL, TR, BR, BL with y-down).  We therefore
+        reverse both the object points and the image points ([3,2,1,0]) before
+        calling IPPE.  Because the physical marker corners are unchanged, the
+        returned ``T_cam_marker`` is expressed in the same marker frame as the
+        ArUco convention — no post-hoc frame conversion is required.
+
+        Returns ``(rvec, tvec)`` of the selected solution, or ``(None, None)``
+        if IPPE is unavailable or fails at runtime (caller falls back to the
+        iterative solver).
+        """
+        if not hasattr(cv2, "solvePnPGeneric"):
+            return None, None
+
+        # IPPE_SQUARE requires object points in the order
+        # [(-h,+h), (+h,+h), (+h,-h), (-h,-h)], i.e. the reverse of ArUco's
+        # [(-h,-h), (+h,-h), (+h,+h), (-h,+h)].  Reorder both arrays with the
+        # same index map so correspondences are preserved.
+        ippe_obj = np.ascontiguousarray(obj_points[[3, 2, 1, 0]])
+        ippe_img = np.ascontiguousarray(image_points[[3, 2, 1, 0]])
+
+        try:
+            retval, rvecs, tvecs, reproj_errors = cv2.solvePnPGeneric(
+                ippe_obj,
+                ippe_img,
+                self.K,
+                self.D,
+                flags=cv2.SOLVEPNP_IPPE_SQUARE,
+            )
+        except Exception:
+            # IPPE can raise/segfault on some OpenCV builds — fall back.
+            return None, None
+
+        if not rvecs or len(rvecs) == 0:
+            return None, None
+
+        # Build (rvec, tvec, error) candidates.  solvePnPGeneric returns lists
+        # of arrays shaped (3, 1).
+        candidates = []
+        for rv, tv, err in zip(rvecs, tvecs, reproj_errors):
+            rv = np.asarray(rv).reshape(3, 1)
+            tv = np.asarray(tv).reshape(3, 1)
+            if not is_finite_array(rv) or not is_finite_array(tv):
+                continue
+            try:
+                err_val = float(np.asarray(err).reshape(-1)[0])
+            except Exception:
+                err_val = float("inf")
+            candidates.append((rv, tv, err_val))
+        if not candidates:
+            return None, None
+
+        prev_T = self._previous_cam_marker_pose()
+
+        if len(candidates) == 1 or prev_T is None:
+            # First frame (no history) or single solution — pick lowest
+            # reprojection error.
+            best = min(candidates, key=lambda c: c[2])
+            return best[0], best[1]
+
+        # Temporal-continuity disambiguation: pick the candidate whose
+        # orientation is closest to the previous frame's pose.
+        def candidate_T(cand):
+            R, _ = cv2.Rodrigues(cand[0])
+            T = np.eye(4)
+            T[:3, :3] = R
+            T[:3, 3] = cand[1].reshape(3)
+            return T
+
+        best = min(candidates, key=lambda c: self._rotation_delta_deg(candidate_T(c), prev_T))
+        return best[0], best[1]
+
+    def _solve_pnp_iterative_seeded(
+        self,
+        obj_points: np.ndarray,
+        image_points: np.ndarray,
+    ) -> tuple[Optional[np.ndarray], Optional[np.ndarray]]:
+        """Iterative solvePnP fallback seeded with the previous frame's pose.
+
+        Used when ``SOLVEPNP_IPPE_SQUARE`` is unavailable or fails at runtime.
+        Seeding with the previous pose (``useExtrinsicGuess=True``) steers the
+        iterative solver toward the temporally-consistent solution and away
+        from the flipped local minimum that plagues from-scratch iterative
+        solves on planar markers.
+        """
+        prev_T = self._previous_cam_marker_pose()
+        use_guess = prev_T is not None
+        if use_guess:
+            prev_rvec, _ = cv2.Rodrigues(prev_T[:3, :3])
+            prev_tvec = prev_T[:3, 3].reshape(3, 1)
+        else:
+            prev_rvec = prev_tvec = None
+        try:
+            ok, rvec, tvec = cv2.solvePnP(
+                obj_points,
+                image_points,
+                self.K,
+                self.D,
+                rvec=prev_rvec,
+                tvec=prev_tvec,
+                useExtrinsicGuess=use_guess,
+                flags=cv2.SOLVEPNP_ITERATIVE,
+            )
+        except Exception:
+            # solvePnP rejects None rvec/tvec on some OpenCV builds even when
+            # useExtrinsicGuess is False — retry without the guess arguments.
+            try:
+                ok, rvec, tvec = cv2.solvePnP(
+                    obj_points,
+                    image_points,
+                    self.K,
+                    self.D,
+                    flags=cv2.SOLVEPNP_ITERATIVE,
+                )
+            except Exception:
+                return None, None
+        if not ok:
+            return None, None
+        return np.asarray(rvec).reshape(3, 1), np.asarray(tvec).reshape(3, 1)
 
     def build_marker_measurement(
         self,
@@ -1998,11 +2169,22 @@ class ArucoMarkerPoseNode(Node):
             return False, "valid_vio_correction_jump_too_large"
 
         chi2 = self.innovation_chi2(innovation, measurement.covariance_diag, P_ov_diag)
-        if chi2 > self.correction_chi2_gate:
+        # Adaptive chi2 gate: when VIO is invalid AND position divergence is
+        # large, widen the gate so the diverged filter can snap back to the
+        # marker-anchored pose.  The nominal gate is tuned for a converged
+        # filter and is far too tight during recovery (observed mean chi2 of
+        # 98.22 vs gate 16.81 while VIO was invalid).
+        effective_chi2_gate = self.correction_chi2_gate
+        recovery_active = False
+        if not self.vio_valid and trans_norm > self.recovery_pos_divergence_threshold_m:
+            effective_chi2_gate = self.correction_chi2_gate * self.recovery_chi2_gate_multiplier
+            recovery_active = True
+        if chi2 > effective_chi2_gate:
             self._diag_corrections_rejected += 1
             self._diag_rejection_reasons["innovation_chi2_rejected"] += 1
             # Structured machine-parsable rejection log (consumed by analyze_log.py)
-            print(f"[MARKER_REJECT] side={self.side} type=chi2 val={chi2:.4f} lim={self.correction_chi2_gate:.4f}", flush=True)
+            gate_label = f"{effective_chi2_gate:.4f}" + ("(recovery)" if recovery_active else "")
+            print(f"[MARKER_REJECT] side={self.side} type=chi2 val={chi2:.4f} lim={gate_label}", flush=True)
             self.hold_vio_invalid(measurement.stamp_sec, "marker_innovation_chi2")
             self.update_vio_valid(matched_odom, force_invalid=True)
             self.publish_reanchor_event_from_measurement(
