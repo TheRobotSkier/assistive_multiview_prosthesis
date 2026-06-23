@@ -1,0 +1,96 @@
+==============================================================================
+LOG ANALYSIS — host-log-20260618_203126.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/host-log-20260618_203126.txt
+Lines:      3493
+Time span:  22:31:27 – 22:32:51 (83.6s)
+Launch args: fusion_mode='legacy'
+
+Nodes started (15):
+  camera_mount_tf_publisher                  pid=20608
+  decompress_bridge                          pid=20615
+  grasp_proximity_controller_node.py         pid=20631
+  odom_to_pose_relay                         pid=20610
+  openvins_odom_tf_relay                     pid=20611
+  openvins_realsense_tf_bridge_node          pid=20607
+  pipeline_diagnostics_node                  pid=20621
+  pipeline_manager_node                      pid=20606
+  point_cloud_xyzrgb_node                    pid=20617
+  pointcloud_fusion_node                     pid=20618
+  preshaping_service_bridge_node             pid=20630
+  rviz2                                      pid=20632
+  segmentation_ros2_node                     pid=20624
+  tf_pipeline_diagnostics                    pid=20609
+  twist_propagation_node                     pid=20627
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  pipeline_diagnostics_node                      0   2754      18  <-- noisy
+  openvins_odom_tf_relay                         0     22       1
+  pointcloud_fusion_node                         0     16      14
+  tf_pipeline_diagnostics                        0      7       3
+  camera_mount_tf_publisher                      0      0       3
+  decompress_bridge                              0      0       8
+  grasp_proximity_controller_node.py             0      0       4
+  odom_to_pose_relay                             0      0       1
+  openvins_realsense_tf_bridge_node              0      0       6
+  pipeline_manager_node                          0      0       4
+  point_cloud_xyzrgb_node                        0      0       2
+  preshaping_service_bridge_node                 0      0       3
+  rviz2                                          0      0      10
+  segmentation_ros2_node                         0      0       2
+  twist_propagation_node                         0      0       4
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  [ 2748x] TF jump (pipeline_diagnostics)  [22:32:22 .. 22:32:51]
+          hint: VIO/odometry discontinuity — check OpenVINS stability & clock drift
+          sample: {'edge': 'marker_map -> head_imu', 'jump_m': 0.623, 'stamp': 1781814742.687}
+          sample: {'edge': 'marker_map -> head_imu', 'jump_m': 0.623, 'stamp': 1781814742.746}
+  [    8x] TF chain disconnected  [22:31:41 .. 22:32:50]
+          hint: OpenVINS→RealSense TF bridge incomplete — Jetson link down?
+          sample: {'head': 'MISSING', 'arm': 'MISSING'}
+          sample: {'head': 'MISSING', 'arm': 'MISSING'}
+  [    4x] relay status change  [22:31:41 .. 22:32:11]
+          hint: openvins_odom_tf_relay head/arm message-flow state
+          sample: {'head': 'WAITING', 'arm': 'WAITING'}
+          sample: {'head': 'WAITING', 'arm': 'WAITING'}
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  Topic rates (Hz) — first / mid / last / min / max:
+    /gtsam/arm_pose                      0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+    /gtsam/head_pose                     0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+    /jetson/arm/image                    0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+    /jetson/arm/odom                     0.0 /   0.0 /  40.0   (min 0.0, max 40.8)
+    /jetson/arm/points                   0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+    /jetson/head/image                   0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+    /jetson/head/odom                    0.0 /   0.0 /  39.2   (min 0.0, max 39.5)
+    /jetson/head/points                  0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+    /vis/head_arm_pose                   0.0 /   0.0 /   0.0   (min 0.0, max 0.0)
+
+  Clock offset / Transport Latency (max |clock_off| per block):
+    peak |clock_off| = 0.049s at 22:32:50
+    all blocks within 50ms — clock sync OK
+
+  TF chain connectivity (marker_map -> depth_optical_frame):
+    > arm_d435i_arm_depth_optical_frame: DISCONNECTED entire run (13 blocks)
+    > arm_imu: DISCONNECTED entire run (9 blocks)
+    > head_d435i_head_depth_optical_frame: DISCONNECTED entire run (10 blocks)
+    > head_imu: DISCONNECTED entire run (9 blocks)
+
+  TF jump events: 2748 total
+    peak burst: 566 jumps in 5s window at 22:32:45
+     1108x  marker_map -> head_imu
+      849x  marker_map -> arm_imu_openvins_corrected
+      791x  marker_map -> head_imu_openvins_corrected
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  (no [ERROR] lines)
+

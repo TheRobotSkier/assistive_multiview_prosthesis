@@ -78,6 +78,13 @@ HEAD_ARM_PAIRS = (
     ("/gtsam/head_pose", "/gtsam/arm_pose"),
 )
 
+# Topics exempt from clock-offset / transport-latency analysis because their
+# large clock deltas are an artifact of latched (TRANSIENT_LOCAL) durability,
+# not real network latency.  These topics are published once at boot and held;
+# the delta between the original (frozen) stamp and a late subscriber match is
+# meaningless and produces false-positive "14776ms clock skew" callouts.
+LATCHED_TOPICS = {"/tf_static"}
+
 
 # ---------------------------------------------------------------------------
 # Quaternion / rotation helpers (no external deps)
@@ -899,7 +906,12 @@ def print_tier_a(rep: BagReport, out):
         ti = rep.topics[name]
         eff = f"{ti.effective_hz:.1f}" if ti.effective_hz else "—"
         absent_flag = "  ABSENT" if ti.count == 0 else ""
-        p(f"  {name:<36} {ti.msg_type:<20.20} {ti.count:>7} {eff:>7}{absent_flag}")
+        hf_flag = ""
+        if ti.effective_hz and ti.effective_hz > 200:
+            hf_flag = (f"  [WARNING: {ti.effective_hz:.0f} Hz — high-frequency "
+                       f"topic may cause local CPU exhaustion and "
+                       f"network stack choking]")
+        p(f"  {name:<36} {ti.msg_type:<20.20} {ti.count:>7} {eff:>7}{absent_flag}{hf_flag}")
     p("")
     # Summary of absent topics
     absent = [t for t in rep.topics.values() if t.count == 0]
@@ -933,8 +945,13 @@ def print_tier_b(rep: BagReport, out):
         med_hz = 1000.0 / ti.median_dt_ms if ti.median_dt_ms > 0 else 0
         max_hz = 1000.0 / ti.min_gap_ms if ti.min_gap_ms and ti.min_gap_ms > 0 else 0
         cv_str = f"{ti.cv_dt:.2f}" if ti.cv_dt is not None else "—"
+        hf_flag = ""
+        if max_hz > 200:
+            hf_flag = (f"  [WARNING: peak {max_hz:.0f} Hz — high-frequency "
+                       f"topic may cause local CPU exhaustion and "
+                       f"network stack choking]")
         p(f"  {name:<36} {min_hz:>7.1f} {med_hz:>7.1f} {max_hz:>7.1f} {cv_str:>5} "
-          f"{ti.avg_size_kb:>7.1f}K {ti.bandwidth_mbs or 0:>6.2f}")
+          f"{ti.avg_size_kb:>7.1f}K {ti.bandwidth_mbs or 0:>6.2f}{hf_flag}")
     p("  (CV = coefficient of variation of inter-message interval; K = KB)")
 
     # Full 6-DOF pose analysis
@@ -1139,14 +1156,169 @@ def print_sysmon(rep: BagReport, out):
     # Correlation callouts
     _correlate(rep, out)
 
+    # ── OS KERNEL NETWORK HEALTH (from /proc/net/snmp deltas in sysmon) ──
+    _print_kernel_net_health(rep, out)
+
+
+def _print_kernel_net_health(rep: BagReport, out):
+    """Evaluate /proc/net/snmp delta counters from host + Jetson sysmon samples."""
+    p = lambda *a, **kw: print(*a, file=out, **kw)
+
+    def _snmp_peak(samples, key):
+        """Collect snmp.{key} deltas and return (peak_rps, total)."""
+        vals = []
+        for s in samples:
+            snmp = s.get("snmp", {})
+            v = snmp.get(key)
+            if isinstance(v, (int, float)):
+                vals.append(v)
+        if not vals:
+            return None, 0
+        return max(vals), sum(vals)
+
+    host = rep.sysmon.get("host", [])
+    jetson = rep.sysmon.get("jetson", [])
+
+    reasm_peak_h, reasm_total_h = _snmp_peak(host, "ip_reasm_fails_delta")
+    reasm_peak_j, reasm_total_j = _snmp_peak(jetson, "ip_reasm_fails_delta")
+    rcvbuf_peak_h, rcvbuf_total_h = _snmp_peak(host, "udp_rcvbuf_errors_delta")
+    rcvbuf_peak_j, rcvbuf_total_j = _snmp_peak(jetson, "udp_rcvbuf_errors_delta")
+
+    # Merge: take the worst peak across host and jetson
+    reasm_peaks = [v for v in (reasm_peak_h, reasm_peak_j) if v is not None]
+    rcvbuf_peaks = [v for v in (rcvbuf_peak_h, rcvbuf_peak_j) if v is not None]
+    reasm_max = max(reasm_peaks) if reasm_peaks else None
+    rcvbuf_max = max(rcvbuf_peaks) if rcvbuf_peaks else None
+    reasm_total = (reasm_total_h or 0) + (reasm_total_j or 0)
+    rcvbuf_total = (rcvbuf_total_h or 0) + (rcvbuf_total_j or 0)
+    has_snmp = reasm_max is not None or rcvbuf_max is not None
+
+    if has_snmp:
+        p("-" * 90)
+        p("OS KERNEL NETWORK HEALTH (from /proc/net/snmp deltas)")
+        p("-" * 90)
+        if rcvbuf_max is not None:
+            labels = []
+            if rcvbuf_peak_h is not None:
+                labels.append(f"host={rcvbuf_peak_h:.1f}/s")
+            if rcvbuf_peak_j is not None:
+                labels.append(f"jetson={rcvbuf_peak_j:.1f}/s")
+            p(f"  UDP RcvbufErrors:  peak={rcvbuf_max:.1f}/s  total={rcvbuf_total}  ({', '.join(labels)})")
+        if reasm_max is not None:
+            labels = []
+            if reasm_peak_h is not None:
+                labels.append(f"host={reasm_peak_h:.1f}/s")
+            if reasm_peak_j is not None:
+                labels.append(f"jetson={reasm_peak_j:.1f}/s")
+            p(f"  IP  ReasmFails:    peak={reasm_max:.1f}/s  total={reasm_total}  ({', '.join(labels)})")
+        # Rule A: RcvbufErrors > 5/s
+        if rcvbuf_max is not None and rcvbuf_max > 5:
+            p(f"")
+            p(f"  [WARNING] OS UDP Socket Buffer Overflows Detected.")
+            p(f"    The Linux kernel is dropping valid data because the ROS 2")
+            p(f"    application threads are stalling or the CPU is starved.")
+            p(f"    Check for blocking callbacks or high-frequency exception loops.")
+        # Rule B: ReasmFails > 1/s
+        if reasm_max is not None and reasm_max > 1:
+            p(f"")
+            p(f"  [WARNING] IP Packet Reassembly Timeouts Detected.")
+            p(f"    The Linux kernel is dropping fragmented data frames (likely")
+            p(f"    PointCloud2) because individual UDP fragments are being lost")
+            p(f"    on the wire or virtual network bridge. Check physical link")
+            p(f"    connections or enable message compression.")
+        if (rcvbuf_max is None or rcvbuf_max <= 5) and (reasm_max is None or reasm_max <= 1):
+            p(f"  (kernel network counters within healthy range)")
+        p("")
+
 
 def _correlate(rep: BagReport, out):
     """Cross-correlate sysmon + bag data to surface likely root causes."""
     p = lambda *a, **kw: print(*a, file=out, **kw)
     callouts = []
 
-    # 1. Drift vs TF jumps
     host = rep.sysmon.get("host", [])
+    jetson = rep.sysmon.get("jetson", [])
+    meta = rep.sysmon.get("meta")
+
+    # ── 0. Latency vs Clock Drift Separation ──
+    # Compute clock offset from bag data (recv_time - publish_time) and
+    # cross-reference with true chrony drift from sysmon.
+    clock_offs = []  # (topic, max_offset_s)
+    for ti in rep.topics.values():
+        if len(ti.stamps) < 2 or len(ti.recv_times) < 2:
+            continue
+        # Skip latched (TRANSIENT_LOCAL) topics — their frozen boot-time stamps
+        # produce meaningless multi-second deltas that masquerade as clock skew.
+        if ti.name in LATCHED_TOPICS:
+            continue
+        offsets = []
+        for pub_ns, recv_ns in zip(ti.stamps, ti.recv_times):
+            offsets.append(abs(recv_ns - pub_ns) / 1e9)
+        if offsets:
+            clock_offs.append((ti.name, max(offsets), sum(offsets) / len(offsets)))
+
+    if clock_offs:
+        peak_topic, peak_off, peak_avg = max(clock_offs, key=lambda x: x[1])
+        # True chrony drift from sysmon
+        true_drift_host_ms = None
+        true_drift_jetson_ms = None
+        if host:
+            hd = [abs(s.get("drift", {}).get("system_offset_s", 0)) for s in host
+                  if s.get("drift")]
+            if hd:
+                true_drift_host_ms = max(hd) * 1000
+        if jetson:
+            jd = [abs(s.get("drift", {}).get("system_offset_s", 0)) for s in jetson
+                  if s.get("drift")]
+            if jd:
+                true_drift_jetson_ms = max(jd) * 1000
+
+        # Determine effective true drift (worst of host/jetson)
+        true_drift_ms = None
+        if true_drift_host_ms is not None and true_drift_jetson_ms is not None:
+            true_drift_ms = max(true_drift_host_ms, true_drift_jetson_ms)
+        elif true_drift_host_ms is not None:
+            true_drift_ms = true_drift_host_ms
+        elif true_drift_jetson_ms is not None:
+            true_drift_ms = true_drift_jetson_ms
+
+        if peak_off > 0.05 and true_drift_ms is not None:
+            if true_drift_ms < 50:
+                callouts.append(
+                    f"Peak message clock delta = {peak_off*1000:.0f}ms on '{peak_topic}' "
+                    f"BUT true chrony drift is only {true_drift_ms:.1f}ms — "
+                    f"the {peak_off*1000:.0f}ms delta is Message Transport / "
+                    f"Serialization Latency, NOT clock skew.")
+            else:
+                callouts.append(
+                    f"Peak message clock delta = {peak_off*1000:.0f}ms on '{peak_topic}' "
+                    f"AND chrony drift = {true_drift_ms:.1f}ms — "
+                    f"clock skew is a likely contributor.")
+
+    # ── Bandwidth cross-reference: NIC util vs useful ROS payload ──
+    total_payload_mbps = 0.0
+    for ti in rep.topics.values():
+        if ti.bandwidth_mbs is not None:
+            total_payload_mbps += ti.bandwidth_mbs
+    if total_payload_mbps > 0 and host:
+        iface = meta.get("host_dds_iface") if meta else None
+        if iface:
+            nic_rx_all = [s.get("net", {}).get(iface, {}).get("rx_mbs", 0)
+                          for s in host]
+            if nic_rx_all:
+                nic_rx_avg = sum(nic_rx_all) / len(nic_rx_all)
+                nic_rx_peak = max(nic_rx_all)
+                if nic_rx_avg > total_payload_mbps * 1.25:
+                    overhead_pct = (nic_rx_avg / total_payload_mbps - 1) * 100
+                    callouts.append(
+                        f"[WARNING] Massive DDS/RTPS Network Overhead Detected. "
+                        f"Expected ROS payload: ~{total_payload_mbps:.2f} MB/s, "
+                        f"NIC [{iface}] rx avg: {nic_rx_avg:.1f} MB/s "
+                        f"(peak {nic_rx_peak:.1f} MB/s). "
+                        f"Overhead: {overhead_pct:.0f}% — check for UDP packet "
+                        f"fragmentation dropouts or Reliable QoS retransmission storms.")
+
+    # 1. Drift vs TF jumps
     if host:
         drifts = [abs(s.get("drift", {}).get("system_offset_s", 0)) for s in host
                   if s.get("drift")]
@@ -1187,6 +1359,172 @@ def _correlate(rep: BagReport, out):
         p("  CORRELATION CALLOUTS:")
         for c in callouts:
             p(f"    ! {c}")
+        p("")
+
+
+# ---------------------------------------------------------------------------
+# Feature 3: Host-Side Backprojection — Time Synchronization Health
+# ---------------------------------------------------------------------------
+
+def print_backprojection_sync(rep: BagReport, out):
+    """Check host-side naive_pointcloud_assembler health by comparing
+    input (depth/image) topic rates vs output (points) topic rates.
+
+    The naive_pointcloud_assembler caches depth, RGB, and CameraInfo
+    independently and publishes on a timer capped at ``max_rate_hz``
+    (configured in pipeline.launch.py).  There is no timestamp
+    synchronization — the output rate is the rate cap, not a sync result.
+    A low output rate relative to the input is therefore expected and
+    not a failure; the only real failure is a near-zero output rate
+    (assembler not running or no input reaching it).
+    """
+    p = lambda *a, **kw: print(*a, file=out, **kw)
+
+    # Build per-side input/output mapping
+    results = []
+    for side in ("head", "arm"):
+        # Input topics: try raw first, fall back to compressed
+        depth_t = rep.topics.get(f"/jetson/{side}/depth")
+        image_t = rep.topics.get(f"/jetson/{side}/image")
+        if depth_t is None:
+            depth_t = rep.topics.get(f"/jetson/{side}/depth/compressed")
+        if image_t is None:
+            image_t = rep.topics.get(f"/jetson/{side}/image/compressed")
+        # Output topic
+        points_t = rep.topics.get(f"/jetson/{side}/points")
+
+        # Need at least one input and the output to compare
+        if not depth_t and not image_t:
+            continue
+        if not points_t:
+            continue
+
+        input_hzs = []
+        label_parts = []
+        if depth_t is not None and depth_t.effective_hz is not None:
+            input_hzs.append(depth_t.effective_hz)
+            label_parts.append(f"depth={depth_t.effective_hz:.1f}Hz")
+        if image_t is not None and image_t.effective_hz is not None:
+            input_hzs.append(image_t.effective_hz)
+            label_parts.append(f"image={image_t.effective_hz:.1f}Hz")
+
+        if not input_hzs:
+            continue
+
+        min_input_hz = min(input_hzs)
+        points_hz = points_t.effective_hz if points_t.effective_hz is not None else 0.0
+
+        # The naive assembler rate-caps the output (default max_rate_hz=5.0).
+        # A drop below the input rate is expected, not a sync failure.
+        # Only flag as a real problem if the output is near-zero (< 1.0 Hz),
+        # which indicates the assembler is not running or receiving no input.
+        entry = {
+            "side": side,
+            "inputs": ", ".join(label_parts),
+            "min_input_hz": min_input_hz,
+            "points_hz": points_hz,
+            "points_absent": points_t.count == 0,
+        }
+        if points_hz < 1.0 or entry["points_absent"]:
+            results.append(entry)
+
+    if not results:
+        return
+
+    p("-" * 90)
+    p("HOST-SIDE POINTCLOUD ASSEMBLER — OUTPUT HEALTH")
+    p("-" * 90)
+    p(f"  {'SIDE':<6} {'INPUTS':<36} {'MIN_INPUT_HZ':>12} {'POINTS_HZ':>10}")
+    p(f"  {'-'*6} {'-'*36} {'-'*12} {'-'*10}")
+    for r in results:
+        p(f"  {r['side']:<6} {r['inputs']:<36} {r['min_input_hz']:>12.1f} "
+          f"{r['points_hz']:>10.1f}")
+    p("")
+
+    for r in results:
+        if r["points_hz"] < 1.0 and not r["points_absent"]:
+            p(f"  [WARNING] Pointcloud assembler output near-zero ({r['side']}): "
+              f"{r['points_hz']:.1f}Hz output from {r['inputs']}.")
+            p(f"    The naive_pointcloud_assembler rate-caps output at max_rate_hz")
+            p(f"    (default 5.0 Hz), so a rate below the input is expected.")
+            p(f"    A near-zero rate indicates the assembler is not running,")
+            p(f"    is not receiving input, or TF lookups are failing.")
+            p(f"    Check [DIAG-ASM] telemetry for skip reasons.")
+            p("")
+        if r["points_absent"]:
+            p(f"  [WARNING] Pointcloud assembler output absent ({r['side']}):")
+            p(f"    Input: {r['inputs']} -> Output: 0 messages recorded.")
+            p(f"    The naive_pointcloud_assembler may not be running or is")
+            p(f"    failing to receive any input frames. Check node lifecycle.")
+            p("")
+
+
+# ---------------------------------------------------------------------------
+# Feature 5: Compression Efficiency (CompressedImage topics)
+# ---------------------------------------------------------------------------
+
+def print_compression_efficiency(rep: BagReport, out):
+    """Report compression ratios for Jetson relay compressed image streams.
+
+    Compares CompressedImage wire format sizes against the expected raw
+    frame sizes for the known downsampled resolution (320×240):
+      - Depth Z16:  320×240×2 = 150 KiB raw
+      - Color RGB8: 320×240×3 = 225 KiB raw
+    """
+    p = lambda *a, **kw: print(*a, file=out, **kw)
+
+    # Expected raw sizes for 320×240 (after 2× downsampling)
+    RAW_DEPTH_KB = 150.0   # 320×240×2 / 1024
+    RAW_COLOR_KB = 225.0   # 320×240×3 / 1024
+
+    compressed_topics = []
+    for side in ("head", "arm"):
+        for kind, raw_kb in [("depth", RAW_DEPTH_KB), ("image", RAW_COLOR_KB)]:
+            ti = rep.topics.get(f"/jetson/{side}/{kind}/compressed")
+            if ti is not None and ti.count > 0 and ti.avg_size_kb is not None:
+                compressed_topics.append((ti.name, ti, raw_kb))
+
+    if not compressed_topics:
+        return
+
+    p("-" * 90)
+    p("COMPRESSION EFFICIENCY (CompressedImage wire format from Jetson relay)")
+    p("-" * 90)
+    p(f"  {'TOPIC':<38} {'#MSG':>6} {'AVG KB':>8} {'RAW KB':>8} {'RATIO':>7} {'SAVED':>7}")
+    p(f"  {'-'*38} {'-'*6} {'-'*8} {'-'*8} {'-'*7} {'-'*7}")
+
+    for name, ti, raw_kb in sorted(compressed_topics):
+        ratio = raw_kb / ti.avg_size_kb if ti.avg_size_kb > 0 else 0
+        saved_pct = (1 - ti.avg_size_kb / raw_kb) * 100 if raw_kb > 0 else 0
+        p(f"  {name:<38} {ti.count:>6} {ti.avg_size_kb:>7.1f}K {raw_kb:>7.1f}K "
+          f"{ratio:>6.1f}x {saved_pct:>6.0f}%")
+
+    # Aggregate bandwidth comparison
+    total_raw_kbs = 0.0
+    total_cmp_kbs = 0.0
+    for _, ti, raw_kb in compressed_topics:
+        hz = ti.effective_hz or 0
+        total_raw_kbs += raw_kb * hz
+        total_cmp_kbs += ti.avg_size_kb * hz
+
+    if total_raw_kbs > 0:
+        p("")
+        p(f"  Aggregate at recorded rates: raw={total_raw_kbs/1024:.3f} MB/s "
+          f" compressed={total_cmp_kbs/1024:.3f} MB/s "
+          f"(saved {(1 - total_cmp_kbs/total_raw_kbs)*100:.0f}%)")
+    p("")
+
+    # Flag poor compression
+    for name, ti, raw_kb in compressed_topics:
+        if ti.avg_size_kb > raw_kb * 0.8 and raw_kb > 0:
+            p(f"  [WARNING] {name}: compressed size ({ti.avg_size_kb:.1f}K) is "
+              f"near raw ({raw_kb:.0f}K) — compression may be ineffective "
+              f"(check encoder params)")
+        elif ti.avg_size_kb < raw_kb * 0.1 and raw_kb > 0:
+            p(f"  [INFO] {name}: excellent compression — "
+              f"{ti.avg_size_kb:.1f}K vs {raw_kb:.0f}K raw "
+              f"({raw_kb/ti.avg_size_kb:.1f}x)")
+    if compressed_topics:
         p("")
 
 
@@ -1336,6 +1674,8 @@ def report(rep: BagReport, out, plot_path: str | None = None):
     print_tier_a(rep, out)
     print_tier_b(rep, out)
     print_sysmon(rep, out)
+    print_backprojection_sync(rep, out)
+    print_compression_efficiency(rep, out)
     if plot_path:
         print_plot(rep, plot_path)
 

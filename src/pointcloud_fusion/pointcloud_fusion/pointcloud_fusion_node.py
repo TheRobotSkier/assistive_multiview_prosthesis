@@ -264,7 +264,10 @@ class PointCloudFusionNode(Node):
         # threshold (seconds), chrony sync is assumed broken and the node
         # automatically falls back to arrival-time stamping.  This prevents
         # total cloud stall when the Jetson clock is wrong (V6 §6.3).
-        self.declare_parameter("clock_skew_fallback_s", 1.0)
+        # Set to 5.0s because transport latency (not chrony drift) can reach
+        # 2.6s under CPU pressure; the sysmon independently monitors chrony
+        # drift at 0.1ms precision, so real chrony failures are still caught.
+        self.declare_parameter("clock_skew_fallback_s", 5.0)
 
         # ── Read parameters ───────────────────────────────────────────────
         self._target_frame = self.get_parameter("target_frame").value
@@ -378,6 +381,11 @@ class PointCloudFusionNode(Node):
                        "tf_fail": {}}
         self._last_publish_time = self.get_clock().now()
         self.create_timer(10.0, self._log_stats)
+        # Dual-view ratio degradation tracking (Phase 3.3).  Counts consecutive
+        # intervals where the dual-view ratio dropped below the warning
+        # threshold.  Emits a WARN after two consecutive low intervals so the
+        # progressive degradation is visible in real-time.
+        self._low_dual_view_intervals: int = 0
 
         # ── Bbox transform cache ───────────────────────────────────────────
         # Caches the most recent successful transform for each pruning box
@@ -443,7 +451,7 @@ class PointCloudFusionNode(Node):
         back to the host arrival time (legacy behaviour).
 
         **Clock-skew auto-fallback:** if the header stamp differs from the
-        host clock by more than ``clock_skew_fallback_s`` (default 1.0s),
+        host clock by more than ``clock_skew_fallback_s`` (default 5.0s),
         chrony sync is assumed broken and the node automatically falls back
         to arrival-time stamping.  This prevents every cloud from being
         rejected by the age gate when the Jetson clock is wrong.
@@ -516,23 +524,37 @@ class PointCloudFusionNode(Node):
                 transformed.append(cloud)
                 continue
             try:
-                # When use_header_stamp_age is active (chrony sync), look up
-                # TF at the cloud's actual capture time with a tolerance so
-                # we get the temporally-correct transform. Otherwise fall
-                # back to the latest available transform (legacy behaviour).
-                if self._use_header_stamp_age and not self._clock_skew_detected:
-                    stamp = rclpy.time.Time.from_msg(cloud.header.stamp)
-                    t = self._tf_buffer.lookup_transform_full(
-                        self._target_frame, stamp,
-                        cloud.header.frame_id, stamp,
-                        self._target_frame,
-                        rclpy.duration.Duration(seconds=self._transform_tolerance),
-                    )
+                # Look up TF at the cloud's capture time.  The relay now
+                # stamps dynamic TF edges with the odom message's timestamp
+                # (the observation time), which is in the same temporal
+                # domain as the depth cloud's header stamp.  This gives the
+                # temporally-correct transform and eliminates the race that
+                # caused single-view fusion.
+                #
+                # Timestamp selection (Phase 3.2): when clock skew is
+                # detected, fall back to the arrival-time stamp for the TF
+                # lookup instead of the header stamp.  This keeps the age
+                # check and TF lookup temporally consistent during transient
+                # latency spikes that trip the skew detector.
+                #
+                # Timeout (Phase 3.1): uses transform_tolerance_s (default
+                # 1.0s) instead of a hardcoded 0.2s.  This runs in a
+                # background daemon thread, so it does NOT block the
+                # executor.  Even with Phase 2 relay latency reductions,
+                # residual transport jitter means the cloud may still arrive
+                # slightly before TF; the longer timeout lets the matching TF
+                # arrive.  If the lookup genuinely fails (TF gap), the cloud
+                # is skipped — a wrong transform produces worse results than
+                # no transform.
+                if self._clock_skew_detected:
+                    stamp = self.get_clock().now()
                 else:
-                    t = self._tf_buffer.lookup_transform(
-                        self._target_frame, cloud.header.frame_id,
-                        rclpy.time.Time(),
-                    )
+                    stamp = rclpy.time.Time.from_msg(cloud.header.stamp)
+                t = self._tf_buffer.lookup_transform(
+                    self._target_frame, cloud.header.frame_id,
+                    stamp,
+                    timeout=rclpy.duration.Duration(seconds=self._transform_tolerance),
+                )
                 transformed.append(tf2_sensor_msgs.do_transform_cloud(cloud, t))
             except Exception as exc:
                 frame = cloud.header.frame_id
@@ -1037,6 +1059,24 @@ class PointCloudFusionNode(Node):
             f"{tf_fail_str}"
             f" last_publish_ago={since_last:.1f}s"
         )
+
+        # Dual-view ratio metric and degradation warning (Phase 3.3).
+        # dual_ratio = dual / max(dual + cam1_only, 1).  Emit WARN if below
+        # 0.3 for two consecutive intervals so progressive degradation is
+        # visible in real-time.
+        dual = stats_snapshot["dual"]
+        cam1_only = stats_snapshot["cam1_only"]
+        dual_ratio = dual / max(dual + cam1_only, 1)
+        if dual_ratio < 0.3:
+            self._low_dual_view_intervals += 1
+            if self._low_dual_view_intervals >= 2:
+                self.get_logger().warn(
+                    f"Dual-view fusion degraded: dual_ratio={dual_ratio:.2f} "
+                    f"(dual={dual}, cam1_only={cam1_only}) for "
+                    f"{self._low_dual_view_intervals} consecutive intervals"
+                )
+        else:
+            self._low_dual_view_intervals = 0
 
         # Stall diagnostic: if nothing published this interval, explain why.
         if stats_snapshot["published"] == 0:

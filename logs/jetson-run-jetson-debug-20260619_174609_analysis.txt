@@ -1,0 +1,67 @@
+==============================================================================
+LOG ANALYSIS — jetson-run-jetson-debug-20260619_174609.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260619_174609.txt
+Lines:      26495
+Time span:  17:46:13 – 17:48:53 (160.0s)
+
+Nodes started (6):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=191
+  tf_throttle                                pid=45
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  aruco_marker_pose_node.py                      2     10      40  <-- noisy
+  dynamic_arm_pose_measurement_node.py           0      0       7
+  jetson_relay                                   0      0      12
+  realsense2_camera_node                         0      0       2
+  run_subscribe_msckf_marker                     0      0       2
+  tf_throttle                                    0      0      18
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  (none of the known failure patterns matched)
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  [2x] process has died [pid 42, exit code 1, cmd '/miahand_ws/src/install_overlay/sensor_fusion_bringup/li
+        first: n/a (aruco_marker_pose_node.py)  last: n/a
+
+------------------------------------------------------------------------------
+ALGORITHMIC LAYER — VIO STATE ESTIMATION HEALTH
+------------------------------------------------------------------------------
+                Markers    Corrections   Yield    Locked
+                -------    -----------   -----    ------
+  Head VIO:      153            147       96.1%    YES
+  Arm  VIO:       —           —           —        —
+
+------------------------------------------------------------------------------
+CRASH / PROCESS-DEATH DETECTED
+------------------------------------------------------------------------------
+  line 2173: [aruco_marker_pose_node.py-4] Traceback (most recent call last):
+  line 2202: [ERROR] [aruco_marker_pose_node.py-4]: process has died [pid 42, exit code 1, cmd '/miahand_ws/src/i
+  line 7111: [aruco_marker_pose_node.py-3] Traceback (most recent call last):
+  line 7203: [ERROR] [aruco_marker_pose_node.py-3]: process has died [pid 41, exit code 1, cmd '/miahand_ws/src/i
+
+------------------------------------------------------------------------------
+JETSON SYSMON (from native jsonl)
+------------------------------------------------------------------------------
+  Samples:    85
+  CPU:        min=19.3%  avg=65.3%  max=89.2%
+  RAM:        min=12.0%  avg=18.7%  max=20.6%  (total 7619.9 MB)
+  NIC [enP8p1s0]: rx avg=0.8 Mbps  max=3.9 Mbps  tx avg=28.4 Mbps  max=67.8 Mbps
+
+

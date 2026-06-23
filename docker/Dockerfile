@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-jazzy-librealsense2 \
         ros-jazzy-realsense2-camera \
         ros-jazzy-realsense2-description \
+        ros-jazzy-depth-image-proc \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Python dependencies ──────────────────────────────────────────────────────
@@ -39,7 +40,8 @@ RUN python3 -m pip install --no-cache-dir --break-system-packages --ignore-insta
         mindrove \
         gtsam \
         open3d \
-        rosbags
+        rosbags \
+    && python3 -m pip install --no-cache-dir --break-system-packages 'setuptools>=68.0'
 
 # ── User setup ───────────────────────────────────────────────────────────────
 # The osrf/ros:jazzy-desktop image already has a 'ubuntu' user with UID 1000.

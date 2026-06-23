@@ -254,7 +254,7 @@ pointcloud_fusion:
         enable_downsampling: true
         enable_distance_filter: true
         enable_hand_removal: true
-        cloud_max_age_s: 0.5
+        cloud_max_age_s: 1.0
         mounts_config_path: ""
         active_mount: "8_cm_cam_mount"
         # TF wait gate: when true, suppresses cloud processing until
@@ -266,7 +266,13 @@ pointcloud_fusion:
         # header stamp (sensor time) instead of host arrival time.
         # Requires chrony time sync between Jetson and host.
         use_header_stamp_age: true
-        transform_tolerance_s: 0.15
+        # Tolerance added to TF lookups.  Even with Phase 2 relay latency
+        # reductions, residual transport jitter means the cloud may still
+        # arrive slightly before TF.  A 1.0s timeout gives the TF time to
+        # arrive; the lookup runs in a background daemon thread so it does
+        # not block the executor.  Dropping the cloud produces worse fusion
+        # results than a slightly-delayed transform.
+        transform_tolerance_s: 1.0
 
 openvins_odom_tf_relay:
     ros__parameters:
@@ -314,14 +320,26 @@ openvins_odom_tf_relay:
         # Optional custom topic for receiving live extrinsics from the Jetson
         # (future support).  Leave empty to disable.
         extrinsics_topic: ""
-        max_pose_norm_m: 2.0
-        max_pose_jump_m: 0.50
-        # V6 §6.3 — when false, the relay does NOT broadcast the dynamic
-        # marker_map -> *_imu TF edges.  Instead, the GTSAM tracker owns
-        # those edges (broadcast_tf=true) so downstream nodes consume the
-        # smoothed FGO trajectory rather than raw, diverging VIO.
-        publish_dynamic_tf: false
+        max_pose_norm_m: 1.5
+        max_pose_jump_m: 0.30
+        # V6 §6.3 — when true, the relay broadcasts dynamic
+        # marker_map -> *_imu TF edges directly.  When false, relies on
+        # the GTSAM tracker to own those edges (broadcast_tf=true).
+        # Set true when GTSAM is not running (e.g. legacy fusion_mode)
+        # to keep the TF chain connected for downstream consumers.
+        publish_dynamic_tf: true
         use_corrected_tf: true
+        # Throttle TF publish rate.  The fusion node consumes clouds at ~5Hz;
+        # a 20Hz TF rate provides 4x oversampling — more than sufficient for
+        # tf2's linear interpolation between entries.  Reducing from the 100Hz
+        # default cuts ~80 sendTransform calls/s per camera, reducing CPU load
+        # on both host and Jetson (via reduced /tf topic volume) and the DDS
+        # storms that cause the growing cloud-TF gap.
+        tf_publish_max_hz: 20.0
+        # Transport latency can spike to 2.3s under CPU pressure.  A 4.0s
+        # hold-last-good cache bridges longer latency spikes while still being
+        # fresh enough for real-time operation (was 2.0s).
+        corrected_tf_cache_max_age_s: 4.0
 
 openvins_realsense_tf_bridge:
     ros__parameters:

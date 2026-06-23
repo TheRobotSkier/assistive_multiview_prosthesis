@@ -70,8 +70,10 @@ REPLAY_TOPICS = [
     "/jetson/arm/points",
     "/jetson/head/odom",
     "/jetson/arm/odom",
-    "/jetson/head/image",
-    "/jetson/arm/image",
+    "/jetson/head/depth/compressed",
+    "/jetson/arm/depth/compressed",
+    "/jetson/head/image/compressed",
+    "/jetson/arm/image/compressed",
     "/jetson/head/camera_info",
     "/jetson/arm/camera_info",
 ]

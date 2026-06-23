@@ -1,0 +1,58 @@
+==============================================================================
+LOG ANALYSIS — jetson-run-jetson-debug-20260618_215720.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260618_215720.txt
+Lines:      9314
+Time span:  21:57:24 – 21:58:24 (60.3s)
+
+Nodes started (6):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=191
+  tf_throttle                                pid=45
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  aruco_marker_pose_node.py                      0     17      56
+  dynamic_arm_pose_measurement_node.py           0      0       7
+  jetson_relay                                   0      0      12
+  realsense2_camera_node                         0      0       2
+  run_subscribe_msckf_marker                     0      0       2
+  tf_throttle                                    0      0       8
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  (none of the known failure patterns matched)
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  (no [ERROR] lines)
+
+------------------------------------------------------------------------------
+ALGORITHMIC LAYER — VIO STATE ESTIMATION HEALTH
+------------------------------------------------------------------------------
+                Markers    Corrections   Yield    Locked
+                -------    -----------   -----    ------
+  Head VIO:      136            133       97.8%    YES
+  Arm  VIO:      177             24       13.6%    YES
+
+------------------------------------------------------------------------------
+JETSON SYSMON (from native jsonl)
+------------------------------------------------------------------------------
+  Samples:    33
+  CPU:        min=19.0%  avg=76.9%  max=89.0%
+  RAM:        min=16.5%  avg=23.9%  max=24.6%  (total 7619.9 MB)
+  NIC [enP8p1s0]: rx avg=1.0 Mbps  max=5.9 Mbps  tx avg=20.5 Mbps  max=25.7 Mbps
+
+

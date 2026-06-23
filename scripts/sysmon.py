@@ -103,6 +103,36 @@ def read_netdev():
             }
     return out
 
+def read_snmp():
+    """Parse /proc/net/snmp for kernel SNMP counters."""
+    try:
+        with open("/proc/net/snmp") as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return None
+    ip_keys = None; ip_vals = None; udp_keys = None; udp_vals = None
+    for i, ln in enumerate(lines):
+        if ln.startswith("Ip:") and ip_keys is None:
+            ip_keys = ln.split()[1:]
+            if i + 1 < len(lines) and lines[i + 1].startswith("Ip:"):
+                ip_vals = lines[i + 1].split()[1:]
+        elif ln.startswith("Udp:") and udp_keys is None:
+            udp_keys = ln.split()[1:]
+            if i + 1 < len(lines) and lines[i + 1].startswith("Udp:"):
+                udp_vals = lines[i + 1].split()[1:]
+    if ip_keys and ip_vals and udp_keys and udp_vals:
+        try:
+            ip_map = dict(zip(ip_keys, ip_vals))
+            udp_map = dict(zip(udp_keys, udp_vals))
+            return {
+                "ip_reasm_fails": int(ip_map.get("ReasmFails", 0)),
+                "udp_rcvbuf_errors": int(udp_map.get("RcvbufErrors", 0)),
+            }
+        except (ValueError, KeyError):
+            return None
+    return None
+
+
 def read_chronyc():
     try:
         r = subprocess.run(["chronyc", "-c", "tracking"],
@@ -157,6 +187,7 @@ def parse_tegrastats(line):
 def main():
     prev_agg, prev_idle, prev_cores, prev_cores_idle = read_proc_stat()
     prev_net = read_netdev()
+    prev_snmp = read_snmp()
     teg = start_tegrastats()
     while True:
         time.sleep(INTERVAL)
@@ -226,6 +257,16 @@ def main():
                 pass
             if line:
                 rec["gpu"] = parse_tegrastats(line)
+        # ── Kernel SNMP counters (IP reassembly failures, UDP rcvbuf errors) ──
+        cur_snmp = read_snmp()
+        if prev_snmp and cur_snmp:
+            rec["snmp"] = {
+                "ip_reasm_fails_delta": max(0, cur_snmp["ip_reasm_fails"]
+                                           - prev_snmp["ip_reasm_fails"]),
+                "udp_rcvbuf_errors_delta": max(0, cur_snmp["udp_rcvbuf_errors"]
+                                              - prev_snmp["udp_rcvbuf_errors"]),
+            }
+        prev_snmp = cur_snmp
 
         print(json.dumps(rec, separators=(",", ":")), flush=True)
         sys.stdout.flush()
@@ -281,6 +322,39 @@ def _detect_dds_iface():
     return None
 
 
+def _read_snmp():
+    """Parse /proc/net/snmp and return {ip_reasm_fails, udp_rcvbuf_errors}.
+
+    Returns None if the file is unreadable or the expected fields are missing.
+    """
+    try:
+        with open("/proc/net/snmp") as f:
+            lines = f.read().splitlines()
+    except Exception:
+        return None
+    ip_keys = None; ip_vals = None; udp_keys = None; udp_vals = None
+    for i, ln in enumerate(lines):
+        if ln.startswith("Ip:") and ip_keys is None:
+            ip_keys = ln.split()[1:]
+            if i + 1 < len(lines) and lines[i + 1].startswith("Ip:"):
+                ip_vals = lines[i + 1].split()[1:]
+        elif ln.startswith("Udp:") and udp_keys is None:
+            udp_keys = ln.split()[1:]
+            if i + 1 < len(lines) and lines[i + 1].startswith("Udp:"):
+                udp_vals = lines[i + 1].split()[1:]
+    if ip_keys and ip_vals and udp_keys and udp_vals:
+        try:
+            ip_map = dict(zip(ip_keys, ip_vals))
+            udp_map = dict(zip(udp_keys, udp_vals))
+            return {
+                "ip_reasm_fails": int(ip_map.get("ReasmFails", 0)),
+                "udp_rcvbuf_errors": int(udp_map.get("RcvbufErrors", 0)),
+            }
+        except (ValueError, KeyError):
+            return None
+    return None
+
+
 def _chronyc_tracking():
     try:
         r = subprocess.run(["chronyc", "-c", "tracking"],
@@ -308,6 +382,7 @@ class HostSampler:
         self.pynvml, self.handle = _init_pynvml()
         self.prev_net = None
         self._net_all = True  # capture all non-lo ifaces
+        self.prev_snmp = _read_snmp()
 
     def sample(self):
         ps = self.psutil
@@ -351,6 +426,19 @@ class HostSampler:
         d = _chronyc_tracking()
         if d:
             rec["drift"] = d
+        # ── Kernel SNMP counters (IP reassembly failures, UDP rcvbuf errors) ──
+        snmp = _read_snmp()
+        snmp_delta = {}
+        if self.prev_snmp and snmp:
+            snmp_delta = {
+                "ip_reasm_fails_delta": max(0, snmp["ip_reasm_fails"]
+                                             - self.prev_snmp["ip_reasm_fails"]),
+                "udp_rcvbuf_errors_delta": max(0, snmp["udp_rcvbuf_errors"]
+                                                - self.prev_snmp["udp_rcvbuf_errors"]),
+            }
+        self.prev_snmp = snmp
+        if snmp_delta:
+            rec["snmp"] = snmp_delta
         return rec
 
 

@@ -19,6 +19,9 @@ Monitors:
   5. Clock offset — sensor stamp vs host clock per topic.
   6. TF chain connectivity — checks marker_map -> depth_optical_frame
      chains are connected.
+  7. Pointcloud chain health — per-side stage rates (compressed → local
+     raw → points) that localise where the drop happens when points are
+     absent despite depth/rgb traffic arriving.
 
 The node only *reads* — it subscribes to /tf, /tf_static, and key topics
 but never publishes anything that could perturb the system.
@@ -186,6 +189,23 @@ DEFAULT_PARAMS = {
     "visual_factor_topic": "/vis/head_arm_pose",
     "head_image_topic": "/jetson/head/image",
     "arm_image_topic": "/jetson/arm/image",
+    # ── Pointcloud chain stage topics ─────────────────────────────
+    # Full chain: compressed (wire) → local raw (decompressed) → points.
+    # Monitoring every stage localises where the drop happens.
+    "head_depth_compressed_topic": "/jetson/head/depth/compressed",
+    "arm_depth_compressed_topic": "/jetson/arm/depth/compressed",
+    "head_image_compressed_topic": "/jetson/head/image/compressed",
+    "arm_image_compressed_topic": "/jetson/arm/image/compressed",
+    "head_depth_raw_topic": "/local/head/depth_raw",
+    "arm_depth_raw_topic": "/local/arm/depth_raw",
+    "head_image_raw_topic": "/local/head/image_raw",
+    "arm_image_raw_topic": "/local/arm/image_raw",
+    # Camera_info is a critical input to the depth_image_proc
+    # ApproximateTimeSynchronizer but was previously unmonitored.
+    "head_camera_info_raw_topic": "/local/head/camera_info",
+    "arm_camera_info_raw_topic": "/local/arm/camera_info",
+    # Seconds with input present but zero points output before flagging
+    "pc_stall_flag_s": 5.0,
 }
 
 
@@ -212,6 +232,7 @@ def create_node():
             self._rate_window = float(p("rate_window_s"))
             self._stall_threshold = float(p("cloud_stall_threshold_s"))
             self._plateau_window = float(p("cloud_plateau_window_s"))
+            self._pc_stall_flag_s = float(p("pc_stall_flag_s"))
 
             # ── TF monitoring ──────────────────────────────────────────
             self._tf_buffer = Buffer()
@@ -297,6 +318,60 @@ def create_node():
                     Image, topic,
                     lambda msg, t=topic: self._on_generic(msg, t),
                     best_effort)
+
+            # ── Pointcloud chain stage monitors ────────────────────────
+            # Track every stage so the [DIAG-PC] block can localise where
+            # the drop happens: compressed → local raw → points.
+            # Camera_info is included because the C++ 4-way synchronizer
+            # requires depth + rgb + camera_info; a missing camera_info
+            # stream produces zero points with no other symptom.
+            from sensor_msgs.msg import CompressedImage, CameraInfo
+            pc_chain_topics = [
+                str(p("head_depth_compressed_topic")),
+                str(p("arm_depth_compressed_topic")),
+                str(p("head_image_compressed_topic")),
+                str(p("arm_image_compressed_topic")),
+                str(p("head_depth_raw_topic")),
+                str(p("arm_depth_raw_topic")),
+                str(p("head_image_raw_topic")),
+                str(p("arm_image_raw_topic")),
+                str(p("head_camera_info_raw_topic")),
+                str(p("arm_camera_info_raw_topic")),
+            ]
+            self._pc_chain_topics = pc_chain_topics
+            for topic in pc_chain_topics:
+                self._topic_stats[topic] = TopicStats()
+                # Compressed topics use CompressedImage; camera_info uses
+                # CameraInfo; local raw images use Image.
+                if topic.endswith("/compressed"):
+                    msg_type = CompressedImage
+                elif topic.endswith("/camera_info"):
+                    msg_type = CameraInfo
+                else:
+                    msg_type = Image
+                self.create_subscription(
+                    msg_type, topic,
+                    lambda msg, t=topic: self._on_generic(msg, t),
+                    best_effort)
+            # Convenience refs for the [DIAG-PC] block
+            self._pc_topics = {
+                "head": {
+                    "depth_compressed": str(p("head_depth_compressed_topic")),
+                    "image_compressed": str(p("head_image_compressed_topic")),
+                    "depth_raw": str(p("head_depth_raw_topic")),
+                    "image_raw": str(p("head_image_raw_topic")),
+                    "camera_info": str(p("head_camera_info_raw_topic")),
+                    "points": str(p("head_cloud_topic")),
+                },
+                "arm": {
+                    "depth_compressed": str(p("arm_depth_compressed_topic")),
+                    "image_compressed": str(p("arm_image_compressed_topic")),
+                    "depth_raw": str(p("arm_depth_raw_topic")),
+                    "image_raw": str(p("arm_image_raw_topic")),
+                    "camera_info": str(p("arm_camera_info_raw_topic")),
+                    "points": str(p("arm_cloud_topic")),
+                },
+            }
 
             # ── Periodic timer ─────────────────────────────────────────
             self.create_timer(self._summary_interval, self._periodic_summary)
@@ -492,6 +567,71 @@ def create_node():
                 lines.append(
                     f"  {parent} -> {child}: "
                     f"{'CONNECTED' if can else 'DISCONNECTED'}")
+
+            # ── Pointcloud chain health ────────────────────────────────
+            # Per-side stage rates localise where the drop happens:
+            #   compressed (wire) → local raw (decompressed) → points (assembler)
+            lines.append("[DIAG-PC] Pointcloud chain health:")
+            for side in ("head", "arm"):
+                tops = self._pc_topics[side]
+                depth_c = self._topic_stats.get(tops["depth_compressed"])
+                image_c = self._topic_stats.get(tops["image_compressed"])
+                depth_r = self._topic_stats.get(tops["depth_raw"])
+                image_r = self._topic_stats.get(tops["image_raw"])
+                ci_r = self._topic_stats.get(tops["camera_info"])
+                pts = self._topic_stats.get(tops["points"])
+                dc_hz = depth_c.rate_hz(self._rate_window) if depth_c else 0.0
+                ic_hz = image_c.rate_hz(self._rate_window) if image_c else 0.0
+                dr_hz = depth_r.rate_hz(self._rate_window) if depth_r else 0.0
+                ir_hz = image_r.rate_hz(self._rate_window) if image_r else 0.0
+                ci_hz = ci_r.rate_hz(self._rate_window) if ci_r else 0.0
+                pt_hz = pts.rate_hz(self._rate_window) if pts else 0.0
+                pt_total = pts.msg_count if pts else 0
+                # Determine the failing stage
+                stage = "OK"
+                if dc_hz < 0.1 and ic_hz < 0.1:
+                    stage = "NO_INPUT"
+                elif dr_hz < 0.1 and ir_hz < 0.1:
+                    stage = "DECOMPRESS_FAIL"
+                elif pt_hz < 0.1 and ci_hz < 0.1 and (
+                    dr_hz > 0.1 or ir_hz > 0.1
+                ):
+                    # Depth/RGB present but camera_info absent → the naive
+                    # assembler cannot build a colored cloud.
+                    stage = "CI_MISSING"
+                elif pt_hz < 0.1 and (dr_hz > 0.1 or ir_hz > 0.1):
+                    # All inputs present but no points → assembler not
+                    # running, TF lookups failing, or timer stalled.
+                    stage = "ASM_STALL"
+                lines.append(
+                    f"  {side}: depth_c={dc_hz:.1f}Hz "
+                    f"image_c={ic_hz:.1f}Hz -> "
+                    f"depth_r={dr_hz:.1f}Hz image_r={ir_hz:.1f}Hz "
+                    f"ci_raw={ci_hz:.1f}Hz -> "
+                    f"points={pt_hz:.1f}Hz (n={pt_total}) [{stage}]")
+                # One-shot warn when input flows but points stay zero
+                if stage == "CI_MISSING":
+                    self.get_logger().warn(
+                        f"PC CI MISSING: {side} has decompressed "
+                        f"depth={dr_hz:.1f}Hz image={ir_hz:.1f}Hz but "
+                        f"camera_info=0Hz — check Jetson relay token "
+                        f"gate or camera_info_bridge",
+                        throttle_duration_sec=self._summary_interval * 3)
+                elif stage == "ASM_STALL":
+                    self.get_logger().warn(
+                        f"PC ASM STALL: {side} has decompressed "
+                        f"depth={dr_hz:.1f}Hz image={ir_hz:.1f}Hz "
+                        f"ci={ci_hz:.1f}Hz but points=0Hz — the "
+                        f"naive_pointcloud_assembler is not producing "
+                        f"output (not running, TF lookup failing, or "
+                        f"timer stalled?)",
+                        throttle_duration_sec=self._summary_interval * 3)
+                elif stage == "DECOMPRESS_FAIL":
+                    self.get_logger().warn(
+                        f"PC DECOMPRESS FAIL: {side} compressed "
+                        f"depth={dc_hz:.1f}Hz image={ic_hz:.1f}Hz but "
+                        f"no /local/* output — decompress_bridge not running?",
+                        throttle_duration_sec=self._summary_interval * 3)
 
             # Log as a single multi-line info block
             self.get_logger().info("\n".join(lines))

@@ -1,0 +1,77 @@
+==============================================================================
+LOG ANALYSIS — jetson-run-jetson-debug-20260618_200303.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260618_200303.txt
+Lines:      19919
+Time span:  20:03:06 – 20:05:37 (150.6s)
+
+Nodes started (6):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=193
+  tf_throttle                                pid=45
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  aruco_marker_pose_node.py                      0     68      90  <-- noisy
+  run_subscribe_msckf_marker                     0      3       2
+  dynamic_arm_pose_measurement_node.py           0      2       7
+  jetson_relay                                   0      2      12
+  realsense2_camera_node                         0      0       2
+  tf_throttle                                    0      0      17
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  (none of the known failure patterns matched)
+
+------------------------------------------------------------------------------
+MIDDLEWARE LAYER — ROS 2 QoS CONTRACT HEALTH
+------------------------------------------------------------------------------
+  TOPIC                                    POLICY                       NODES                           COUNT
+  ---------------------------------------- ---------------------------- ------------------------------ ------
+  /head/marker_pose/dynamic_observation    RELIABILITY                  aruco_marker_pose_node.py, dynamic_arm_pose_measurement_node.py      2
+  /head/marker_pose/observation            RELIABILITY                  aruco_marker_pose_node.py           1
+  /head/marker_pose/observation            RELIABILITY_QOS_POLICY       run_subscribe_msckf_marker          1
+  /arm/marker_pose/observation             RELIABILITY                  aruco_marker_pose_node.py           1
+  /arm/marker_pose/dynamic_arm_pose_observation RELIABILITY                  dynamic_arm_pose_measurement_node.py      1
+  /arm/marker_pose/dynamic_arm_pose_observation RELIABILITY_QOS_POLICY       run_subscribe_msckf_marker          1
+  /arm/marker_pose/observation             RELIABILITY_QOS_POLICY       run_subscribe_msckf_marker          1
+  /jetson/head/points                      RELIABILITY                  jetson_relay                        1
+  /jetson/arm/points                       RELIABILITY                  jetson_relay                        1
+
+  [CRITICAL ALERT] 9 QoS-incompatible channel(s) detected.
+    These topics are completely blocked at the middleware layer.
+    Data flow on these channels is zero — check QoS profiles.
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  (no [ERROR] lines)
+
+------------------------------------------------------------------------------
+ALGORITHMIC LAYER — VIO STATE ESTIMATION HEALTH
+------------------------------------------------------------------------------
+                Markers    Corrections   Yield    Locked
+                -------    -----------   -----    ------
+  Head VIO:      105              6        5.7%    YES
+  Arm  VIO:      126              5        4.0%    YES
+
+------------------------------------------------------------------------------
+JETSON SYSMON (from native jsonl)
+------------------------------------------------------------------------------
+  Samples:    77
+  CPU:        min=18.7%  avg=79.3%  max=94.2%
+  RAM:        min=16.7%  avg=24.7%  max=25.3%  (total 7619.9 MB)
+  NIC [enP8p1s0]: rx avg=0.7 Mbps  max=7.3 Mbps  tx avg=465.9 Mbps  max=486.0 Mbps
+
+

@@ -1,0 +1,78 @@
+==============================================================================
+LOG ANALYSIS — jetson-run-jetson-debug-20260620_232138.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260620_232138.txt
+Lines:      1135
+Time span:  23:21:41 – 23:22:06 (24.4s)
+
+Nodes started (6):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=191
+  tf_throttle                                pid=45
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  run_subscribe_msckf_marker                     1      0       2  <-- noisy
+  aruco_marker_pose_node.py                      0     24      35
+  dynamic_arm_pose_measurement_node.py           0      0       7
+  jetson_relay                                   0      0      12
+  realsense2_camera_node                         0      0       2
+  tf_throttle                                    0      0       4
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  [   24x] startup odom not ready  [23:21:44 .. 23:22:06]
+          hint: Expected during startup before OpenVINS init; only actionable if persistent after init
+          sample: {}
+          sample: {}
+
+------------------------------------------------------------------------------
+STARTUP PHASE CLASSIFICATION
+------------------------------------------------------------------------------
+  Structured startup events:
+    23:21:42  phase=first_marker side=head marker_ids=[0]
+    23:21:42  phase=first_marker side=arm marker_ids=[0]
+  startup odom-not-ready warnings observed: 24
+  classification: POTENTIALLY ACTIONABLE (no init marker seen)
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  [1x] process has died [pid 191, exit code -11, cmd '/miahand_ws/src/install_overlay/ov_msckf/lib/ov_msckf
+        first: n/a (run_subscribe_msckf_marker)  last: n/a
+
+------------------------------------------------------------------------------
+ALGORITHMIC LAYER — VIO STATE ESTIMATION HEALTH
+------------------------------------------------------------------------------
+                Markers    Corrections   Yield    Locked   VIO        PosNorm
+                -------    -----------   -----    ------   ---        -------
+  Head VIO:      286              0        0.0%     no   INVALID    0.00m
+  [CRITICAL WARNING] Head state estimator is running completely untethered. Check camera occlusion or marker visibility.
+  Arm  VIO:      279              0        0.0%     no   INVALID    0.00m
+  [CRITICAL WARNING] Arm  state estimator is running completely untethered. Check camera occlusion or marker visibility.
+
+------------------------------------------------------------------------------
+CRASH / PROCESS-DEATH DETECTED
+------------------------------------------------------------------------------
+  line 206: [ERROR] [run_subscribe_msckf_marker-9]: process has died [pid 191, exit code -11, cmd '/miahand_ws/s
+
+------------------------------------------------------------------------------
+JETSON SYSMON (from native jsonl)
+------------------------------------------------------------------------------
+  Samples:    14
+  CPU:        min=19.2%  avg=59.1%  max=70.4%
+  RAM:        min=12.2%  avg=18.4%  max=19.8%  (total 7619.8 MB)
+  NIC [enP8p1s0]: rx avg=71.1 Mbps  max=104.4 Mbps  tx avg=9.8 Mbps  max=14.7 Mbps
+
+

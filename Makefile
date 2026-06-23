@@ -99,7 +99,7 @@ else
   COMPOSE_PROFILE_FLAG := --profile mobile-sam-gpu
 endif
 
-.PHONY: help build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test test-unit test-baseline test-fresh test-replay test-replay-baseline shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill mounts-viz mounts-viz-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-bag record-bag-mock record-debug analyze-log analyze-bag analyze-bag-meta inspect-bag run-camera-log run-camera-log-debug run-tui jetson-fetch-log analyze-jetson
+.PHONY: help build build-prosthesis build-segmentation-cuda build-segmentation-cpu build-mobile-sam-cpu build-mobile-sam-gpu build-rviz rebuild dev dev-shell segmentation segmentation-cuda segmentation-cpu mobile-sam mobile-sam-cpu mobile-sam-gpu up up-cpu up-prosthesis up-hw test test-unit test-baseline test-fresh test-replay test-replay-baseline shell down down-segmentation down-mobile-sam clean clean-volumes logs segmentation-status segmentation-logs rviz rviz-kill rviz-openvins rviz-openvins-kill rviz-static rviz-static-kill rviz-twist-propagation rviz-twist-propagation-kill mounts-viz mounts-viz-kill robotlab-connect robotlab-view robotlab-stop timesync timesync-host timesync-check network-tune network-tune-jetson network-tune-all jetson-setup jetson-sync jetson-cameras jetson-cameras-stop jetson-cameras-logs jetson-list-cameras jetson-openvins jetson-openvins-stop jetson-openvins-logs jetson-imu-test-single jetson-imu-test-dual jetson-imu-test-stop jetson-imu-test-logs rviz-imu-test-single rviz-imu-test-dual rviz-imu-test-kill ros2-ethernet-shell ros2-listen-jetson ros2-pub-host ros2-topic-list ros2-node-list validate-segmentation validate-segmentation-config up-grasp-test down-grasp-test logs-grasp-test test-static-grasp emg-force-grasp emg-grasp-test print-force emg-infer run-emg-grasp test1-tier-a test1-tier-b test1-analysis test1-mock test1-mock-stop test1-mock-check test1-rebuild mock-v6 pipeline-v6 record-bag record-bag-mock record-debug analyze-log analyze-bag analyze-bag-meta analyze-aggregate inspect-bag run-camera-log run-camera-log-debug run-tui jetson-fetch-log analyze-jetson
 
 # ── Help ───────────────────────────────────────────────────────────────────
 help:
@@ -159,6 +159,7 @@ help:
 	@echo "    make analyze-log            Summarize the latest host-log for debugging"
 	@echo "    make analyze-bag            Analyze the latest bag + sysmon for debugging"
 	@echo "    make analyze-bag-meta       Analyze the latest bag metadata only (fast, Tier A)"
+	@echo "    make analyze-aggregate      Pooled metrics across ALL logs (TF, markers, QoS, latency)"
 	@echo "    make down                   Stop all containers"
 	@echo ""
 	@echo "  RViz:"
@@ -960,6 +961,19 @@ analyze-jetson: ## Analyze the latest locally-fetched Jetson log + sibling sysmo
 	echo "Analyzing: $$LOCAL_PATH"; \
 	echo ""; \
 	python3 $(CURDIR)/scripts/analyze_log.py --plot --jetson "$$LOCAL_PATH"
+
+# Aggregate pooled pipeline-health metrics across ALL logs + bags.
+# Usage: make analyze-aggregate  /  make analyze-aggregate JSON=report.json
+JSON ?=
+analyze-aggregate: ## Pooled metrics across all logs (TF, markers, QoS, latency, bandwidth)
+	@if [ -z "$(JSON)" ]; then \
+		python3 scripts/aggregate_analysis.py; \
+	else \
+		python3 scripts/aggregate_analysis.py --json "$(JSON)"; \
+	fi
+
+# ── Combined analysis (host log + bag + Jetson log) ───────────────────────────
+analyze: analyze-log analyze-bag analyze-jetson analyze-aggregate ## Run all analyzers in sequence
 
 # ── Jetson OpenVINS (cameras + VIO containers + host RViz) ───────────────────
 # Syncs the repo, starts both Jetson containers, and opens the Phase 2 RViz.

@@ -1,0 +1,724 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-19-14-10-23-640085-KingBob-699
+[INFO] [launch]: Default logging verbosity is set to INFO
+[pipeline] fusion_mode='legacy'
+[INFO] [pipeline_manager_node-1]: process started with pid [705]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [706]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [707]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [708]
+[INFO] [odom_to_pose_relay-5]: process started with pid [709]
+[INFO] [openvins_odom_tf_relay-6]: process started with pid [710]
+[INFO] [decompress_bridge-7]: process started with pid [711]
+[INFO] [decompress_bridge-8]: process started with pid [712]
+[INFO] [decompress_bridge-9]: process started with pid [713]
+[INFO] [decompress_bridge-10]: process started with pid [714]
+[INFO] [point_cloud_xyzrgb_node-11]: process started with pid [715]
+[INFO] [point_cloud_xyzrgb_node-12]: process started with pid [716]
+[INFO] [pointcloud_fusion_node-13]: process started with pid [717]
+[INFO] [pipeline_diagnostics_node-14]: process started with pid [718]
+[INFO] [segmentation_ros2_node-15]: process started with pid [719]
+[INFO] [twist_propagation_node-16]: process started with pid [720]
+[INFO] [preshaping_service_bridge_node-17]: process started with pid [721]
+[INFO] [grasp_proximity_controller_node.py-18]: process started with pid [722]
+[INFO] [rviz2-19]: process started with pid [723]
+[preshaping_service_bridge_node-17] [INFO] [1781878224.886925451] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-17] [INFO] [1781878224.892306947] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[rviz2-19] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[pipeline_manager_node-1] [INFO] [1781878226.802917171] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781878226.805181403] [pipeline_manager]: Pipeline manager started — state: IDLE
+[tf_pipeline_diagnostics-4] [INFO] [1781878227.063700194] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[openvins_odom_tf_relay-6] [WARN] [1781878227.270691696] [openvins_odom_tf_relay]: OpenVINS odometry TF relay active: marker_map -> head_imu (via /jetson/head/odom), marker_map -> arm_imu (via /jetson/arm/odom), publish_dynamic_tf=True, use_corrected_tf=True, tf_publish_max_hz=100 Hz
+[pipeline_diagnostics_node-14] [INFO] [1781878227.570034448] [pipeline_diagnostics]: PipelineDiagnostics ready (summary_interval=5.0s, jump_threshold=0.2m)
+[pointcloud_fusion_node-13] [INFO] [1781878227.748324997] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-13] [INFO] [1781878227.749878689] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-13] [INFO] [1781878227.784567426] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-13] [WARN] [1781878227.786833321] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[pointcloud_fusion_node-13] [INFO] [1781878227.789376160] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-13] [INFO] [1781878227.791198458] [pointcloud_fusion]: Pointcloud fusion: /jetson/head/points + /jetson/arm/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[pipeline_manager_node-1] [INFO] [1781878227.807917491] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878227.978307716] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878227.979009504] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[camera_mount_tf_publisher-3] [INFO] [1781878228.038362218] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1781878228.039504641] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878228.081732399] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878228.085096729] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878228.087425772] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[segmentation_ros2_node-15] [INFO] [1781878228.811725147] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[grasp_proximity_controller_node.py-18] [INFO] [1781878228.961727389] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[grasp_proximity_controller_node.py-18] [INFO] [1781878228.999342440] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[twist_propagation_node-16] [INFO] [1781878229.159842837] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-16] [INFO] [1781878229.207203972] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-16] [INFO] [1781878229.211783619] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[decompress_bridge-10] [INFO] [1781878229.762440061] [arm_image_decompress]: DecompressBridge: {/jetson/arm/image/compressed} -> {/local/arm/image_raw}
+[pointcloud_fusion_node-13] [WARN] [1781878229.788960746] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[decompress_bridge-7] [INFO] [1781878229.866064770] [head_depth_decompress]: DecompressBridge: {/jetson/head/depth/compressed} -> {/local/head/depth_raw}
+[decompress_bridge-8] [INFO] [1781878229.905339944] [arm_depth_decompress]: DecompressBridge: {/jetson/arm/depth/compressed} -> {/local/arm/depth_raw}
+[decompress_bridge-9] [INFO] [1781878229.927656178] [head_image_decompress]: DecompressBridge: {/jetson/head/image/compressed} -> {/local/head/image_raw}
+[pointcloud_fusion_node-13] [WARN] [1781878231.794099540] [pointcloud_fusion]: TF wait gate: not connected after 4s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[pipeline_diagnostics_node-14] [INFO] [1781878232.526241900] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=45 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=45 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=10 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=45 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=45 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=45 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=45 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=45 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=45 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=10 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=45 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=45 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: (no data)
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: DISCONNECTED
+[rviz2-19] [INFO] [1781878234.098536327] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-19] [INFO] [1781878234.098781914] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[rviz2-19] [INFO] [1781878234.407124115] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-19] [INFO] [1781878234.866363955] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-19] 
+[rviz2-19] [INFO] [1781878234.872077833] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-19] 
+[rviz2-19] [INFO] [1781878234.948308623] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-19] 
+[rviz2-19] [INFO] [1781878234.952688017] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-19] 
+[rviz2-19] [INFO] [1781878235.329647222] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-19] [INFO] [1781878235.456772226] [rviz2]: Stereo is NOT SUPPORTED
+[openvins_odom_tf_relay-6] [WARN] [1781878237.223355675] [openvins_odom_tf_relay]: [RELAY-STATUS] 10s elapsed — head: WAITING (0 msgs), arm: WAITING (0 msgs)
+[pipeline_diagnostics_node-14] [INFO] [1781878237.531856628] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=95 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=95 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=20 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=95 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=95 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=95 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=95 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=95 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=95 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=20 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=95 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=95 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: (no data)
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: DISCONNECTED
+[openvins_odom_tf_relay-6] [WARN] [1781878237.612155279] [openvins_odom_tf_relay]: arm: OpenVINS initialized (covariance), publishing TF marker_map -> arm_imu (p=(-0.066, -0.114, 0.342), cov_trace=1.69e-02, pos_norm=0.367m, elapsed=10.4s, actual_imu_frame='arm_imu')
+[grasp_proximity_controller_node.py-18] [INFO] [1781878237.613607399] [proximity_controller]: Received first hand pose — control loop now active
+[pointcloud_fusion_node-13] [INFO] [1781878237.792756549] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=10.0s
+[pointcloud_fusion_node-13] [WARN] [1781878237.814863921] [pointcloud_fusion]: Stall diagnostic (no publish for 10s): cam1: no cloud; cam2: no cloud
+[pointcloud_fusion_node-13] [WARN] [1781878237.839254057] [pointcloud_fusion]: TF wait gate: not connected after 10s — head_d435i_head_depth_optical_frame: Could not find a connection between 'marker_map' and 'head_d435i_head_depth_optical_frame' because they are not part of the same tree.Tf has two or more unconnected trees.; arm_d435i_arm_depth_optical_frame: Lookup would require extrapolation at time 1781878237.224839, but only time 1781878237.714699 is in the buffer, when looking up transform from frame [arm_d435i_arm_depth_optical_frame] to frame [marker_map]
+[openvins_odom_tf_relay-6] [WARN] [1781878238.336803801] [openvins_odom_tf_relay]: arm odom pose jumped 0.308m (> 0.2m) — suppressing TF
+[tf_pipeline_diagnostics-4] [WARN] [1781878239.024786786] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[pointcloud_fusion_node-13] [WARN] [1781878239.803308973] [pointcloud_fusion]: TF tree connected via 'arm_d435i_arm_depth_optical_frame' — starting point cloud fusion (waited 12.0s since node startup)
+[openvins_odom_tf_relay-6] [WARN] [1781878241.079255506] [openvins_odom_tf_relay]: arm odom pose norm 1.00m exceeds max 1.0m — suppressing TF
+[pipeline_diagnostics_node-14] [WARN] [1781878241.406242538] [pipeline_diagnostics]: DIVERGENCE: /jetson/arm/odom norm=2.03m (>2.0m)
+[pipeline_diagnostics_node-14] [INFO] [1781878242.529015376] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=145 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=145 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=30 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=145 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=145 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=145 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=145 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=145 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=145 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=30 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: updates=22 jumps=0 max_jump=0.000m age=1.5s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=145 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=145 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 41.0 Hz (total=202, clock_off=0.018s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: norm=5.512m max=5.512m !!!CRITICAL
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: CONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: CONNECTED
+[openvins_odom_tf_relay-6] [WARN] [1781878243.084865275] [openvins_odom_tf_relay]: arm odom pose norm 8.16m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878245.095813239] [openvins_odom_tf_relay]: arm odom pose norm 23.55m exceeds max 1.0m — suppressing TF
+[pipeline_diagnostics_node-14] [WARN] [1781878246.406405589] [pipeline_diagnostics]: DIVERGENCE: /jetson/arm/odom norm=39.37m (>2.0m)
+[openvins_odom_tf_relay-6] [WARN] [1781878247.100739218] [openvins_odom_tf_relay]: arm odom pose norm 49.70m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878247.226792159] [openvins_odom_tf_relay]: [RELAY-STATUS] 20s elapsed — head: WAITING (0 msgs), arm: OK (22 msgs)
+[pipeline_diagnostics_node-14] [INFO] [1781878247.526656597] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=195 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=195 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=40 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=195 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=195 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=195 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=195 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=195 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=195 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=40 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: updates=22 jumps=0 max_jump=0.000m age=6.5s [STALE]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=195 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=195 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 41.2 Hz (total=409, clock_off=0.009s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: norm=57.229m max=57.229m !!!CRITICAL
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: CONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: CONNECTED
+[pointcloud_fusion_node-13] [INFO] [1781878247.786158485] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=20.0s
+[pointcloud_fusion_node-13] [WARN] [1781878247.787011837] [pointcloud_fusion]: Stall diagnostic (no publish for 20s): cam1: no cloud; cam2: no cloud
+[tf_pipeline_diagnostics-4] [WARN] [1781878248.009581535] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):OK | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-6] [WARN] [1781878249.103813876] [openvins_odom_tf_relay]: arm odom pose norm 81.15m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878251.104932677] [openvins_odom_tf_relay]: arm odom pose norm 133.06m exceeds max 1.0m — suppressing TF
+[pipeline_diagnostics_node-14] [WARN] [1781878251.431072787] [pipeline_diagnostics]: DIVERGENCE: /jetson/arm/odom norm=143.21m (>2.0m)
+[pipeline_diagnostics_node-14] [INFO] [1781878252.527226633] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=245 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=245 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=50 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=245 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=245 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=245 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=245 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=245 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=245 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=50 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: updates=22 jumps=0 max_jump=0.000m age=11.5s [STALE]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=245 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=245 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 40.4 Hz (total=610, clock_off=0.036s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: norm=178.976m max=178.976m !!!CRITICAL
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: CONNECTED
+[openvins_odom_tf_relay-6] [WARN] [1781878253.132276623] [openvins_odom_tf_relay]: arm odom pose norm 202.13m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878255.138845673] [openvins_odom_tf_relay]: arm odom pose norm 287.21m exceeds max 1.0m — suppressing TF
+[pipeline_diagnostics_node-14] [WARN] [1781878256.455928000] [pipeline_diagnostics]: DIVERGENCE: /jetson/arm/odom norm=353.67m (>2.0m)
+[openvins_odom_tf_relay-6] [WARN] [1781878257.139700288] [openvins_odom_tf_relay]: arm odom pose norm 390.92m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878257.221055993] [openvins_odom_tf_relay]: [RELAY-STATUS] 30s elapsed — head: WAITING (0 msgs), arm: OK (22 msgs)
+[pipeline_diagnostics_node-14] [INFO] [1781878257.526692092] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=295 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=295 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=60 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=295 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=295 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=295 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=295 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=295 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=295 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=60 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: updates=22 jumps=0 max_jump=0.000m age=16.5s [STALE]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=295 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=295 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 41.4 Hz (total=818, clock_off=0.008s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: norm=413.298m max=413.298m !!!CRITICAL
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: CONNECTED
+[pointcloud_fusion_node-13] [INFO] [1781878257.789930749] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=30.0s
+[pointcloud_fusion_node-13] [WARN] [1781878257.793533257] [pointcloud_fusion]: Stall diagnostic (no publish for 30s): cam1: no cloud; cam2: no cloud
+[tf_pipeline_diagnostics-4] [WARN] [1781878259.030674886] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-6] [WARN] [1781878259.148095905] [openvins_odom_tf_relay]: arm odom pose norm 514.50m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878261.150173091] [openvins_odom_tf_relay]: arm odom pose norm 657.85m exceeds max 1.0m — suppressing TF
+[pipeline_diagnostics_node-14] [WARN] [1781878261.456909212] [pipeline_diagnostics]: DIVERGENCE: /jetson/arm/odom norm=683.76m (>2.0m)
+[pipeline_diagnostics_node-14] [INFO] [1781878262.526682997] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=345 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=345 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=70 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=345 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=345 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=345 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=345 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=345 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=345 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=70 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: updates=22 jumps=0 max_jump=0.000m age=21.5s [STALE]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=345 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=345 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 39.8 Hz (total=1017, clock_off=0.010s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: norm=816.381m max=816.381m !!!CRITICAL
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: CONNECTED
+[openvins_odom_tf_relay-6] [WARN] [1781878263.166011698] [openvins_odom_tf_relay]: arm odom pose norm 878.80m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878265.166622858] [openvins_odom_tf_relay]: arm odom pose norm 1092.44m exceeds max 1.0m — suppressing TF
+[pipeline_diagnostics_node-14] [WARN] [1781878266.471753038] [pipeline_diagnostics]: DIVERGENCE: /jetson/arm/odom norm=1253.58m (>2.0m)
+[openvins_odom_tf_relay-6] [WARN] [1781878267.177534093] [openvins_odom_tf_relay]: arm odom pose norm 1344.67m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878267.218816437] [openvins_odom_tf_relay]: [RELAY-STATUS] 40s elapsed — head: WAITING (0 msgs), arm: OK (22 msgs)
+[pipeline_diagnostics_node-14] [INFO] [1781878267.557848551] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=80 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=80 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: updates=22 jumps=0 max_jump=0.000m age=26.5s [STALE]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=395 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 41.0 Hz (total=1221, clock_off=0.033s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: norm=1390.284m max=1390.284m !!!CRITICAL
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: CONNECTED
+[pointcloud_fusion_node-13] [INFO] [1781878267.786761920] [pointcloud_fusion]: Stats: published=0 (dual=0, cam1_only=0) received(cam1=0, cam2=0) last_cloud_age(cam1=none, cam2=none) dist_removed=0 bbox_removed=0 bbox_skipped=0 bbox_cache_hits=0 last_publish_ago=40.0s
+[pointcloud_fusion_node-13] [WARN] [1781878267.789112166] [pointcloud_fusion]: Stall diagnostic (no publish for 40s): cam1: no cloud; cam2: no cloud
+[tf_pipeline_diagnostics-4] [WARN] [1781878269.018471886] [tf_pipeline_diagnostics]: [TF-DIAG] Camera mount TFs are OK, but OpenVINS chain is disconnected (OpenVINS(head):MISSING | OpenVINS(arm):MISSING | mount_root:OK | mount_internal:OK). Check Jetson bridge connectivity and that OpenVINS is running.
+[openvins_odom_tf_relay-6] [WARN] [1781878269.209933924] [openvins_odom_tf_relay]: arm odom pose norm 1623.36m exceeds max 1.0m — suppressing TF
+[openvins_odom_tf_relay-6] [WARN] [1781878271.217115632] [openvins_odom_tf_relay]: arm odom pose norm 1936.34m exceeds max 1.0m — suppressing TF
+[pipeline_diagnostics_node-14] [WARN] [1781878271.488860282] [pipeline_diagnostics]: DIVERGENCE: /jetson/arm/odom norm=1983.68m (>2.0m)
+[pipeline_diagnostics_node-14] [INFO] [1781878272.526489503] [pipeline_diagnostics]: ------------------------------------------------------------
+[pipeline_diagnostics_node-14] [DIAG-TF] Dynamic TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link: updates=445 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount: updates=445 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0: updates=90 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite: updates=445 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame: updates=445 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame: updates=445 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount: updates=445 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame: updates=445 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link: updates=445 jumps=0 max_jump=0.000m age=0.0s [OK]
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0: updates=90 jumps=0 max_jump=0.000m age=0.3s [OK]
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: updates=22 jumps=0 max_jump=0.000m age=31.5s [STALE]
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner: updates=445 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame: updates=445 jumps=0 max_jump=0.000m age=0.1s [OK]
+[pipeline_diagnostics_node-14] [DIAG-TF] Static TF edges:
+[pipeline_diagnostics_node-14]   arm_cam0 -> arm_d435i_arm_link
+[pipeline_diagnostics_node-14]   arm_d435i_arm_accel_frame -> arm_d435i_arm_accel_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_color_frame -> arm_d435i_arm_color_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_depth_frame -> arm_d435i_arm_depth_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_gyro_frame -> arm_d435i_arm_gyro_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_imu_frame -> arm_d435i_arm_imu_optical_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_accel_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_color_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_depth_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_gyro_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> arm_d435i_arm_imu_frame
+[pipeline_diagnostics_node-14]   arm_d435i_arm_link -> d435i_arm_bottom_screw_frame_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   arm_imu -> arm_cam0
+[pipeline_diagnostics_node-14]   bb_corner -> bb_opposite
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam1_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> bbcam2_frame
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> d435i_arm_link_8_cm_cam_mount
+[pipeline_diagnostics_node-14]   d435i_arm_bottom_screw_frame_8_cm_cam_mount -> palm_frame
+[pipeline_diagnostics_node-14]   head_cam0 -> head_d435i_head_link
+[pipeline_diagnostics_node-14]   head_d435i_head_accel_frame -> head_d435i_head_accel_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_color_frame -> head_d435i_head_color_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_depth_frame -> head_d435i_head_depth_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_gyro_frame -> head_d435i_head_gyro_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_imu_frame -> head_d435i_head_imu_optical_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_accel_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_color_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_depth_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_gyro_frame
+[pipeline_diagnostics_node-14]   head_d435i_head_link -> head_d435i_head_imu_frame
+[pipeline_diagnostics_node-14]   head_imu -> head_cam0
+[pipeline_diagnostics_node-14]   palm_frame -> bb_corner
+[pipeline_diagnostics_node-14]   palm_frame -> grasp_contact_frame
+[pipeline_diagnostics_node-14] [DIAG-RATE] Topic rates:
+[pipeline_diagnostics_node-14]   /gtsam/arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /gtsam/head_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/arm/odom: 40.3 Hz (total=1423, clock_off=0.008s)
+[pipeline_diagnostics_node-14]   /jetson/arm/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/image: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/odom: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /jetson/head/points: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14]   /vis/head_arm_pose: 0.0 Hz (total=0, clock_off=-1.000s)
+[pipeline_diagnostics_node-14] [DIAG-NORM] Pose norms:
+[pipeline_diagnostics_node-14]   odom /jetson/arm/odom: norm=2159.186m max=2159.186m !!!CRITICAL
+[pipeline_diagnostics_node-14]   odom /jetson/head/odom: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/arm_pose: (no data)
+[pipeline_diagnostics_node-14]   gtsam /gtsam/head_pose: (no data)
+[pipeline_diagnostics_node-14] [DIAG-CHAIN] TF chain connectivity:
+[pipeline_diagnostics_node-14]   marker_map -> head_d435i_head_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_d435i_arm_depth_optical_frame: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> head_imu: DISCONNECTED
+[pipeline_diagnostics_node-14]   marker_map -> arm_imu: CONNECTED
+[openvins_odom_tf_relay-6] [WARN] [1781878273.231241075] [openvins_odom_tf_relay]: arm odom pose norm 2284.38m exceeds max 1.0m — suppressing TF

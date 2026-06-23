@@ -56,7 +56,13 @@ help: ## Show this help message
 build: ## Build all ROS packages (Release mode, symlink-install for Python)
 	@$(ROS_SETUP) && \
 	cd /prosthesis_ws && \
-	colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+	(colcon build --symlink-install \
+		--abort-on-error false \
+		--cmake-args -DCMAKE_BUILD_TYPE=Release || \
+	 (rm -rf build/*/ install/*/ log/*/ && \
+	  colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release && \
+	  echo "[make] NOTE: rebuilt without --symlink-install." && \
+	  echo "[make] Run 'make pyproject-fix' on your host to add pyproject.toml files."))
 
 build-pkg: ## Build a single package (use: make build-pkg PKG=pipeline_manager)
 	@if [ -z "$(PKG)" ]; then \
@@ -75,6 +81,20 @@ build-debug: ## Build all packages with debug symbols
 clean: ## Remove all build artifacts (build/, install/, log/)
 	rm -rf /prosthesis_ws/build/* /prosthesis_ws/install/* /prosthesis_ws/log/*
 	@echo "Build artifacts cleaned."
+
+pyproject-fix: ## Add pyproject.toml to all packages that need it (fixes --editable error)
+	@echo "=== Adding pyproject.toml to all Python packages ==="
+	@for pkg in $$(find $(CURDIR)/src -name "setup.py" -exec dirname {} \;); do \
+	  if [ ! -f "$$pkg/pyproject.toml" ]; then \
+	    echo '[build-system]' > "$$pkg/pyproject.toml" && \
+	    echo 'requires = ["setuptools>=64.0"]' >> "$$pkg/pyproject.toml" && \
+	    echo 'build-backend = "setuptools.build_meta"' >> "$$pkg/pyproject.toml" && \
+	    echo "  OK: $$pkg"; \
+	  else \
+	    echo "  SKIP (exists): $$pkg"; \
+	  fi; \
+	done
+	@echo "=== Done. Re-run 'make build' inside the container. ==="
 
 test: ## Run the full test suite (smoke tests + pytest unit tests)
 	@$(ROS_SETUP) && \
@@ -205,12 +225,15 @@ RECORD_BAG_DIR := v6_$$(date +%Y%m%d_%H%M%S)
 RECORD_TOPICS_V6 := \
 	/jetson/head/points \
 	/jetson/arm/points \
-	/jetson/head/image \
-	/jetson/arm/image \
+	/jetson/head/depth/compressed \
+	/jetson/arm/depth/compressed \
+	/jetson/head/image/compressed \
+	/jetson/arm/image/compressed \
 	/jetson/head/camera_info \
 	/jetson/arm/camera_info \
 	/jetson/head/odom \
 	/jetson/arm/odom \
+	/fused_pointcloud \
 	/gtsam/head_pose \
 	/gtsam/arm_pose \
 	/vis/head_arm_pose \

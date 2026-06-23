@@ -307,6 +307,19 @@ def _launch_setup(context, *args, **kwargs):
                 print(f"[pipeline] WARNING: TF diagnostics script not found "
                       f"(tried source-tree and installed layouts). "
                       f"diag_script={diag_script!r}.")
+        # OpenVINS odometry-to-TF relay: publishes marker_map -> *_imu
+        # from odom messages so the host doesn't depend on Jetson /tf.
+        # The *_imu_openvins_corrected frames are published by the Jetson-side
+        # aruco_marker_pose_node.py (NOT the GTSAM tracker), so they are
+        # available in all fusion modes including legacy.  When
+        # use_corrected_tf=True (config default), the relay rebroadcasts the
+        # ArUco-corrected trajectory under the raw *_imu names.  This is
+        # essential in legacy mode: raw VIO is unstable (jumps 0.8m+) and
+        # gets suppressed by the relay's outlier gate, so without the
+        # corrected path the marker_map -> *_imu edge goes STALE and the
+        # entire pointcloud fusion pipeline stalls.
+        relay_params = _node_params(config, "openvins_odom_tf_relay")
+
         camera_nodes.extend(
             [
                 Node(
@@ -324,15 +337,128 @@ def _launch_setup(context, *args, **kwargs):
                     output="screen",
                     arguments=["--ros-args", "--log-level", "warn"],
                 ),
-                # OpenVINS odometry-to-TF relay: publishes marker_map -> *_imu
-                # from odom messages so the host doesn't depend on Jetson /tf.
                 Node(
                     package="camera",
                     executable="openvins_odom_tf_relay",
                     name="openvins_odom_tf_relay",
-                    parameters=[_node_params(config, "openvins_odom_tf_relay")],
+                    parameters=[relay_params],
                     output="screen",
                     arguments=["--ros-args", "--log-level", "warn"],
+                ),
+                # ── Host-side depth-to-pointcloud backprojection ────────────
+                # Replaces Jetson-side pointcloud publishing.  Depth images
+                # (Z16, 320×240 after 2× NEAREST downscale in jetson_relay)
+                # cross the Cat5e cable at ~5 Hz without IP fragmentation.
+                # The Jetson relay publishes compressed (PNG/JPEG) to
+                # /jetson/* /depth/compressed and /image/compressed.
+                # These decompress bridges unpack them back to raw Image
+                # topics on /local/* (host-local only — never cross the wire).
+                # The naive_pointcloud_assembler nodes then consume from /local/*.
+                Node(
+                    package="camera",
+                    executable="decompress_bridge",
+                    name="head_depth_decompress",
+                    parameters=[{
+                        "sub_topic": "/jetson/head/depth/compressed",
+                        "pub_topic": "/local/head/depth_raw",
+                    }],
+                    output="screen",
+                ),
+                Node(
+                    package="camera",
+                    executable="decompress_bridge",
+                    name="arm_depth_decompress",
+                    parameters=[{
+                        "sub_topic": "/jetson/arm/depth/compressed",
+                        "pub_topic": "/local/arm/depth_raw",
+                    }],
+                    output="screen",
+                ),
+                Node(
+                    package="camera",
+                    executable="decompress_bridge",
+                    name="head_image_decompress",
+                    parameters=[{
+                        "sub_topic": "/jetson/head/image/compressed",
+                        "pub_topic": "/local/head/image_raw",
+                    }],
+                    output="screen",
+                ),
+                Node(
+                    package="camera",
+                    executable="decompress_bridge",
+                    name="arm_image_decompress",
+                    parameters=[{
+                        "sub_topic": "/jetson/arm/image/compressed",
+                        "pub_topic": "/local/arm/image_raw",
+                    }],
+                    output="screen",
+                ),
+                # Camera-info QoS bridges: the Jetson relay publishes
+                # camera_info with BEST_EFFORT QoS (to avoid RELIABLE
+                # retransmission storms over the wire).  These bridges
+                # relay BEST_EFFORT→RELIABLE inside local RAM (zero
+                # network overhead) for the naive_pointcloud_assembler.
+                Node(
+                    package="camera",
+                    executable="camera_info_bridge",
+                    name="head_camera_info_bridge",
+                    parameters=[{
+                        "sub_topic": "/jetson/head/camera_info",
+                        "pub_topic": "/local/head/camera_info",
+                    }],
+                    output="screen",
+                ),
+                Node(
+                    package="camera",
+                    executable="camera_info_bridge",
+                    name="arm_camera_info_bridge",
+                    parameters=[{
+                        "sub_topic": "/jetson/arm/camera_info",
+                        "pub_topic": "/local/arm/camera_info",
+                    }],
+                    output="screen",
+                ),
+                # ── Host-side depth-to-pointcloud assembly ────────────────
+                # Replaces the native depth_image_proc::PointCloudXyzrgbNode
+                # whose 4-way ApproximateTimeSynchronizer could never match
+                # a tuple due to the RealSense ASIC↔system clock domain
+                # split (5+ second offset).  The custom assembler caches
+                # the latest depth/RGB/CameraInfo independently and builds
+                # a cloud with no time synchronization at all.
+                #
+                # Depth (Z16, 320×240 after 2× NEAREST downscale in
+                # jetson_relay) crosses the Cat5e cable compressed.  The
+                # decompress bridges unpack to /local/* (host-local only).
+                Node(
+                    package="camera",
+                    executable="naive_pointcloud_assembler",
+                    name="head_pointcloud_assembler",
+                    parameters=[{
+                        "side": "head",
+                        "depth_topic": "/local/head/depth_raw",
+                        "rgb_topic": "/local/head/image_raw",
+                        "camera_info_topic": "/local/head/camera_info",
+                        "output_topic": "/jetson/head/points",
+                        "max_rate_hz": 5.0,
+                        "depth_scale": 1000.0,
+                    }],
+                    output="screen",
+                ),
+                Node(
+                    package="camera",
+                    executable="naive_pointcloud_assembler",
+                    name="arm_pointcloud_assembler",
+                    parameters=[{
+                        "side": "arm",
+                        "depth_topic": "/local/arm/depth_raw",
+                        "rgb_topic": "/local/arm/image_raw",
+                        "camera_info_topic": "/local/arm/camera_info",
+                        "output_topic": "/jetson/arm/points",
+                        "max_rate_hz": 5.0,
+                        "depth_scale": 1000.0,
+                    }],
+                    output="screen",
                 ),
             ]
         )

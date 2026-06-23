@@ -20,6 +20,10 @@ Keyboard shortcuts (PyVista viewer):
     k  - toggle LUT contact points
     b  - toggle superquadric mesh
     i  - toggle info text
+    a  - toggle alignment correction (auto-offset to point cloud)
+    x  - rotate correction 90 deg about X axis
+    y  - rotate correction 90 deg about Y axis
+    z  - rotate correction 90 deg about Z axis
     +  - next SMC iteration filter
     -  - previous SMC iteration filter
     *  - show all iterations (reset filter)
@@ -645,7 +649,42 @@ def visualize_pyvista(dump: dict, args):
         "show_info": True,
         "grasp_type_filter": 0,  # 0 = all, 1/2/3 = specific type
         "iteration_filter": max_iteration if n_grasps > 0 else None,  # default to last iteration
+        "correction_enabled": False,  # auto-alignment correction on/off
+        "correction_t": np.zeros(3),  # translation correction (m)
+        "correction_rot_axis": 0,     # 0=X, 1=Y, 2=Z
+        "correction_rot_idx": 0,      # 0=0deg, 1=90deg, 2=180deg, 3=270deg
     }
+
+    # ---- Pre-compute suggested alignment offset ----
+    _suggested_t = np.zeros(3)
+    if len(pc) > 0:
+        ip_pos = dump["input_pose"][:3].astype(np.float64)
+        cloud_centroid = pc.mean(axis=0)
+        _suggested_t = cloud_centroid - ip_pos
+        # Small Z standoff so hand base isn't inside the object surface
+        _suggested_t += np.array([0.0, 0.0, 0.05])
+        print(f"  Suggested alignment: t=[{_suggested_t[0]:.3f}, {_suggested_t[1]:.3f}, {_suggested_t[2]:.3f}]")
+        print(f"    (input pose -> cloud centroid + 5cm Z standoff)")
+
+    def _build_correction():
+        """Build the current correction 4x4 transform from state."""
+        if not state["correction_enabled"]:
+            return np.eye(4)
+        # Build rotation from axis index and 90-deg increment
+        angle = state["correction_rot_idx"] * np.pi / 2.0
+        axis = state["correction_rot_axis"]  # 0=X, 1=Y, 2=Z
+        c = np.cos(angle)
+        s = np.sin(angle)
+        if axis == 0:
+            R = np.array([[1, 0, 0], [0, c, -s], [0, s, c]])
+        elif axis == 1:
+            R = np.array([[c, 0, s], [0, 1, 0], [-s, 0, c]])
+        else:  # axis == 2
+            R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
+        T_corr = np.eye(4)
+        T_corr[:3, :3] = R
+        T_corr[:3, 3] = state["correction_t"]
+        return T_corr
 
 
 
@@ -1021,12 +1060,15 @@ def visualize_pyvista(dump: dict, args):
         positions = []
         point_colors = []
 
+        T_corr = _build_correction()
+
         # Use iteration-filtered best when filter is active.
         display_best = best_idx if state["iteration_filter"] is None else _filtered_best()[0]
         for i in all_indices:
             gt = grasps["grasp_type"][i]
             is_best = (i == display_best)
-            T = grasps["pose_4x4"][i]
+            T_raw = grasps["pose_4x4"][i]
+            T = T_corr @ T_raw
             positions.append(T[:3, 3])
 
             if is_best:
@@ -1069,7 +1111,8 @@ def visualize_pyvista(dump: dict, args):
         for idx in top_indices:
             gt = grasps["grasp_type"][idx]
             is_best = (idx == display_best)
-            T = grasps["pose_4x4"][idx]
+            T_raw = grasps["pose_4x4"][idx]
+            T = T_corr @ T_raw
             pos = T[:3, 3]
             R = T[:3, :3]
             score = grasps["combined"][idx]
@@ -1143,7 +1186,8 @@ def visualize_pyvista(dump: dict, args):
     def _compute_hand_positions(grasp_idx):
         """Run FK and return the compact hand markers in world coordinates."""
         gt = grasps["grasp_type"][grasp_idx]
-        T = grasps["pose_4x4"][grasp_idx]
+        T_raw = grasps["pose_4x4"][grasp_idx]
+        T = _build_correction() @ T_raw
         closure = grasps["closure"][grasp_idx]
         thumb_mode = 0.0 if gt == 3 else 1.0
         q_active = np.array([closure, closure, closure], dtype=float)
@@ -1353,7 +1397,8 @@ def visualize_pyvista(dump: dict, args):
                 continue
 
             gt = grasps["grasp_type"][idx]
-            T = grasps["pose_4x4"][idx]
+            T_raw = grasps["pose_4x4"][idx]
+            T = _build_correction() @ T_raw
             closure = grasps["closure"][idx]
             R, t = T[:3, :3], T[:3, 3]
             is_best = (idx == display_best)
@@ -1507,7 +1552,13 @@ def visualize_pyvista(dump: dict, args):
             lines.append("Best: none")
 
         lines.append(f"TSDF: {tsdf_str}  Hand: {hand_str}  Contacts: {contacts_str}  SQ: {sq_str}")
-        lines.append("Keys: t=TSDF  g=grasps  p=cloud  r=ROI  c=cam  h=hand  k=contacts  b=SQ  +/-/*=iter  ?=help")
+        # Alignment status
+        if state["correction_enabled"]:
+            t = state["correction_t"]
+            ax = ["X", "Y", "Z"][state["correction_rot_axis"]]
+            ang = state["correction_rot_idx"] * 90
+            lines.append(f"ALIGN: ON  t=[{t[0]:.2f},{t[1]:.2f},{t[2]:.2f}]  rot({ax},{ang}deg)")
+        lines.append("Keys: t=TSDF  g=grasps  p=cloud  r=ROI  c=cam  h=hand  k=contacts  b=SQ  a=align  x/y/z=rot  +/-/*=iter  ?=help")
 
         text = "\n".join(lines)
         actor = plotter.add_text(
@@ -1577,6 +1628,25 @@ def visualize_pyvista(dump: dict, args):
         if state["show_hand"]:
             add_hand_skeletons()
         # Contact points also depend on which grasps are displayed.
+        for actor in actor_groups["contact_points"]:
+            plotter.remove_actor(actor)
+        actor_groups["contact_points"].clear()
+        if state["show_contacts"]:
+            add_contact_points()
+        update_info_text()
+        plotter.render()
+
+    def rebuild_all_corrected():
+        """Full rebuild of grasps, hands, and contacts (for alignment changes)."""
+        for actor in actor_groups["grasps"]:
+            plotter.remove_actor(actor)
+        actor_groups["grasps"].clear()
+        add_grasp_actors()
+        for actor in actor_groups["hand_skeleton"]:
+            plotter.remove_actor(actor)
+        actor_groups["hand_skeleton"].clear()
+        if state["show_hand"]:
+            add_hand_skeletons()
         for actor in actor_groups["contact_points"]:
             plotter.remove_actor(actor)
         actor_groups["contact_points"].clear()
@@ -1738,6 +1808,10 @@ def visualize_pyvista(dump: dict, args):
         print("  k  - toggle LUT contact points")
         print("  b  - toggle superquadric mesh")
         print("  i  - toggle info text")
+        print("  a  - toggle alignment correction")
+        print("  x  - rotate correction 90 deg about X axis")
+        print("  y  - rotate correction 90 deg about Y axis")
+        print("  z  - rotate correction 90 deg about Z axis")
         print("  +  - next SMC iteration filter")
         print("  -  - previous SMC iteration filter")
         print("  *  - show all iterations (reset filter)")
@@ -1764,6 +1838,47 @@ def visualize_pyvista(dump: dict, args):
     plotter.add_key_event("minus", on_key_minus)
     plotter.add_key_event("asterisk", on_key_star)
     plotter.add_key_event("question", on_key_help)
+
+    # ---- Alignment correction keybindings ----
+    def on_key_a():
+        """Toggle alignment correction on/off."""
+        state["correction_enabled"] = not state["correction_enabled"]
+        if state["correction_enabled"]:
+            state["correction_t"] = _suggested_t.copy()
+            state["correction_rot_idx"] = 0
+            state["correction_rot_axis"] = 0
+            print(f"  Alignment: ON  t=[{_suggested_t[0]:.3f},{_suggested_t[1]:.3f},{_suggested_t[2]:.3f}]")
+        else:
+            print("  Alignment: OFF")
+        rebuild_all_corrected()
+
+    def _cycle_rotation(axis_idx: int):
+        if not state["correction_enabled"]:
+            state["correction_enabled"] = True
+            state["correction_t"] = _suggested_t.copy()
+            state["correction_rot_idx"] = 0
+            state["correction_rot_axis"] = axis_idx
+        else:
+            state["correction_rot_axis"] = axis_idx
+            state["correction_rot_idx"] = (state["correction_rot_idx"] + 1) % 4
+        ax = ["X", "Y", "Z"][axis_idx]
+        ang = state["correction_rot_idx"] * 90
+        print(f"  Alignment rotation: {ax} axis, {ang} deg")
+        rebuild_all_corrected()
+
+    def on_key_x():
+        _cycle_rotation(0)
+
+    def on_key_y():
+        _cycle_rotation(1)
+
+    def on_key_z():
+        _cycle_rotation(2)
+
+    plotter.add_key_event("a", on_key_a)
+    plotter.add_key_event("x", on_key_x)
+    plotter.add_key_event("y", on_key_y)
+    plotter.add_key_event("z", on_key_z)
 
     plotter.add_axes()
     plotter.show()

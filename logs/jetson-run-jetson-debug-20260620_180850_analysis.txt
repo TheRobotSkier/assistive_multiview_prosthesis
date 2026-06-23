@@ -1,0 +1,93 @@
+==============================================================================
+LOG ANALYSIS — jetson-run-jetson-debug-20260620_180850.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260620_180850.txt
+Lines:      11335
+Time span:  18:08:54 – 18:10:04 (70.4s)
+
+Nodes started (6):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=191
+  tf_throttle                                pid=45
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  aruco_marker_pose_node.py                      0     24      61
+  dynamic_arm_pose_measurement_node.py           0      0       7
+  jetson_relay                                   0      0      12
+  realsense2_camera_node                         0      0       2
+  run_subscribe_msckf_marker                     0      0       2
+  tf_throttle                                    0      0       9
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  [   20x] startup odom not ready  [18:08:56 .. 18:09:14]
+          hint: Expected during startup before OpenVINS init; only actionable if persistent after init
+          sample: {}
+          sample: {}
+
+------------------------------------------------------------------------------
+STARTUP PHASE CLASSIFICATION
+------------------------------------------------------------------------------
+  Structured startup events:
+    18:08:54  phase=first_marker side=arm marker_ids=[0]
+    18:08:54  phase=first_marker side=head marker_ids=[0]
+    18:09:16  phase=odom_ready side=arm topic=/ov_msckf_arm/odomimu
+    18:09:16  phase=odom_ready side=head topic=/ov_msckf/odomimu
+  startup odom-not-ready warnings observed: 20
+  classification: POTENTIALLY ACTIONABLE (no init marker seen)
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  (no [ERROR] lines)
+
+------------------------------------------------------------------------------
+QUANTITATIVE EVALUATION — MARKER REJECTIONS BY TYPE
+------------------------------------------------------------------------------
+  TYPE            COUNT   MEAN_VAL    MAX_VAL  GATE_LIMIT  STATUS
+  -------------- ------ ---------- ---------- -----------  ------------------------------------
+  chi2                9     497.73     821.22       16.81  Exceeded (S covariance tight)
+  translation         3       0.52       0.81        0.30  Exceeded (Hard jump wall)
+  rotation            3      74.13     127.85        5.00  Exceeded (Hard rotation wall)
+
+  Per-side totals: arm=4  head=2  marker=9
+
+------------------------------------------------------------------------------
+ALGORITHMIC LAYER — VIO STATE ESTIMATION HEALTH
+------------------------------------------------------------------------------
+                Markers    Corrections   Yield    Locked   VIO        PosNorm
+                -------    -----------   -----    ------   ---        -------
+  Head VIO:     1020             80        7.8%    YES   valid      0.77m
+  Arm  VIO:     1016             76        7.5%    YES   valid      0.61m
+
+------------------------------------------------------------------------------
+DRIFT INCIDENT TIMELINE
+------------------------------------------------------------------------------
+  total incidents: 2
+  per-side: arm=1, head=1
+  by-reason: marker_innovation_jump=2
+  sample incidents:
+    18:09:18 side=arm reason=marker_innovation_jump pos_norm=0.99m speed=0.37mps
+    18:09:18 side=head reason=marker_innovation_jump pos_norm=1.10m speed=0.10mps pos_slope=0.02mps
+
+------------------------------------------------------------------------------
+JETSON SYSMON (from native jsonl)
+------------------------------------------------------------------------------
+  Samples:    39
+  CPU:        min=18.8%  avg=83.5%  max=96.0%
+  RAM:        min=11.8%  avg=19.6%  max=20.3%  (total 7619.8 MB)
+  NIC [enP8p1s0]: rx avg=153.8 Mbps  max=173.5 Mbps  tx avg=41.4 Mbps  max=50.9 Mbps
+
+

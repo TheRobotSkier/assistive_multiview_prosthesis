@@ -1,0 +1,68 @@
+[INFO] [launch]: All log files can be found below /home/prosthesis/.ros/log/2026-06-19-14-13-10-587349-KingBob-2760
+[INFO] [launch]: Default logging verbosity is set to INFO
+[pipeline] fusion_mode='legacy'
+[INFO] [pipeline_manager_node-1]: process started with pid [2764]
+[INFO] [openvins_realsense_tf_bridge_node-2]: process started with pid [2765]
+[INFO] [camera_mount_tf_publisher-3]: process started with pid [2766]
+[INFO] [tf_pipeline_diagnostics-4]: process started with pid [2767]
+[INFO] [odom_to_pose_relay-5]: process started with pid [2768]
+[INFO] [openvins_odom_tf_relay-6]: process started with pid [2769]
+[INFO] [decompress_bridge-7]: process started with pid [2770]
+[INFO] [decompress_bridge-8]: process started with pid [2771]
+[INFO] [decompress_bridge-9]: process started with pid [2772]
+[INFO] [decompress_bridge-10]: process started with pid [2773]
+[INFO] [point_cloud_xyzrgb_node-11]: process started with pid [2774]
+[INFO] [point_cloud_xyzrgb_node-12]: process started with pid [2775]
+[INFO] [pointcloud_fusion_node-13]: process started with pid [2776]
+[INFO] [pipeline_diagnostics_node-14]: process started with pid [2777]
+[INFO] [segmentation_ros2_node-15]: process started with pid [2778]
+[INFO] [twist_propagation_node-16]: process started with pid [2779]
+[INFO] [preshaping_service_bridge_node-17]: process started with pid [2782]
+[INFO] [grasp_proximity_controller_node.py-18]: process started with pid [2785]
+[INFO] [rviz2-19]: process started with pid [2788]
+[rviz2-19] QStandardPaths: XDG_RUNTIME_DIR not set, defaulting to '/tmp/runtime-prosthesis'
+[preshaping_service_bridge_node-17] [INFO] [1781878391.269212345] [preshaping_service]: Loaded Rust preshaping backend (/prosthesis_ws/install/grasp_preshaping/lib/libgrasp_preshaping.so), API version=1
+[preshaping_service_bridge_node-17] [INFO] [1781878391.271731413] [preshaping_service]: Preshaping service bridge ready on /grasp_preshaping/compute_grasp
+[pipeline_manager_node-1] [INFO] [1781878393.262891155] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_manager_node-1] [INFO] [1781878393.265486978] [pipeline_manager]: Pipeline manager started — state: IDLE
+[decompress_bridge-7] [INFO] [1781878393.389804889] [head_depth_decompress]: DecompressBridge: {/jetson/head/depth/compressed} -> {/local/head/depth_raw}
+[decompress_bridge-10] [INFO] [1781878394.130058720] [arm_image_decompress]: DecompressBridge: {/jetson/arm/image/compressed} -> {/local/arm/image_raw}
+[pipeline_manager_node-1] [INFO] [1781878394.278707510] [pipeline_manager]: Loaded EMG live config: /prosthesis_ws/config/emg_live.yaml
+[pipeline_diagnostics_node-14] [INFO] [1781878394.429304001] [pipeline_diagnostics]: PipelineDiagnostics ready (summary_interval=5.0s, jump_threshold=0.2m)
+[tf_pipeline_diagnostics-4] [INFO] [1781878394.782159692] [tf_pipeline_diagnostics]: TF diagnostics will start in 10.0s, then check every 10.0s
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878394.943776878] [openvins_realsense_tf_bridge]: Published nominal static chain: 20 transforms (10 per camera)
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878394.944583553] [openvins_realsense_tf_bridge]: OpenVINS/RealSense TF bridge active: head_cam0->head_d435i_head_link, arm_cam0->arm_d435i_arm_link. Static chain publishing=ON
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878395.049147855] [openvins_realsense_tf_bridge]: head: publishing head_cam0->head_d435i_head_link from RealSense extrinsic head_d435i_head_color_optical_frame->head_d435i_head_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878395.057565431] [openvins_realsense_tf_bridge]: arm: publishing arm_cam0->arm_d435i_arm_link from RealSense extrinsic arm_d435i_arm_color_optical_frame->arm_d435i_arm_link
+[openvins_realsense_tf_bridge_node-2] [INFO] [1781878395.060360325] [openvins_realsense_tf_bridge]: All 2 bridge transform(s) resolved — switching to liveness mode (10.0 Hz)
+[camera_mount_tf_publisher-3] [INFO] [1781878395.488890454] [camera_mount_tf_publisher]: Published TF tree for mount '8_cm_cam_mount' + bounding box (8 TFs)
+[camera_mount_tf_publisher-3] [INFO] [1781878395.490805990] [camera_mount_tf_publisher]: Camera mount TF publisher started in pipeline (root=arm_d435i_arm_link) mode (8 TFs, 10 Hz liveness)
+[decompress_bridge-8] [INFO] [1781878395.513648793] [arm_depth_decompress]: DecompressBridge: {/jetson/arm/depth/compressed} -> {/local/arm/depth_raw}
+[pointcloud_fusion_node-13] [INFO] [1781878395.665836032] [pointcloud_fusion]: Pruning box 0: frame=palm_frame, min=[-0.10999999940395355, -0.13500000536441803, -0.3100000023841858], max=[0.10999999940395355, 0.20499999821186066, 0.10999999940395355]
+[pointcloud_fusion_node-13] [INFO] [1781878395.666684925] [pointcloud_fusion]: Pruning box 1: frame=d435i_arm_bottom_screw_frame_8_cm_cam_mount, min=[-0.03500000014901161, -0.10000000149011612, -0.03999999910593033], max=[0.05000000074505806, 0.05000000074505806, 0.14000000059604645]
+[pointcloud_fusion_node-13] [INFO] [1781878395.702331952] [pointcloud_fusion]: Using timer-based merge (require_both=False, rate=15.0Hz, max_age=0.5s)
+[pointcloud_fusion_node-13] [WARN] [1781878395.704335564] [pointcloud_fusion]: TF wait gate: not connected after 0s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 
+[pointcloud_fusion_node-13] [INFO] [1781878395.706336631] [pointcloud_fusion]: TF wait gate active: waiting for TF tree to connect (checking every 2.0s)
+[pointcloud_fusion_node-13] [INFO] [1781878395.709222651] [pointcloud_fusion]: Pointcloud fusion: /jetson/head/points + /jetson/arm/points -> /fused_pointcloud (target_frame=marker_map, arm_frame=arm_d435i_arm_depth_frame, max_dist=2.0m, voxel=0.005m, pruning_boxes=2, bbox_fallback=cache)
+[segmentation_ros2_node-15] [INFO] [1781878395.804980594] [segmentation_bridge]: Segmentation node ready. debounce=0.02s, roi_radius=0.1m
+[openvins_odom_tf_relay-6] [WARN] [1781878395.926541571] [openvins_odom_tf_relay]: OpenVINS odometry TF relay active: marker_map -> head_imu (via /jetson/head/odom), marker_map -> arm_imu (via /jetson/arm/odom), publish_dynamic_tf=True, use_corrected_tf=True, tf_publish_max_hz=100 Hz
+[grasp_proximity_controller_node.py-18] [INFO] [1781878396.098478356] [proximity_controller]: Grasp contact offset enabled: [0.1543, -0.1485, 0.1352]
+[decompress_bridge-9] [INFO] [1781878396.138177017] [head_image_decompress]: DecompressBridge: {/jetson/head/image/compressed} -> {/local/head/image_raw}
+[grasp_proximity_controller_node.py-18] [INFO] [1781878396.140763808] [proximity_controller]: GraspProximityController started — enter_thresh=0.100 m, exit_thresh=0.200 m, partial_factor=0.3, wrist_plan=relative base=hardware, TF: marker_map → grasp_contact_frame
+[twist_propagation_node-16] [INFO] [1781878396.199102575] [twist_propagation]: Propagation origin offset: (0.1543, -0.1485, 0.1352) (shifts start point in pose local frame)
+[twist_propagation_node-16] [INFO] [1781878396.255173471] [twist_propagation]: Twist propagation node started -- active=False, horizon=2.0s, dt=0.02s, hit_thresh=0.05m, collision_radius=0.05m, effective_thresh=0.1m, multi_click=0 (r=0.03m, r_min=0.005m), background_cycle=True, cycle_rate=50Hz, use_tsdf_fusion=False
+[twist_propagation_node-16] [INFO] [1781878396.256968601] [twist_propagation]: External twist source: /hand_twist (max_age=2.0s)
+[rviz2-19] [INFO] [1781878396.268650068] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-19] [INFO] [1781878396.268865407] [rviz2]: OpenGl version: 4.6 (GLSL 4.6)
+[rviz2-19] [INFO] [1781878396.349788865] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-19] [INFO] [1781878396.658407502] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-19] 
+[rviz2-19] [INFO] [1781878396.669801582] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-19] 
+[rviz2-19] [INFO] [1781878396.853781510] [rviz2]: Subscribing to: /segmentation/object_cloud
+[rviz2-19] 
+[rviz2-19] [INFO] [1781878396.856300220] [rviz2]: Subscribing to: /fused_pointcloud
+[rviz2-19] 
+[rviz2-19] [INFO] [1781878397.210649813] [rviz2]: Stereo is NOT SUPPORTED
+[rviz2-19] [INFO] [1781878397.379153702] [rviz2]: Stereo is NOT SUPPORTED
+[pointcloud_fusion_node-13] [WARN] [1781878397.705916410] [pointcloud_fusion]: TF wait gate: not connected after 2s — head_d435i_head_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. ; arm_d435i_arm_depth_optical_frame: "marker_map" passed to lookupTransform argument target_frame does not exist. 

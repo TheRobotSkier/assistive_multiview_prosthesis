@@ -1,0 +1,70 @@
+==============================================================================
+LOG ANALYSIS — jetson-run-jetson-debug-20260618_201930.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260618_201930.txt
+Lines:      9380
+Time span:  20:19:33 – 20:20:34 (60.4s)
+
+Nodes started (6):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=193
+  tf_throttle                                pid=49
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  aruco_marker_pose_node.py                      0     26      63
+  jetson_relay                                   0      2      12
+  dynamic_arm_pose_measurement_node.py           0      0       7
+  realsense2_camera_node                         0      0       2
+  run_subscribe_msckf_marker                     0      0       2
+  tf_throttle                                    0      0       8
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  (none of the known failure patterns matched)
+
+------------------------------------------------------------------------------
+MIDDLEWARE LAYER — ROS 2 QoS CONTRACT HEALTH
+------------------------------------------------------------------------------
+  TOPIC                                    POLICY                       NODES                           COUNT
+  ---------------------------------------- ---------------------------- ------------------------------ ------
+  /jetson/arm/trackhist                    RELIABILITY                  jetson_relay                        1
+  /jetson/head/trackhist                   RELIABILITY                  jetson_relay                        1
+
+  [CRITICAL ALERT] 2 QoS-incompatible channel(s) detected.
+    These topics are completely blocked at the middleware layer.
+    Data flow on these channels is zero — check QoS profiles.
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  (no [ERROR] lines)
+
+------------------------------------------------------------------------------
+ALGORITHMIC LAYER — VIO STATE ESTIMATION HEALTH
+------------------------------------------------------------------------------
+                Markers    Corrections   Yield    Locked
+                -------    -----------   -----    ------
+  Head VIO:       86             13       15.1%    YES
+  Arm  VIO:      188             12        6.4%    YES
+
+------------------------------------------------------------------------------
+JETSON SYSMON (from native jsonl)
+------------------------------------------------------------------------------
+  Samples:    34
+  CPU:        min=0.0%  avg=81.9%  max=94.3%
+  RAM:        min=16.6%  avg=23.8%  max=24.6%  (total 7619.9 MB)
+  NIC [enP8p1s0]: rx avg=0.9 Mbps  max=7.1 Mbps  tx avg=450.6 Mbps  max=486.1 Mbps
+
+

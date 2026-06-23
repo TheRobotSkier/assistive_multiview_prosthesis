@@ -1,0 +1,80 @@
+==============================================================================
+LOG ANALYSIS — jetson-run-jetson-debug-20260620_134300.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260620_134300.txt
+Lines:      13047
+Time span:  13:43:03 – 13:44:43 (99.9s)
+
+Nodes started (6):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=191
+  tf_throttle                                pid=45
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  aruco_marker_pose_node.py                      2     50      47  <-- noisy
+  dynamic_arm_pose_measurement_node.py           0      0       7
+  jetson_relay                                   0      0      12
+  realsense2_camera_node                         0      0       2
+  run_subscribe_msckf_marker                     0      0       2
+  tf_throttle                                    0      0      12
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  [   50x] startup odom not ready  [13:43:05 .. 13:43:57]
+          hint: Expected during startup before OpenVINS init; only actionable if persistent after init
+          sample: {}
+          sample: {}
+
+------------------------------------------------------------------------------
+STARTUP PHASE CLASSIFICATION
+------------------------------------------------------------------------------
+  Structured startup events:
+    13:43:50  phase=odom_ready side=head topic=/ov_msckf/odomimu
+  startup odom-not-ready warnings observed: 50
+  classification: POTENTIALLY ACTIONABLE (no init marker seen)
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  [2x] process has died [pid 41, exit code 1, cmd '/miahand_ws/src/install_overlay/sensor_fusion_bringup/li
+        first: n/a (aruco_marker_pose_node.py)  last: n/a
+
+------------------------------------------------------------------------------
+ALGORITHMIC LAYER — VIO STATE ESTIMATION HEALTH
+------------------------------------------------------------------------------
+                Markers    Corrections   Yield    Locked   VIO        PosNorm
+                -------    -----------   -----    ------   ---        -------
+  Head VIO:        0              0        0.0%     no   INVALID    0.00m
+  [CRITICAL WARNING] Head state estimator detected 0 markers and reports VIO=INVALID (pos_norm=0.00m). Check camera occlusion, marker visibility, or whether the node crashed before detection (see traceback above).
+  Arm  VIO:        0              0        0.0%     no   INVALID    0.00m
+  [CRITICAL WARNING] Arm  state estimator detected 0 markers and reports VIO=INVALID (pos_norm=0.00m). Check camera occlusion, marker visibility, or whether the node crashed before detection (see traceback above).
+
+------------------------------------------------------------------------------
+CRASH / PROCESS-DEATH DETECTED
+------------------------------------------------------------------------------
+  line 4038: [aruco_marker_pose_node.py-3] Traceback (most recent call last):
+  line 4131: [ERROR] [aruco_marker_pose_node.py-3]: process has died [pid 41, exit code 1, cmd '/miahand_ws/src/i
+  line 5016: [aruco_marker_pose_node.py-4] Traceback (most recent call last):
+  line 5041: [ERROR] [aruco_marker_pose_node.py-4]: process has died [pid 42, exit code 1, cmd '/miahand_ws/src/i
+
+------------------------------------------------------------------------------
+JETSON SYSMON (from native jsonl)
+------------------------------------------------------------------------------
+  Samples:    54
+  CPU:        min=19.5%  avg=60.4%  max=100.0%
+  RAM:        min=11.6%  avg=18.4%  max=20.0%  (total 7619.8 MB)
+  NIC [enP8p1s0]: rx avg=17.3 Mbps  max=20.9 Mbps  tx avg=23.0 Mbps  max=35.8 Mbps
+
+

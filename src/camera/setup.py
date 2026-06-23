@@ -22,6 +22,9 @@ setup(
             "openvins_realsense_tf_bridge_node = camera.openvins_realsense_tf_bridge_node:main",
             "openvins_odom_tf_relay = camera.openvins_odom_tf_relay:main",
             "pipeline_diagnostics_node = camera.pipeline_diagnostics_node:main",
+            "decompress_bridge = camera.decompress_bridge:main",
+            "camera_info_bridge = camera.camera_info_bridge:main",
+            "naive_pointcloud_assembler = camera.naive_pointcloud_assembler:main",
         ],
     },
     data_files=[

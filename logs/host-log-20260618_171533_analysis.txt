@@ -1,0 +1,32 @@
+==============================================================================
+LOG ANALYSIS — host-log-20260618_171533.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/host-log-20260618_171533.txt
+Lines:      4
+Time span:  n/a
+Launch args: fusion_mode='legacy'
+
+Nodes started (0):
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  launch                                         1      0       2  <-- noisy
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  (none of the known failure patterns matched)
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  [1x] Caught exception in launch (see debug for traceback): "package 'depth_image_proc' not found, searchi
+        first: n/a (launch)  last: n/a
+

@@ -20,20 +20,26 @@
       </Peers>
     </Discovery>
     <!-- ── Internal / socket buffer tuning ────────────────────────────────
-         Uses the "min" attribute … the kernel may grant a larger buffer.
-         Kernel grant = 2× min (double-buffering).
+         SocketReceiveBufferSize: 50 MB — the host receives two 0.5 MB
+         PointCloud2 streams at ~15 Hz plus odometry, images, and TF.
+         Under CPU pressure (~91 %) a backlog of a few hundred RTPS
+         fragments is common; 50 MB absorbs the burst without dropping
+         fragments into the NACK/retransmission path.
 
-         SocketReceiveBufferSize: 8 MB holds one full PointCloud2 plus
-         overhead from multiple subscribers (keyframe_buffer, fusion,
-         record).  Jetson publishes ~15 Hz × 2 cameras ~ 30 clouds/s.
+         SocketSendBufferSize: 8 MB — the host publishes /fused_pointcloud
+         (one merged cloud downstream), so send-side demand is modest.
 
-         SocketSendBufferSize: 8 MB for /fused_pointcloud from host.
-
-         See: plans/2026-06-16-network-buffer-tuning-host-v2.md
+         MaxQueuedRexmitBytes: 5 MB — hard ceiling on the retransmission
+         backlog.  When CPU spikes cause a brief receive gap a naive
+         unbounded queue can consume tens of MB of kernel buffer space and
+         trigger a retransmission storm.  Capping at 5 MB forces CycloneDDS
+         to drop the oldest rexmit requests when the queue fills, breaking
+         the positive-feedback spiral.
     ─────────────────────────────────────────────────────────────────────── -->
     <Internal>
-      <SocketReceiveBufferSize min="8MB"/>
+      <SocketReceiveBufferSize min="50MB"/>
       <SocketSendBufferSize min="8MB"/>
+      <MaxQueuedRexmitBytes>5MB</MaxQueuedRexmitBytes>
     </Internal>
   </Domain>
 </CycloneDDS>

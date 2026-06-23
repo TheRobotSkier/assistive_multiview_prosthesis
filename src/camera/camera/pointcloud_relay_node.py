@@ -2,6 +2,14 @@
 
 Subscribes to /fused_pointcloud and republishes on /segmentation/input_cloud.
 This bridges the real multiview camera output to the segmentation node.
+
+Pipeline contract: The entire host-side pointcloud pipeline (camera merger →
+pointcloud fusion → segmentation → keyframe buffer / TSDF) operates on
+``sensor_msgs/msg/PointCloud2`` natively.  There is no depth-image to
+PointCloud2 back-projection path on the host.  The Jetson MUST deliver
+``/jetson/head/points`` and ``/jetson/arm/points`` as PointCloud2 messages;
+a depth-only image stream is not a viable alternative without a full
+host-side rewrite.
 """
 
 import rclpy

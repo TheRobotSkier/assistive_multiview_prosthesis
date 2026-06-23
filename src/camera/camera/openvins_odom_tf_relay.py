@@ -167,10 +167,37 @@ class OpenVINSOdomTFRelay(Node):
         # (marker_map -> *_imu_openvins_corrected) and rebroadcasts them
         # as the raw *_imu edges.  This gives downstream consumers the
         # more stable ArUco-corrected trajectory instead of raw VIO.
-        # Only takes effect when publish_dynamic_tf is also True.
+        # This path runs independently of publish_dynamic_tf, so the
+        # corrected trajectory is available even when GTSAM owns the raw
+        # TF edges (publish_dynamic_tf=False, broadcast_tf=true).
         # Falls back to publishing from raw odom if the corrected frame
         # is not available in the TF buffer.
         self.declare_parameter("use_corrected_tf", False)
+        # Throttle TF publish rate to avoid flooding the /tf topic.
+        # OpenVINS odom arrives at ~200 Hz per camera, and each message
+        # generates a TF broadcast.  With two cameras and corrected-TF
+        # dual-publishing, the unfiltered rate approaches ~800 Hz, which
+        # triggers DDS retransmission storms under CPU pressure.
+        # Capping to 100 Hz per camera gives smooth visualisation while
+        # keeping the reliable /tf topic well under the DDS write budget.
+        self.declare_parameter("tf_publish_max_hz", 100.0)
+        # Maximum velocity (m/s) for raw VIO position changes.  When the
+        # frame-to-frame velocity exceeds this, the raw VIO TF is suppressed.
+        # Only applies to the raw VIO path (never fires when corrected TF is
+        # active).  Real motion is < 2 m/s; failure mode is > 19 m/s.
+        # A 3.0 m/s threshold gives 50% margin above real motion.
+        self.declare_parameter("max_velocity_mps", 3.0)
+        # Maximum age (seconds) of the hold-last-good corrected-TF cache.
+        # When the corrected-TF lookup fails, the relay rebroadcasts the last
+        # successful corrected transform if it is younger than this.  Beyond
+        # this age, the cache is stale and the relay falls through to the
+        # raw VIO path.
+        self.declare_parameter("corrected_tf_cache_max_age_s", 2.0)
+        # Low-pass filter alpha for corrected-TF translation smoothing.
+        # 0.0 = no update (frozen), 1.0 = no filtering (pass-through).
+        # 0.3 gives ~3-frame settling, smoothing reanchor discontinuities
+        # over ~0.1s at 28 Hz without adding significant lag.
+        self.declare_parameter("corrected_tf_lpf_alpha", 0.3)
 
         # ── Read parameters ───────────────────────────────────────────────
         head_odom_topic = self.get_parameter("head_odom_topic").value
@@ -208,10 +235,28 @@ class OpenVINSOdomTFRelay(Node):
         self._max_pose_jump_m = self.get_parameter("max_pose_jump_m").value
         self._publish_dynamic_tf = self.get_parameter("publish_dynamic_tf").value
         self._use_corrected_tf = self.get_parameter("use_corrected_tf").value
+        self._tf_publish_max_hz = float(
+            self.get_parameter("tf_publish_max_hz").value)
+        self._tf_publish_interval_ns = int(
+            1e9 / max(self._tf_publish_max_hz, 1.0))
+        self._max_velocity_mps = float(
+            self.get_parameter("max_velocity_mps").value)
+        self._corrected_cache_max_age_s = float(
+            self.get_parameter("corrected_tf_cache_max_age_s").value)
+        self._corrected_lpf_alpha = float(
+            self.get_parameter("corrected_tf_lpf_alpha").value)
 
         # ── TF2 buffer for self-calibration lookups ───────────────────────
+        # spin_thread=True gives the /tf subscription its own background
+        # thread and executor, so set_transform can populate the buffer and
+        # notify the condition variable even while the main executor is
+        # blocked inside lookup_transform.  Without this, the 0.5s (now 0.15s)
+        # lookup timeout is a guaranteed stall whenever the corrected frame is
+        # not already in the buffer when the lookup starts — the /tf callback
+        # that would deliver it cannot fire on the same single thread.  TF2's
+        # Buffer is designed for concurrent access (internal mutexes).
         self._tf_buffer = Buffer()
-        self._tf_listener = TransformListener(self._tf_buffer, self)
+        self._tf_listener = TransformListener(self._tf_buffer, self, spin_thread=True)
 
         # ── QoS — OpenVINS publishes odom with BEST_EFFORT ────────────────
         best_effort = QoSProfile(
@@ -248,6 +293,10 @@ class OpenVINSOdomTFRelay(Node):
         self._head_count = 0
         self._arm_count = 0
 
+        # -- TF rate-limiter state -----------------------------------------
+        self._last_head_tf_time: int = 0  # nanoseconds
+        self._last_arm_tf_time: int = 0   # nanoseconds
+
         # -- Startup timestamp for fallback timeout --------------------------
         self._startup_time = self.get_clock().now()
 
@@ -269,6 +318,18 @@ class OpenVINSOdomTFRelay(Node):
         self._arm_actual_imu_frame: str | None = None
         self._last_head_pos: tuple[float, float, float] | None = None
         self._last_arm_pos: tuple[float, float, float] | None = None
+        # -- Per-camera last position timestamps for velocity computation ---
+        self._last_head_pos_time_ns: int = 0
+        self._last_arm_pos_time_ns: int = 0
+        # -- Corrected-TF hold-last-good cache (Phase 2.1) ------------------
+        # Maps child frame name -> (transform, cache_time_ns).
+        self._corrected_cache: dict[str, tuple[TransformStamped, int]] = {}
+        # -- Corrected-TF low-pass filter state (Phase 3.6) -----------------
+        # Maps child frame name -> filtered (x, y, z) or None (uninitialized).
+        self._corrected_lpf_state: dict[str, tuple[float, float, float] | None] = {}
+        # -- Velocity suppression counters (Phase 3.5) ----------------------
+        self._head_vel_suppress_count = 0
+        self._arm_vel_suppress_count = 0
 
         # -- Publish static *_imu -> *_cam0 edges --------------------------
         # Stored for liveness re-send on /tf, matching the same pattern
@@ -316,7 +377,8 @@ class OpenVINSOdomTFRelay(Node):
             f"{self._target_frame} -> {self._arm_imu} "
             f"(via {arm_odom_topic}), "
             f"publish_dynamic_tf={self._publish_dynamic_tf}, "
-            f"use_corrected_tf={self._use_corrected_tf}"
+            f"use_corrected_tf={self._use_corrected_tf}, "
+            f"tf_publish_max_hz={self._tf_publish_max_hz:.0f} Hz",
         )
 
     def _on_head_odom(self, msg: Odometry):
@@ -391,36 +453,19 @@ class OpenVINSOdomTFRelay(Node):
                 f"actual_imu_frame={actual_imu!r})"
             )
 
-        # ── Post-initialization outlier suppression ────────────────────────
-        pos_norm = math.sqrt(x * x + y * y + z * z)
-        if pos_norm > self._max_pose_norm_m:
-            self.get_logger().warn(
-                f'{name} odom pose norm {pos_norm:.2f}m exceeds max '
-                f'{self._max_pose_norm_m}m — suppressing TF',
-                throttle_duration_sec=2.0)
-            return
+        # ── TF rate limit check ─────────────────────────────────────────
+        # Rate-limit TF publishing per camera to avoid flooding the /tf
+        # topic.  OpenVINS odom arrives at ~200 Hz; without throttling the
+        # combined /tf rate from this relay alone approaches 400+ Hz, which
+        # triggers CycloneDDS retransmission storms under CPU pressure.
+        # Self-calibration and outlier suppression still run on every
+        # message; only the actual TF broadcast is gated.
+        last_tf_attr = f"_last_{name}_tf_time"
+        now_ns = self.get_clock().now().nanoseconds
+        last_ns = getattr(self, last_tf_attr)
+        tf_allowed = (now_ns - last_ns) >= self._tf_publish_interval_ns
 
-        last_pos = self._last_head_pos if name == 'head' else self._last_arm_pos
-        if last_pos is not None:
-            jump = math.sqrt(
-                (x - last_pos[0]) ** 2
-                + (y - last_pos[1]) ** 2
-                + (z - last_pos[2]) ** 2
-            )
-            if jump > self._max_pose_jump_m:
-                self.get_logger().warn(
-                    f'{name} odom pose jumped {jump:.3f}m '
-                    f'(> {self._max_pose_jump_m}m) — suppressing TF',
-                    throttle_duration_sec=2.0)
-                return
-
-        # Update last position
-        if name == 'head':
-            self._last_head_pos = (x, y, z)
-        else:
-            self._last_arm_pos = (x, y, z)
-
-        # ── Corrected TF republishing ───────────────────────────────────
+        # ── Corrected TF republishing (before outlier suppression) ──────
         # When use_corrected_tf=True, look up the ArUco-corrected frame
         # (e.g. marker_map -> head_imu_openvins_corrected) and rebroadcast
         # it as the raw frame name.  This replaces the jumping raw VIO
@@ -428,59 +473,205 @@ class OpenVINSOdomTFRelay(Node):
         # This path runs regardless of publish_dynamic_tf so that the
         # corrected trajectory is available even when GTSAM owns the raw
         # TF edges (publish_dynamic_tf=False, broadcast_tf=True).
+        #
+        # IMPORTANT: this block runs BEFORE the raw VIO outlier suppression
+        # below.  The corrected frame comes from the Jetson-side
+        # aruco_marker_pose_node.py (an independent, ArUco-anchored source),
+        # so raw VIO jump/norm checks do not apply to it.  Without this
+        # ordering, the outlier suppression's early `return` would starve
+        # the corrected-TF path whenever raw VIO is unstable — exactly the
+        # scenario that left marker_map -> *_imu STALE and broke the entire
+        # pointcloud fusion pipeline.
         corrected_frame = f"{child}_openvins_corrected"
         published_corrected = False
+        # Decoupled ingestion vs. broadcast (Phase 2.5): always perform the
+        # corrected-TF lookup and cache/LPF update (even when rate-limited) so
+        # the internal state is always current; only the DDS broadcast is
+        # gated by tf_allowed.  This ensures the LPF and cache always have the
+        # latest data, reducing latency when a broadcast does happen.
         if self._use_corrected_tf:
+            tf_stamp = self._resolve_tf_stamp(msg)
             try:
-                host_stamp = self.get_clock().now().to_msg()
-                # Look up the corrected transform.
+                # Look up the corrected transform.  With spin_thread=True
+                # (Phase 2.1), this timeout genuinely waits for newly-arrived
+                # corrected frames instead of being a guaranteed stall.  The
+                # corrected frame typically arrives within a few ms of the
+                # odom message (both come from the Jetson via DDS), so 0.15s
+                # is generous (Phase 2.3: reduced from 0.5s).  If it hasn't
+                # arrived in 0.15s, the hold-last-good cache kicks in.
                 tf_corrected = self._tf_buffer.lookup_transform(
                     parent, corrected_frame, rclpy.time.Time(),
-                    timeout=rclpy.duration.Duration(seconds=0.1))
-                # Rebroadcast the corrected transform under the raw child frame.
+                    timeout=rclpy.duration.Duration(seconds=0.15))
+
+                # Apply low-pass filter to translation (Phase 3.6).
+                # Smooths reanchor discontinuities (0.7-0.96m jumps) into
+                # gradual transitions over ~3 frames.  Only filter
+                # translation; rotation discontinuities are less visually
+                # disruptive and filtering them could smear fast reanchors.
+                trans = tf_corrected.transform.translation
+                lpf_state = self._corrected_lpf_state.get(child)
+                if lpf_state is None:
+                    # First frame after startup — initialize filter state.
+                    filt_x, filt_y, filt_z = trans.x, trans.y, trans.z
+                else:
+                    a = self._corrected_lpf_alpha
+                    filt_x = a * trans.x + (1.0 - a) * lpf_state[0]
+                    filt_y = a * trans.y + (1.0 - a) * lpf_state[1]
+                    filt_z = a * trans.z + (1.0 - a) * lpf_state[2]
+                self._corrected_lpf_state[child] = (filt_x, filt_y, filt_z)
+
+                # Build the rebroadcast transform (always, so the cache and
+                # broadcast share the same code path).
                 rebroadcast = TransformStamped()
-                rebroadcast.header.stamp = host_stamp
+                rebroadcast.header.stamp = tf_stamp
                 rebroadcast.header.frame_id = parent
                 rebroadcast.child_frame_id = child
-                rebroadcast.transform = tf_corrected.transform
-                self._tf_broadcaster.sendTransform(rebroadcast)
-                published_corrected = True
+                rebroadcast.transform.translation.x = filt_x
+                rebroadcast.transform.translation.y = filt_y
+                rebroadcast.transform.translation.z = filt_z
+                rebroadcast.transform.rotation = tf_corrected.transform.rotation
+                # Update hold-last-good cache (Phase 2.1) — always, so the
+                # cache stays current even when rate-limited.
+                self._corrected_cache[child] = (rebroadcast, now_ns)
+                # Only broadcast when the rate limiter allows it.
+                if tf_allowed:
+                    self._tf_broadcaster.sendTransform(rebroadcast)
+                    published_corrected = True
             except Exception:
-                # Corrected frame not available; fall through.
-                pass
+                # Corrected frame not available — try hold-last-good cache
+                # (Phase 2.1).  Rebroadcast the last successful corrected
+                # transform if it is younger than the max cache age.
+                cached = self._corrected_cache.get(child)
+                if cached is not None and tf_allowed:
+                    cached_tf, cache_time_ns = cached
+                    cache_age_s = (now_ns - cache_time_ns) / 1e9
+                    if cache_age_s < self._corrected_cache_max_age_s:
+                        rebroadcast = TransformStamped()
+                        rebroadcast.header.stamp = tf_stamp
+                        rebroadcast.header.frame_id = parent
+                        rebroadcast.child_frame_id = child
+                        rebroadcast.transform = cached_tf.transform
+                        self._tf_broadcaster.sendTransform(rebroadcast)
+                        published_corrected = True
+                    else:
+                        # Cache too old — clear it and fall through to raw VIO.
+                        self._corrected_cache.pop(child, None)
+                # else: no cache available or rate-limited; fall through to raw VIO path.
 
-        # ── Raw odom TF broadcast ───────────────────────────────────────
-        # When publish_dynamic_tf is False (e.g. when the V6 GTSAM tracker
-        # owns the dynamic TF tree via broadcast_tf=true), skip broadcasting
-        # the marker_map -> *_imu edge UNLESS we already published a
-        # corrected frame above.  The relay still runs its init guard,
-        # outlier suppression, and self-calibration so that the odometry is
-        # validated and the static *_imu -> *_cam0 extrinsics are maintained,
-        # but the smoothed trajectory from GTSAM is what feeds downstream TF
-        # consumers (V6 §6.3).
-        if not published_corrected and self._publish_dynamic_tf:
-            # Stamp with the host clock so all edges in the TF chain
-            # (relay, bridge, camera mounts) share the same time domain.
-            # Using the Jetson odom timestamp created a ~10s clock gap that
-            # prevented TF2 from composing the multi-edge chain for bbox
-            # removal lookups ("extrapolation into the past" errors).
-            host_stamp = self.get_clock().now().to_msg()
-            tf_msg = _make_transform(
-                parent, child, x, y, z, qx, qy, qz, qw,
-                host_stamp,
-            )
-            self._tf_broadcaster.sendTransform(tf_msg)
-        elif not published_corrected:
-            # Neither corrected nor dynamic TF — log throttled.
-            count_attr = f"_{name}_count"
-            count = getattr(self, count_attr)
-            count += 1
-            setattr(self, count_attr, count)
-            if count % 200 == 1:
-                self.get_logger().info(
-                    f"Relay #{count} ({name}): publish_dynamic_tf=False — "
-                    f"deferring {parent} -> {child} to GTSAM tracker"
+        # Update the rate-limit timestamp immediately when a corrected TF
+        # was published, so the rate limiter accounts for it even though we
+        # skip the raw VIO path below.
+        if published_corrected:
+            setattr(self, last_tf_attr, now_ns)
+
+        # ── Raw VIO path (skipped entirely when corrected TF published) ──
+        # The outlier suppression and raw TF broadcast below apply only to
+        # the raw VIO odometry.  When a corrected TF was already published
+        # above, skip straight to self-calibration and logging so the early
+        # `return` in the outlier gate does not starve those subsystems.
+        if not published_corrected:
+            # ── Post-initialization outlier suppression ────────────────────
+            pos_norm = math.sqrt(x * x + y * y + z * z)
+
+            # Compute jump and velocity from last position BEFORE updating
+            # (Phase 3.4 fix: update position unconditionally to avoid
+            # cascading false suppressions from stale reference positions).
+            last_pos = (
+                self._last_head_pos if name == 'head' else self._last_arm_pos)
+            last_time_attr = f"_last_{name}_pos_time_ns"
+            last_time_ns = getattr(self, last_time_attr)
+            now_pos_ns = self.get_clock().now().nanoseconds
+
+            jump = 0.0
+            velocity = 0.0
+            if last_pos is not None and last_time_ns > 0:
+                jump = math.sqrt(
+                    (x - last_pos[0]) ** 2
+                    + (y - last_pos[1]) ** 2
+                    + (z - last_pos[2]) ** 2
                 )
+                dt = (now_pos_ns - last_time_ns) / 1e9
+                if dt > 1e-6:
+                    velocity = jump / dt
+
+            # Update last position and timestamp unconditionally (Phase 3.4).
+            if name == 'head':
+                self._last_head_pos = (x, y, z)
+                self._last_head_pos_time_ns = now_pos_ns
+            else:
+                self._last_arm_pos = (x, y, z)
+                self._last_arm_pos_time_ns = now_pos_ns
+
+            if pos_norm > self._max_pose_norm_m:
+                self.get_logger().warn(
+                    f'{name} odom pose norm {pos_norm:.2f}m exceeds max '
+                    f'{self._max_pose_norm_m}m — suppressing TF',
+                    throttle_duration_sec=2.0)
+                return
+
+            if last_pos is not None and jump > self._max_pose_jump_m:
+                self.get_logger().warn(
+                    f'{name} odom pose jumped {jump:.3f}m '
+                    f'(> {self._max_pose_jump_m}m) — suppressing TF',
+                    throttle_duration_sec=2.0)
+                return
+
+            # Velocity-based suppression (Phase 3.3).
+            # Only fires on the raw VIO path (corrected path already handled
+            # above).  With the hold-last-good cache (Phase 2.1), corrected
+            # TF persists even when this fires.  Real motion is < 2 m/s;
+            # failure mode is > 19 m/s.  The 3.0 m/s threshold gives 50%
+            # margin above real motion.
+            if velocity > self._max_velocity_mps:
+                vel_attr = f"_{name}_vel_suppress_count"
+                count = getattr(self, vel_attr) + 1
+                setattr(self, vel_attr, count)
+                self.get_logger().warn(
+                    f'{name} odom velocity {velocity:.2f}m/s exceeds max '
+                    f'{self._max_velocity_mps}m/s — suppressing TF '
+                    f'(total={count})',
+                    throttle_duration_sec=2.0)
+                return
+
+            # ── Raw odom TF broadcast ───────────────────────────────────
+            # When publish_dynamic_tf is False (e.g. when the V6 GTSAM tracker
+            # owns the dynamic TF tree via broadcast_tf=true), skip
+            # broadcasting the marker_map -> *_imu edge.  The relay still
+            # runs its init guard, outlier suppression, and self-calibration
+            # so that the odometry is validated and the static
+            # *_imu -> *_cam0 extrinsics are maintained, but the smoothed
+            # trajectory from GTSAM is what feeds downstream TF consumers
+            # (V6 §6.3).
+            if tf_allowed and self._publish_dynamic_tf:
+                # Stamp with the odom message's timestamp (the time the pose
+                # was observed) so the TF shares the same temporal domain as
+                # the depth clouds.  Chrony keeps clocks synced to <1ms; the
+                # old "10s clock gap" was a chrony-failure symptom, now
+                # resolved.  A sanity guard in _resolve_tf_stamp falls back
+                # to the host clock if the odom stamp is implausible.
+                tf_stamp = self._resolve_tf_stamp(msg)
+                tf_msg = _make_transform(
+                    parent, child, x, y, z, qx, qy, qz, qw,
+                    tf_stamp,
+                )
+                self._tf_broadcaster.sendTransform(tf_msg)
+            elif not self._publish_dynamic_tf:
+                # Dynamic TF disabled — log throttled.
+                count_attr = f"_{name}_count"
+                count = getattr(self, count_attr)
+                count += 1
+                setattr(self, count_attr, count)
+                if count % 200 == 1:
+                    self.get_logger().info(
+                        f"Relay #{count} ({name}): publish_dynamic_tf=False "
+                        f"— deferring {parent} -> {child} to GTSAM tracker"
+                    )
+
+            # Record last TF publish time (even if suppressed by rate limit).
+            # This prevents a burst of suppressed messages from causing a
+            # burst of publishes once the interval elapses.
+            if self._publish_dynamic_tf:  # TF would have been sent if allowed
+                setattr(self, last_tf_attr, now_ns)
 
         # ── Self-calibration attempt (once per camera) ──────────────────
         if (self._self_calibrate and not getattr(self, calibrated_attr)
@@ -488,19 +679,48 @@ class OpenVINSOdomTFRelay(Node):
             self._try_self_calibrate(name, child, cam_frame,
                                      calibrated_attr, actual_imu_attr)
 
-        # Throttled log every 100th message
+        # Throttled log every 100th message (counts *received* odom msgs,
+        # not TF publishes — TF rate is limited by tf_publish_max_hz).
         count_attr = f"_{name}_count"
         count = getattr(self, count_attr)
         count += 1
         setattr(self, count_attr, count)
         if count % 100 == 1:
             self.get_logger().info(
-                f"Relay #{count} ({name}): "
+                f"Relay Rx #{count} ({name}): "
                 f"{parent} -> {child} "
                 f"t=({x:.3f}, {y:.3f}, {z:.3f})"
             )
 
     # ── Periodic status (visible at warn level) ───────────────────────────
+
+    def _resolve_tf_stamp(self, msg: Odometry):
+        """Return the timestamp to use for dynamic TF edges.
+
+        Uses the odom message's header stamp (the time the pose was actually
+        observed on the Jetson) so that the TF shares the same temporal
+        domain as the depth clouds.  Chrony keeps the Jetson and host clocks
+        synced to <1ms, so the odom stamp and host clock are in the same
+        domain and the old "10s clock gap" (a chrony-failure symptom) no
+        longer applies.
+
+        Safety guard: if the odom stamp is implausibly far from the host
+        clock (>2.0s), fall back to the host clock and log a warning.  This
+        catches future chrony failures without crashing the pipeline.
+        """
+        odom_stamp = msg.header.stamp
+        host_now = self.get_clock().now()
+        # Compare seconds + nanoseconds as a float for the sanity check.
+        odom_sec = odom_stamp.sec + odom_stamp.nanosec * 1e-9
+        host_sec = host_now.nanoseconds * 1e-9
+        if abs(odom_sec - host_sec) > 2.0:
+            self.get_logger().warn(
+                f"Odom stamp {odom_sec:.3f} is {abs(odom_sec - host_sec):.1f}s "
+                f"from host clock {host_sec:.3f} — chrony may be broken; "
+                f"falling back to host clock for TF stamp",
+                throttle_duration_sec=5.0)
+            return host_now.to_msg()
+        return odom_stamp
 
     def _status_tick(self):
         """Log a one-line status every 10 seconds, visible at warn level."""

@@ -684,9 +684,17 @@ class TwistPropagationNode(Node):
         self.create_subscription(PointCloud2, input_cloud_topic, self._on_input_cloud, cloud_qos)
         self.create_subscription(PointCloud2, seg_cloud_topic, self._on_segmented_cloud, cloud_qos)
 
-        # Optional odometry subscription for covariance data
+        # Optional odometry subscription for covariance data.
+        # BEST_EFFORT — Jetson relay publishes /jetson/*/odom with BEST_EFFORT
+        # to suppress DDS NACK storms; this subscriber must match.
         if odom_topic:
-            self.create_subscription(Odometry, odom_topic, self._on_odom, 10)
+            odom_qos = QoSProfile(
+                reliability=ReliabilityPolicy.BEST_EFFORT,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=10,
+            )
+            self.create_subscription(
+                Odometry, odom_topic, self._on_odom, odom_qos)
 
         # ── Publishers ─────────────────────────────────────────────────────
         twist_topic = self.get_parameter("hand_twist_topic").value

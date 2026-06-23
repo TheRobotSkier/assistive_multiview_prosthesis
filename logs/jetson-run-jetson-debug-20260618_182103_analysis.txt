@@ -1,0 +1,49 @@
+==============================================================================
+LOG ANALYSIS — jetson-run-jetson-debug-20260618_182103.txt
+==============================================================================
+File:       /home/daniel/multiview_prosthesis/logs/jetson-run-jetson-debug-20260618_182103.txt
+Lines:      9513
+Time span:  18:21:06 – 18:22:11 (65.4s)
+
+Nodes started (6):
+  aruco_marker_pose_node.py                  pid=42
+  dynamic_arm_pose_measurement_node.py       pid=43
+  jetson_relay                               pid=44
+  realsense2_camera_node                     pid=40
+  run_subscribe_msckf_marker                 pid=193
+  tf_throttle                                pid=45
+
+------------------------------------------------------------------------------
+SEVERITY TALLY (per node)
+------------------------------------------------------------------------------
+  NODE                                         ERR   WARN    INFO
+  aruco_marker_pose_node.py                      0     37      54
+  run_subscribe_msckf_marker                     0      3       2
+  dynamic_arm_pose_measurement_node.py           0      2       7
+  tf_throttle                                    0      1       8
+  jetson_relay                                   0      0      12
+  realsense2_camera_node                         0      0       2
+
+------------------------------------------------------------------------------
+KNOWN-FAILURE DIGEST
+------------------------------------------------------------------------------
+  (none of the known failure patterns matched)
+
+------------------------------------------------------------------------------
+DIAGNOSTICS TIMELINE (from [DIAG-*] blocks)
+------------------------------------------------------------------------------
+  (no diagnostics blocks found — was debug_monitor:=true used?)
+
+------------------------------------------------------------------------------
+ERRORS
+------------------------------------------------------------------------------
+  (no [ERROR] lines)
+
+------------------------------------------------------------------------------
+JETSON SYSMON (from native jsonl)
+------------------------------------------------------------------------------
+  Samples:    35
+  CPU:        min=19.4%  avg=75.4%  max=92.6%
+  RAM:        min=16.4%  avg=23.7%  max=24.6%  (total 7619.9 MB)
+  NIC [enP8p1s0]: rx avg=0.7 Mbps  max=5.9 Mbps  tx avg=465.6 Mbps  max=499.8 Mbps
+
