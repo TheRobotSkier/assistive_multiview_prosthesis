@@ -1751,6 +1751,13 @@ def visualize_pyvista(dump: dict, args):
         print("  0  - filter: all types")
         print("  ?  - this help\n")
 
+    # Clear conflicting PyVista default key bindings before registering our own.
+    # PyVista's reset_key_events() pre-registers 'plus'/'minus' to point-size
+    # and 'b' to a VTK widget callback; since add_key_event appends (non-unique),
+    # both would fire simultaneously.  Clear them first so only our handlers run.
+    for _conflict_key in ("plus", "minus", "b"):
+        plotter.iren.clear_events_for_key(_conflict_key)
+
     plotter.add_key_event("t", on_key_t)
     plotter.add_key_event("g", on_key_g)
     plotter.add_key_event("p", on_key_p)
